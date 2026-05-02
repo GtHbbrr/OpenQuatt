@@ -28,6 +28,77 @@
     return renderSettingsFieldCard(fieldKey, title, copy, `<div class="oq-settings-static-value">${escapeHtml(value)}</div>`, className);
   }
 
+  function getSettingsStatValue(key) {
+    const entity = state.entities[key];
+    if (!entity) {
+      return "—";
+    }
+
+    const numeric = Number(entity.value);
+    if (!Number.isNaN(numeric)) {
+      const decimals = Number.isInteger(numeric) ? 0 : 1;
+      return `${numeric.toFixed(decimals)}${entity.uom ? ` ${entity.uom}` : ""}`;
+    }
+
+    const text = String(entity.state ?? entity.value ?? "").trim();
+    return text || "—";
+  }
+
+  function renderSettingsTrendStatsField() {
+    if (!isEntityActive("trendHistoryFlashEnabled")) {
+      return "";
+    }
+
+    const detailStats = [
+      { key: "trendHistoryFlashOldest", label: "Oudste punt" },
+      { key: "trendHistoryFlashNewest", label: "Nieuwste punt" },
+      { key: "trendHistoryFlashLastFlush", label: "Laatste opslag" },
+    ];
+    const availableValue = getSettingsStatValue("trendHistoryFlashAvailable");
+    const newestValue = getSettingsStatValue("trendHistoryFlashNewest");
+    const storageValue = getSettingsStatValue("trendHistoryFlashSize");
+    const writesValue = getSettingsStatValue("trendHistoryFlashWrites");
+
+    const controlMarkup = `
+      <div class="oq-settings-trend-stats-shell">
+        <div class="oq-settings-trend-stats-summary">
+          <div class="oq-settings-trend-stats-summary-copy">
+            <span class="oq-settings-trend-stats-summary-label">Beschikbaar</span>
+            <strong class="oq-settings-trend-stats-summary-value">${escapeHtml(availableValue)}</strong>
+            <p class="oq-settings-trend-stats-summary-note">Nieuwste punt ${escapeHtml(newestValue)}.</p>
+          </div>
+          <div class="oq-settings-trend-stats-badges" aria-label="Flashhistorie statistieken">
+            <div class="oq-settings-trend-stats-badge">
+              <span class="oq-settings-trend-stats-badge-label">Grootte</span>
+              <strong class="oq-settings-trend-stats-badge-value">${escapeHtml(storageValue)}</strong>
+            </div>
+            <div class="oq-settings-trend-stats-badge">
+              <span class="oq-settings-trend-stats-badge-label">Schrijfacties</span>
+              <strong class="oq-settings-trend-stats-badge-value">${escapeHtml(writesValue)}</strong>
+            </div>
+          </div>
+        </div>
+        <div class="oq-settings-trend-stats-grid">
+          ${detailStats.map((stat) => `
+            <div class="oq-settings-trend-stat">
+              <span class="oq-settings-trend-stat-label">${escapeHtml(stat.label)}</span>
+              <strong class="oq-settings-trend-stat-value">${escapeHtml(getSettingsStatValue(stat.key))}</strong>
+            </div>
+          `).join("")}
+        </div>
+      </div>
+    `;
+
+    return renderSettingsFieldCard(
+      "trendHistoryFlashStats",
+      "Flashhistorie",
+      "Overzicht van wat er nu in flash is opgeslagen.",
+      controlMarkup,
+      "oq-settings-field--span-2",
+      `<p class="oq-settings-action-note">Wordt ongeveer elk uur opgeslagen en ook bij herstart of OTA.</p>`,
+    );
+  }
+
   function formatSettingsOptionLabel(option) {
     const value = String(option || "").trim();
     if (!value) {
@@ -146,6 +217,32 @@
         <div class="oq-settings-choice-grid">
           ${renderToggleCard("Uit", !enabled, "off", disabledCopy)}
           ${renderToggleCard("Aan", enabled, "on", enabledCopy)}
+        </div>
+      `,
+      className,
+    );
+  }
+
+  function renderSettingsButtonField(key, title, copy, buttonLabel, action, className = "", options = {}) {
+    const busy = state.loadingEntities || state.busyAction === key;
+    const disabled = options.disabled === true;
+    const buttonClass = options.buttonClass || "oq-helper-button oq-helper-button--ghost";
+    const note = options.note || "";
+    return renderSettingsFieldCard(
+      key,
+      title,
+      copy,
+      `
+        <div class="oq-settings-action-field">
+          <button
+            class="${buttonClass}"
+            type="button"
+            data-oq-action="${escapeHtml(action)}"
+            ${busy || disabled ? "disabled" : ""}
+          >
+            ${escapeHtml(buttonLabel)}
+          </button>
+          ${note ? `<p class="oq-settings-action-note">${escapeHtml(note)}</p>` : ""}
         </div>
       `,
       className,
@@ -1117,16 +1214,38 @@
     return renderSettingsSection(
       "Trends",
       "Trendopslag",
-      "Sla 24 uur aan trenddata tijdelijk op in het werkgeheugen. Zet dit uit als je de grafieken niet gebruikt.",
+      "Bewaar de laatste 7 dagen in werkgeheugen en optioneel tot 30 dagen in flash.",
       `
         <div class="oq-settings-grid">
           ${renderSettingsSwitchField(
             "trendHistoryEnabled",
             "Trendopslag",
             "Schakel de trendopslag voor de grafieken in of uit.",
-            "OpenQuatt bewaart trenddata tijdelijk in het werkgeheugen en toont de Trends-tab.",
+            "OpenQuatt bewaart live trenddata in het werkgeheugen zodat je de grafieken kunt blijven gebruiken.",
             "OpenQuatt bewaart geen trenddata en verbergt de Trends-tab."
           )}
+          ${renderSettingsSwitchField(
+            "trendHistoryFlashEnabled",
+            "Trendhistorie opslaan in flash",
+            "Bewaart trenddata ook na herstart of OTA.",
+            "Trendhistorie wordt bewaard in flash zodat je later verder kunt terugkijken.",
+            "Trendhistorie blijft alleen in het werkgeheugen en is na herstart weg."
+          )}
+          ${renderSettingsButtonField(
+            "trendHistoryFlush",
+            "Trendhistorie nu opslaan",
+            "Schrijf de huidige trendbuffer direct weg naar flash.",
+            "Nu opslaan",
+            "flush-trend-history",
+            "",
+            {
+              disabled: !isEntityActive("trendHistoryFlashEnabled"),
+              note: isEntityActive("trendHistoryFlashEnabled")
+                ? "Handig voor een OTA of een geplande herstart."
+                : "Schakel flashopslag eerst in om de huidige historie te bewaren.",
+            }
+          )}
+          ${renderSettingsTrendStatsField()}
         </div>
       `,
     );
@@ -1267,10 +1386,6 @@
           <div class="oq-settings-system-row">
             <span class="oq-settings-system-row-label">Datum/tijd</span>
             <strong class="oq-settings-system-row-value">${escapeHtml(dateTime)}</strong>
-          </div>
-          <div class="oq-settings-system-row">
-            <span class="oq-settings-system-row-label">ESP-temp</span>
-            <strong class="oq-settings-system-row-value">${escapeHtml(state.entities.espInternalTemp ? formatOverviewStatValue("espInternalTemp") : "—")}</strong>
           </div>
           <div class="oq-settings-system-row oq-settings-system-row--with-action">
             <div class="oq-settings-system-row-copy">

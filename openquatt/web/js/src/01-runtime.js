@@ -1,4 +1,5 @@
-  const TREND_WINDOW_HOURS_OPTIONS = [24, 12, 6, 3];
+  const DEFAULT_TREND_WINDOW_HOURS = 24;
+  const TREND_WINDOW_HOURS_OPTIONS = [3, 12, 24, 72, 168, 336, 720];
 
   const state = {
     mounted: false,
@@ -22,6 +23,8 @@
     trendWindowHours: getStoredTrendWindowHours(),
     trendHistoryRaw: "",
     trendHistoryError: "",
+    trendHistorySignature: "",
+    trendHistoryNowMs: Number.NaN,
     busyAction: "",
     controlError: "",
     controlNotice: "",
@@ -186,14 +189,44 @@
   function getStoredTrendWindowHours() {
     try {
       const stored = Number(window.localStorage.getItem("oq-trend-window-hours"));
-      return TREND_WINDOW_HOURS_OPTIONS.includes(stored) ? stored : TREND_WINDOW_HOURS_OPTIONS[0];
+      return TREND_WINDOW_HOURS_OPTIONS.includes(stored) ? stored : DEFAULT_TREND_WINDOW_HOURS;
     } catch (_error) {
-      return TREND_WINDOW_HOURS_OPTIONS[0];
+      return DEFAULT_TREND_WINDOW_HOURS;
     }
   }
 
+  function isTrendHistoryFlashEnabled() {
+    const entity = state.entities?.trendHistoryFlashEnabled;
+    if (!entity) {
+      return false;
+    }
+    if (typeof entity.value === "boolean") {
+      return entity.value;
+    }
+    const raw = String(entity.state ?? entity.value ?? "").toLowerCase();
+    return raw === "on" || raw === "true" || raw === "1";
+  }
+
+  function getAvailableTrendWindowHoursOptions() {
+    return isTrendHistoryFlashEnabled()
+      ? TREND_WINDOW_HOURS_OPTIONS
+      : TREND_WINDOW_HOURS_OPTIONS.filter((hours) => hours <= 168);
+  }
+
+  function normalizeTrendWindowHours(hours) {
+    const options = getAvailableTrendWindowHoursOptions();
+    const numeric = Number(hours);
+    if (options.includes(numeric)) {
+      return numeric;
+    }
+    if (Number.isFinite(numeric) && numeric > options[options.length - 1]) {
+      return options[options.length - 1];
+    }
+    return options.includes(DEFAULT_TREND_WINDOW_HOURS) ? DEFAULT_TREND_WINDOW_HOURS : options[0];
+  }
+
   function setTrendWindowHours(hours) {
-    state.trendWindowHours = TREND_WINDOW_HOURS_OPTIONS.includes(hours) ? hours : TREND_WINDOW_HOURS_OPTIONS[0];
+    state.trendWindowHours = normalizeTrendWindowHours(hours);
     try {
       window.localStorage.setItem("oq-trend-window-hours", String(state.trendWindowHours));
     } catch (_error) {

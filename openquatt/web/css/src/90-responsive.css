@@ -351,10 +351,19 @@ esp-app.oq-native-app.oq-native-app--collapsed {
   .oq-settings-choice-grid,
   .oq-settings-response-grid,
   .oq-settings-choice-inline-grid,
+  .oq-settings-trend-stats-grid,
   .oq-settings-rule-groups,
   .oq-settings-curve-grid,
   .oq-settings-hp-columns,
   .oq-settings-hp-group-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .oq-settings-trend-stats-summary {
+    flex-direction: column;
+  }
+
+  .oq-settings-trend-stats-badges {
     grid-template-columns: 1fr;
   }
 
