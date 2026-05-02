@@ -812,6 +812,11 @@ body.oq-page-light {
   overflow: auto;
 }
 
+.oq-helper-modal--scrollable {
+  max-height: calc(100svh - 48px);
+  overflow: auto;
+}
+
 .oq-helper-modal-backdrop--quickstart {
   align-items: flex-start;
   padding-top: 24px;
@@ -6507,6 +6512,10 @@ esp-app.oq-native-app.oq-native-app--collapsed {
     padding: 18px;
   }
 
+  .oq-helper-modal--scrollable {
+    max-height: calc(100svh - 24px);
+  }
+
   .oq-helper-modal-grid {
     grid-template-columns: 1fr;
   }
@@ -6533,6 +6542,11 @@ esp-app.oq-native-app.oq-native-app--collapsed {
 
   .oq-settings-backup-modal-grid {
     grid-template-columns: 1fr;
+  }
+
+  .oq-settings-backup-modal-section,
+  .oq-settings-backup-stat {
+    min-width: 0;
   }
 
   .oq-settings-installation-summary button,
