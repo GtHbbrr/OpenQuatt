@@ -125,7 +125,7 @@
       return;
     }
     entity.value = Boolean(value);
-    entity.state = "";
+    entity.state = Boolean(value);
   }
 
   function isSwitchEnabled(name) {
@@ -363,6 +363,7 @@
     setEntity("text_sensor", "OpenQuatt Release Channel", { state: "dev", value: "dev" });
     setEntity("sensor", "Uptime", { value: 0, uom: "h" });
     syncUptimeEntity();
+    setEntity("sensor", "ESP Internal Temperature", { value: 37.8, uom: "°C" });
     setEntity("sensor", "Firmware Update Progress", { value: 0, uom: "%" });
     setEntity("text_sensor", "Firmware Update Status", { state: "Idle", value: "Idle" });
     setEntity("button", "Trendhistorie nu opslaan", { state: "" });
@@ -381,7 +382,7 @@
       summary: "Nieuwe firmware met verdere UI- en regelingverbeteringen staat klaar voor deze preview.",
       release_url: getMockReleaseUrl("dev"),
     });
-    setEntity("binary_sensor", "Setup Complete", { value: state.complete });
+    setEntity("binary_sensor", "Setup Complete", { value: state.complete, state: state.complete });
     setEntity("select", "Heating Control Mode", {
       value: "Power House",
       state: "Power House",

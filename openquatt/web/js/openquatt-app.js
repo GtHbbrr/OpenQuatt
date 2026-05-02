@@ -4488,23 +4488,43 @@ const HP_GENERATION_IMAGE_V2 = "data:image/webp;base64,UklGRgoWAABXRUJQVlA4WAoAA
       return "";
     }
 
-    const stats = [
-      { key: "trendHistoryFlashAvailable", label: "Beschikbaar" },
+    const detailStats = [
       { key: "trendHistoryFlashOldest", label: "Oudste punt" },
       { key: "trendHistoryFlashNewest", label: "Nieuwste punt" },
       { key: "trendHistoryFlashLastFlush", label: "Laatste opslag" },
-      { key: "trendHistoryFlashSize", label: "Grootte" },
-      { key: "trendHistoryFlashWrites", label: "Schrijfacties" },
     ];
+    const availableValue = getSettingsStatValue("trendHistoryFlashAvailable");
+    const newestValue = getSettingsStatValue("trendHistoryFlashNewest");
+    const storageValue = getSettingsStatValue("trendHistoryFlashSize");
+    const writesValue = getSettingsStatValue("trendHistoryFlashWrites");
 
     const controlMarkup = `
-      <div class="oq-settings-trend-stats-grid">
-        ${stats.map((stat) => `
-          <div class="oq-settings-trend-stat">
-            <span class="oq-settings-trend-stat-label">${escapeHtml(stat.label)}</span>
-            <strong class="oq-settings-trend-stat-value">${escapeHtml(getSettingsStatValue(stat.key))}</strong>
+      <div class="oq-settings-trend-stats-shell">
+        <div class="oq-settings-trend-stats-summary">
+          <div class="oq-settings-trend-stats-summary-copy">
+            <span class="oq-settings-trend-stats-summary-label">Beschikbaar</span>
+            <strong class="oq-settings-trend-stats-summary-value">${escapeHtml(availableValue)}</strong>
+            <p class="oq-settings-trend-stats-summary-note">Nieuwste punt ${escapeHtml(newestValue)}.</p>
           </div>
-        `).join("")}
+          <div class="oq-settings-trend-stats-badges" aria-label="Flashhistorie statistieken">
+            <div class="oq-settings-trend-stats-badge">
+              <span class="oq-settings-trend-stats-badge-label">Grootte</span>
+              <strong class="oq-settings-trend-stats-badge-value">${escapeHtml(storageValue)}</strong>
+            </div>
+            <div class="oq-settings-trend-stats-badge">
+              <span class="oq-settings-trend-stats-badge-label">Schrijfacties</span>
+              <strong class="oq-settings-trend-stats-badge-value">${escapeHtml(writesValue)}</strong>
+            </div>
+          </div>
+        </div>
+        <div class="oq-settings-trend-stats-grid">
+          ${detailStats.map((stat) => `
+            <div class="oq-settings-trend-stat">
+              <span class="oq-settings-trend-stat-label">${escapeHtml(stat.label)}</span>
+              <strong class="oq-settings-trend-stat-value">${escapeHtml(getSettingsStatValue(stat.key))}</strong>
+            </div>
+          `).join("")}
+        </div>
       </div>
     `;
 
