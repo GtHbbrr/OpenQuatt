@@ -857,7 +857,8 @@ void OpenQuattTrends::write_samples_for_history_(AsyncResponseStream *stream, ui
     return should_emit;
   };
 
-  if (this->flash_enabled_ && this->flash_archive_scanned_) {
+  const bool needs_flash_archive = window_hours > (RAM_WINDOW_MS / (60UL * 60UL * 1000UL));
+  if (needs_flash_archive && this->flash_enabled_ && this->flash_archive_scanned_) {
     for (const auto &info : this->flash_blocks_) {
       if (info.end_timestamp_ms < cutoff_ms) {
         continue;
