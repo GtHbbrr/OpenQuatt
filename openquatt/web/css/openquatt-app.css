@@ -3036,6 +3036,47 @@ body.oq-page-light {
   color: #f8fafc;
 }
 
+.oq-settings-trend-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+}
+
+.oq-settings-trend-stat {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid var(--oq-helper-line);
+  background: rgba(255, 255, 255, 0.76);
+}
+
+.oq-helper-shell--dark .oq-settings-trend-stat {
+  background: rgba(15, 23, 42, 0.28);
+}
+
+.oq-settings-trend-stat-label {
+  color: var(--oq-helper-soft);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.oq-settings-trend-stat-value {
+  color: var(--oq-helper-ink);
+  font-size: 1.05rem;
+  line-height: 1.3;
+  letter-spacing: -0.02em;
+  overflow-wrap: anywhere;
+}
+
+.oq-helper-shell--dark .oq-settings-trend-stat-value {
+  color: #f8fafc;
+}
+
 .oq-settings-field-control {
   min-width: 0;
 }

@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 #include <cstring>
 
 #include "esphome/core/log.h"
@@ -365,6 +366,9 @@ bool OpenQuattTrends::scan_flash_archive_() {
     FlashBlockInfo info{};
     info.sequence = header.sequence;
     info.start_timestamp_ms = header.start_timestamp_ms;
+    const size_t last_sample_index = header.sample_count > 0 ? static_cast<size_t>(header.sample_count - 1) : 0;
+    info.end_timestamp_ms = samples[last_sample_index].timestamp_ms;
+    info.flush_timestamp_ms = header.reserved > 0 ? static_cast<uint64_t>(header.reserved) * 1000ULL : 0ULL;
     info.sample_count = header.sample_count;
     info.slot_index = static_cast<uint32_t>(slot);
     this->flash_blocks_.push_back(info);
@@ -372,7 +376,6 @@ bool OpenQuattTrends::scan_flash_archive_() {
     any_valid = true;
     if (header.sequence >= highest_sequence) {
       highest_sequence = header.sequence;
-      const size_t last_sample_index = header.sample_count > 0 ? static_cast<size_t>(header.sample_count - 1) : 0;
       this->flash_latest_timestamp_ms_ = samples[last_sample_index].timestamp_ms;
     }
   }
@@ -517,6 +520,7 @@ bool OpenQuattTrends::write_flash_block_(const FlashBlockBuilder &builder) {
   header.start_timestamp_ms = builder.start_timestamp_ms;
   header.payload_bytes = static_cast<uint32_t>(builder.sample_count * sizeof(TrendSample));
   header.crc32 = crc32_(reinterpret_cast<const uint8_t *>(builder.samples.data()), header.payload_bytes);
+  header.reserved = static_cast<uint32_t>(this->current_time_ms_() / 1000ULL);
   std::memcpy(slot_buffer.data(), &header, sizeof(header));
   std::memcpy(slot_buffer.data() + sizeof(header), builder.samples.data(), header.payload_bytes);
 
@@ -529,6 +533,9 @@ bool OpenQuattTrends::write_flash_block_(const FlashBlockBuilder &builder) {
   FlashBlockInfo info{};
   info.sequence = builder.sequence;
   info.start_timestamp_ms = builder.start_timestamp_ms;
+  const size_t last_sample_index = builder.sample_count > 0 ? static_cast<size_t>(builder.sample_count - 1) : 0;
+  info.end_timestamp_ms = builder.samples[last_sample_index].timestamp_ms;
+  info.flush_timestamp_ms = static_cast<uint64_t>(header.reserved) * 1000ULL;
   info.sample_count = builder.sample_count;
   info.slot_index = slot_index;
 
@@ -546,7 +553,6 @@ bool OpenQuattTrends::write_flash_block_(const FlashBlockBuilder &builder) {
     return a.slot_index < b.slot_index;
   });
 
-  const size_t last_sample_index = builder.sample_count > 0 ? static_cast<size_t>(builder.sample_count - 1) : 0;
   this->flash_latest_timestamp_ms_ = builder.samples[last_sample_index].timestamp_ms;
   this->next_flash_sequence_ = builder.sequence + 1U;
   this->flash_dirty_ = false;
@@ -702,6 +708,108 @@ void OpenQuattTrends::update_flash_metadata_(uint64_t latest_timestamp_ms) {
   this->flash_latest_timestamp_ms_ = latest_timestamp_ms;
 }
 
+uint64_t OpenQuattTrends::get_flash_oldest_timestamp_ms_() const {
+  if (this->flash_blocks_.empty()) {
+    return 0;
+  }
+  return this->flash_blocks_.front().start_timestamp_ms;
+}
+
+uint64_t OpenQuattTrends::get_flash_newest_timestamp_ms_() const {
+  if (this->flash_latest_timestamp_ms_ > 0) {
+    return this->flash_latest_timestamp_ms_;
+  }
+  if (this->flash_blocks_.empty()) {
+    return 0;
+  }
+  return this->flash_blocks_.back().end_timestamp_ms;
+}
+
+uint64_t OpenQuattTrends::get_flash_last_flush_timestamp_ms_() const {
+  if (this->flash_blocks_.empty()) {
+    return 0;
+  }
+
+  const FlashBlockInfo &latest = this->flash_blocks_.back();
+  if (latest.flush_timestamp_ms > 0) {
+    return latest.flush_timestamp_ms;
+  }
+  return latest.end_timestamp_ms;
+}
+
+std::string OpenQuattTrends::format_flash_absolute_time_(uint64_t timestamp_ms) const {
+  if (timestamp_ms == 0) {
+    return "Nog niet";
+  }
+
+  if (!this->time_is_valid_()) {
+    return "Wacht op tijdsync";
+  }
+
+  auto formatted = ESPTime::from_epoch_local(static_cast<time_t>(timestamp_ms / 1000ULL)).strftime("%d-%m %H:%M");
+  return formatted.empty() || formatted == "ERROR" ? "—" : formatted;
+}
+
+std::string OpenQuattTrends::format_flash_relative_age_(uint64_t timestamp_ms) const {
+  if (timestamp_ms == 0) {
+    return "Nog leeg";
+  }
+
+  const uint64_t now_ms = this->current_time_ms_();
+  if (now_ms <= timestamp_ms) {
+    return "Zojuist";
+  }
+
+  const uint64_t age_minutes = (now_ms - timestamp_ms) / (60ULL * 1000ULL);
+  if (age_minutes < 1) {
+    return "Zojuist";
+  }
+  if (age_minutes < 60) {
+    char buffer[32];
+    std::snprintf(buffer, sizeof(buffer), "%llu min geleden", static_cast<unsigned long long>(age_minutes));
+    return buffer;
+  }
+
+  const uint64_t age_hours = age_minutes / 60ULL;
+  if (age_hours < 24) {
+    char buffer[32];
+    std::snprintf(buffer, sizeof(buffer), "%llu u geleden", static_cast<unsigned long long>(age_hours));
+    return buffer;
+  }
+
+  const uint64_t age_days = age_hours / 24ULL;
+  char buffer[32];
+  std::snprintf(buffer, sizeof(buffer), "%llu d geleden", static_cast<unsigned long long>(age_days));
+  return buffer;
+}
+
+std::string OpenQuattTrends::format_flash_available_span_(uint64_t oldest_timestamp_ms, uint64_t newest_timestamp_ms) const {
+  if (oldest_timestamp_ms == 0 || newest_timestamp_ms == 0 || newest_timestamp_ms <= oldest_timestamp_ms) {
+    return "Nog leeg";
+  }
+
+  const float span_days = static_cast<float>(newest_timestamp_ms - oldest_timestamp_ms) / static_cast<float>(24ULL * 60ULL * 60ULL * 1000ULL);
+  if (span_days >= 1.0f) {
+    char buffer[24];
+    std::snprintf(buffer, sizeof(buffer), "%.1f dagen", span_days);
+    std::string value(buffer);
+    std::replace(value.begin(), value.end(), '.', ',');
+    return value;
+  }
+
+  const uint64_t span_hours = (newest_timestamp_ms - oldest_timestamp_ms) / (60ULL * 60ULL * 1000ULL);
+  if (span_hours >= 1) {
+    char buffer[24];
+    std::snprintf(buffer, sizeof(buffer), "%llu uur", static_cast<unsigned long long>(span_hours));
+    return buffer;
+  }
+
+  const uint64_t span_minutes = (newest_timestamp_ms - oldest_timestamp_ms) / (60ULL * 1000ULL);
+  char buffer[24];
+  std::snprintf(buffer, sizeof(buffer), "%llu min", static_cast<unsigned long long>(span_minutes));
+  return buffer;
+}
+
 void OpenQuattTrends::write_sample_line_(AsyncResponseStream *stream, const TrendSample &sample) const {
   const float outside = decode_temp_(sample.values.outside_c_x10);
   const float supply = decode_temp_(sample.values.supply_c_x10);
@@ -783,6 +891,45 @@ void OpenQuattTrends::write_history(AsyncResponseStream *stream, uint32_t window
   const uint64_t now_ms = this->current_time_ms_();
   stream->printf("@now|%llu\n", static_cast<unsigned long long>(now_ms));
   this->write_samples_for_history_(stream, window_hours);
+}
+
+std::string OpenQuattTrends::get_flash_available_label() const {
+  if (this->flash_partition_ == nullptr) {
+    return "Niet beschikbaar";
+  }
+
+  const uint64_t oldest_timestamp_ms = this->get_flash_oldest_timestamp_ms_();
+  const uint64_t newest_timestamp_ms = this->get_flash_newest_timestamp_ms_();
+  return this->format_flash_available_span_(oldest_timestamp_ms, newest_timestamp_ms);
+}
+
+std::string OpenQuattTrends::get_flash_oldest_point_label() const {
+  if (this->flash_partition_ == nullptr) {
+    return "—";
+  }
+  return this->format_flash_absolute_time_(this->get_flash_oldest_timestamp_ms_());
+}
+
+std::string OpenQuattTrends::get_flash_newest_point_label() const {
+  if (this->flash_partition_ == nullptr) {
+    return "—";
+  }
+  return this->format_flash_relative_age_(this->get_flash_newest_timestamp_ms_());
+}
+
+std::string OpenQuattTrends::get_flash_last_flush_label() const {
+  if (this->flash_partition_ == nullptr) {
+    return "—";
+  }
+  return this->format_flash_absolute_time_(this->get_flash_last_flush_timestamp_ms_());
+}
+
+float OpenQuattTrends::get_flash_storage_kib() const {
+  return static_cast<float>(this->flash_blocks_.size() * FLASH_SLOT_SIZE) / 1024.0f;
+}
+
+uint32_t OpenQuattTrends::get_flash_write_count() const {
+  return this->next_flash_sequence_;
 }
 
 }  // namespace openquatt_trends

@@ -2,6 +2,7 @@
 
 #include <array>
 #include <cstdint>
+#include <string>
 #include <vector>
 
 #include "esp_partition.h"
@@ -31,6 +32,12 @@ class OpenQuattTrends : public Component {
   bool force_flush();
   void clear_history();
   void write_history(AsyncResponseStream *stream, uint32_t window_hours);
+  std::string get_flash_available_label() const;
+  std::string get_flash_oldest_point_label() const;
+  std::string get_flash_newest_point_label() const;
+  std::string get_flash_last_flush_label() const;
+  float get_flash_storage_kib() const;
+  uint32_t get_flash_write_count() const;
 
  protected:
   static constexpr uint32_t TAG_MAGIC = 0x4F545247;  // "OTRG"
@@ -79,6 +86,8 @@ class OpenQuattTrends : public Component {
   struct FlashBlockInfo {
     uint32_t sequence{0};
     uint64_t start_timestamp_ms{0};
+    uint64_t end_timestamp_ms{0};
+    uint64_t flush_timestamp_ms{0};
     uint16_t sample_count{0};
     uint32_t slot_index{0};
   };
@@ -136,6 +145,12 @@ class OpenQuattTrends : public Component {
   uint32_t get_window_stride_(uint32_t window_hours) const;
   uint64_t get_latest_archive_timestamp_ms_() const;
   void update_flash_metadata_(uint64_t latest_timestamp_ms);
+  uint64_t get_flash_oldest_timestamp_ms_() const;
+  uint64_t get_flash_newest_timestamp_ms_() const;
+  uint64_t get_flash_last_flush_timestamp_ms_() const;
+  std::string format_flash_absolute_time_(uint64_t timestamp_ms) const;
+  std::string format_flash_relative_age_(uint64_t timestamp_ms) const;
+  std::string format_flash_available_span_(uint64_t oldest_timestamp_ms, uint64_t newest_timestamp_ms) const;
 
   switch_::Switch *capture_switch_{nullptr};
   switch_::Switch *flash_switch_{nullptr};

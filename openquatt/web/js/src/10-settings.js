@@ -28,6 +28,57 @@
     return renderSettingsFieldCard(fieldKey, title, copy, `<div class="oq-settings-static-value">${escapeHtml(value)}</div>`, className);
   }
 
+  function getSettingsStatValue(key) {
+    const entity = state.entities[key];
+    if (!entity) {
+      return "—";
+    }
+
+    const numeric = Number(entity.value);
+    if (!Number.isNaN(numeric)) {
+      const decimals = Number.isInteger(numeric) ? 0 : 1;
+      return `${numeric.toFixed(decimals)}${entity.uom ? ` ${entity.uom}` : ""}`;
+    }
+
+    const text = String(entity.state ?? entity.value ?? "").trim();
+    return text || "—";
+  }
+
+  function renderSettingsTrendStatsField() {
+    if (!isEntityActive("trendHistoryFlashEnabled")) {
+      return "";
+    }
+
+    const stats = [
+      { key: "trendHistoryFlashAvailable", label: "Beschikbaar" },
+      { key: "trendHistoryFlashOldest", label: "Oudste punt" },
+      { key: "trendHistoryFlashNewest", label: "Nieuwste punt" },
+      { key: "trendHistoryFlashLastFlush", label: "Laatste opslag" },
+      { key: "trendHistoryFlashSize", label: "Grootte" },
+      { key: "trendHistoryFlashWrites", label: "Schrijfacties" },
+    ];
+
+    const controlMarkup = `
+      <div class="oq-settings-trend-stats-grid">
+        ${stats.map((stat) => `
+          <div class="oq-settings-trend-stat">
+            <span class="oq-settings-trend-stat-label">${escapeHtml(stat.label)}</span>
+            <strong class="oq-settings-trend-stat-value">${escapeHtml(getSettingsStatValue(stat.key))}</strong>
+          </div>
+        `).join("")}
+      </div>
+    `;
+
+    return renderSettingsFieldCard(
+      "trendHistoryFlashStats",
+      "Flashhistorie",
+      "Overzicht van wat er nu in flash is opgeslagen.",
+      controlMarkup,
+      "oq-settings-field--span-2",
+      `<p class="oq-settings-action-note">Wordt ongeveer elk uur opgeslagen en ook bij herstart of OTA.</p>`,
+    );
+  }
+
   function formatSettingsOptionLabel(option) {
     const value = String(option || "").trim();
     if (!value) {
@@ -1174,6 +1225,7 @@
                 : "Schakel flashopslag eerst in om de huidige historie te bewaren.",
             }
           )}
+          ${renderSettingsTrendStatsField()}
         </div>
       `,
     );

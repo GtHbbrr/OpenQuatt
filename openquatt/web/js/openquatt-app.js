@@ -167,6 +167,12 @@
     trendHistoryEnabled: { domain: "switch", name: "Trendopslag", optional: true },
     trendHistoryFlashEnabled: { domain: "switch", name: "Trendhistorie opslaan in flash", optional: true },
     trendHistoryFlush: { domain: "button", name: "Trendhistorie nu opslaan", optional: true },
+    trendHistoryFlashAvailable: { domain: "text_sensor", name: "Trendhistorie beschikbaar", optional: true },
+    trendHistoryFlashOldest: { domain: "text_sensor", name: "Trendhistorie oudste punt", optional: true },
+    trendHistoryFlashNewest: { domain: "text_sensor", name: "Trendhistorie nieuwste punt", optional: true },
+    trendHistoryFlashLastFlush: { domain: "text_sensor", name: "Trendhistorie laatste opslag", optional: true },
+    trendHistoryFlashSize: { domain: "sensor", name: "Trendhistorie grootte", optional: true },
+    trendHistoryFlashWrites: { domain: "sensor", name: "Trendhistorie schrijfacties", optional: true },
     electricalEnergyDaily: { domain: "sensor", name: "Electrical Energy Daily", optional: true },
     electricalEnergyCumulative: { domain: "sensor", name: "Electrical Energy Cumulative", optional: true },
     heatingElectricalEnergyDaily: { domain: "sensor", name: "Heating Electrical Energy Daily", optional: true },
@@ -578,6 +584,12 @@
     "silentModeOverride",
     "trendHistoryEnabled",
     "trendHistoryFlashEnabled",
+    "trendHistoryFlashAvailable",
+    "trendHistoryFlashOldest",
+    "trendHistoryFlashNewest",
+    "trendHistoryFlashLastFlush",
+    "trendHistoryFlashSize",
+    "trendHistoryFlashWrites",
     ...CIC_COMPATIBILITY_KEYS,
     ...FLOW_SETTING_KEYS,
     ...COOLING_SETTING_KEYS,
@@ -4354,7 +4366,7 @@
   function isTrendHistoryEnabled() {
     return !hasEntity("trendHistoryEnabled") || isEntityActive("trendHistoryEnabled");
   }
-  
+
   function getSetupCompleteState() {
     const entity = state.entities.setupComplete;
     if (!entity) {
@@ -4453,6 +4465,57 @@ const HP_GENERATION_IMAGE_V2 = "data:image/webp;base64,UklGRgoWAABXRUJQVlA4WAoAA
 
   function renderSettingsStaticField(fieldKey, title, copy, value, className = "") {
     return renderSettingsFieldCard(fieldKey, title, copy, `<div class="oq-settings-static-value">${escapeHtml(value)}</div>`, className);
+  }
+
+  function getSettingsStatValue(key) {
+    const entity = state.entities[key];
+    if (!entity) {
+      return "—";
+    }
+
+    const numeric = Number(entity.value);
+    if (!Number.isNaN(numeric)) {
+      const decimals = Number.isInteger(numeric) ? 0 : 1;
+      return `${numeric.toFixed(decimals)}${entity.uom ? ` ${entity.uom}` : ""}`;
+    }
+
+    const text = String(entity.state ?? entity.value ?? "").trim();
+    return text || "—";
+  }
+
+  function renderSettingsTrendStatsField() {
+    if (!isEntityActive("trendHistoryFlashEnabled")) {
+      return "";
+    }
+
+    const stats = [
+      { key: "trendHistoryFlashAvailable", label: "Beschikbaar" },
+      { key: "trendHistoryFlashOldest", label: "Oudste punt" },
+      { key: "trendHistoryFlashNewest", label: "Nieuwste punt" },
+      { key: "trendHistoryFlashLastFlush", label: "Laatste opslag" },
+      { key: "trendHistoryFlashSize", label: "Grootte" },
+      { key: "trendHistoryFlashWrites", label: "Schrijfacties" },
+    ];
+
+    const controlMarkup = `
+      <div class="oq-settings-trend-stats-grid">
+        ${stats.map((stat) => `
+          <div class="oq-settings-trend-stat">
+            <span class="oq-settings-trend-stat-label">${escapeHtml(stat.label)}</span>
+            <strong class="oq-settings-trend-stat-value">${escapeHtml(getSettingsStatValue(stat.key))}</strong>
+          </div>
+        `).join("")}
+      </div>
+    `;
+
+    return renderSettingsFieldCard(
+      "trendHistoryFlashStats",
+      "Flashhistorie",
+      "Overzicht van wat er nu in flash is opgeslagen.",
+      controlMarkup,
+      "oq-settings-field--span-2",
+      `<p class="oq-settings-action-note">Wordt ongeveer elk uur opgeslagen en ook bij herstart of OTA.</p>`,
+    );
   }
 
   function formatSettingsOptionLabel(option) {
@@ -5601,6 +5664,7 @@ const HP_GENERATION_IMAGE_V2 = "data:image/webp;base64,UklGRgoWAABXRUJQVlA4WAoAA
                 : "Schakel flashopslag eerst in om de huidige historie te bewaren.",
             }
           )}
+          ${renderSettingsTrendStatsField()}
         </div>
       `,
     );

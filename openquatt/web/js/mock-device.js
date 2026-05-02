@@ -19,6 +19,11 @@
       csrfToken: "",
       recoveryUntil: 0,
     },
+    trendFlashWrites: 437,
+    trendFlashStoredKiB: 182.5,
+    trendFlashOldestAt: Date.now() - Math.round(18.4 * 24 * 60 * 60 * 1000),
+    trendFlashNewestAt: Date.now() - (2 * 60 * 1000),
+    trendFlashLastFlushAt: Date.now() - (12 * 60 * 1000),
   };
 
   const HP2_ENTITIES = [
@@ -361,6 +366,12 @@
     setEntity("sensor", "Firmware Update Progress", { value: 0, uom: "%" });
     setEntity("text_sensor", "Firmware Update Status", { state: "Idle", value: "Idle" });
     setEntity("button", "Trendhistorie nu opslaan", { state: "" });
+    setEntity("text_sensor", "Trendhistorie beschikbaar", { state: "18,4 dagen", value: "18,4 dagen" });
+    setEntity("text_sensor", "Trendhistorie oudste punt", { state: "14-04 06:00", value: "14-04 06:00" });
+    setEntity("text_sensor", "Trendhistorie nieuwste punt", { state: "2 min geleden", value: "2 min geleden" });
+    setEntity("text_sensor", "Trendhistorie laatste opslag", { state: "02-05 11:35", value: "02-05 11:35" });
+    setEntity("sensor", "Trendhistorie grootte", { value: 182.5, uom: "kB" });
+    setEntity("sensor", "Trendhistorie schrijfacties", { value: 437 });
     setEntity("update", "Firmware Update", {
       state: "available",
       value: "available",
@@ -625,6 +636,7 @@
   }
 
   function notifyMockUpdated() {
+    updateTrendFlashStats();
     syncDevMeta();
     window.dispatchEvent(new Event("oq-mock-updated"));
   }
@@ -694,6 +706,52 @@
     }
 
     return samples;
+  }
+
+  function formatTrendFlashDate(date) {
+    const day = String(date.getDate()).padStart(2, "0");
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const hours = String(date.getHours()).padStart(2, "0");
+    const minutes = String(date.getMinutes()).padStart(2, "0");
+    return `${day}-${month} ${hours}:${minutes}`;
+  }
+
+  function formatTrendFlashAge(fromMs, toMs = Date.now()) {
+    const deltaMinutes = Math.max(0, Math.round((toMs - fromMs) / 60000));
+    if (deltaMinutes < 1) {
+      return "Zojuist";
+    }
+    if (deltaMinutes < 60) {
+      return `${deltaMinutes} min geleden`;
+    }
+    const deltaHours = Math.round(deltaMinutes / 60);
+    if (deltaHours < 24) {
+      return `${deltaHours} u geleden`;
+    }
+    return `${Math.round(deltaHours / 24)} d geleden`;
+  }
+
+  function updateTrendFlashStats() {
+    if (!getEntity("text_sensor", "Trendhistorie beschikbaar")) {
+      return;
+    }
+
+    if (!isSwitchEnabled("Trendhistorie opslaan in flash")) {
+      setText("text_sensor", "Trendhistorie beschikbaar", "Nog leeg");
+      setText("text_sensor", "Trendhistorie oudste punt", "Nog niet");
+      setText("text_sensor", "Trendhistorie nieuwste punt", "Nog leeg");
+      setText("text_sensor", "Trendhistorie laatste opslag", "Nog niet");
+      setNumber("Trendhistorie grootte", 0, "kB");
+      setNumber("Trendhistorie schrijfacties", 0, "");
+      return;
+    }
+
+    setText("text_sensor", "Trendhistorie beschikbaar", "18,4 dagen");
+    setText("text_sensor", "Trendhistorie oudste punt", formatTrendFlashDate(new Date(state.trendFlashOldestAt)));
+    setText("text_sensor", "Trendhistorie nieuwste punt", formatTrendFlashAge(state.trendFlashNewestAt));
+    setText("text_sensor", "Trendhistorie laatste opslag", formatTrendFlashDate(new Date(state.trendFlashLastFlushAt)));
+    setNumber("Trendhistorie grootte", state.trendFlashStoredKiB, "kB");
+    setNumber("Trendhistorie schrijfacties", state.trendFlashWrites, "");
   }
 
   function applyPreset(value) {
@@ -1275,6 +1333,11 @@
         updateEntity.state = currentVersion === latestVersion ? "up_to_date" : "available";
         updateEntity.value = updateEntity.state;
       }
+    } else if (name === "Trendhistorie nu opslaan") {
+      state.trendFlashLastFlushAt = Date.now();
+      state.trendFlashNewestAt = Date.now() - (2 * 60 * 1000);
+      state.trendFlashWrites += 1;
+      state.trendFlashStoredKiB = Math.min(360, Number((state.trendFlashStoredKiB + 0.5).toFixed(1)));
     }
     updateSummary();
     notifyMockUpdated();

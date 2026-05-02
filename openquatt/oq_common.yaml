@@ -476,6 +476,33 @@ sensor:
     web_server:
       sorting_group_id: oq_system_diagnostics
 
+  - platform: template
+    id: oq_trend_history_flash_size
+    name: Trendhistorie grootte
+    disabled_by_default: true
+    icon: mdi:database-outline
+    unit_of_measurement: kB
+    accuracy_decimals: 1
+    update_interval: 60s
+    entity_category: diagnostic
+    lambda: |-
+      return id(oq_trends_endpoint).get_flash_storage_kib();
+    web_server:
+      sorting_group_id: oq_system_diagnostics
+
+  - platform: template
+    id: oq_trend_history_flash_writes
+    name: Trendhistorie schrijfacties
+    disabled_by_default: true
+    icon: mdi:pencil-box-multiple-outline
+    accuracy_decimals: 0
+    update_interval: 60s
+    entity_category: diagnostic
+    lambda: |-
+      return id(oq_trends_endpoint).get_flash_write_count();
+    web_server:
+      sorting_group_id: oq_system_diagnostics
+
 text_sensor:
   - platform: wifi_info
     ip_address:
@@ -516,6 +543,55 @@ text_sensor:
       }
     web_server:
       sorting_group_id: oq_system_diagnostics
+
+  - platform: template
+    id: oq_trend_history_flash_available
+    name: Trendhistorie beschikbaar
+    disabled_by_default: true
+    icon: mdi:calendar-range
+    entity_category: diagnostic
+    update_interval: 60s
+    lambda: |-
+      return id(oq_trends_endpoint).get_flash_available_label();
+    web_server:
+      sorting_group_id: oq_system_diagnostics
+
+  - platform: template
+    id: oq_trend_history_flash_oldest
+    name: Trendhistorie oudste punt
+    disabled_by_default: true
+    icon: mdi:calendar-start
+    entity_category: diagnostic
+    update_interval: 60s
+    lambda: |-
+      return id(oq_trends_endpoint).get_flash_oldest_point_label();
+    web_server:
+      sorting_group_id: oq_system_diagnostics
+
+  - platform: template
+    id: oq_trend_history_flash_newest
+    name: Trendhistorie nieuwste punt
+    disabled_by_default: true
+    icon: mdi:clock-end
+    entity_category: diagnostic
+    update_interval: 60s
+    lambda: |-
+      return id(oq_trends_endpoint).get_flash_newest_point_label();
+    web_server:
+      sorting_group_id: oq_system_diagnostics
+
+  - platform: template
+    id: oq_trend_history_flash_last_flush
+    name: Trendhistorie laatste opslag
+    disabled_by_default: true
+    icon: mdi:content-save-clock-outline
+    entity_category: diagnostic
+    update_interval: 60s
+    lambda: |-
+      return id(oq_trends_endpoint).get_flash_last_flush_label();
+    web_server:
+      sorting_group_id: oq_system_diagnostics
+
   - platform: template
     id: oq_project_version_text
     name: OpenQuatt Version
