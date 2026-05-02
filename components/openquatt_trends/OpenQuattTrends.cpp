@@ -834,10 +834,7 @@ void OpenQuattTrends::write_sample_line_(AsyncResponseStream *stream, const Tren
 void OpenQuattTrends::write_samples_for_history_(AsyncResponseStream *stream, uint32_t window_hours) {
   const uint64_t cutoff_ms = this->get_window_cutoff_ms_(window_hours);
   const uint32_t stride = this->get_window_stride_(window_hours);
-  const uint64_t flash_latest = this->flash_enabled_ && this->flash_archive_scanned_
-                                   ? this->get_latest_archive_timestamp_ms_()
-                                   : 0ULL;
-  const uint64_t ram_cutoff = flash_latest > 0 ? std::max(cutoff_ms, flash_latest + 1ULL) : cutoff_ms;
+  uint64_t emitted_flash_latest = 0;
 
   uint64_t window_index = 0;
   bool has_last_sample = false;
@@ -871,10 +868,14 @@ void OpenQuattTrends::write_samples_for_history_(AsyncResponseStream *stream, ui
       }
       for (const auto &sample : block_samples) {
         emit_sample(sample, false);
+        if (sample.timestamp_ms >= cutoff_ms && sample.timestamp_ms > emitted_flash_latest) {
+          emitted_flash_latest = sample.timestamp_ms;
+        }
       }
     }
   }
 
+  const uint64_t ram_cutoff = emitted_flash_latest > 0 ? std::max(cutoff_ms, emitted_flash_latest + 1ULL) : cutoff_ms;
   const auto ram_samples = this->collect_ram_samples_();
   for (const auto &sample : ram_samples) {
     if (sample.timestamp_ms < ram_cutoff) {
