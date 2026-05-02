@@ -87,9 +87,9 @@ void OpenQuattTrends::setup() {
     return;
   }
 
-  this->flash_partition_ = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_ANY, "trenddata");
+  this->flash_partition_ = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_ANY, "openquatt_data");
   if (this->flash_partition_ == nullptr) {
-    ESP_LOGW(TAG, "Trend flash partition 'trenddata' not found");
+    ESP_LOGW(TAG, "Trend flash partition 'openquatt_data' not found");
   }
 
   if (this->flash_switch_ != nullptr) {
