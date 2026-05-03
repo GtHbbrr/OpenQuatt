@@ -399,29 +399,11 @@ function renderWebServerLogEntries(entries = state.webServerLogEntries) {
 }
 
 function renderWebServerLogStatusBanner() {
-  if (isWebServerLogDemoMode()) {
-    return `
-      <div class="oq-helper-modal-success oq-helper-modal-success--compact">
-        <strong>Voorbeeldlog</strong>
-        <span>De lokale preview vult deze lijst met voorbeeldmeldingen en bewaart ze zolang de app open is.</span>
-      </div>
-    `;
-  }
-
   if (state.webServerLogError) {
     return `<p class="oq-helper-modal-note oq-helper-modal-note--error">${escapeHtml(state.webServerLogError)}</p>`;
   }
 
-  if (state.webServerLogConnected || state.webServerLogSource) {
-    return `
-      <div class="oq-helper-modal-success oq-helper-modal-success--compact">
-        <strong>Recente meldingen</strong>
-        <span>Laatste meldingen blijven zichtbaar terwijl OpenQuatt open is.</span>
-      </div>
-    `;
-  }
-
-  return `<p class="oq-helper-modal-note">Open de log om recente meldingen te bekijken.</p>`;
+  return "";
 }
 
 function renderWebServerLogsModal() {

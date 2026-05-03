@@ -578,10 +578,10 @@
 
 .oq-webserver-log-entry {
   display: grid;
-  grid-template-columns: 5.5rem minmax(0, 1fr);
-  gap: 0.75rem;
+  grid-template-columns: 4.9rem minmax(0, 1fr);
+  gap: 0.55rem;
   align-items: start;
-  padding: 0.18rem 0.1rem;
+  padding: 0.1rem 0;
   margin: 0;
   white-space: normal;
   word-break: break-word;
@@ -589,14 +589,18 @@
 
 .oq-webserver-log-entry-time {
   color: var(--oq-helper-faint);
-  font-size: 0.72rem;
-  line-height: 1.5;
+  font-size: 0.75rem;
+  line-height: 1.35;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
   white-space: nowrap;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.01em;
+  padding-top: 0.13rem;
 }
 
 .oq-webserver-log-entry-text {
   display: block;
+  min-width: 0;
   white-space: pre-wrap;
 }
 
