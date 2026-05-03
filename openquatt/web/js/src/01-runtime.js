@@ -92,20 +92,11 @@
   }
 
   function getStoredInterfacePanelOpen() {
-    try {
-      return window.localStorage.getItem("oq-interface-panel-open") !== "false";
-    } catch (_error) {
-      return true;
-    }
+    return false;
   }
 
   function setInterfacePanelOpen(open) {
-    state.interfacePanelOpen = open !== false;
-    try {
-      window.localStorage.setItem("oq-interface-panel-open", state.interfacePanelOpen ? "true" : "false");
-    } catch (_error) {
-      // Ignore storage failures in embedded browsers.
-    }
+    state.interfacePanelOpen = open === true;
   }
 
   function getStoredSurface() {

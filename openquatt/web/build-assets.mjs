@@ -55,6 +55,10 @@ async function buildEmbeddedAssetBlock() {
   return lines.join("\n");
 }
 
+function toBundlePath(value) {
+  return value.split(path.sep).join("/");
+}
+
 async function buildBundle(bundle) {
   const parts = await Promise.all(
     bundle.sources.map(async (source) => ({
@@ -64,12 +68,12 @@ async function buildBundle(bundle) {
   );
 
   const header = [
-    `/* Generated bundle: ${path.relative(__dirname, bundle.output)} */`,
+    `/* Generated bundle: ${toBundlePath(path.relative(__dirname, bundle.output))} */`,
     "/* Source files are in ./js/src and ./css/src. */",
     "/* Rebuild with: node openquatt/web/build-assets.mjs */",
     "",
   ].join("\n");
-  const bodySegments = parts.map(({ source, content }) => `/* --- ${path.relative(__dirname, source)} --- */\n${content.trimEnd()}`);
+  const bodySegments = parts.map(({ source, content }) => `/* --- ${toBundlePath(path.relative(__dirname, source))} --- */\n${content.trimEnd()}`);
   if (bundle.label === "JS") {
     bodySegments.splice(5, 0, await buildEmbeddedAssetBlock());
   }
