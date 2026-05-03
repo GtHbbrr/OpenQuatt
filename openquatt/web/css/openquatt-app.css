@@ -2654,6 +2654,7 @@ body.oq-page-light {
 .oq-settings-backup-modal-sections {
   display: grid;
   gap: 12px;
+  margin-top: 8px;
 }
 
 .oq-settings-backup-modal-section {
