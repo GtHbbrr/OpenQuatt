@@ -1373,7 +1373,8 @@
     }
 
     if (action === "open-settings-backup-import") {
-      openSettingsBackupImportPicker();
+      state.systemModal = "settings-backup-import";
+      render();
       return;
     }
 

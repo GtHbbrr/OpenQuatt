@@ -1359,6 +1359,10 @@
       return renderSettingsBackupRestoreModal();
     }
 
+    if (state.systemModal === "settings-backup-import") {
+      return renderSettingsBackupImportModal();
+    }
+
     if (state.systemModal === "restart-confirm") {
       const busy = state.busyAction === "restartAction";
       return `

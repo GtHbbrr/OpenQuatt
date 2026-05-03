@@ -1393,18 +1393,44 @@
               Backup herstellen
             </button>
           </div>
-          <input
-            class="oq-settings-backup-input"
-            type="file"
-            accept=".json,application/json"
-            data-oq-backup-file-input="true"
-            hidden
-          >
           <p class="oq-settings-action-note">Ontbrekende velden houden hun firmware-default. Onbekende velden uit een backup worden overgeslagen.</p>
           ${state.settingsBackupError ? `<p class="oq-settings-backup-error">${escapeHtml(state.settingsBackupError)}</p>` : ""}
         </div>
       `,
     );
+  }
+
+  function renderSettingsBackupImportModal() {
+    const busy = state.settingsBackupBusy;
+    return `
+      <div class="oq-helper-modal-backdrop${state.overviewTheme === "dark" ? " oq-helper-modal-backdrop--dark" : ""}" data-oq-modal="system">
+        <section class="oq-helper-modal oq-helper-modal--wide" role="dialog" aria-modal="true" aria-labelledby="oq-backup-import-modal-title">
+          <div class="oq-helper-modal-head">
+            <div>
+              <p class="oq-helper-modal-kicker">Beheer</p>
+              <h2 class="oq-helper-modal-title" id="oq-backup-import-modal-title">Backup herstellen</h2>
+            </div>
+            <button class="oq-helper-modal-close" type="button" data-oq-action="close-system-modal" aria-label="Sluit backup import popup">×</button>
+          </div>
+          <p class="oq-helper-modal-copy">Kies een JSON-backup om de instellingen te vergelijken en daarna gericht terug te zetten.</p>
+          <div class="oq-helper-modal-row">
+            <span class="oq-helper-modal-label">Backupbestand</span>
+            <input
+              class="oq-settings-backup-input oq-settings-backup-import-input"
+              type="file"
+              accept=".json,application/json"
+              data-oq-backup-file-input="true"
+              ${busy ? "disabled" : ""}
+            >
+            <span class="oq-helper-modal-subvalue">Na selectie openen we automatisch het vergelijkingsoverzicht.</span>
+          </div>
+          ${state.settingsBackupError ? `<p class="oq-settings-backup-error">${escapeHtml(state.settingsBackupError)}</p>` : ""}
+          <div class="oq-helper-modal-actions">
+            <button class="oq-helper-button oq-helper-button--ghost" type="button" data-oq-action="close-system-modal" ${busy ? "disabled" : ""}>Annuleren</button>
+          </div>
+        </section>
+      </div>
+    `;
   }
 
   function renderSettingsBackupRestoreModal() {
