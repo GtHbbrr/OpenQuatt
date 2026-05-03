@@ -112,7 +112,6 @@ const LOGO_MARKUP = `
     restartAction: { domain: "button", name: "Restart", optional: true },
     uptime: { domain: "sensor", name: "Uptime", optional: true },
     uptimeReadable: { domain: "text_sensor", name: "Uptime readable", optional: true },
-    uptimeReadableLegacy: { domain: "text_sensor", name: "Uptime", optional: true },
     timeNowHhmm: { domain: "text_sensor", name: "Time now (HH:MM)", optional: true },
     timeValid: { domain: "binary_sensor", name: "Time valid", optional: true },
     ipAddress: { domain: "text_sensor", name: "IP Address", optional: true },
@@ -390,7 +389,6 @@ const LOGO_MARKUP = `
     "status",
     "uptime",
     "uptimeReadable",
-    "uptimeReadableLegacy",
     "timeNowHhmm",
     "timeValid",
     "ipAddress",
@@ -1423,8 +1421,6 @@ const OPENQUATT_RESUME_CLEAR_VALUE = "2000-01-01 00:00:00";
     const uptimeText = String(
       state.entities.uptimeReadable?.state
       ?? state.entities.uptimeReadable?.value
-      ?? state.entities.uptimeReadableLegacy?.state
-      ?? state.entities.uptimeReadableLegacy?.value
       ?? ""
     ).trim();
     if (uptimeText && uptimeText.toLowerCase() !== "unknown") {

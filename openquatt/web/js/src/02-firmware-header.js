@@ -129,8 +129,6 @@
     const uptimeText = String(
       state.entities.uptimeReadable?.state
       ?? state.entities.uptimeReadable?.value
-      ?? state.entities.uptimeReadableLegacy?.state
-      ?? state.entities.uptimeReadableLegacy?.value
       ?? ""
     ).trim();
     if (uptimeText && uptimeText.toLowerCase() !== "unknown") {
