@@ -6653,7 +6653,7 @@ const HP_GENERATION_IMAGE_V2 = "data:image/webp;base64,UklGRgoWAABXRUJQVlA4WAoAA
           </div>
           <div class="oq-settings-backup-modal-sections">
             ${summary.sectionSummaries.map((section) => `
-              <details class="oq-settings-backup-modal-section"${section.differenceCount ? " open" : ""}>
+              <details class="oq-settings-backup-modal-section">
                 <summary class="oq-settings-backup-modal-section-head">
                   <span class="oq-settings-backup-modal-section-head-copy">
                     <strong>${escapeHtml(section.label)}</strong>
