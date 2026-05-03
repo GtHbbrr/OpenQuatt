@@ -2666,6 +2666,28 @@ const OPENQUATT_RESUME_CLEAR_VALUE = "2000-01-01 00:00:00";
       return renderSettingsBackupImportModal();
     }
 
+    if (state.systemModal === "settings-backup-success") {
+      const notice = state.controlNotice || "Backup hersteld.";
+      return `
+        <div class="oq-helper-modal-backdrop${state.overviewTheme === "dark" ? " oq-helper-modal-backdrop--dark" : ""}" data-oq-modal="system">
+          <section class="oq-helper-modal" role="dialog" aria-modal="true" aria-labelledby="oq-backup-success-modal-title">
+            <div class="oq-helper-modal-head">
+              <div>
+                <p class="oq-helper-modal-kicker">Beheer</p>
+                <h2 class="oq-helper-modal-title" id="oq-backup-success-modal-title">Backup hersteld</h2>
+              </div>
+              <button class="oq-helper-modal-close" type="button" data-oq-action="close-system-modal" aria-label="Sluit bevestiging">×</button>
+            </div>
+            <p class="oq-helper-modal-copy">${escapeHtml(notice)}</p>
+            <p class="oq-helper-modal-copy">Je kunt nu terug naar het overzicht of OpenQuatt gewoon verder gebruiken.</p>
+            <div class="oq-helper-modal-actions">
+              <button class="oq-helper-button oq-helper-button--primary" type="button" data-oq-action="close-system-modal">Gereed</button>
+            </div>
+          </section>
+        </div>
+      `;
+    }
+
     if (state.systemModal === "restart-confirm") {
       const busy = state.busyAction === "restartAction";
       return `
@@ -3678,7 +3700,7 @@ const OPENQUATT_RESUME_CLEAR_VALUE = "2000-01-01 00:00:00";
         skipped.push("setupComplete");
       }
 
-      state.systemModal = "";
+      state.systemModal = "settings-backup-success";
       clearSettingsBackupDraft();
       state.controlNotice = `Backup hersteld (${applied.length} toegepast${skipped.length ? `, ${skipped.length} overgeslagen` : ""}).`;
       await syncEntities();

@@ -886,7 +886,7 @@
         skipped.push("setupComplete");
       }
 
-      state.systemModal = "";
+      state.systemModal = "settings-backup-success";
       clearSettingsBackupDraft();
       state.controlNotice = `Backup hersteld (${applied.length} toegepast${skipped.length ? `, ${skipped.length} overgeslagen` : ""}).`;
       await syncEntities();
