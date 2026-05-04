@@ -55,30 +55,37 @@ uint32_t parse_window_hours_from_url(const char *url) {
 
 class ChunkedTextWriter {
  public:
-  explicit ChunkedTextWriter(httpd_req_t *req) : req_(req) {}
+  explicit ChunkedTextWriter(httpd_req_t *req) : req_(req) {
+    this->buffer_.allocate(BUFFER_SIZE);
+    this->scratch_.allocate(SCRATCH_SIZE);
+  }
 
   bool printf(const char *format, ...) {
+    if (!this->buffer_ || !this->scratch_) {
+      return false;
+    }
     va_list args;
     va_start(args, format);
-    const int written = std::vsnprintf(this->scratch_, sizeof(this->scratch_), format, args);
+    const int written = std::vsnprintf(this->scratch_.data(), this->scratch_.size(), format, args);
     va_end(args);
     if (written < 0) {
       return false;
     }
-    if (static_cast<size_t>(written) < sizeof(this->scratch_)) {
-      return this->write_bytes_(this->scratch_, static_cast<size_t>(written));
+    if (static_cast<size_t>(written) < this->scratch_.size()) {
+      return this->write_bytes_(this->scratch_.data(), static_cast<size_t>(written));
     }
 
     // Trend lines are intentionally compact. If this ever grows, truncate the
     // single line instead of allocating a dynamic buffer on the heap.
-    return this->write_bytes_(this->scratch_, sizeof(this->scratch_) - 1);
+    return this->write_bytes_(this->scratch_.data(), this->scratch_.size() - 1);
   }
 
   bool flush() {
     if (this->used_ == 0) {
       return true;
     }
-    if (httpd_resp_send_chunk(this->req_, this->buffer_, static_cast<ssize_t>(this->used_)) != ESP_OK) {
+    if (!this->buffer_ ||
+        httpd_resp_send_chunk(this->req_, this->buffer_.data(), static_cast<ssize_t>(this->used_)) != ESP_OK) {
       return false;
     }
     this->used_ = 0;
@@ -90,6 +97,9 @@ class ChunkedTextWriter {
   static constexpr size_t SCRATCH_SIZE = 160;
 
   bool write_bytes_(const char *data, size_t len) {
+    if (!this->buffer_) {
+      return false;
+    }
     size_t remaining = len;
     const char *cursor = data;
     while (remaining > 0) {
@@ -98,7 +108,7 @@ class ChunkedTextWriter {
       }
       const size_t space = BUFFER_SIZE - this->used_;
       const size_t to_copy = std::min(space, remaining);
-      std::memcpy(this->buffer_ + this->used_, cursor, to_copy);
+      std::memcpy(this->buffer_.data() + this->used_, cursor, to_copy);
       this->used_ += to_copy;
       cursor += to_copy;
       remaining -= to_copy;
@@ -107,8 +117,8 @@ class ChunkedTextWriter {
   }
 
   httpd_req_t *req_;
-  char buffer_[BUFFER_SIZE]{};
-  char scratch_[SCRATCH_SIZE]{};
+  PsramBuffer<char> buffer_{};
+  PsramBuffer<char> scratch_{};
   size_t used_{0};
 };
 

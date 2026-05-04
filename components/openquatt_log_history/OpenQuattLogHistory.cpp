@@ -17,7 +17,7 @@ namespace {
 
 class ChunkedJsonWriter {
  public:
-  explicit ChunkedJsonWriter(httpd_req_t *req) : req_(req) {}
+  explicit ChunkedJsonWriter(httpd_req_t *req) : req_(req) { this->buffer_.allocate(BUFFER_SIZE); }
 
   bool write_char(char c) { return this->write_bytes_(&c, 1); }
 
@@ -104,7 +104,8 @@ class ChunkedJsonWriter {
     if (this->used_ == 0) {
       return true;
     }
-    if (httpd_resp_send_chunk(this->req_, this->buffer_, static_cast<ssize_t>(this->used_)) != ESP_OK) {
+    if (!this->buffer_ ||
+        httpd_resp_send_chunk(this->req_, this->buffer_.data(), static_cast<ssize_t>(this->used_)) != ESP_OK) {
       return false;
     }
     this->used_ = 0;
@@ -115,6 +116,9 @@ class ChunkedJsonWriter {
   static constexpr size_t BUFFER_SIZE = 512;
 
   bool write_bytes_(const char *data, size_t len) {
+    if (!this->buffer_) {
+      return false;
+    }
     if (data == nullptr || len == 0) {
       return true;
     }
@@ -128,7 +132,7 @@ class ChunkedJsonWriter {
 
       const size_t space = BUFFER_SIZE - this->used_;
       const size_t to_copy = std::min(space, remaining);
-      std::memcpy(this->buffer_ + this->used_, cursor, to_copy);
+      std::memcpy(this->buffer_.data() + this->used_, cursor, to_copy);
       this->used_ += to_copy;
       cursor += to_copy;
       remaining -= to_copy;
@@ -142,7 +146,7 @@ class ChunkedJsonWriter {
   }
 
   httpd_req_t *req_;
-  char buffer_[BUFFER_SIZE]{};
+  PsramBuffer<char> buffer_{};
   size_t used_{0};
 };
 
