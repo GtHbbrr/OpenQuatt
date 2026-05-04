@@ -726,7 +726,13 @@ function renderWebServerLogHistoryControls() {
 
 function buildWebServerLogCopyText() {
   return state.webServerLogEntries
-    .map((entry) => String(entry.raw ?? entry.text ?? "").trimEnd())
+    .map((entry) => {
+      const line = String(entry.raw ?? entry.text ?? "").trimEnd();
+      if (!line.trim()) {
+        return "";
+      }
+      return `${formatWebServerLogDateTime(entry.receivedAt)} ${line}`;
+    })
     .filter((entry) => entry.trim() !== "")
     .join("\n");
 }
