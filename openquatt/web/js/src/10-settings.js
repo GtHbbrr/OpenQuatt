@@ -1578,15 +1578,6 @@
               Openen
             </button>
           </div>
-          ${hasEntity("webServerLogHistoryEnabled") ? `
-          <div class="oq-settings-system-row" data-oq-diagnostics-row="webserverLogHistory">
-            <div class="oq-settings-system-row-copy">
-              <p class="oq-settings-system-row-label">RAM log history</p>
-              <strong class="oq-settings-system-row-value">${escapeHtml(getWebServerLogHistoryStatusLabel())}</strong>
-              <p class="oq-settings-system-row-note">${escapeHtml(getWebServerLogHistoryInfoCopy())}</p>
-            </div>
-          </div>
-          ` : ""}
           <div class="oq-settings-system-row" data-oq-diagnostics-row="datetime">
             <span class="oq-settings-system-row-label">Datum/tijd</span>
             <strong class="oq-settings-system-row-value">${escapeHtml(dateTime)}</strong>
