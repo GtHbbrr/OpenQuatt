@@ -145,12 +145,15 @@
     }
   }
 
-  function setSettingsGroup(groupId) {
+  function setSettingsGroup(groupId, options = {}) {
     state.settingsGroup = SETTINGS_GROUP_IDS.has(groupId) ? groupId : SETTINGS_GROUPS[0].id;
     try {
       window.localStorage.setItem("oq-settings-group", state.settingsGroup);
     } catch (_error) {
       // Ignore storage failures in embedded browsers.
+    }
+    if (options.syncUrl !== false && state.appView === "settings") {
+      syncUrlAppView(options.syncMode || "replace");
     }
   }
 
@@ -326,17 +329,33 @@
     }
   }
 
+  function getUrlSettingsGroup() {
+    try {
+      const url = new URL(window.location.href);
+      const group = String(url.searchParams.get("group") || "");
+      return SETTINGS_GROUP_IDS.has(group) ? group : "";
+    } catch (_error) {
+      return "";
+    }
+  }
+
   function syncUrlAppView(mode = "replace") {
     try {
       const url = new URL(window.location.href);
       const normalized = normalizeAppView(state.appView) || getDefaultAppView();
       url.searchParams.set("view", normalized);
+      if (normalized === "settings") {
+        const group = SETTINGS_GROUP_IDS.has(state.settingsGroup) ? state.settingsGroup : SETTINGS_GROUPS[0].id;
+        url.searchParams.set("group", group);
+      } else {
+        url.searchParams.delete("group");
+      }
       if (url.hash && normalizeAppView(url.hash.replace(/^#/, ""))) {
         url.hash = "";
       }
 
       const method = mode === "push" ? "pushState" : "replaceState";
-      window.history[method]({ oqView: normalized }, "", url.toString());
+      window.history[method]({ oqView: normalized, oqSettingsGroup: normalized === "settings" ? state.settingsGroup : "" }, "", url.toString());
     } catch (_error) {
       // Ignore history failures in embedded browsers.
     }
@@ -355,11 +374,20 @@
 
   function handlePopState() {
     const nextView = getUrlAppView() || getDefaultAppView();
-    if (nextView === state.appView) {
+    const nextSettingsGroup = nextView === "settings" ? (getUrlSettingsGroup() || state.settingsGroup) : "";
+    if (nextView === state.appView && (nextView !== "settings" || nextSettingsGroup === state.settingsGroup)) {
       return;
     }
 
     state.appView = nextView;
+    if (nextView === "settings" && nextSettingsGroup) {
+      state.settingsGroup = nextSettingsGroup;
+      try {
+        window.localStorage.setItem("oq-settings-group", state.settingsGroup);
+      } catch (_error) {
+        // Ignore storage failures in embedded browsers.
+      }
+    }
     render();
     void syncEntities();
   }
@@ -456,6 +484,10 @@
     root.addEventListener("pointerdown", handlePointerDown);
     state.root = root;
     const initialUrlView = getUrlAppView();
+    const initialUrlSettingsGroup = initialUrlView === "settings" ? getUrlSettingsGroup() : "";
+    if (initialUrlSettingsGroup) {
+      setSettingsGroup(initialUrlSettingsGroup, { syncUrl: false });
+    }
     if (initialUrlView) {
       setAppView(initialUrlView, { syncMode: "replace", forceSync: true });
     }
