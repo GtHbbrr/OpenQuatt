@@ -1579,22 +1579,13 @@
             </button>
           </div>
           ${hasEntity("webServerLogHistoryEnabled") ? `
-            <div class="oq-settings-system-row oq-settings-system-row--with-action" data-oq-diagnostics-row="webserverLogHistory">
-              <div class="oq-settings-system-row-copy">
-                <p class="oq-settings-system-row-label">RAM log history</p>
-                <strong class="oq-settings-system-row-value">${escapeHtml(getWebServerLogHistoryStatusLabel())}</strong>
-                <p class="oq-settings-system-row-note">${escapeHtml(getWebServerLogHistoryInfoCopy())}</p>
-              </div>
-              <button
-                class="oq-helper-button oq-helper-button--ghost"
-                type="button"
-                data-oq-action="toggle-overview-control"
-                data-control-key="webServerLogHistoryEnabled"
-                data-control-state="${isWebServerLogHistoryEnabled() ? "off" : "on"}"
-              >
-                ${isWebServerLogHistoryEnabled() ? "Uitschakelen" : "Inschakelen"}
-              </button>
+          <div class="oq-settings-system-row" data-oq-diagnostics-row="webserverLogHistory">
+            <div class="oq-settings-system-row-copy">
+              <p class="oq-settings-system-row-label">RAM log history</p>
+              <strong class="oq-settings-system-row-value">${escapeHtml(getWebServerLogHistoryStatusLabel())}</strong>
+              <p class="oq-settings-system-row-note">${escapeHtml(getWebServerLogHistoryInfoCopy())}</p>
             </div>
+          </div>
           ` : ""}
           <div class="oq-settings-system-row" data-oq-diagnostics-row="datetime">
             <span class="oq-settings-system-row-label">Datum/tijd</span>
