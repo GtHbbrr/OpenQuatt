@@ -1031,10 +1031,6 @@ const OPENQUATT_RESUME_CLEAR_VALUE = "2000-01-01 00:00:00";
     const changed = state.appView !== normalized;
     state.appView = normalized;
 
-    if (normalized === "settings" && !options.preserveSettingsGroup) {
-      setSettingsGroup(SETTINGS_GROUPS[0].id);
-    }
-
     if (changed || options.forceSync) {
       syncUrlAppView(mode);
     }
