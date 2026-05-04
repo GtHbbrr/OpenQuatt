@@ -17,7 +17,7 @@ namespace {
 
 class ChunkedJsonWriter {
  public:
-  explicit ChunkedJsonWriter(httpd_req_t *req) : req_(req) {}
+  explicit ChunkedJsonWriter(httpd_req_t *req) : req_(req) { this->buffer_.allocate(BUFFER_SIZE); }
 
   bool write_char(char c) { return this->write_bytes_(&c, 1); }
 
@@ -104,7 +104,8 @@ class ChunkedJsonWriter {
     if (this->used_ == 0) {
       return true;
     }
-    if (httpd_resp_send_chunk(this->req_, this->buffer_, static_cast<ssize_t>(this->used_)) != ESP_OK) {
+    if (!this->buffer_ ||
+        httpd_resp_send_chunk(this->req_, this->buffer_.data(), static_cast<ssize_t>(this->used_)) != ESP_OK) {
       return false;
     }
     this->used_ = 0;
@@ -115,6 +116,9 @@ class ChunkedJsonWriter {
   static constexpr size_t BUFFER_SIZE = 512;
 
   bool write_bytes_(const char *data, size_t len) {
+    if (!this->buffer_) {
+      return false;
+    }
     if (data == nullptr || len == 0) {
       return true;
     }
@@ -128,7 +132,7 @@ class ChunkedJsonWriter {
 
       const size_t space = BUFFER_SIZE - this->used_;
       const size_t to_copy = std::min(space, remaining);
-      std::memcpy(this->buffer_ + this->used_, cursor, to_copy);
+      std::memcpy(this->buffer_.data() + this->used_, cursor, to_copy);
       this->used_ += to_copy;
       cursor += to_copy;
       remaining -= to_copy;
@@ -142,7 +146,7 @@ class ChunkedJsonWriter {
   }
 
   httpd_req_t *req_;
-  char buffer_[BUFFER_SIZE]{};
+  PsramBuffer<char> buffer_{};
   size_t used_{0};
 };
 
@@ -181,7 +185,7 @@ class OpenQuattLogHistoryRequestHandler : public AsyncWebHandler {
 
 float OpenQuattLogHistory::get_setup_priority() const { return setup_priority::WIFI; }
 
-bool OpenQuattLogHistory::capture_enabled_() const { return this->enabled_; }
+bool OpenQuattLogHistory::capture_enabled_() const { return this->enabled_ && this->entries_; }
 
 bool OpenQuattLogHistory::time_is_valid_() const { return this->clock_ != nullptr && this->clock_->now().is_valid(); }
 
@@ -330,6 +334,9 @@ void OpenQuattLogHistory::split_log_fields_(const char *raw, const char **tag_st
 }
 
 void OpenQuattLogHistory::push_entry_(const LogEntry &entry) {
+  if (!this->entries_) {
+    return;
+  }
   if (ENTRY_CAPACITY == 0) {
     return;
   }
@@ -407,6 +414,10 @@ void OpenQuattLogHistory::setup() {
     this->enabled_ = this->enabled_switch_->state;
   }
 
+  if (!this->entries_.allocate(ENTRY_CAPACITY)) {
+    ESP_LOGE(TAG, "Failed to allocate log history buffer in PSRAM");
+  }
+
   logger::global_logger->add_log_callback(this, [](void *self, uint8_t level, const char *tag, const char *message,
                                                    size_t message_len) {
     static_cast<OpenQuattLogHistory *>(self)->on_log_(level, tag, message, message_len);
@@ -424,6 +435,7 @@ void OpenQuattLogHistory::dump_config() {
   ESP_LOGCONFIG(TAG, "  Clock: %s", this->clock_ == nullptr ? "<missing>" : "configured");
   ESP_LOGCONFIG(TAG, "  Enabled: %s", YESNO(this->enabled_));
   ESP_LOGCONFIG(TAG, "  Entries: %u / %u", static_cast<unsigned>(this->count_), static_cast<unsigned>(ENTRY_CAPACITY));
+  ESP_LOGCONFIG(TAG, "  History buffer: %s", !this->entries_ ? "missing" : (this->entries_.is_external() ? "PSRAM" : "internal"));
 }
 
 void OpenQuattLogHistory::write_recent_logs(httpd_req_t *req) const {

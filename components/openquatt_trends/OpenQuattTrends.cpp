@@ -55,30 +55,37 @@ uint32_t parse_window_hours_from_url(const char *url) {
 
 class ChunkedTextWriter {
  public:
-  explicit ChunkedTextWriter(httpd_req_t *req) : req_(req) {}
+  explicit ChunkedTextWriter(httpd_req_t *req) : req_(req) {
+    this->buffer_.allocate(BUFFER_SIZE);
+    this->scratch_.allocate(SCRATCH_SIZE);
+  }
 
   bool printf(const char *format, ...) {
+    if (!this->buffer_ || !this->scratch_) {
+      return false;
+    }
     va_list args;
     va_start(args, format);
-    const int written = std::vsnprintf(this->scratch_, sizeof(this->scratch_), format, args);
+    const int written = std::vsnprintf(this->scratch_.data(), this->scratch_.size(), format, args);
     va_end(args);
     if (written < 0) {
       return false;
     }
-    if (static_cast<size_t>(written) < sizeof(this->scratch_)) {
-      return this->write_bytes_(this->scratch_, static_cast<size_t>(written));
+    if (static_cast<size_t>(written) < this->scratch_.size()) {
+      return this->write_bytes_(this->scratch_.data(), static_cast<size_t>(written));
     }
 
     // Trend lines are intentionally compact. If this ever grows, truncate the
     // single line instead of allocating a dynamic buffer on the heap.
-    return this->write_bytes_(this->scratch_, sizeof(this->scratch_) - 1);
+    return this->write_bytes_(this->scratch_.data(), this->scratch_.size() - 1);
   }
 
   bool flush() {
     if (this->used_ == 0) {
       return true;
     }
-    if (httpd_resp_send_chunk(this->req_, this->buffer_, static_cast<ssize_t>(this->used_)) != ESP_OK) {
+    if (!this->buffer_ ||
+        httpd_resp_send_chunk(this->req_, this->buffer_.data(), static_cast<ssize_t>(this->used_)) != ESP_OK) {
       return false;
     }
     this->used_ = 0;
@@ -90,6 +97,9 @@ class ChunkedTextWriter {
   static constexpr size_t SCRATCH_SIZE = 160;
 
   bool write_bytes_(const char *data, size_t len) {
+    if (!this->buffer_) {
+      return false;
+    }
     size_t remaining = len;
     const char *cursor = data;
     while (remaining > 0) {
@@ -98,7 +108,7 @@ class ChunkedTextWriter {
       }
       const size_t space = BUFFER_SIZE - this->used_;
       const size_t to_copy = std::min(space, remaining);
-      std::memcpy(this->buffer_ + this->used_, cursor, to_copy);
+      std::memcpy(this->buffer_.data() + this->used_, cursor, to_copy);
       this->used_ += to_copy;
       cursor += to_copy;
       remaining -= to_copy;
@@ -107,8 +117,8 @@ class ChunkedTextWriter {
   }
 
   httpd_req_t *req_;
-  char buffer_[BUFFER_SIZE]{};
-  char scratch_[SCRATCH_SIZE]{};
+  PsramBuffer<char> buffer_{};
+  PsramBuffer<char> scratch_{};
   size_t used_{0};
 };
 
@@ -147,6 +157,10 @@ void OpenQuattTrends::setup() {
   if (web_server_base::global_web_server_base == nullptr) {
     ESP_LOGE(TAG, "global_web_server_base is unavailable");
     return;
+  }
+
+  if (!this->ram_history_.allocate(RAM_CAPACITY)) {
+    ESP_LOGE(TAG, "Failed to allocate trend history buffer in PSRAM");
   }
 
   this->flash_partition_ = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_ANY, "openquatt_data");
@@ -193,6 +207,8 @@ void OpenQuattTrends::dump_config() {
   ESP_LOGCONFIG(TAG, "  Clock: %s", this->clock_ == nullptr ? "<missing>" : "configured");
   ESP_LOGCONFIG(TAG, "  Flash partition: %s", this->flash_partition_ == nullptr ? "<missing>" : "configured");
   ESP_LOGCONFIG(TAG, "  RAM samples: %u / %u", static_cast<unsigned>(this->ram_count_), static_cast<unsigned>(RAM_CAPACITY));
+  ESP_LOGCONFIG(TAG, "  RAM history buffer: %s",
+                !this->ram_history_ ? "missing" : (this->ram_history_.is_external() ? "PSRAM" : "internal"));
   ESP_LOGCONFIG(TAG, "  Flash enabled: %s", YESNO(this->flash_enabled_));
   ESP_LOGCONFIG(TAG, "  Flash archive scanned: %s", YESNO(this->flash_archive_scanned_));
 }
@@ -200,7 +216,7 @@ void OpenQuattTrends::dump_config() {
 float OpenQuattTrends::get_setup_priority() const { return setup_priority::WIFI; }
 
 bool OpenQuattTrends::capture_enabled_() const {
-  return this->capture_switch_ != nullptr && this->capture_switch_->state;
+  return this->ram_history_ && this->capture_switch_ != nullptr && this->capture_switch_->state;
 }
 
 bool OpenQuattTrends::flash_switch_enabled_() const {
@@ -289,6 +305,9 @@ void OpenQuattTrends::rebase_ram_history_(uint64_t offset_ms) {
   if (offset_ms == 0) {
     return;
   }
+  if (!this->ram_history_) {
+    return;
+  }
 
   for (size_t i = 0; i < this->ram_count_; ++i) {
     const size_t index = (this->ram_head_ + i) % RAM_CAPACITY;
@@ -319,7 +338,7 @@ void OpenQuattTrends::sync_time_state_() {
 }
 
 void OpenQuattTrends::load_archive_if_needed_() {
-  if (!this->flash_enabled_ || this->flash_partition_ == nullptr || !this->time_is_valid_()) {
+  if (!this->ram_history_ || !this->flash_enabled_ || this->flash_partition_ == nullptr || !this->time_is_valid_()) {
     return;
   }
 
@@ -337,6 +356,9 @@ void OpenQuattTrends::load_archive_if_needed_() {
 }
 
 void OpenQuattTrends::push_ram_sample_(const TrendSample &sample) {
+  if (!this->ram_history_) {
+    return;
+  }
   if (RAM_CAPACITY == 0) {
     return;
   }
@@ -351,7 +373,7 @@ void OpenQuattTrends::push_ram_sample_(const TrendSample &sample) {
 }
 
 bool OpenQuattTrends::get_ram_sample_at_(size_t ordered_index, TrendSample *sample) const {
-  if (sample == nullptr || ordered_index >= this->ram_count_) {
+  if (sample == nullptr || !this->ram_history_ || ordered_index >= this->ram_count_) {
     return false;
   }
   const size_t index = (this->ram_head_ + ordered_index) % RAM_CAPACITY;
@@ -397,6 +419,9 @@ bool OpenQuattTrends::scan_flash_archive_() {
 }
 
 bool OpenQuattTrends::merge_flash_history_into_ram_() {
+  if (!this->ram_history_) {
+    return false;
+  }
   if (!this->flash_archive_scanned_) {
     if (!this->scan_flash_archive_()) {
       return false;
