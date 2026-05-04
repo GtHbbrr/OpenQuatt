@@ -297,7 +297,6 @@ sensor:
           max_value: 16
           ignore_out_of_range: true
     skip_updates: ${oq_skip_10s}
-    register_count: 10  # 2101 - 2110
     force_new_range: true
     web_server:
       sorting_group_id: oq_${hp_id}
@@ -320,6 +319,7 @@ sensor:
           max_value: 100
           ignore_out_of_range: true
     skip_updates: ${oq_skip_10s}
+    force_new_range: true
     web_server:
       sorting_group_id: oq_${hp_id}
 
@@ -361,6 +361,7 @@ sensor:
           max_value: 1000
           ignore_out_of_range: true
     skip_updates: ${oq_skip_10s}
+    force_new_range: true
     web_server:
       sorting_group_id: oq_${hp_id}
 
@@ -374,6 +375,7 @@ sensor:
     unit_of_measurement: "RPM"
     state_class: "measurement"
     accuracy_decimals: 0
+    # register_count: 2  # 2105 - 2106
     filters:
       - multiply: 1
       - clamp:
@@ -452,7 +454,6 @@ sensor:
           max_value: 100
           ignore_out_of_range: true
     skip_updates: ${oq_skip_30s}
-    register_count: 7  # 2111 - 2117
     force_new_range: true
     web_server:
       sorting_group_id: oq_${hp_id}
@@ -490,6 +491,7 @@ sensor:
     device_class: "temperature"
     state_class: "measurement"
     accuracy_decimals: 2
+    register_count: 2  # 2113 - 2114
     filters:
       - offset: -3000
       - multiply: 0.01
@@ -533,6 +535,7 @@ sensor:
     device_class: "pressure"
     state_class: "measurement"
     accuracy_decimals: 2
+    # register_count: 5  # 2117 - 2121
     filters:
       - multiply: 0.1
       - clamp:
@@ -554,14 +557,25 @@ sensor:
 
   - platform: modbus_controller
     modbus_controller_id: ${hp_id}
-    name: "${prefix}Raw status / firmware block"
+    name: "${prefix}Firmware EEPROM"
     disabled_by_default: true
     icon: mdi:memory
     register_type: holding
-    register_count: 14  # 2119 - 2132
-    address: 2119
+    register_count: 4  # 2123 - 2127
+    address: 2123
     skip_updates: ${oq_skip_30s}
-    force_new_range: true
+    web_server:
+      sorting_group_id: oq_${hp_id}
+
+  - platform: modbus_controller
+    modbus_controller_id: ${hp_id}
+    name: "${prefix}Control board item number"
+    disabled_by_default: true
+    icon: mdi:identifier
+    register_type: holding
+    register_count: 4  # 2127 - 2131
+    address: 2127
+    skip_updates: ${oq_skip_30s}
     web_server:
       sorting_group_id: oq_${hp_id}
 
@@ -667,6 +681,7 @@ sensor:
     device_class: "temperature"
     state_class: "measurement"
     accuracy_decimals: 2
+    # register_count: 2  # 2135 - 2137
     filters:
       - offset: -3000
       - multiply: 0.01
@@ -675,7 +690,6 @@ sensor:
           max_value: 100
           ignore_out_of_range: true
     skip_updates: ${oq_skip_30s}
-    register_count: 3  # 2135 - 2137
     force_new_range: true
     web_server:
       sorting_group_id: oq_${hp_id}
