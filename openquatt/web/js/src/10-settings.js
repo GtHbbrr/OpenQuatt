@@ -45,7 +45,7 @@
   }
 
   function renderSettingsTrendStatsField() {
-    if (!isEntityActive("trendHistoryFlashEnabled")) {
+    if (!isEntityActive("trendHistoryEnabled") || !isEntityActive("trendHistoryFlashEnabled")) {
       return "";
     }
 
@@ -1214,6 +1214,9 @@
       return "";
     }
 
+    const trendHistoryEnabled = isEntityActive("trendHistoryEnabled");
+    const trendHistoryFlashEnabled = trendHistoryEnabled && isEntityActive("trendHistoryFlashEnabled");
+
     return renderSettingsSection(
       "Trends",
       "Trendopslag",
@@ -1227,14 +1230,14 @@
             "OpenQuatt bewaart live trenddata in het werkgeheugen zodat je de grafieken kunt blijven gebruiken.",
             "OpenQuatt bewaart geen trenddata en verbergt de Trends-tab."
           )}
-          ${renderSettingsSwitchField(
+          ${trendHistoryEnabled ? renderSettingsSwitchField(
             "trendHistoryFlashEnabled",
             "Trendhistorie opslaan in flash",
             "Bewaart trenddata ook na herstart of OTA.",
             "Trendhistorie wordt bewaard in flash zodat je later verder kunt terugkijken.",
             "Trendhistorie blijft alleen in het werkgeheugen en is na herstart weg."
-          )}
-          ${renderSettingsButtonField(
+          ) : ""}
+          ${trendHistoryFlashEnabled ? renderSettingsButtonField(
             "trendHistoryFlush",
             "Trendhistorie nu opslaan",
             "Schrijf de huidige trendbuffer direct weg naar flash.",
@@ -1242,13 +1245,11 @@
             "flush-trend-history",
             "",
             {
-              disabled: !isEntityActive("trendHistoryFlashEnabled"),
-              note: isEntityActive("trendHistoryFlashEnabled")
-                ? "Handig voor een OTA of een geplande herstart."
-                : "Schakel flashopslag eerst in om de huidige historie te bewaren.",
+              disabled: !trendHistoryFlashEnabled,
+              note: "Handig voor een OTA of een geplande herstart.",
             }
-          )}
-          ${renderSettingsTrendStatsField()}
+          ) : ""}
+          ${trendHistoryFlashEnabled ? renderSettingsTrendStatsField() : ""}
         </div>
       `,
     );
