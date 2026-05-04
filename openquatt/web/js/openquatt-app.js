@@ -724,6 +724,8 @@ const OPENQUATT_RESUME_CLEAR_VALUE = "2000-01-01 00:00:00";
     webServerLogHistoryError: "",
     webServerLogHistoryRequestToken: 0,
     webServerLogHistoryLoaded: false,
+    webServerLogCopyMessage: "",
+    webServerLogCopyError: "",
     webServerLogRecentTail: [],
     webServerLogRecentAnchorAt: 0,
     webServerLogEntries: [],
@@ -4289,6 +4291,11 @@ const OPENQUATT_RESUME_CLEAR_VALUE = "2000-01-01 00:00:00";
       return;
     }
 
+    if (action === "copy-webserver-log-output") {
+      void copyWebServerLogOutput();
+      return;
+    }
+
     if (action === "confirm-settings-backup-restore") {
       void restoreSettingsBackup();
       return;
@@ -5594,6 +5601,8 @@ function openWebServerLogsModal() {
   if (isWebServerLogDemoMode() && state.webServerLogEntries.length === 0) {
     state.webServerLogEntries = seedWebServerLogDemoEntries();
   }
+  state.webServerLogCopyMessage = "";
+  state.webServerLogCopyError = "";
   state.systemModal = "webserver-logs";
   render();
   scrollWebServerLogToBottom();
@@ -5608,6 +5617,8 @@ function clearWebServerLogOutput() {
   state.webServerLogHistoryError = "";
   state.webServerLogHistoryLoading = false;
   state.webServerLogHistoryLoaded = false;
+  state.webServerLogCopyMessage = "";
+  state.webServerLogCopyError = "";
   state.webServerLogHistoryRequestToken += 1;
   state.webServerLogRecentTail = [];
   state.webServerLogRecentAnchorAt = 0;
@@ -5912,6 +5923,17 @@ function renderWebServerLogStatusBanner() {
   if (state.webServerLogHistoryLoading) {
     rows.push(`<p class="oq-helper-modal-note">Recente firmwarelogs worden opgehaald...</p>`);
   }
+  if (state.webServerLogCopyMessage) {
+    rows.push(`
+      <div class="oq-helper-modal-success oq-helper-modal-success--compact" aria-live="polite">
+        <strong>Kopiëren</strong>
+        <span>${escapeHtml(state.webServerLogCopyMessage)}</span>
+      </div>
+    `);
+  }
+  if (state.webServerLogCopyError) {
+    rows.push(`<p class="oq-helper-modal-note oq-helper-modal-note--error">${escapeHtml(state.webServerLogCopyError)}</p>`);
+  }
   if (state.webServerLogHistoryError) {
     rows.push(`<p class="oq-helper-modal-note oq-helper-modal-note--error">${escapeHtml(state.webServerLogHistoryError)}</p>`);
   }
@@ -5956,6 +5978,69 @@ function renderWebServerLogHistoryControls() {
   `;
 }
 
+function buildWebServerLogCopyText() {
+  return state.webServerLogEntries
+    .map((entry) => String(entry.raw ?? entry.text ?? "").trimEnd())
+    .filter((entry) => entry.trim() !== "")
+    .join("\n");
+}
+
+async function writeTextToClipboard(text) {
+  if (!text) {
+    return false;
+  }
+
+  if (window.navigator?.clipboard?.writeText && window.isSecureContext) {
+    await window.navigator.clipboard.writeText(text);
+    return true;
+  }
+
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.setAttribute("readonly", "");
+  textarea.style.position = "fixed";
+  textarea.style.top = "-1000px";
+  textarea.style.opacity = "0";
+  document.body.appendChild(textarea);
+  textarea.focus();
+  textarea.select();
+
+  let success = false;
+  try {
+    success = document.execCommand("copy");
+  } finally {
+    document.body.removeChild(textarea);
+  }
+
+  return success;
+}
+
+async function copyWebServerLogOutput() {
+  const text = buildWebServerLogCopyText();
+  state.webServerLogCopyMessage = "";
+  state.webServerLogCopyError = "";
+
+  if (!text) {
+    state.webServerLogCopyError = "Er zijn nog geen logregels om te kopiëren.";
+    render();
+    return;
+  }
+
+  try {
+    const copied = await writeTextToClipboard(text);
+    if (!copied) {
+      throw new Error("Kopiëren naar het klembord is niet gelukt.");
+    }
+    state.webServerLogCopyMessage = `${state.webServerLogEntries.length} logregel${state.webServerLogEntries.length === 1 ? "" : "s"} gekopieerd.`;
+  } catch (error) {
+    state.webServerLogCopyError = error instanceof Error ? error.message : "Kopiëren naar het klembord is niet gelukt.";
+  }
+
+  if (state.systemModal === "webserver-logs") {
+    render();
+  }
+}
+
 function renderWebServerLogsModal() {
   const demoMode = isWebServerLogDemoMode();
   return `
@@ -5980,6 +6065,7 @@ function renderWebServerLogsModal() {
           </div>
         </div>
         <div class="oq-helper-modal-actions">
+          <button class="oq-helper-button oq-helper-button--ghost" type="button" data-oq-action="copy-webserver-log-output" ${state.webServerLogEntries.length === 0 ? "disabled" : ""}>Kopieer log</button>
           <button class="oq-helper-button oq-helper-button--ghost" type="button" data-oq-action="clear-webserver-log-output">Legen</button>
           <button class="oq-helper-button oq-helper-button--primary" type="button" data-oq-action="close-system-modal">Gereed</button>
         </div>

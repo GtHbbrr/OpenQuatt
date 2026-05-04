@@ -1470,6 +1470,11 @@
       return;
     }
 
+    if (action === "copy-webserver-log-output") {
+      void copyWebServerLogOutput();
+      return;
+    }
+
     if (action === "confirm-settings-backup-restore") {
       void restoreSettingsBackup();
       return;

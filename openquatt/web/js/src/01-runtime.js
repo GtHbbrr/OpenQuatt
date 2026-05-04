@@ -41,6 +41,8 @@
     webServerLogHistoryError: "",
     webServerLogHistoryRequestToken: 0,
     webServerLogHistoryLoaded: false,
+    webServerLogCopyMessage: "",
+    webServerLogCopyError: "",
     webServerLogRecentTail: [],
     webServerLogRecentAnchorAt: 0,
     webServerLogEntries: [],
