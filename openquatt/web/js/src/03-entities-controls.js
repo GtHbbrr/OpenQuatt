@@ -1678,6 +1678,15 @@
         render();
         await pollFirmwareUpdateState();
         state.controlNotice = "Releasekanaal bijgewerkt.";
+      } else if (key === "webServerLogHistoryEnabled") {
+        if (enabled) {
+          void refreshWebServerLogHistory();
+        } else {
+          clearWebServerLogOutput();
+        }
+        if (state.systemModal === "webserver-logs") {
+          render();
+        }
       } else if (state.appView === "settings") {
         await refreshEntities(getSettingsRefreshKeys(), "state");
       } else {
