@@ -25,6 +25,8 @@
     trendHistoryError: "",
     trendHistorySignature: "",
     trendHistoryNowMs: Number.NaN,
+    trendHistoryLastFetchAt: 0,
+    trendHistoryFetchPromise: null,
     deviceReconnectMode: "",
     deviceReconnectStartedAt: 0,
     deviceReconnectLastError: "",

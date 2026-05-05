@@ -712,6 +712,7 @@ sensor:
     icon: mdi:water-pump
     register_type: holding
     address: 2138
+    force_new_range: true
     #skip_updates: 0
     unit_of_measurement: "L/h"
     device_class: "volume_flow_rate"

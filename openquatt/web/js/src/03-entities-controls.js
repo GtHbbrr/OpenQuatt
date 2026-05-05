@@ -905,20 +905,31 @@
     );
   }
 
-  async function refreshTrendHistoryData() {
+  async function refreshTrendHistoryData(options = {}) {
     if (!isTrendHistoryEnabled()) {
       const changed = Boolean(state.trendHistoryRaw || state.trendHistoryError);
       state.trendHistoryRaw = "";
       state.trendHistoryError = "";
       state.trendHistorySignature = "";
       state.trendHistoryNowMs = Number.NaN;
+      state.trendHistoryLastFetchAt = 0;
       return changed;
     }
     if (isDevPreviewEnvironmentForFetches()) {
       return false;
     }
 
-    try {
+    const force = options.force === true;
+    const now = Date.now();
+    if (!force && state.trendHistoryFetchPromise) {
+      return state.trendHistoryFetchPromise;
+    }
+    if (!force && (state.trendHistoryRaw || state.trendHistoryError) &&
+        (now - Number(state.trendHistoryLastFetchAt || 0)) < TREND_HISTORY_REFRESH_INTERVAL_MS) {
+      return false;
+    }
+
+    state.trendHistoryFetchPromise = (async () => {
       const windowHours = normalizeTrendWindowHours(state.trendWindowHours || DEFAULT_TREND_WINDOW_HOURS);
       if (windowHours !== state.trendWindowHours) {
         setTrendWindowHours(windowHours);
@@ -947,7 +958,12 @@
       state.trendHistoryError = "";
       state.trendHistorySignature = signature;
       state.trendHistoryNowMs = Number.isFinite(nowMs) ? nowMs : Number.NaN;
+      state.trendHistoryLastFetchAt = Date.now();
       return changed;
+    })();
+
+    try {
+      return await state.trendHistoryFetchPromise;
     } catch (error) {
       const nextError = `Trendhistorie kon niet worden geladen. ${error.message}`;
       const changed = state.trendHistoryError !== nextError;
@@ -955,7 +971,10 @@
       state.trendHistoryRaw = "";
       state.trendHistorySignature = "";
       state.trendHistoryNowMs = Number.NaN;
+      state.trendHistoryLastFetchAt = Date.now();
       return changed;
+    } finally {
+      state.trendHistoryFetchPromise = null;
     }
   }
 
@@ -981,7 +1000,7 @@
     try {
       await refreshEntities(keys, "all");
       if (state.appView === "overview" || state.appView === "trends") {
-        await refreshTrendHistoryData();
+        await refreshTrendHistoryData({ force: true });
       }
       await refreshAuthStatus();
     } finally {
@@ -1314,7 +1333,7 @@
       }
       setTrendWindowHours(Number(button.dataset.trendHours || 24));
       render();
-      void refreshTrendHistoryData().then((changed) => {
+      void refreshTrendHistoryData({ force: true }).then((changed) => {
         if (changed) {
           render();
         }
