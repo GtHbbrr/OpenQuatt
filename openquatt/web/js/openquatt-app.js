@@ -11,6 +11,7 @@ const LOGO_MARKUP = `
   };
   const OFFICIAL_ESPHOME_UI_URL = "https://oi.esphome.io/v3/www.js";
   const ENTITY_REFRESH_CONCURRENCY = 4;
+  const TREND_HISTORY_REFRESH_INTERVAL_MS = 60000;
   const STRATEGY_OPTION_POWER_HOUSE = "Power House";
   const STRATEGY_OPTION_CURVE = "Water Temperature Control (heating curve)";
 
@@ -708,6 +709,8 @@ const OPENQUATT_RESUME_CLEAR_VALUE = "2000-01-01 00:00:00";
     trendHistoryError: "",
     trendHistorySignature: "",
     trendHistoryNowMs: Number.NaN,
+    trendHistoryLastFetchAt: 0,
+    trendHistoryFetchPromise: null,
     deviceReconnectMode: "",
     deviceReconnectStartedAt: 0,
     deviceReconnectLastError: "",
@@ -3756,20 +3759,31 @@ const OPENQUATT_RESUME_CLEAR_VALUE = "2000-01-01 00:00:00";
     );
   }
 
-  async function refreshTrendHistoryData() {
+  async function refreshTrendHistoryData(options = {}) {
     if (!isTrendHistoryEnabled()) {
       const changed = Boolean(state.trendHistoryRaw || state.trendHistoryError);
       state.trendHistoryRaw = "";
       state.trendHistoryError = "";
       state.trendHistorySignature = "";
       state.trendHistoryNowMs = Number.NaN;
+      state.trendHistoryLastFetchAt = 0;
       return changed;
     }
     if (isDevPreviewEnvironmentForFetches()) {
       return false;
     }
 
-    try {
+    const force = options.force === true;
+    const now = Date.now();
+    if (!force && state.trendHistoryFetchPromise) {
+      return state.trendHistoryFetchPromise;
+    }
+    if (!force && (state.trendHistoryRaw || state.trendHistoryError) &&
+        (now - Number(state.trendHistoryLastFetchAt || 0)) < TREND_HISTORY_REFRESH_INTERVAL_MS) {
+      return false;
+    }
+
+    state.trendHistoryFetchPromise = (async () => {
       const windowHours = normalizeTrendWindowHours(state.trendWindowHours || DEFAULT_TREND_WINDOW_HOURS);
       if (windowHours !== state.trendWindowHours) {
         setTrendWindowHours(windowHours);
@@ -3798,7 +3812,12 @@ const OPENQUATT_RESUME_CLEAR_VALUE = "2000-01-01 00:00:00";
       state.trendHistoryError = "";
       state.trendHistorySignature = signature;
       state.trendHistoryNowMs = Number.isFinite(nowMs) ? nowMs : Number.NaN;
+      state.trendHistoryLastFetchAt = Date.now();
       return changed;
+    })();
+
+    try {
+      return await state.trendHistoryFetchPromise;
     } catch (error) {
       const nextError = `Trendhistorie kon niet worden geladen. ${error.message}`;
       const changed = state.trendHistoryError !== nextError;
@@ -3806,7 +3825,10 @@ const OPENQUATT_RESUME_CLEAR_VALUE = "2000-01-01 00:00:00";
       state.trendHistoryRaw = "";
       state.trendHistorySignature = "";
       state.trendHistoryNowMs = Number.NaN;
+      state.trendHistoryLastFetchAt = Date.now();
       return changed;
+    } finally {
+      state.trendHistoryFetchPromise = null;
     }
   }
 
@@ -3832,7 +3854,7 @@ const OPENQUATT_RESUME_CLEAR_VALUE = "2000-01-01 00:00:00";
     try {
       await refreshEntities(keys, "all");
       if (state.appView === "overview" || state.appView === "trends") {
-        await refreshTrendHistoryData();
+        await refreshTrendHistoryData({ force: true });
       }
       await refreshAuthStatus();
     } finally {
@@ -4165,7 +4187,7 @@ const OPENQUATT_RESUME_CLEAR_VALUE = "2000-01-01 00:00:00";
       }
       setTrendWindowHours(Number(button.dataset.trendHours || 24));
       render();
-      void refreshTrendHistoryData().then((changed) => {
+      void refreshTrendHistoryData({ force: true }).then((changed) => {
         if (changed) {
           render();
         }
