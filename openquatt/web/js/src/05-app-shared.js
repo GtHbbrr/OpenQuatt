@@ -144,6 +144,23 @@
     if (typeof document === "undefined") {
       return;
     }
+    if (state.nativeOpen) {
+      document.documentElement.classList.add("oq-surface-native");
+      if (document.body) {
+        document.body.classList.add("oq-surface-native");
+      }
+      document.documentElement.classList.remove("oq-page-dark", "oq-page-light");
+      if (document.body) {
+        document.body.classList.remove("oq-page-dark", "oq-page-light");
+      }
+      return;
+    }
+
+    document.documentElement.classList.remove("oq-surface-native");
+    if (document.body) {
+      document.body.classList.remove("oq-surface-native");
+    }
+
     const isDark = state.overviewTheme === "dark";
     document.documentElement.classList.toggle("oq-page-dark", isDark);
     document.documentElement.classList.toggle("oq-page-light", !isDark);

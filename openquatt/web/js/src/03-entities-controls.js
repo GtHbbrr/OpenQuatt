@@ -199,6 +199,11 @@
     return [...new Set(["setupComplete", ...SETTINGS_KEYS])];
   }
 
+  function getDevInitialLoadDelayMs() {
+    const raw = typeof window !== "undefined" ? Number(window.__OQ_DEV_LOAD_DELAY_MS || 0) : 0;
+    return Number.isFinite(raw) && raw > 0 ? raw : 0;
+  }
+
   function formatValue(key, value = getEntityValue(key)) {
     if (value === "" || value === null || Number.isNaN(Number(value))) {
       return "—";
@@ -990,19 +995,83 @@
     }
   }
 
+  function getInitialPrimeKeys() {
+    const base = ["setupComplete", "strategy", ...HEADER_ENTITY_KEYS];
+    if (state.appView === "settings") {
+      return [...new Set([...base, ...getSettingsRefreshKeys()])];
+    }
+    if (state.appView === "overview" || state.appView === "trends" || state.appView === "energy") {
+      return [...new Set([...base, ...FAST_OVERVIEW_KEYS])];
+    }
+    return [...new Set(base)];
+  }
+
+  function getDeferredPrimeKeys(initialKeys = []) {
+    const initial = new Set(initialKeys);
+    const fullKeys = state.appView === "settings"
+      ? [...new Set(["setupComplete", "strategy", ...HEADER_ENTITY_KEYS, ...getSettingsRefreshKeys()])]
+      : state.appView === "overview" || state.appView === "trends" || state.appView === "energy"
+        ? [...new Set(["setupComplete", "strategy", ...HEADER_ENTITY_KEYS, ...OVERVIEW_KEYS, ...FIRMWARE_ENTITY_KEYS])]
+        : [...new Set(["setupComplete", "strategy", ...HEADER_ENTITY_KEYS])];
+    return fullKeys.filter((key) => !initial.has(key));
+  }
+
+  async function primeDeferredEntities(keys) {
+    if (!keys.length || state.nativeOpen) {
+      return;
+    }
+
+    state.entitySyncInFlight = true;
+    try {
+      await refreshEntities(keys, "state");
+    } finally {
+      state.entitySyncInFlight = false;
+    }
+
+    if (state.mounted && !state.nativeOpen) {
+      render();
+    }
+  }
+
+  async function primeSupplementaryData() {
+    if (state.nativeOpen) {
+      return;
+    }
+
+    try {
+      if (state.appView === "overview" || state.appView === "trends") {
+        await refreshTrendHistoryData({ force: true });
+      }
+      await refreshAuthStatus();
+    } finally {
+      if (state.mounted && !state.nativeOpen) {
+        render();
+      }
+    }
+  }
+
   async function primeEntities() {
     if (state.nativeOpen) {
       return;
     }
     state.loadingEntities = true;
     render();
-    const keys = Object.keys(ENTITY_DEFS).filter((key) => !["apply", "reset"].includes(key));
+    const loadDelayMs = getDevInitialLoadDelayMs();
+    if (loadDelayMs > 0) {
+      await new Promise((resolve) => window.setTimeout(resolve, loadDelayMs));
+    }
+    const initialKeys = getInitialPrimeKeys();
+    const deferredKeys = getDeferredPrimeKeys(initialKeys);
     try {
-      await refreshEntities(keys, "all");
-      if (state.appView === "overview" || state.appView === "trends") {
-        await refreshTrendHistoryData({ force: true });
-      }
-      await refreshAuthStatus();
+      await refreshEntities(initialKeys, "all");
+      state.loadingEntities = false;
+      render();
+      window.setTimeout(() => {
+        void primeDeferredEntities(deferredKeys);
+      }, 0);
+      window.setTimeout(() => {
+        void primeSupplementaryData();
+      }, 0);
     } finally {
       state.loadingEntities = false;
       render();

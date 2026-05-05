@@ -12,11 +12,24 @@ function renderSettingsView() {
 
   function renderInitialLoadingView() {
     return `
-      <section class="oq-helper-panel">
-        <p class="oq-helper-label">OpenQuatt</p>
-        <h2 class="oq-helper-section-title">OpenQuatt laden</h2>
-        <p class="oq-helper-section-copy">We halen de actuele gegevens op en zetten de interface klaar.</p>
-      </section>
+      <div class="oq-helper-modal-backdrop${state.overviewTheme === "dark" ? " oq-helper-modal-backdrop--dark" : ""} oq-helper-modal-backdrop--loading" data-oq-modal="initial-load">
+        <section class="oq-helper-modal oq-helper-modal--reconnect oq-helper-modal--loading" role="status" aria-live="polite" aria-labelledby="oq-loading-modal-title">
+          <div class="oq-helper-modal-head">
+            <div>
+              <p class="oq-helper-modal-kicker">OpenQuatt</p>
+              <h2 class="oq-helper-modal-title" id="oq-loading-modal-title">OpenQuatt laden</h2>
+            </div>
+          </div>
+          <p class="oq-helper-modal-copy">We halen de eerste gegevens op en zetten de interface klaar. De rest vullen we meteen daarna aan op de achtergrond.</p>
+          <div class="oq-helper-reconnect-status oq-helper-loading-status">
+            <span class="oq-helper-reconnect-spinner" aria-hidden="true"></span>
+            <div>
+              <strong>Eerste synchronisatie</strong>
+              <span>De belangrijkste data wordt nu opgehaald.</span>
+            </div>
+          </div>
+        </section>
+      </div>
     `;
   }
 
@@ -41,7 +54,7 @@ function renderSettingsView() {
       return;
     }
 
-    const mainContent = state.loadingEntities || !hasLoadedEntities()
+    const mainContent = state.loadingEntities
       ? renderInitialLoadingView()
       : state.appView === "overview"
       ? renderOverviewView()

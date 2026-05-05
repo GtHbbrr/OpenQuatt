@@ -51,6 +51,12 @@ body.oq-page-light {
   background: linear-gradient(180deg, #f6f2ea 0%, #f8fafc 100%);
 }
 
+html.oq-surface-native,
+body.oq-surface-native {
+  color-scheme: light dark;
+  background: transparent;
+}
+
 .oq-helper-shell {
   margin-bottom: 18px;
   color: var(--oq-helper-ink);
@@ -787,6 +793,10 @@ body.oq-page-light {
   backdrop-filter: blur(8px);
 }
 
+.oq-helper-modal-backdrop--loading {
+  align-items: center;
+}
+
 .oq-helper-modal {
   width: min(100%, 560px);
   border: 1px solid rgba(226, 232, 240, 0.9);
@@ -804,6 +814,10 @@ body.oq-page-light {
 
 .oq-helper-modal--reconnect {
   width: min(100%, 560px);
+}
+
+.oq-helper-modal--loading {
+  width: min(100%, 620px);
 }
 
 .oq-helper-modal--quickstart {
@@ -952,9 +966,22 @@ body.oq-page-light {
   background: linear-gradient(180deg, rgba(255, 247, 237, 0.76), rgba(255, 255, 255, 0.96));
 }
 
+.oq-helper-loading-status {
+  margin-top: 4px;
+}
+
+.oq-helper-loading-status span {
+  color: var(--oq-helper-faint);
+}
+
 .oq-helper-shell--dark .oq-helper-reconnect-status,
 .oq-helper-modal-backdrop--dark .oq-helper-reconnect-status {
   background: linear-gradient(180deg, rgba(66, 32, 14, 0.28), rgba(22, 33, 49, 0.94));
+}
+
+.oq-helper-shell--dark .oq-helper-loading-status span,
+.oq-helper-modal-backdrop--dark .oq-helper-loading-status span {
+  color: #94a3b8;
 }
 
 .oq-helper-reconnect-spinner {

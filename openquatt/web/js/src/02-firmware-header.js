@@ -1085,7 +1085,7 @@
       : "";
 
     return `
-      <div class="oq-helper-shell${state.overviewTheme === "dark" ? " oq-helper-shell--dark" : ""} oq-native-surface-shell">
+      <div class="oq-helper-shell oq-native-surface-shell">
         <div class="oq-helper-card oq-native-surface-card">
           <div class="oq-native-surface-head">
             <div class="oq-native-surface-copy">

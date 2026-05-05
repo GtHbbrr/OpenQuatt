@@ -142,6 +142,7 @@ NESTED_KEY_ORDER_RULES = {
         "oq_heatpump_listener_extras",
     ),
     ("openquatt_duo_waveshare.yaml", "packages"): (
+        "oq_waveshare_psram",
         "openquatt_base",
     ),
     ("openquatt_single_heatpump_listener.yaml", "packages"): (
@@ -149,6 +150,7 @@ NESTED_KEY_ORDER_RULES = {
         "oq_heatpump_listener_extras",
     ),
     ("openquatt_single_waveshare.yaml", "packages"): (
+        "oq_waveshare_psram",
         "openquatt_base",
     ),
 }

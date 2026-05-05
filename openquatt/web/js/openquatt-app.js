@@ -511,6 +511,11 @@ const LOGO_MARKUP = `
   const FAST_OVERVIEW_KEYS = [
     "strategy",
     "openquattEnabled",
+    "openquattResumeAt",
+    "manualCoolingEnable",
+    "coolingPermitted",
+    "coolingRequestActive",
+    "coolingBlockReason",
     "controlModeLabel",
     "flowMode",
     "flowSelected",
@@ -532,6 +537,7 @@ const LOGO_MARKUP = `
     "hpCapacity",
     "boilerHeatPower",
     "systemHeatPower",
+    "silentModeOverride",
     "hp1Power",
     "hp1Heat",
     "hp1Compressor",
@@ -2501,7 +2507,7 @@ const OPENQUATT_RESUME_CLEAR_VALUE = "2000-01-01 00:00:00";
       : "";
 
     return `
-      <div class="oq-helper-shell${state.overviewTheme === "dark" ? " oq-helper-shell--dark" : ""} oq-native-surface-shell">
+      <div class="oq-helper-shell oq-native-surface-shell">
         <div class="oq-helper-card oq-native-surface-card">
           <div class="oq-native-surface-head">
             <div class="oq-native-surface-copy">
@@ -3126,6 +3132,11 @@ const OPENQUATT_RESUME_CLEAR_VALUE = "2000-01-01 00:00:00";
 
   function getSettingsRefreshKeys() {
     return [...new Set(["setupComplete", ...SETTINGS_KEYS])];
+  }
+
+  function getDevInitialLoadDelayMs() {
+    const raw = typeof window !== "undefined" ? Number(window.__OQ_DEV_LOAD_DELAY_MS || 0) : 0;
+    return Number.isFinite(raw) && raw > 0 ? raw : 0;
   }
 
   function formatValue(key, value = getEntityValue(key)) {
@@ -3919,19 +3930,83 @@ const OPENQUATT_RESUME_CLEAR_VALUE = "2000-01-01 00:00:00";
     }
   }
 
+  function getInitialPrimeKeys() {
+    const base = ["setupComplete", "strategy", ...HEADER_ENTITY_KEYS];
+    if (state.appView === "settings") {
+      return [...new Set([...base, ...getSettingsRefreshKeys()])];
+    }
+    if (state.appView === "overview" || state.appView === "trends" || state.appView === "energy") {
+      return [...new Set([...base, ...FAST_OVERVIEW_KEYS])];
+    }
+    return [...new Set(base)];
+  }
+
+  function getDeferredPrimeKeys(initialKeys = []) {
+    const initial = new Set(initialKeys);
+    const fullKeys = state.appView === "settings"
+      ? [...new Set(["setupComplete", "strategy", ...HEADER_ENTITY_KEYS, ...getSettingsRefreshKeys()])]
+      : state.appView === "overview" || state.appView === "trends" || state.appView === "energy"
+        ? [...new Set(["setupComplete", "strategy", ...HEADER_ENTITY_KEYS, ...OVERVIEW_KEYS, ...FIRMWARE_ENTITY_KEYS])]
+        : [...new Set(["setupComplete", "strategy", ...HEADER_ENTITY_KEYS])];
+    return fullKeys.filter((key) => !initial.has(key));
+  }
+
+  async function primeDeferredEntities(keys) {
+    if (!keys.length || state.nativeOpen) {
+      return;
+    }
+
+    state.entitySyncInFlight = true;
+    try {
+      await refreshEntities(keys, "state");
+    } finally {
+      state.entitySyncInFlight = false;
+    }
+
+    if (state.mounted && !state.nativeOpen) {
+      render();
+    }
+  }
+
+  async function primeSupplementaryData() {
+    if (state.nativeOpen) {
+      return;
+    }
+
+    try {
+      if (state.appView === "overview" || state.appView === "trends") {
+        await refreshTrendHistoryData({ force: true });
+      }
+      await refreshAuthStatus();
+    } finally {
+      if (state.mounted && !state.nativeOpen) {
+        render();
+      }
+    }
+  }
+
   async function primeEntities() {
     if (state.nativeOpen) {
       return;
     }
     state.loadingEntities = true;
     render();
-    const keys = Object.keys(ENTITY_DEFS).filter((key) => !["apply", "reset"].includes(key));
+    const loadDelayMs = getDevInitialLoadDelayMs();
+    if (loadDelayMs > 0) {
+      await new Promise((resolve) => window.setTimeout(resolve, loadDelayMs));
+    }
+    const initialKeys = getInitialPrimeKeys();
+    const deferredKeys = getDeferredPrimeKeys(initialKeys);
     try {
-      await refreshEntities(keys, "all");
-      if (state.appView === "overview" || state.appView === "trends") {
-        await refreshTrendHistoryData({ force: true });
-      }
-      await refreshAuthStatus();
+      await refreshEntities(initialKeys, "all");
+      state.loadingEntities = false;
+      render();
+      window.setTimeout(() => {
+        void primeDeferredEntities(deferredKeys);
+      }, 0);
+      window.setTimeout(() => {
+        void primeSupplementaryData();
+      }, 0);
     } finally {
       state.loadingEntities = false;
       render();
@@ -5400,6 +5475,23 @@ const OPENQUATT_RESUME_CLEAR_VALUE = "2000-01-01 00:00:00";
     if (typeof document === "undefined") {
       return;
     }
+    if (state.nativeOpen) {
+      document.documentElement.classList.add("oq-surface-native");
+      if (document.body) {
+        document.body.classList.add("oq-surface-native");
+      }
+      document.documentElement.classList.remove("oq-page-dark", "oq-page-light");
+      if (document.body) {
+        document.body.classList.remove("oq-page-dark", "oq-page-light");
+      }
+      return;
+    }
+
+    document.documentElement.classList.remove("oq-surface-native");
+    if (document.body) {
+      document.body.classList.remove("oq-surface-native");
+    }
+
     const isDark = state.overviewTheme === "dark";
     document.documentElement.classList.toggle("oq-page-dark", isDark);
     document.documentElement.classList.toggle("oq-page-light", !isDark);
@@ -11276,11 +11368,24 @@ function renderSettingsView() {
 
   function renderInitialLoadingView() {
     return `
-      <section class="oq-helper-panel">
-        <p class="oq-helper-label">OpenQuatt</p>
-        <h2 class="oq-helper-section-title">OpenQuatt laden</h2>
-        <p class="oq-helper-section-copy">We halen de actuele gegevens op en zetten de interface klaar.</p>
-      </section>
+      <div class="oq-helper-modal-backdrop${state.overviewTheme === "dark" ? " oq-helper-modal-backdrop--dark" : ""} oq-helper-modal-backdrop--loading" data-oq-modal="initial-load">
+        <section class="oq-helper-modal oq-helper-modal--reconnect oq-helper-modal--loading" role="status" aria-live="polite" aria-labelledby="oq-loading-modal-title">
+          <div class="oq-helper-modal-head">
+            <div>
+              <p class="oq-helper-modal-kicker">OpenQuatt</p>
+              <h2 class="oq-helper-modal-title" id="oq-loading-modal-title">OpenQuatt laden</h2>
+            </div>
+          </div>
+          <p class="oq-helper-modal-copy">We halen de eerste gegevens op en zetten de interface klaar. De rest vullen we meteen daarna aan op de achtergrond.</p>
+          <div class="oq-helper-reconnect-status oq-helper-loading-status">
+            <span class="oq-helper-reconnect-spinner" aria-hidden="true"></span>
+            <div>
+              <strong>Eerste synchronisatie</strong>
+              <span>De belangrijkste data wordt nu opgehaald.</span>
+            </div>
+          </div>
+        </section>
+      </div>
     `;
   }
 
@@ -11305,7 +11410,7 @@ function renderSettingsView() {
       return;
     }
 
-    const mainContent = state.loadingEntities || !hasLoadedEntities()
+    const mainContent = state.loadingEntities
       ? renderInitialLoadingView()
       : state.appView === "overview"
       ? renderOverviewView()
