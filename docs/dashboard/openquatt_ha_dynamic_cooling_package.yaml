@@ -212,8 +212,8 @@ template:
           {% endfor %}
           {{ ns.values | max | round(2) if ns.values | count > 0 else 0 }}
 
-      - name: OpenQuatt Cooling Room 1 Dew Point Effective
-        unique_id: openquatt_cooling_room_1_dew_point_effective
+      - name: OpenQuatt HA Cooling Room 1 Dew Point Effective
+        unique_id: openquatt_ha_cooling_room_1_dew_point_effective
         unit_of_measurement: "°C"
         device_class: temperature
         state_class: measurement
@@ -250,8 +250,8 @@ template:
             {% endif %}
           {% endif %}
 
-      - name: OpenQuatt Cooling Room 2 Dew Point Effective
-        unique_id: openquatt_cooling_room_2_dew_point_effective
+      - name: OpenQuatt HA Cooling Room 2 Dew Point Effective
+        unique_id: openquatt_ha_cooling_room_2_dew_point_effective
         unit_of_measurement: "°C"
         device_class: temperature
         state_class: measurement
@@ -288,8 +288,8 @@ template:
             {% endif %}
           {% endif %}
 
-      - name: OpenQuatt Cooling Room 3 Dew Point Effective
-        unique_id: openquatt_cooling_room_3_dew_point_effective
+      - name: OpenQuatt HA Cooling Room 3 Dew Point Effective
+        unique_id: openquatt_ha_cooling_room_3_dew_point_effective
         unit_of_measurement: "°C"
         device_class: temperature
         state_class: measurement
@@ -326,8 +326,8 @@ template:
             {% endif %}
           {% endif %}
 
-      - name: OpenQuatt Cooling Room 4 Dew Point Effective
-        unique_id: openquatt_cooling_room_4_dew_point_effective
+      - name: OpenQuatt HA Cooling Room 4 Dew Point Effective
+        unique_id: openquatt_ha_cooling_room_4_dew_point_effective
         unit_of_measurement: "°C"
         device_class: temperature
         state_class: measurement
@@ -364,8 +364,8 @@ template:
             {% endif %}
           {% endif %}
 
-      - name: OpenQuatt Cooling Room 5 Dew Point Effective
-        unique_id: openquatt_cooling_room_5_dew_point_effective
+      - name: OpenQuatt HA Cooling Room 5 Dew Point Effective
+        unique_id: openquatt_ha_cooling_room_5_dew_point_effective
         unit_of_measurement: "°C"
         device_class: temperature
         state_class: measurement
@@ -402,8 +402,8 @@ template:
             {% endif %}
           {% endif %}
 
-      - name: OpenQuatt Cooling Room 6 Dew Point Effective
-        unique_id: openquatt_cooling_room_6_dew_point_effective
+      - name: OpenQuatt HA Cooling Room 6 Dew Point Effective
+        unique_id: openquatt_ha_cooling_room_6_dew_point_effective
         unit_of_measurement: "°C"
         device_class: temperature
         state_class: measurement
