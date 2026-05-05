@@ -31,7 +31,7 @@ class OpenQuattLogHistory : public Component {
 
  protected:
   static constexpr size_t ENTRY_CAPACITY = 250;
-  static constexpr size_t RAW_MAX_LEN = 96;
+  static constexpr size_t RAW_MAX_LEN = 224;
 
   struct LogEntry {
     uint16_t seq{0};
