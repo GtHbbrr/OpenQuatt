@@ -53,7 +53,7 @@ number:
   - platform: template
     id: cooling_safety_margin
     name: "Cooling Safety Margin"
-    icon: mdi:shield-thermometer
+    icon: mdi:shield-check
     unit_of_measurement: "°C"
     min_value: 0.0
     max_value: 4.0
@@ -287,7 +287,7 @@ sensor:
   - platform: template
     id: cooling_safety_margin_selected
     name: "Cooling Safety Margin (Selected)"
-    icon: mdi:shield-thermometer
+    icon: mdi:shield-check
     unit_of_measurement: "°C"
     accuracy_decimals: 1
     update_interval: 10s
@@ -337,7 +337,7 @@ sensor:
   - platform: template
     id: minimum_safe_supply_temp
     name: "Cooling Minimum Safe Supply Temp"
-    icon: mdi:shield-thermometer
+    icon: mdi:water-thermometer
     unit_of_measurement: "°C"
     device_class: temperature
     state_class: measurement
@@ -411,7 +411,7 @@ sensor:
   - platform: template
     id: cooling_effective_min_supply_temp
     name: "Cooling Effective Minimum Supply Temp"
-    icon: mdi:shield-thermometer
+    icon: mdi:water-thermometer
     unit_of_measurement: "°C"
     device_class: temperature
     state_class: measurement
