@@ -37,6 +37,8 @@ esphome:
     - ${heating_curve_logic_header}
   platformio_options:
     board_build.partitions: ../../../openquatt/partitions/openquatt_8mb_trends.csv
+    extra_scripts:
+      - pre:../../../scripts/fix_factory_flasher_args.py
     build_flags:
       # Hard-pinned for Single entrypoints to prevent accidental topology drift.
       - -DOQ_TOPOLOGY_DUO=0
