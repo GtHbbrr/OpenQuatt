@@ -279,8 +279,6 @@ text_sensor:
       if (id(oq_outside_temp_selected_hold_active)) add("Outside temp");
       if (id(oq_room_temp_selected_hold_active)) add("Room temp");
       if (id(oq_room_setpoint_selected_hold_active)) add("Room setpoint");
-      if (id(oq_cooling_room_count_selected_hold_active)) add("Cooling room count");
-      if (id(oq_cooling_valid_room_count_hold_active)) add("Cooling valid rooms");
       if (id(oq_cooling_dew_point_selected_hold_active)) add("Cooling dew point");
 
       if (active.empty()) active = "None";
