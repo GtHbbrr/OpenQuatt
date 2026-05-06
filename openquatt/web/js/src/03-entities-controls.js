@@ -304,6 +304,21 @@
     return [...new Set(INITIAL_SETTINGS_READY_KEY_MAP[normalized] || INITIAL_SETTINGS_READY_KEY_MAP.installation)];
   }
 
+  function queuePendingEntitySyncOptions(options = {}) {
+    const current = state.pendingEntitySyncOptions || {};
+    const merged = {
+      ...current,
+      ...options,
+    };
+    if (current.forceBulk || options.forceBulk) {
+      merged.forceBulk = true;
+      merged.forceFast = false;
+    } else if (current.forceFast || options.forceFast) {
+      merged.forceFast = true;
+    }
+    state.pendingEntitySyncOptions = merged;
+  }
+
   function hasUsableEntityValue(key) {
     const value = String(getEntityValue(key) ?? "").trim().toLowerCase();
     return value !== "" && value !== "unknown" && value !== "unavailable" && value !== "nan";
@@ -467,10 +482,14 @@
     }
   }
 
-  async function refreshEntities(keys, detail = "state") {
+  async function refreshEntities(keys, detail = "state", options = {}) {
+    const requestedConcurrency = Number(options.concurrency);
+    const concurrency = Number.isFinite(requestedConcurrency) && requestedConcurrency > 0
+      ? Math.floor(requestedConcurrency)
+      : ENTITY_REFRESH_CONCURRENCY;
     const results = [];
-    for (let index = 0; index < keys.length; index += ENTITY_REFRESH_CONCURRENCY) {
-      const batch = keys.slice(index, index + ENTITY_REFRESH_CONCURRENCY);
+    for (let index = 0; index < keys.length; index += concurrency) {
+      const batch = keys.slice(index, index + concurrency);
       const batchResults = await Promise.allSettled(
         batch.map(async (key) => ({ key, payload: await fetchEntityPayload(key, detail) }))
       );
@@ -1193,7 +1212,9 @@
 
     state.entitySyncInFlight = true;
     try {
-      await refreshEntities(keys, detail);
+      await refreshEntities(keys, detail, {
+        concurrency: detail === "all" ? ENTITY_REFRESH_CONCURRENCY : FAST_VIEW_ENTITY_REFRESH_CONCURRENCY,
+      });
     } finally {
       state.entitySyncInFlight = false;
       const pendingOptions = state.pendingEntitySyncOptions;
@@ -1239,8 +1260,11 @@
     }
     const initialKeys = getInitialPrimeKeys();
     const deferredKeys = getDeferredPrimeKeys(initialKeys);
+    const initialDetail = state.appView === "settings" ? "all" : "state";
     try {
-      await refreshEntities(initialKeys, "all");
+      await refreshEntities(initialKeys, initialDetail, {
+        concurrency: initialDetail === "all" ? ENTITY_REFRESH_CONCURRENCY : FAST_VIEW_ENTITY_REFRESH_CONCURRENCY,
+      });
       if (state.appView === "settings") {
         await waitForInitialSettingsReady();
       } else {
@@ -1262,13 +1286,7 @@
       return;
     }
     if (state.entitySyncInFlight) {
-      if (options.forceBulk === true) {
-        state.pendingEntitySyncOptions = {
-          ...(state.pendingEntitySyncOptions || {}),
-          ...options,
-          forceBulk: true,
-        };
-      }
+      queuePendingEntitySyncOptions(options);
       return;
     }
 
@@ -1278,15 +1296,16 @@
     }
 
     const appView = state.appView;
-    const isOverviewLike = appView === "overview" || appView === "trends";
-    const isBulkDue = options.forceBulk === true || (now - Number(state.lastBulkEntitySyncAt || 0)) >= BULK_POLL_INTERVAL_MS;
+    const isOverviewLike = appView === "overview" || appView === "trends" || appView === "energy";
+    const forceFast = options.forceFast === true && !options.forceBulk;
+    const isBulkDue = !forceFast && (options.forceBulk === true || (now - Number(state.lastBulkEntitySyncAt || 0)) >= BULK_POLL_INTERVAL_MS);
     const isStaticDue = (now - Number(state.lastStaticEntitySyncAt || 0)) >= STATIC_POLL_INTERVAL_MS;
     const staticKeys = isStaticDue || state.updateInstallBusy || state.updateInstallPhaseHint
       ? FIRMWARE_ENTITY_KEYS
       : [];
     const keys = isOverviewLike
       ? [
-          ...(isBulkDue ? OVERVIEW_KEYS : FAST_OVERVIEW_KEYS),
+          ...(forceFast ? FAST_OVERVIEW_KEYS : isBulkDue ? OVERVIEW_KEYS : FAST_OVERVIEW_KEYS),
           ...HEADER_ENTITY_KEYS,
           "setupComplete",
           ...staticKeys,
@@ -1309,7 +1328,9 @@
     state.lastEntitySyncAttemptAt = now;
     try {
       const reconnectModeBefore = state.deviceReconnectMode;
-      await refreshEntities([...new Set(keys)], appView === "settings" ? "all" : "state");
+      await refreshEntities([...new Set(keys)], appView === "settings" ? "all" : "state", {
+        concurrency: forceFast && isOverviewLike ? FAST_VIEW_ENTITY_REFRESH_CONCURRENCY : ENTITY_REFRESH_CONCURRENCY,
+      });
       state.lastFastEntitySyncAt = Date.now();
       if (isBulkDue) {
         state.lastBulkEntitySyncAt = state.lastFastEntitySyncAt;
@@ -1318,10 +1339,13 @@
         state.lastStaticEntitySyncAt = state.lastFastEntitySyncAt;
       }
       const reconnectChanged = reconnectModeBefore !== state.deviceReconnectMode;
-      const trendChanged = isOverviewLike
-        ? await refreshTrendHistoryData()
-        : false;
-      const authChanged = await refreshAuthStatus();
+      const shouldDeferSupplementary = forceFast && isOverviewLike;
+      const trendChanged = shouldDeferSupplementary
+        ? false
+        : isOverviewLike
+          ? await refreshTrendHistoryData()
+          : false;
+      const authChanged = shouldDeferSupplementary ? false : await refreshAuthStatus();
       const nextHeaderSignature = getHeaderRenderSignature();
       if (reconnectChanged) {
         render();
@@ -1360,6 +1384,11 @@
       if (!patchOverviewDom()) {
         render();
       }
+      if (shouldDeferSupplementary && !state.nativeOpen) {
+        window.setTimeout(() => {
+          void primeSupplementaryData();
+        }, 0);
+      }
     } catch (error) {
       state.controlError = `Helperstatus kon niet worden geladen. ${error.message}`;
       render();
@@ -1370,6 +1399,11 @@
       if (pendingOptions && !state.nativeOpen) {
         window.setTimeout(() => {
           void syncEntities(pendingOptions);
+        }, 0);
+      }
+      if (forceFast && isOverviewLike && !state.nativeOpen && !pendingOptions) {
+        window.setTimeout(() => {
+          void syncEntities({ forceBulk: true });
         }, 0);
       }
     }
@@ -1628,9 +1662,10 @@
       if ((button.dataset.viewId || "") === "trends" && !isTrendHistoryEnabled()) {
         return;
       }
-      setAppView(button.dataset.viewId || "overview", { syncMode: "push" });
+      const nextView = button.dataset.viewId || "overview";
+      setAppView(nextView, { syncMode: "push" });
       render();
-      syncEntities({ forceBulk: true });
+      syncEntities(nextView === "settings" ? { forceBulk: true } : { forceFast: true });
       return;
     }
 
@@ -2503,6 +2538,7 @@
       }
       state.quickStartModalOpen = action !== "apply";
       setAppView("overview", { syncMode: "replace" });
+      syncEntities({ forceFast: true });
     } catch (error) {
       state.controlError = `Actie mislukt voor "${entity.name}". ${error.message}`;
     } finally {

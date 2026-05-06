@@ -339,7 +339,7 @@
       void primeEntities();
       return;
     }
-    void syncEntities({ forceBulk: true });
+    void syncEntities(state.appView === "settings" ? { forceBulk: true } : { forceFast: true });
   }
 
   function normalizeAppView(view) {
@@ -429,7 +429,7 @@
       }
     }
     render();
-    void syncEntities({ forceBulk: true });
+    void syncEntities(nextView === "settings" ? { forceBulk: true } : { forceFast: true });
   }
 
   function syncNativeVisibility() {
