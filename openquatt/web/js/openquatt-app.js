@@ -3412,9 +3412,39 @@ const OPENQUATT_RESUME_CLEAR_VALUE = "2000-01-01 00:00:00";
     };
   }
 
+  const ENTITY_REQUEST_TIMEOUT_MS = 8000;
+  const RECONNECT_ENTITY_REQUEST_TIMEOUT_MS = 3000;
+
+  function getEntityRequestTimeoutMs() {
+    return state.deviceReconnectMode || state.busyAction === "restartAction" || state.updateInstallBusy || state.updateInstallPhaseHint
+      ? RECONNECT_ENTITY_REQUEST_TIMEOUT_MS
+      : ENTITY_REQUEST_TIMEOUT_MS;
+  }
+
   async function fetchEntityPayload(key, detail = "state") {
     const entity = ENTITY_DEFS[key];
     const url = `${buildEntityPath(entity.domain, entity.name)}${detail === "all" ? "?detail=all" : ""}`;
+    const timeoutMs = getEntityRequestTimeoutMs();
+
+    if (typeof AbortController === "function") {
+      const controller = new AbortController();
+      const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        const response = await fetch(url, { signal: controller.signal });
+        if (!response.ok) {
+          throw new Error(`${entity.name} HTTP ${response.status}`);
+        }
+        return response.json();
+      } catch (error) {
+        if (controller.signal.aborted) {
+          throw new Error(`${entity.name} request timed out after ${timeoutMs}ms`);
+        }
+        throw error;
+      } finally {
+        window.clearTimeout(timeoutId);
+      }
+    }
+
     const response = await fetch(url);
     if (!response.ok) {
       throw new Error(`${entity.name} HTTP ${response.status}`);
@@ -3436,7 +3466,26 @@ const OPENQUATT_RESUME_CLEAR_VALUE = "2000-01-01 00:00:00";
 
   function noteEntityRefreshSuccess() {
     state.lastEntitySyncAt = Date.now();
+    const wasReconnectActive = Boolean(state.deviceReconnectMode);
     clearDeviceReconnect();
+    if (wasReconnectActive) {
+      state.lastFastEntitySyncAt = 0;
+      state.lastBulkEntitySyncAt = 0;
+      state.lastStaticEntitySyncAt = 0;
+      state.trendHistoryRaw = "";
+      state.trendHistoryError = "";
+      state.trendHistorySignature = "";
+      state.trendHistoryNowMs = Number.NaN;
+      state.trendHistoryLastFetchAt = 0;
+      if (typeof resetWebServerLogRecoveryState === "function") {
+        resetWebServerLogRecoveryState();
+      } else {
+        closeWebServerLogStream();
+        clearWebServerLogOutput();
+        state.webServerLogEnabled = null;
+        state.webServerLogConnected = false;
+      }
+    }
   }
 
   function noteEntityRefreshFailure(message) {
@@ -6202,6 +6251,13 @@ function clearWebServerLogOutput() {
   if (state.systemModal === "webserver-logs") {
     render();
   }
+}
+
+function resetWebServerLogRecoveryState() {
+  closeWebServerLogStream();
+  state.webServerLogEnabled = null;
+  state.webServerLogConnected = false;
+  clearWebServerLogOutput();
 }
 
 function syncWebServerLogStream() {
