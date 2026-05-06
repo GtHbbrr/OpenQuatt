@@ -488,8 +488,10 @@
   function noteEntityRefreshSuccess() {
     state.lastEntitySyncAt = Date.now();
     const wasReconnectActive = Boolean(state.deviceReconnectMode);
-    clearDeviceReconnect();
-    if (wasReconnectActive) {
+    const reconnectRecovered = wasReconnectActive && typeof markDeviceReconnectRecovered === "function"
+      ? markDeviceReconnectRecovered()
+      : false;
+    if (reconnectRecovered) {
       state.lastFastEntitySyncAt = 0;
       state.lastBulkEntitySyncAt = 0;
       state.lastStaticEntitySyncAt = 0;

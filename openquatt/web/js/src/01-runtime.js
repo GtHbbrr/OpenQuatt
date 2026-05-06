@@ -35,6 +35,8 @@
     trendHistoryFetchPromise: null,
     deviceReconnectMode: "",
     deviceReconnectStartedAt: 0,
+    deviceReconnectRecoveryStartedAt: 0,
+    deviceReconnectRecoveryTimer: null,
     deviceReconnectLastError: "",
     entitySyncFailureCount: 0,
     lastEntitySyncAt: 0,

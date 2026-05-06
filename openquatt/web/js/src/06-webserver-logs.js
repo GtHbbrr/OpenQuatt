@@ -378,6 +378,9 @@ function resetWebServerLogRecoveryState() {
   state.webServerLogEnabled = null;
   state.webServerLogConnected = false;
   clearWebServerLogOutput();
+  if (state.systemModal === "webserver-logs") {
+    void refreshWebServerLogHistory();
+  }
 }
 
 function syncWebServerLogStream() {
