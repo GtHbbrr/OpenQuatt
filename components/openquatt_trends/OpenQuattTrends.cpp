@@ -187,7 +187,7 @@ void OpenQuattTrends::setup() {
 
 void OpenQuattTrends::loop() {
   this->sync_time_state_();
-  if (!this->flash_enabled_ || this->flash_partition_ == nullptr) {
+  if (!this->flash_switch_enabled_() || this->flash_partition_ == nullptr) {
     return;
   }
 
@@ -212,7 +212,7 @@ void OpenQuattTrends::dump_config() {
   ESP_LOGCONFIG(TAG, "  RAM samples: %u / %u", static_cast<unsigned>(this->ram_count_), static_cast<unsigned>(RAM_CAPACITY));
   ESP_LOGCONFIG(TAG, "  RAM history buffer: %s",
                 !this->ram_history_ ? "missing" : (this->ram_history_.is_external() ? "PSRAM" : "internal"));
-  ESP_LOGCONFIG(TAG, "  Flash enabled: %s", YESNO(this->flash_enabled_));
+  ESP_LOGCONFIG(TAG, "  Flash enabled: %s", YESNO(this->flash_switch_enabled_()));
   ESP_LOGCONFIG(TAG, "  Flash archive scanned: %s", YESNO(this->flash_archive_scanned_));
 }
 
@@ -223,6 +223,9 @@ bool OpenQuattTrends::capture_enabled_() const {
 }
 
 bool OpenQuattTrends::flash_switch_enabled_() const {
+  if (this->flash_switch_ != nullptr) {
+    return this->flash_switch_->state;
+  }
   return this->flash_enabled_;
 }
 
@@ -341,7 +344,8 @@ void OpenQuattTrends::sync_time_state_() {
 }
 
 void OpenQuattTrends::load_archive_if_needed_() {
-  if (!this->ram_history_ || !this->flash_enabled_ || this->flash_partition_ == nullptr || !this->time_is_valid_()) {
+  if (!this->ram_history_ || !this->flash_switch_enabled_() || this->flash_partition_ == nullptr ||
+      !this->time_is_valid_()) {
     return;
   }
 
@@ -505,7 +509,7 @@ void OpenQuattTrends::reset_flash_builder_() {
 }
 
 bool OpenQuattTrends::append_sample_to_flash_(const TrendSample &sample) {
-  if (!this->flash_enabled_ || this->flash_partition_ == nullptr || !this->time_is_valid_()) {
+  if (!this->flash_switch_enabled_() || this->flash_partition_ == nullptr || !this->time_is_valid_()) {
     return false;
   }
 
@@ -602,7 +606,7 @@ bool OpenQuattTrends::write_flash_block_(const FlashBlockBuilder &builder) {
 }
 
 bool OpenQuattTrends::flush_flash_builder_(bool force) {
-  if (!this->flash_enabled_ || this->flash_partition_ == nullptr || !this->time_is_valid_()) {
+  if (!this->flash_switch_enabled_() || this->flash_partition_ == nullptr || !this->time_is_valid_()) {
     return false;
   }
 
@@ -694,30 +698,24 @@ void OpenQuattTrends::capture_sample(float outside_c, float supply_c, float room
   this->push_ram_sample_(sample);
   this->last_capture_ms_ = now_monotonic_ms;
 
-  if (this->flash_enabled_) {
+  if (this->flash_switch_enabled_()) {
     this->append_sample_to_flash_(sample);
   }
 }
 
 void OpenQuattTrends::set_flash_enabled(bool enabled) {
-  if (this->flash_enabled_ == enabled) {
-    if (enabled) {
-      this->load_archive_if_needed_();
-    }
+  if (enabled) {
+    this->flash_enabled_ = true;
+    this->load_archive_if_needed_();
     return;
   }
 
-  this->flash_enabled_ = enabled;
-  if (!enabled) {
-    this->clear_flash_archive_();
-    return;
-  }
-
-  this->load_archive_if_needed_();
+  this->flash_enabled_ = false;
+  this->clear_flash_archive_();
 }
 
 bool OpenQuattTrends::force_flush() {
-  if (!this->flash_enabled_) {
+  if (!this->flash_switch_enabled_()) {
     return false;
   }
   return this->flush_flash_builder_(true);
@@ -890,7 +888,8 @@ bool OpenQuattTrends::write_sample_line_(ChunkedTextWriter *writer, const TrendS
 void OpenQuattTrends::write_samples_for_history_(ChunkedTextWriter *writer, uint32_t window_hours) {
   const uint64_t cutoff_ms = this->get_window_cutoff_ms_(window_hours);
   const uint32_t stride = this->get_window_stride_(window_hours);
-  if (this->flash_enabled_ && this->flash_partition_ != nullptr && !this->flash_archive_scanned_) {
+  const bool flash_enabled = this->flash_switch_enabled_();
+  if (flash_enabled && this->flash_partition_ != nullptr && !this->flash_archive_scanned_) {
     this->scan_flash_archive_();
   }
   const uint64_t oldest_ram_timestamp_ms = this->get_ram_oldest_timestamp_ms_();
@@ -918,7 +917,7 @@ void OpenQuattTrends::write_samples_for_history_(ChunkedTextWriter *writer, uint
   };
 
   const bool ram_covers_window = oldest_ram_timestamp_ms != 0 && oldest_ram_timestamp_ms <= cutoff_ms;
-  const bool should_read_flash_archive = this->flash_enabled_ && this->flash_archive_scanned_ &&
+  const bool should_read_flash_archive = flash_enabled && this->flash_archive_scanned_ &&
                                          this->flash_index_count_ > 0 && !ram_covers_window;
   if (should_read_flash_archive) {
     for (size_t block_index = 0; block_index < this->flash_index_count_; ++block_index) {
