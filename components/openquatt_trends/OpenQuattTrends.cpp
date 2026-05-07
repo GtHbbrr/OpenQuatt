@@ -381,6 +381,14 @@ bool OpenQuattTrends::get_ram_sample_at_(size_t ordered_index, TrendSample *samp
   return true;
 }
 
+uint64_t OpenQuattTrends::get_ram_oldest_timestamp_ms_() const {
+  TrendSample sample{};
+  if (this->ram_count_ == 0 || !this->get_ram_sample_at_(0, &sample)) {
+    return 0;
+  }
+  return sample.timestamp_ms;
+}
+
 bool OpenQuattTrends::scan_flash_archive_() {
   this->reset_flash_metadata_();
   this->next_flash_sequence_ = 0;
@@ -813,8 +821,8 @@ std::string OpenQuattTrends::format_flash_available_span_(uint64_t oldest_timest
 
   const float span_days = static_cast<float>(newest_timestamp_ms - oldest_timestamp_ms) / static_cast<float>(24ULL * 60ULL * 60ULL * 1000ULL);
   if (span_days >= 1.0f) {
-    char buffer[24];
-    std::snprintf(buffer, sizeof(buffer), "%.1f dagen", span_days);
+    char buffer[48];
+    std::snprintf(buffer, sizeof(buffer), "Nog %.1f dagen beschikbaar", span_days);
     std::string value(buffer);
     std::replace(value.begin(), value.end(), '.', ',');
     return value;
@@ -822,14 +830,14 @@ std::string OpenQuattTrends::format_flash_available_span_(uint64_t oldest_timest
 
   const uint64_t span_hours = (newest_timestamp_ms - oldest_timestamp_ms) / (60ULL * 60ULL * 1000ULL);
   if (span_hours >= 1) {
-    char buffer[24];
-    std::snprintf(buffer, sizeof(buffer), "%llu uur", static_cast<unsigned long long>(span_hours));
+    char buffer[48];
+    std::snprintf(buffer, sizeof(buffer), "Nog %llu uur beschikbaar", static_cast<unsigned long long>(span_hours));
     return buffer;
   }
 
   const uint64_t span_minutes = (newest_timestamp_ms - oldest_timestamp_ms) / (60ULL * 1000ULL);
-  char buffer[24];
-  std::snprintf(buffer, sizeof(buffer), "%llu min", static_cast<unsigned long long>(span_minutes));
+  char buffer[48];
+  std::snprintf(buffer, sizeof(buffer), "Nog %llu min beschikbaar", static_cast<unsigned long long>(span_minutes));
   return buffer;
 }
 
@@ -860,15 +868,8 @@ bool OpenQuattTrends::write_sample_line_(ChunkedTextWriter *writer, const TrendS
 void OpenQuattTrends::write_samples_for_history_(ChunkedTextWriter *writer, uint32_t window_hours) {
   const uint64_t cutoff_ms = this->get_window_cutoff_ms_(window_hours);
   const uint32_t stride = this->get_window_stride_(window_hours);
+  const uint64_t oldest_ram_timestamp_ms = this->get_ram_oldest_timestamp_ms_();
   uint64_t emitted_flash_latest = 0;
-  bool ram_has_window_samples = false;
-  for (size_t index = 0; index < this->ram_count_; ++index) {
-    TrendSample sample{};
-    if (this->get_ram_sample_at_(index, &sample) && sample.timestamp_ms >= cutoff_ms) {
-      ram_has_window_samples = true;
-      break;
-    }
-  }
 
   uint64_t window_index = 0;
   bool has_last_sample = false;
@@ -891,9 +892,9 @@ void OpenQuattTrends::write_samples_for_history_(ChunkedTextWriter *writer, uint
     return should_emit;
   };
 
-  const bool long_window = window_hours > (RAM_WINDOW_MS / (60UL * 60UL * 1000UL));
-  const bool should_read_flash_archive = long_window || !ram_has_window_samples;
-  if (should_read_flash_archive && this->flash_enabled_ && this->flash_archive_scanned_) {
+  const bool ram_covers_window = oldest_ram_timestamp_ms != 0 && oldest_ram_timestamp_ms <= cutoff_ms;
+  const bool should_read_flash_archive = this->flash_enabled_ && this->flash_archive_scanned_ && !ram_covers_window;
+  if (should_read_flash_archive) {
     const uint32_t first_sequence = this->next_flash_sequence_ > FLASH_SLOT_COUNT
       ? this->next_flash_sequence_ - FLASH_SLOT_COUNT
       : 0;

@@ -146,6 +146,7 @@ class OpenQuattTrends : public Component {
   void write_samples_for_history_(ChunkedTextWriter *writer, uint32_t window_hours);
   uint64_t get_window_cutoff_ms_(uint32_t window_hours) const;
   uint32_t get_window_stride_(uint32_t window_hours) const;
+  uint64_t get_ram_oldest_timestamp_ms_() const;
   uint64_t get_latest_archive_timestamp_ms_() const;
   void update_flash_metadata_(uint64_t latest_timestamp_ms);
   void reset_flash_metadata_();
