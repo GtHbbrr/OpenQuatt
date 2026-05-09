@@ -127,6 +127,7 @@ binary_sensor:
   - platform: template
     id: cooling_fallback_active
     name: "Cooling Fallback Active"
+    internal: true
     icon: mdi:water-alert
     device_class: running
     lambda: |-
@@ -218,6 +219,7 @@ text_sensor:
   - platform: template
     id: cooling_guard_mode
     name: "Cooling Guard Mode"
+    disabled_by_default: true
     icon: mdi:shield-half-full
     entity_category: diagnostic
     update_interval: 10s
@@ -235,6 +237,7 @@ text_sensor:
   - platform: template
     id: cooling_block_reason
     name: "Cooling Block Reason"
+    disabled_by_default: true
     icon: mdi:information-outline
     entity_category: diagnostic
     update_interval: 5s
@@ -354,6 +357,7 @@ sensor:
   - platform: template
     id: cooling_fallback_night_min_outdoor_temp
     name: "Cooling Fallback Night Minimum Outdoor Temp"
+    disabled_by_default: true
     icon: mdi:weather-night
     unit_of_measurement: "°C"
     device_class: temperature
@@ -378,6 +382,7 @@ sensor:
   - platform: template
     id: cooling_fallback_min_supply_temp
     name: "Cooling Fallback Minimum Supply Temp"
+    disabled_by_default: true
     icon: mdi:thermometer-chevron-down
     unit_of_measurement: "°C"
     device_class: temperature
