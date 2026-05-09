@@ -230,7 +230,6 @@ text_sensor:
   - platform: template
     id: oq_cooling_enable_effective_source
     name: "Cooling Enable Effective Source"
-    internal: true
     icon: mdi:source-branch
     entity_category: diagnostic
     update_interval: 5s
