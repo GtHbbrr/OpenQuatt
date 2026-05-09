@@ -331,6 +331,7 @@ button:
   - platform: template
     id: reset_heating_curve_pid_integral
     name: "Reset Heating Curve PID integral"
+    disabled_by_default: true
     icon: mdi:restart
     entity_category: config
     web_server:

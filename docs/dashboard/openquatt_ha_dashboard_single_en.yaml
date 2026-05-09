@@ -2365,12 +2365,6 @@ views:
               - **Minimum runtime** keeps a started compressor on for at least
               `300 s`. You can lengthen this runtime, but not lower it.
 
-              - **Demand filter ramp up** controls how many demand steps per
-              minute `Demand filtered` may rise toward `Demand raw` in Power
-              House mode.
-
-
-
               </details>
             text_only: true
           - type: entities
@@ -2378,8 +2372,6 @@ views:
             entities:
               - entity: number.openquatt_minimum_runtime
                 name: Minimum runtime
-              - entity: number.openquatt_demand_filter_ramp_up
-                name: Demand filter ramp up
       - type: grid
         cards:
           - type: heading
@@ -2748,8 +2740,8 @@ views:
               - First compare `Supply target` and `Supply actual` to see control
               error.
 
-              - Use `Heating Curve PID` and `Reset PID integral` for fine tuning
-              when response is too slow or too nervous.
+              - Use `Heating Curve PID` for fine tuning when response is too
+              slow or too nervous.
 
               - `Outside temp (selected)` helps explain why `Supply target`
               rises or drops.
@@ -2768,8 +2760,6 @@ views:
                 name: Supply target
               - entity: sensor.openquatt_water_supply_temp_selected
                 name: Supply actual (selected)
-              - entity: button.openquatt_reset_heating_curve_pid_integral
-                name: Reset PID integral
     cards: []
     header:
       card:

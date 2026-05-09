@@ -22,6 +22,7 @@ button:
   - platform: template
     id: oq_setup_complete_button
     name: "Complete setup"
+    disabled_by_default: true
     icon: mdi:check-bold
     entity_category: config
     web_server:
@@ -33,6 +34,7 @@ button:
   - platform: template
     id: oq_setup_reset_button
     name: "Reset setup state"
+    disabled_by_default: true
     icon: mdi:restart
     entity_category: config
     web_server:
