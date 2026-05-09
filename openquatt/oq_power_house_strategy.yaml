@@ -247,6 +247,7 @@ number:
   - platform: template
     id: oq_demand_filter_ramp_up_step_min
     name: "Demand filter ramp up"
+    disabled_by_default: true
     icon: mdi:stairs-up
     unit_of_measurement: "step/min"
     min_value: 1

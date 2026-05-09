@@ -249,6 +249,7 @@ number:
     id: oq_dual_hp_enable_level
     name: "Dual HP Enable Level"
     internal: ${hc_dual_tuning_internal}
+    disabled_by_default: true
     icon: mdi:arrow-up-bold-hexagon-outline
     unit_of_measurement: "lvl"
     min_value: 1
@@ -266,6 +267,7 @@ number:
     id: oq_dual_hp_enable_hold_min
     name: "Dual HP Enable Hold"
     internal: ${hc_dual_tuning_internal}
+    disabled_by_default: true
     icon: mdi:timer-plus-outline
     unit_of_measurement: "min"
     min_value: 1
@@ -283,6 +285,7 @@ number:
     id: oq_dual_hp_disable_hold_min
     name: "Dual HP Disable Hold"
     internal: ${hc_dual_tuning_internal}
+    disabled_by_default: true
     icon: mdi:timer-minus-outline
     unit_of_measurement: "min"
     min_value: 1

@@ -2451,10 +2451,6 @@ views:
               `300 s` aan. Je kunt deze runtime verlengen, maar niet lager
               zetten.
 
-              - **Demand filter ramp up** bepaalt met hoeveel demand-stappen per
-              minuut `Demand filtered` maximaal mag stijgen richting `Demand
-              raw` in PH-modus.
-
               - In heating-curve mode wordt PID-demand direct doorgezet en
               vertaald naar sequentiële levelstappen op HP1.
 
@@ -2466,8 +2462,6 @@ views:
             entities:
               - entity: number.openquatt_minimum_runtime
                 name: Minimum runtime
-              - entity: number.openquatt_demand_filter_ramp_up
-                name: Demand filter ramp up
       - type: grid
         cards:
           - type: heading
@@ -2838,8 +2832,8 @@ views:
               - Vergelijk eerst `Aanvoerdoel` met `Werkelijke aanvoer (gekozen)` om de
               regelafwijking te zien.
 
-              - Gebruik `Stooklijn-PID` en `Reset PID-integraal` bij
-              finetuning als de regeling te traag of te nerveus reageert.
+              - Gebruik `Stooklijn-PID` bij finetuning als de regeling te
+              traag of te nerveus reageert.
 
               - `Buitentemp (gekozen)` helpt verklaren waarom het `Supply
               target` stijgt of daalt.
@@ -2858,8 +2852,6 @@ views:
                 name: Aanvoerdoel
               - entity: sensor.openquatt_water_supply_temp_selected
                 name: Werkelijke aanvoer (gekozen)
-              - entity: button.openquatt_reset_heating_curve_pid_integral
-                name: Reset PID-integraal
     cards: []
     header:
       card:

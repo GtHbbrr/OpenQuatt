@@ -2624,35 +2624,9 @@ views:
               - **Minimum runtime** keeps a started compressor on for at least
               `300 s`. You can lengthen this runtime, but not lower it.
 
-              - **Demand filter ramp up** controls how many demand steps per
-              minute `Demand filtered` may rise toward `Demand raw` in Power
-              House mode.
-
               - In heating-curve mode, PID demand is passed through directly;
               allocation is single-HP-first with dual-enable hysteresis and
               sequential level steps.
-
-              - In Power House mode, OpenQuatt compares the best single-HP and
-              dual-HP options, prefers the lower-power topology by default, and
-              lets a less efficient topology win only when heat match is clearly
-              better. Switches toward a higher-power topology are held briefly to
-              reduce back-and-forth switching.
-
-              - **Dual HP enable level (lvl)** defines at which sustained
-              single-HP compressor level a second HP may be enabled in
-              heating-curve mode.
-
-              - Disable level is derived internally as `enable - 1` to keep tuning
-              compact.
-
-              - **Enable/disable hold** adds time hysteresis to damp frequent
-              toggling in heating-curve mode.
-
-              - Lower enable level or shorter enable-hold = faster second-HP
-              activation in heating-curve mode.
-
-              - Longer disable-hold = dual-HP stays active longer in
-              heating-curve mode.
 
 
               </details>
@@ -2662,14 +2636,6 @@ views:
             entities:
               - entity: number.openquatt_minimum_runtime
                 name: Minimum runtime
-              - entity: number.openquatt_demand_filter_ramp_up
-                name: Demand filter ramp up
-              - entity: number.openquatt_dual_hp_enable_level
-                name: Dual HP enable level
-              - entity: number.openquatt_dual_hp_enable_hold
-                name: Dual HP enable hold
-              - entity: number.openquatt_dual_hp_disable_hold
-                name: Dual HP disable hold
       - type: grid
         cards:
           - type: heading
@@ -3051,8 +3017,8 @@ views:
               - First compare `Supply target` and `Supply actual` to see control
               error.
 
-              - Use `Heating Curve PID` and `Reset PID integral` for fine tuning
-              when response is too slow or too nervous.
+              - Use `Heating Curve PID` for fine tuning when response is too
+              slow or too nervous.
 
               - `Outside temp (selected)` helps explain why `Supply target`
               rises or drops.
@@ -3071,8 +3037,6 @@ views:
                 name: Supply target
               - entity: sensor.openquatt_water_supply_temp_selected
                 name: Supply actual (selected)
-              - entity: button.openquatt_reset_heating_curve_pid_integral
-                name: Reset PID integral
     cards: []
     header:
       card:
