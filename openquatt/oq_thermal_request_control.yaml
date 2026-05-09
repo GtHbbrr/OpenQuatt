@@ -243,25 +243,6 @@ number:
     web_server:
       sorting_group_id: oq_heating_strategy
 
-  # Dual-HP enable threshold on single-HP compressor level request (1..10).
-  # Disable threshold is derived internally as max(1, enable - 1) to keep parameter count low.
-  - platform: template
-    id: oq_dual_hp_enable_level
-    name: "Dual HP Enable Level"
-    internal: ${hc_dual_tuning_internal}
-    disabled_by_default: true
-    icon: mdi:arrow-up-bold-hexagon-outline
-    unit_of_measurement: "lvl"
-    min_value: 1
-    max_value: 10
-    step: 1
-    mode: slider
-    restore_value: true
-    optimistic: true
-    initial_value: 5
-    web_server:
-      sorting_group_id: oq_heating_strategy
-
   # Hold time before enabling dual-HP in curve mode.
   - platform: template
     id: oq_dual_hp_enable_hold_min
