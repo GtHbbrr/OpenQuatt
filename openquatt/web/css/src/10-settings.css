@@ -434,11 +434,26 @@
   display: grid;
   gap: 10px;
   margin-top: 14px;
+  max-width: 640px;
 }
 
 .oq-api-security-key-head {
   display: grid;
   gap: 3px;
+}
+
+.oq-api-security-status-line {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  color: var(--oq-helper-faint);
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.oq-api-security-status-line strong {
+  color: var(--oq-helper-ink);
+  font-size: 0.98rem;
 }
 
 .oq-api-security-key-head strong {
@@ -453,16 +468,21 @@
 }
 
 .oq-helper-shell--dark .oq-api-security-key-head strong,
-.oq-helper-modal-backdrop--dark .oq-api-security-key-head strong {
+.oq-helper-shell--dark .oq-api-security-status-line strong,
+.oq-helper-modal-backdrop--dark .oq-api-security-key-head strong,
+.oq-helper-modal-backdrop--dark .oq-api-security-status-line strong {
   color: #f8fafc;
 }
 
 .oq-helper-shell--dark .oq-api-security-key-head span,
-.oq-helper-modal-backdrop--dark .oq-api-security-key-head span {
+.oq-helper-shell--dark .oq-api-security-status-line,
+.oq-helper-modal-backdrop--dark .oq-api-security-key-head span,
+.oq-helper-modal-backdrop--dark .oq-api-security-status-line {
   color: #cbd5e1;
 }
 
 .oq-settings-api-security-key-value {
+  box-sizing: border-box;
   min-width: 0;
   width: 100%;
   padding: 12px 14px;

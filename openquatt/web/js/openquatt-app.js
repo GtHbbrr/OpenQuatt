@@ -2379,20 +2379,6 @@ const OPENQUATT_RESUME_CLEAR_VALUE = "2000-01-01 00:00:00";
     return "Er is nog geen API-sleutel opgeslagen. Inschakelen maakt direct een nieuwe sleutel aan.";
   }
 
-  function getApiSecurityModalNotice() {
-    const status = state.apiSecurityStatus;
-    if (!status) {
-      return "";
-    }
-    if (status.enabled) {
-      return "API-encryptie staat aan.";
-    }
-    if (status.key) {
-      return "API-encryptie staat uit, maar de sleutel blijft bewaard.";
-    }
-    return "Er is nog geen API-sleutel opgeslagen.";
-  }
-
   function getApiSecurityToggleLabel() {
     const status = state.apiSecurityStatus;
     if (!status) {
@@ -2423,7 +2409,7 @@ const OPENQUATT_RESUME_CLEAR_VALUE = "2000-01-01 00:00:00";
     const status = state.apiSecurityStatus || {};
     const enabled = status.enabled === true;
     const hasKey = Boolean(status.key);
-    const modalNotice = state.apiSecurityNotice || getApiSecurityModalNotice();
+    const modalNotice = state.apiSecurityNotice;
     const errorMarkup = state.apiSecurityError
       ? `<div class="oq-helper-modal-note oq-helper-modal-note--error" aria-live="assertive">${escapeHtml(state.apiSecurityError)}</div>`
       : "";
@@ -2442,11 +2428,15 @@ const OPENQUATT_RESUME_CLEAR_VALUE = "2000-01-01 00:00:00";
           ${modalNotice ? `<div class="oq-helper-modal-success oq-helper-modal-success--compact" aria-live="polite"><strong>Status</strong><span>${escapeHtml(modalNotice)}</span></div>` : ""}
           ${errorMarkup}
           <div class="oq-api-security-key-block">
+            <div class="oq-api-security-status-line">
+              <span>Status</span>
+              <strong>${escapeHtml(getApiSecurityStatusLabel())}</strong>
+            </div>
             <div class="oq-api-security-key-head">
               <strong>API-sleutel</strong>
               <span>${escapeHtml(hasKey ? "Gebruik deze sleutel in Home Assistant voor de ESPHome-integratie." : "Inschakelen maakt direct een nieuwe sleutel aan.")}</span>
             </div>
-            <div class="oq-settings-api-security-key-value">${escapeHtml(status.key || "Nog geen sleutel ingesteld")}</div>
+            ${hasKey ? `<div class="oq-settings-api-security-key-value">${escapeHtml(status.key)}</div>` : ""}
           </div>
           <div class="oq-settings-api-security-actions">
             <button
@@ -2457,22 +2447,26 @@ const OPENQUATT_RESUME_CLEAR_VALUE = "2000-01-01 00:00:00";
             >
               ${escapeHtml(getApiSecurityToggleLabel())}
             </button>
-            <button
-              class="oq-helper-button oq-helper-button--ghost"
-              type="button"
-              data-oq-action="rotate-api-security"
-              ${state.apiSecurityBusy || !status.csrf_token ? "disabled" : ""}
-            >
-              ${escapeHtml(getApiSecurityRotateLabel())}
-            </button>
-            <button
-              class="oq-helper-button oq-helper-button--ghost"
-              type="button"
-              data-oq-action="copy-api-security-key"
-              ${state.apiSecurityBusy || !hasKey ? "disabled" : ""}
-            >
-              Kopieer sleutel
-            </button>
+            ${hasKey
+              ? `
+                <button
+                  class="oq-helper-button oq-helper-button--ghost"
+                  type="button"
+                  data-oq-action="rotate-api-security"
+                  ${state.apiSecurityBusy || !status.csrf_token ? "disabled" : ""}
+                >
+                  ${escapeHtml(getApiSecurityRotateLabel())}
+                </button>
+                <button
+                  class="oq-helper-button oq-helper-button--ghost"
+                  type="button"
+                  data-oq-action="copy-api-security-key"
+                  ${state.apiSecurityBusy ? "disabled" : ""}
+                >
+                  Kopieer sleutel
+                </button>
+              `
+              : ""}
           </div>
           <div class="oq-helper-modal-actions">
             <button class="oq-helper-button oq-helper-button--ghost" type="button" data-oq-action="close-system-modal" ${state.apiSecurityBusy ? "disabled" : ""}>Gereed</button>
