@@ -962,12 +962,122 @@
       : "Login uit. Webtoegang is open / onbeveiligd op het netwerk.";
   }
 
+  function getApiSecurityModalTitle() {
+    return "ESPHome API encryption";
+  }
+
+  function getApiSecurityModalCopy() {
+    const status = state.apiSecurityStatus;
+    if (!status) {
+      return "We halen de huidige API-beveiliging op.";
+    }
+    if (status.enabled) {
+      return "De native API is beveiligd. Je kunt de sleutel hier bekijken, kopiëren of roteren.";
+    }
+    if (status.key) {
+      return "De sleutel blijft opgeslagen, ook wanneer encryptie uit staat. Je kunt hem hier meteen kopiëren of opnieuw inschakelen.";
+    }
+    return "Er is nog geen API-sleutel opgeslagen. Inschakelen maakt direct een nieuwe sleutel aan.";
+  }
+
+  function getApiSecurityToggleLabel() {
+    const status = state.apiSecurityStatus;
+    if (!status) {
+      return "Laden...";
+    }
+    return status.enabled ? "Uitschakelen" : status.key ? "Inschakelen" : "Genereer en schakel in";
+  }
+
+  function getApiSecurityRotateLabel() {
+    const status = state.apiSecurityStatus;
+    if (!status) {
+      return "Laden...";
+    }
+    return status.key ? "Roteer sleutel" : "Genereer sleutel";
+  }
+
   function renderLoginStatusRow(label, value, copy = "") {
     return `
       <div class="oq-helper-modal-row">
         <span class="oq-helper-modal-label">${escapeHtml(label)}</span>
         <strong class="oq-helper-modal-value">${escapeHtml(value)}</strong>
-        ${copy ? `<span class="oq-helper-modal-subvalue">${escapeHtml(copy)}</span>` : ""}
+      ${copy ? `<span class="oq-helper-modal-subvalue">${escapeHtml(copy)}</span>` : ""}
+    </div>
+    `;
+  }
+
+  function renderApiSecurityModal() {
+    const status = state.apiSecurityStatus || {};
+    const enabled = status.enabled === true;
+    const hasKey = Boolean(status.key);
+    const modalNotice = state.apiSecurityNotice;
+    const errorMarkup = state.apiSecurityError
+      ? `<div class="oq-helper-modal-note oq-helper-modal-note--error" aria-live="assertive">${escapeHtml(state.apiSecurityError)}</div>`
+      : "";
+
+    return `
+      <div class="oq-helper-modal-backdrop${state.overviewTheme === "dark" ? " oq-helper-modal-backdrop--dark" : ""}" data-oq-modal="system">
+        <section class="oq-helper-modal oq-helper-modal--wide" role="dialog" aria-modal="true" aria-labelledby="oq-api-security-modal-title">
+          <div class="oq-helper-modal-head">
+            <div>
+              <p class="oq-helper-modal-kicker">Toegang</p>
+              <h2 class="oq-helper-modal-title" id="oq-api-security-modal-title">${escapeHtml(getApiSecurityModalTitle())}</h2>
+            </div>
+            <button class="oq-helper-modal-close" type="button" data-oq-action="close-system-modal" aria-label="Sluit API-beveiliging popup">×</button>
+          </div>
+          <p class="oq-helper-modal-copy">${escapeHtml(getApiSecurityModalCopy())}</p>
+          ${modalNotice ? `<div class="oq-helper-modal-success oq-helper-modal-success--compact" aria-live="polite"><strong>Status</strong><span>${escapeHtml(modalNotice)}</span></div>` : ""}
+          ${errorMarkup}
+          <div class="oq-settings-api-security-shell oq-settings-api-security-shell--modal">
+            <div class="oq-settings-quickstart-status-row oq-settings-api-security-status-row">
+              <div>
+                <p class="oq-settings-quickstart-status-label">Huidige status</p>
+                <strong class="oq-settings-quickstart-status-value">${escapeHtml(getApiSecurityStatusLabel())}</strong>
+                <p class="oq-settings-quickstart-status-copy">${escapeHtml(getApiSecurityStatusDetail())}</p>
+              </div>
+              <button
+                class="oq-helper-button oq-helper-button--primary"
+                type="button"
+                data-oq-action="${enabled ? "disable-api-security" : "enable-api-security"}"
+                ${state.apiSecurityBusy || !status.csrf_token ? "disabled" : ""}
+              >
+                ${escapeHtml(getApiSecurityToggleLabel())}
+              </button>
+            </div>
+            <div class="oq-settings-api-security-key">
+              <div class="oq-settings-field-head">
+                <h3>API-sleutel</h3>
+              </div>
+              <p class="oq-settings-action-note">${escapeHtml(hasKey ? "Gebruik deze sleutel in Home Assistant voor de ESPHome-integratie." : "Inschakelen maakt direct een nieuwe sleutel aan.")}</p>
+              ${hasKey ? `<div class="oq-settings-api-security-key-row"><div class="oq-settings-api-security-key-value">${escapeHtml(status.key)}</div></div>` : ""}
+              ${hasKey
+                ? `
+                  <div class="oq-settings-api-security-actions">
+                    <button
+                      class="oq-helper-button oq-helper-button--ghost"
+                      type="button"
+                      data-oq-action="rotate-api-security"
+                      ${state.apiSecurityBusy || !status.csrf_token ? "disabled" : ""}
+                    >
+                      ${escapeHtml(getApiSecurityRotateLabel())}
+                    </button>
+                    <button
+                      class="oq-helper-button oq-helper-button--ghost"
+                      type="button"
+                      data-oq-action="copy-api-security-key"
+                      ${state.apiSecurityBusy ? "disabled" : ""}
+                    >
+                      Kopieer sleutel
+                    </button>
+                  </div>
+                `
+                : ""}
+            </div>
+          </div>
+          <div class="oq-helper-modal-actions">
+            <button class="oq-helper-button oq-helper-button--ghost" type="button" data-oq-action="close-system-modal" ${state.apiSecurityBusy ? "disabled" : ""}>Gereed</button>
+          </div>
+        </section>
       </div>
     `;
   }
@@ -1467,6 +1577,10 @@
   function renderSystemModal() {
     if (state.systemModal === "login") {
       return renderLoginModal();
+    }
+
+    if (state.systemModal === "api-security") {
+      return renderApiSecurityModal();
     }
 
     if (state.systemModal === "connectivity") {

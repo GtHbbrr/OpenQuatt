@@ -19,6 +19,12 @@
       csrfToken: "",
       recoveryUntil: 0,
     },
+    apiSecurity: {
+      enabled: false,
+      key: "",
+      source: "bootstrap-disabled",
+      csrfToken: "",
+    },
     trendFlashWrites: 437,
     trendFlashStoredKiB: 182.5,
     trendFlashOldestAt: Date.now() - Math.round(18.4 * 24 * 60 * 60 * 1000),
@@ -177,6 +183,10 @@
     state.auth.csrfToken = generateAuthToken();
   }
 
+  function refreshApiSecurityToken() {
+    state.apiSecurity.csrfToken = generateAuthToken();
+  }
+
   function getAuthStatusPayload() {
     return {
       enabled: Boolean(state.auth.enabled),
@@ -266,6 +276,81 @@
     return makeAuthResponse(200, {
       ok: true,
       status: getAuthStatusPayload(),
+    });
+  }
+
+  function generateApiKey() {
+    const bytes = new Uint8Array(32);
+    window.crypto.getRandomValues(bytes);
+    let binary = "";
+    bytes.forEach((byte) => {
+      binary += String.fromCharCode(byte);
+    });
+    return window.btoa(binary);
+  }
+
+  function getApiSecurityStatusPayload() {
+    return {
+      enabled: Boolean(state.apiSecurity.enabled),
+      key: String(state.apiSecurity.key || ""),
+      source: String(state.apiSecurity.source || ""),
+      csrf_token: String(state.apiSecurity.csrfToken || ""),
+    };
+  }
+
+  function handleApiSecurityStatus() {
+    return makeAuthResponse(200, getApiSecurityStatusPayload());
+  }
+
+  function handleApiSecurityEnable(init) {
+    const params = parseAuthFormBody(init);
+    const status = getApiSecurityStatusPayload();
+    if (params.get("csrf_token") !== status.csrf_token) {
+      return makeAuthResponse(403, { ok: false, error: "forbidden" });
+    }
+
+    if (!state.apiSecurity.key) {
+      state.apiSecurity.key = generateApiKey();
+    }
+    state.apiSecurity.enabled = true;
+    state.apiSecurity.source = "runtime-enabled";
+    refreshApiSecurityToken();
+    return makeAuthResponse(200, {
+      ok: true,
+      status: getApiSecurityStatusPayload(),
+    });
+  }
+
+  function handleApiSecurityRotate(init) {
+    const params = parseAuthFormBody(init);
+    const status = getApiSecurityStatusPayload();
+    if (params.get("csrf_token") !== status.csrf_token) {
+      return makeAuthResponse(403, { ok: false, error: "forbidden" });
+    }
+
+    state.apiSecurity.key = generateApiKey();
+    state.apiSecurity.enabled = true;
+    state.apiSecurity.source = "runtime-rotated";
+    refreshApiSecurityToken();
+    return makeAuthResponse(200, {
+      ok: true,
+      status: getApiSecurityStatusPayload(),
+    });
+  }
+
+  function handleApiSecurityDisable(init) {
+    const params = parseAuthFormBody(init);
+    const status = getApiSecurityStatusPayload();
+    if (params.get("csrf_token") !== status.csrf_token) {
+      return makeAuthResponse(403, { ok: false, error: "forbidden" });
+    }
+
+    state.apiSecurity.enabled = false;
+    state.apiSecurity.source = "runtime-disabled";
+    refreshApiSecurityToken();
+    return makeAuthResponse(200, {
+      ok: true,
+      status: getApiSecurityStatusPayload(),
     });
   }
 
@@ -1483,6 +1568,18 @@
       if (url.pathname === "/auth/disable" && String(init?.method || "GET").toUpperCase() === "POST") {
         return handleAuthDisable(init || {});
       }
+      if (url.pathname === "/api-security/status" && (!init || !init.method || String(init.method).toUpperCase() === "GET")) {
+        return handleApiSecurityStatus();
+      }
+      if (url.pathname === "/api-security/enable" && String(init?.method || "GET").toUpperCase() === "POST") {
+        return handleApiSecurityEnable(init || {});
+      }
+      if (url.pathname === "/api-security/rotate" && String(init?.method || "GET").toUpperCase() === "POST") {
+        return handleApiSecurityRotate(init || {});
+      }
+      if (url.pathname === "/api-security/disable" && String(init?.method || "GET").toUpperCase() === "POST") {
+        return handleApiSecurityDisable(init || {});
+      }
       if (url.pathname === "/openquatt/logs/recent" && String(init?.method || "GET").toUpperCase() === "GET") {
         return mockResponse(200, {
           enabled: Boolean(state.logHistoryEnabled),
@@ -1651,6 +1748,7 @@
 
   seedEntities();
   refreshAuthToken();
+  refreshApiSecurityToken();
   setInstallationMode(state.installation);
   applyScenario(state.scenario);
   updateSummary();

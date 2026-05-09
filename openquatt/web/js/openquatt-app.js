@@ -820,6 +820,10 @@ const OPENQUATT_RESUME_CLEAR_VALUE = "2000-01-01 00:00:00";
     authBusy: false,
     authNotice: "",
     authError: "",
+    apiSecurityStatus: null,
+    apiSecurityBusy: false,
+    apiSecurityNotice: "",
+    apiSecurityError: "",
     updateCheckBusy: false,
     updateInstallBusy: false,
     updateInstallTargetVersion: "",
@@ -2401,12 +2405,122 @@ const OPENQUATT_RESUME_CLEAR_VALUE = "2000-01-01 00:00:00";
       : "Login uit. Webtoegang is open / onbeveiligd op het netwerk.";
   }
 
+  function getApiSecurityModalTitle() {
+    return "ESPHome API encryption";
+  }
+
+  function getApiSecurityModalCopy() {
+    const status = state.apiSecurityStatus;
+    if (!status) {
+      return "We halen de huidige API-beveiliging op.";
+    }
+    if (status.enabled) {
+      return "De native API is beveiligd. Je kunt de sleutel hier bekijken, kopiëren of roteren.";
+    }
+    if (status.key) {
+      return "De sleutel blijft opgeslagen, ook wanneer encryptie uit staat. Je kunt hem hier meteen kopiëren of opnieuw inschakelen.";
+    }
+    return "Er is nog geen API-sleutel opgeslagen. Inschakelen maakt direct een nieuwe sleutel aan.";
+  }
+
+  function getApiSecurityToggleLabel() {
+    const status = state.apiSecurityStatus;
+    if (!status) {
+      return "Laden...";
+    }
+    return status.enabled ? "Uitschakelen" : status.key ? "Inschakelen" : "Genereer en schakel in";
+  }
+
+  function getApiSecurityRotateLabel() {
+    const status = state.apiSecurityStatus;
+    if (!status) {
+      return "Laden...";
+    }
+    return status.key ? "Roteer sleutel" : "Genereer sleutel";
+  }
+
   function renderLoginStatusRow(label, value, copy = "") {
     return `
       <div class="oq-helper-modal-row">
         <span class="oq-helper-modal-label">${escapeHtml(label)}</span>
         <strong class="oq-helper-modal-value">${escapeHtml(value)}</strong>
-        ${copy ? `<span class="oq-helper-modal-subvalue">${escapeHtml(copy)}</span>` : ""}
+      ${copy ? `<span class="oq-helper-modal-subvalue">${escapeHtml(copy)}</span>` : ""}
+    </div>
+    `;
+  }
+
+  function renderApiSecurityModal() {
+    const status = state.apiSecurityStatus || {};
+    const enabled = status.enabled === true;
+    const hasKey = Boolean(status.key);
+    const modalNotice = state.apiSecurityNotice;
+    const errorMarkup = state.apiSecurityError
+      ? `<div class="oq-helper-modal-note oq-helper-modal-note--error" aria-live="assertive">${escapeHtml(state.apiSecurityError)}</div>`
+      : "";
+
+    return `
+      <div class="oq-helper-modal-backdrop${state.overviewTheme === "dark" ? " oq-helper-modal-backdrop--dark" : ""}" data-oq-modal="system">
+        <section class="oq-helper-modal oq-helper-modal--wide" role="dialog" aria-modal="true" aria-labelledby="oq-api-security-modal-title">
+          <div class="oq-helper-modal-head">
+            <div>
+              <p class="oq-helper-modal-kicker">Toegang</p>
+              <h2 class="oq-helper-modal-title" id="oq-api-security-modal-title">${escapeHtml(getApiSecurityModalTitle())}</h2>
+            </div>
+            <button class="oq-helper-modal-close" type="button" data-oq-action="close-system-modal" aria-label="Sluit API-beveiliging popup">×</button>
+          </div>
+          <p class="oq-helper-modal-copy">${escapeHtml(getApiSecurityModalCopy())}</p>
+          ${modalNotice ? `<div class="oq-helper-modal-success oq-helper-modal-success--compact" aria-live="polite"><strong>Status</strong><span>${escapeHtml(modalNotice)}</span></div>` : ""}
+          ${errorMarkup}
+          <div class="oq-settings-api-security-shell oq-settings-api-security-shell--modal">
+            <div class="oq-settings-quickstart-status-row oq-settings-api-security-status-row">
+              <div>
+                <p class="oq-settings-quickstart-status-label">Huidige status</p>
+                <strong class="oq-settings-quickstart-status-value">${escapeHtml(getApiSecurityStatusLabel())}</strong>
+                <p class="oq-settings-quickstart-status-copy">${escapeHtml(getApiSecurityStatusDetail())}</p>
+              </div>
+              <button
+                class="oq-helper-button oq-helper-button--primary"
+                type="button"
+                data-oq-action="${enabled ? "disable-api-security" : "enable-api-security"}"
+                ${state.apiSecurityBusy || !status.csrf_token ? "disabled" : ""}
+              >
+                ${escapeHtml(getApiSecurityToggleLabel())}
+              </button>
+            </div>
+            <div class="oq-settings-api-security-key">
+              <div class="oq-settings-field-head">
+                <h3>API-sleutel</h3>
+              </div>
+              <p class="oq-settings-action-note">${escapeHtml(hasKey ? "Gebruik deze sleutel in Home Assistant voor de ESPHome-integratie." : "Inschakelen maakt direct een nieuwe sleutel aan.")}</p>
+              ${hasKey ? `<div class="oq-settings-api-security-key-row"><div class="oq-settings-api-security-key-value">${escapeHtml(status.key)}</div></div>` : ""}
+              ${hasKey
+                ? `
+                  <div class="oq-settings-api-security-actions">
+                    <button
+                      class="oq-helper-button oq-helper-button--ghost"
+                      type="button"
+                      data-oq-action="rotate-api-security"
+                      ${state.apiSecurityBusy || !status.csrf_token ? "disabled" : ""}
+                    >
+                      ${escapeHtml(getApiSecurityRotateLabel())}
+                    </button>
+                    <button
+                      class="oq-helper-button oq-helper-button--ghost"
+                      type="button"
+                      data-oq-action="copy-api-security-key"
+                      ${state.apiSecurityBusy ? "disabled" : ""}
+                    >
+                      Kopieer sleutel
+                    </button>
+                  </div>
+                `
+                : ""}
+            </div>
+          </div>
+          <div class="oq-helper-modal-actions">
+            <button class="oq-helper-button oq-helper-button--ghost" type="button" data-oq-action="close-system-modal" ${state.apiSecurityBusy ? "disabled" : ""}>Gereed</button>
+          </div>
+        </section>
       </div>
     `;
   }
@@ -2906,6 +3020,10 @@ const OPENQUATT_RESUME_CLEAR_VALUE = "2000-01-01 00:00:00";
   function renderSystemModal() {
     if (state.systemModal === "login") {
       return renderLoginModal();
+    }
+
+    if (state.systemModal === "api-security") {
+      return renderApiSecurityModal();
     }
 
     if (state.systemModal === "connectivity") {
@@ -3690,6 +3808,15 @@ const OPENQUATT_RESUME_CLEAR_VALUE = "2000-01-01 00:00:00";
     state.authDraftConfirmPassword = "";
   }
 
+  function getApiSecurityStatusSignature(status = state.apiSecurityStatus || {}) {
+    return [
+      status.enabled ? "on" : "off",
+      String(status.key || ""),
+      String(status.source || ""),
+      String(status.csrf_token || ""),
+    ].join(":");
+  }
+
   async function refreshAuthStatus() {
     try {
       const response = await fetch("/auth/status", { cache: "no-store" });
@@ -3719,6 +3846,203 @@ const OPENQUATT_RESUME_CLEAR_VALUE = "2000-01-01 00:00:00";
         state.authError = `Loginstatus kon niet worden geladen. ${error.message}`;
       }
       return false;
+    }
+  }
+
+  async function refreshApiSecurityStatus() {
+    try {
+      const response = await fetch("/api-security/status", { cache: "no-store" });
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      const payload = await response.json();
+      const nextStatus = {
+        enabled: Boolean(payload.enabled),
+        key: String(payload.key || ""),
+        source: String(payload.source || ""),
+        csrf_token: String(payload.csrf_token || ""),
+      };
+      const previousSignature = getApiSecurityStatusSignature();
+      const nextSignature = getApiSecurityStatusSignature(nextStatus);
+      state.apiSecurityStatus = nextStatus;
+      state.apiSecurityError = "";
+      if (previousSignature !== nextSignature) {
+        state.apiSecurityNotice = "";
+      }
+      return previousSignature !== nextSignature;
+    } catch (error) {
+      state.apiSecurityError = `API-beveiliging kon niet worden geladen. ${error.message}`;
+      return false;
+    }
+  }
+
+  async function copyTextToClipboard(text) {
+    if (!text) {
+      return false;
+    }
+    if (window.navigator?.clipboard?.writeText && window.isSecureContext) {
+      await window.navigator.clipboard.writeText(text);
+      return true;
+    }
+
+    const textarea = document.createElement("textarea");
+    textarea.value = text;
+    textarea.setAttribute("readonly", "");
+    textarea.style.position = "fixed";
+    textarea.style.top = "-1000px";
+    textarea.style.opacity = "0";
+    document.body.appendChild(textarea);
+    textarea.focus();
+    textarea.select();
+
+    let success = false;
+    try {
+      success = document.execCommand("copy");
+    } finally {
+      document.body.removeChild(textarea);
+    }
+    return success;
+  }
+
+  async function commitEnableApiSecurity() {
+    const status = state.apiSecurityStatus || {};
+    if (!status.csrf_token) {
+      state.apiSecurityError = "API-beveiliging laden nog. Probeer het zo opnieuw.";
+      render();
+      return;
+    }
+
+    state.apiSecurityBusy = true;
+    state.apiSecurityNotice = "";
+    state.apiSecurityError = "";
+    render();
+
+    try {
+      const params = new URLSearchParams();
+      params.set("csrf_token", status.csrf_token);
+
+      const response = await fetch("/api-security/enable", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8" },
+        body: params.toString(),
+      });
+      const payload = await response.json().catch(() => ({ ok: false, error: "invalid_response" }));
+      if (!response.ok || !payload.ok) {
+        throw new Error(payload.error || `HTTP ${response.status}`);
+      }
+      await refreshApiSecurityStatus();
+      state.apiSecurityNotice = "API-encryptie staat nu aan.";
+      render();
+    } catch (error) {
+      state.apiSecurityError = `Inschakelen is mislukt. ${error.message}`;
+      render();
+    } finally {
+      state.apiSecurityBusy = false;
+      render();
+    }
+  }
+
+  async function commitRotateApiSecurity() {
+    const status = state.apiSecurityStatus || {};
+    if (!status.csrf_token) {
+      state.apiSecurityError = "API-beveiliging laden nog. Probeer het zo opnieuw.";
+      render();
+      return;
+    }
+
+    state.apiSecurityBusy = true;
+    state.apiSecurityNotice = "";
+    state.apiSecurityError = "";
+    render();
+
+    try {
+      const params = new URLSearchParams();
+      params.set("csrf_token", status.csrf_token);
+
+      const response = await fetch("/api-security/rotate", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8" },
+        body: params.toString(),
+      });
+      const payload = await response.json().catch(() => ({ ok: false, error: "invalid_response" }));
+      if (!response.ok || !payload.ok) {
+        throw new Error(payload.error || `HTTP ${response.status}`);
+      }
+      await refreshApiSecurityStatus();
+      state.apiSecurityNotice = "API-sleutel is vernieuwd.";
+      render();
+    } catch (error) {
+      state.apiSecurityError = `Roteren is mislukt. ${error.message}`;
+      render();
+    } finally {
+      state.apiSecurityBusy = false;
+      render();
+    }
+  }
+
+  async function commitDisableApiSecurity() {
+    const status = state.apiSecurityStatus || {};
+    if (!status.csrf_token) {
+      state.apiSecurityError = "API-beveiliging laden nog. Probeer het zo opnieuw.";
+      render();
+      return;
+    }
+    if (!status.enabled) {
+      state.apiSecurityNotice = "API-encryptie staat al uit.";
+      state.apiSecurityError = "";
+      render();
+      return;
+    }
+
+    state.apiSecurityBusy = true;
+    state.apiSecurityNotice = "";
+    state.apiSecurityError = "";
+    render();
+
+    try {
+      const params = new URLSearchParams();
+      params.set("csrf_token", status.csrf_token);
+
+      const response = await fetch("/api-security/disable", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8" },
+        body: params.toString(),
+      });
+      const payload = await response.json().catch(() => ({ ok: false, error: "invalid_response" }));
+      if (!response.ok || !payload.ok) {
+        throw new Error(payload.error || `HTTP ${response.status}`);
+      }
+      await refreshApiSecurityStatus();
+      state.apiSecurityNotice = "API-encryptie staat nu uit.";
+      render();
+    } catch (error) {
+      state.apiSecurityError = `Uitzetten is mislukt. ${error.message}`;
+      render();
+    } finally {
+      state.apiSecurityBusy = false;
+      render();
+    }
+  }
+
+  async function copyApiSecurityKey() {
+    const key = String(state.apiSecurityStatus?.key || "").trim();
+    if (!key) {
+      state.apiSecurityError = "Er is nog geen API-sleutel om te kopiëren.";
+      render();
+      return;
+    }
+
+    try {
+      const copied = await copyTextToClipboard(key);
+      if (!copied) {
+        throw new Error("Kopiëren naar het klembord is niet gelukt.");
+      }
+      state.apiSecurityNotice = "API-sleutel gekopieerd.";
+      state.apiSecurityError = "";
+      render();
+    } catch (error) {
+      state.apiSecurityError = `Kopiëren is mislukt. ${error.message}`;
+      render();
     }
   }
 
@@ -4413,6 +4737,9 @@ const OPENQUATT_RESUME_CLEAR_VALUE = "2000-01-01 00:00:00";
         await refreshTrendHistoryData({ force: true });
       }
       await refreshAuthStatus();
+      if (state.appView === "settings") {
+        await refreshApiSecurityStatus();
+      }
     } finally {
       if (state.mounted && !state.nativeOpen) {
         render();
@@ -4531,6 +4858,7 @@ const OPENQUATT_RESUME_CLEAR_VALUE = "2000-01-01 00:00:00";
           ? await refreshTrendHistoryData()
           : false;
       const authChanged = shouldDeferSupplementary ? false : await refreshAuthStatus();
+      const apiSecurityChanged = shouldDeferSupplementary || state.appView !== "settings" ? false : await refreshApiSecurityStatus();
       const nextHeaderSignature = getHeaderRenderSignature();
       if (reconnectChanged) {
         render();
@@ -4541,6 +4869,10 @@ const OPENQUATT_RESUME_CLEAR_VALUE = "2000-01-01 00:00:00";
         return;
       }
       if (authChanged && state.systemModal === "login") {
+        render();
+        return;
+      }
+      if (apiSecurityChanged && state.appView === "settings") {
         render();
         return;
       }
@@ -4654,6 +4986,7 @@ const OPENQUATT_RESUME_CLEAR_VALUE = "2000-01-01 00:00:00";
       state.appView,
       state.settingsGroup,
       state.loadingEntities ? "loading" : "ready",
+      getApiSecurityStatusSignature(),
       getEntitySignatureFragment("setupComplete"),
       ...SETTINGS_KEYS.map((key) => getEntitySignatureFragment(key)),
     ].join("|");
@@ -4916,6 +5249,35 @@ const OPENQUATT_RESUME_CLEAR_VALUE = "2000-01-01 00:00:00";
       return;
     }
 
+    if (action === "open-api-security-modal") {
+      state.systemModal = "api-security";
+      state.apiSecurityNotice = "";
+      state.apiSecurityError = "";
+      render();
+      void refreshApiSecurityStatus();
+      return;
+    }
+
+    if (action === "copy-api-security-key") {
+      void copyApiSecurityKey();
+      return;
+    }
+
+    if (action === "enable-api-security") {
+      void commitEnableApiSecurity();
+      return;
+    }
+
+    if (action === "rotate-api-security") {
+      void commitRotateApiSecurity();
+      return;
+    }
+
+    if (action === "disable-api-security") {
+      void commitDisableApiSecurity();
+      return;
+    }
+
     if (action === "flush-trend-history") {
       void triggerNamedButton("trendHistoryFlush", {
         successNotice: "Trendhistorie is opgeslagen in flash.",
@@ -5026,6 +5388,8 @@ const OPENQUATT_RESUME_CLEAR_VALUE = "2000-01-01 00:00:00";
       state.authDraftConfirmPassword = "";
       state.authNotice = "";
       state.authError = "";
+      state.apiSecurityNotice = "";
+      state.apiSecurityError = "";
       clearSettingsBackupDraft();
       render();
       return;
@@ -7380,7 +7744,7 @@ function renderWebServerLogsModal() {
         ? [renderSettingsHeatingSection()]
         : activeGroup === "cooling"
           ? [renderSettingsCoolingSection()]
-      : activeGroup === "advanced"
+        : activeGroup === "advanced"
             ? [
                 renderSettingsFlowSection(),
                 renderSettingsCompressorSection(),
@@ -7389,7 +7753,7 @@ function renderWebServerLogsModal() {
             : [
                 renderSettingsQuickStartSection(),
                 renderSettingsTrendSection(),
-                renderSettingsLoginSection(),
+                renderSettingsAccessSecuritySection(),
                 renderSettingsBackupSection(),
                 renderSettingsDiagnosticsSection(),
               ];
@@ -7572,22 +7936,36 @@ function renderWebServerLogsModal() {
       }
     }
 
-    const loginStatus = stack.querySelector('button[data-oq-action="open-login-modal"]')?.closest(".oq-settings-quickstart-status");
-    if (loginStatus) {
-      const valueNode = loginStatus.querySelector(".oq-settings-quickstart-status-value");
-      const copyNode = loginStatus.querySelector(".oq-settings-quickstart-status-copy");
-      const button = loginStatus.querySelector('button[data-oq-action="open-login-modal"]');
-      const statusLabel = getWebAuthStatusLabel();
-      const statusCopy = getWebAuthStatusDetail();
-      if (valueNode && valueNode.textContent !== statusLabel) {
-        valueNode.textContent = statusLabel;
-      }
-      if (copyNode && copyNode.textContent !== statusCopy) {
-        copyNode.textContent = statusCopy;
-      }
-      if (button) {
-        button.disabled = false;
-      }
+    const accessRows = stack.querySelectorAll('[data-oq-access-security-item]');
+    if (accessRows.length) {
+      accessRows.forEach((row) => {
+        const item = String(row.dataset.oqAccessSecurityItem || "");
+        const valueNode = row.querySelector(".oq-settings-quickstart-status-value");
+        const copyNode = row.querySelector(".oq-settings-quickstart-status-copy");
+        const button = row.querySelector("button[data-oq-action]");
+        if (item === "login") {
+          const statusLabel = getWebAuthStatusLabel();
+          const statusCopy = getWebAuthStatusDetail();
+          if (valueNode && valueNode.textContent !== statusLabel) {
+            valueNode.textContent = statusLabel;
+          }
+          if (copyNode && copyNode.textContent !== statusCopy) {
+            copyNode.textContent = statusCopy;
+          }
+        } else if (item === "api") {
+          const statusLabel = getApiSecurityStatusLabel();
+          const statusCopy = getApiSecurityStatusDetail();
+          if (valueNode && valueNode.textContent !== statusLabel) {
+            valueNode.textContent = statusLabel;
+          }
+          if (copyNode && copyNode.textContent !== statusCopy) {
+            copyNode.textContent = statusCopy;
+          }
+        }
+        if (button) {
+          button.disabled = false;
+        }
+      });
     }
 
     const systemSummary = stack.querySelector(".oq-settings-system-summary");
@@ -8351,6 +8729,83 @@ function renderWebServerLogsModal() {
         </div>
       `,
     );
+  }
+
+  function renderSettingsAccessSecuritySection() {
+    return renderSettingsSection(
+      "Toegang",
+      "Toegang & Beveiliging",
+      "Pas hier de web-login of de ESPHome API-sleutel aan.",
+      `
+        <div class="oq-settings-access-security-shell">
+          <div class="oq-settings-quickstart-status" data-oq-access-security-item="login">
+            <div class="oq-settings-quickstart-status-row">
+              <div>
+                <p class="oq-settings-quickstart-status-label">Login</p>
+                <strong class="oq-settings-quickstart-status-value">${escapeHtml(getWebAuthStatusLabel())}</strong>
+                <p class="oq-settings-quickstart-status-copy">${escapeHtml(getWebAuthStatusDetail())}</p>
+              </div>
+              <button
+                class="oq-helper-button oq-helper-button--ghost"
+                type="button"
+                data-oq-action="open-login-modal"
+              >
+                Aanpassen
+              </button>
+            </div>
+          </div>
+          <div class="oq-settings-quickstart-status" data-oq-access-security-item="api">
+            <div class="oq-settings-quickstart-status-row">
+              <div>
+                <p class="oq-settings-quickstart-status-label">ESPHome API encryption</p>
+                <strong class="oq-settings-quickstart-status-value">${escapeHtml(getApiSecurityStatusLabel())}</strong>
+                <p class="oq-settings-quickstart-status-copy">${escapeHtml(getApiSecurityStatusDetail())}</p>
+              </div>
+              <button
+                class="oq-helper-button oq-helper-button--ghost"
+                type="button"
+                data-oq-action="open-api-security-modal"
+              >
+                Aanpassen
+              </button>
+            </div>
+          </div>
+        </div>
+      `,
+    );
+  }
+
+  function getApiSecurityStatusLabel() {
+    const status = state.apiSecurityStatus;
+    if (!status) {
+      return "Laden...";
+    }
+    return status.enabled ? "Aan" : "Uit";
+  }
+
+  function getApiSecurityStatusDetail() {
+    const status = state.apiSecurityStatus;
+    if (!status) {
+      return "API-encryptie wordt geladen.";
+    }
+    if (status.enabled) {
+      return "API-encryptie staat aan. Gebruik dezelfde sleutel in Home Assistant.";
+    }
+    if (status.key) {
+      return "De sleutel blijft opgeslagen, maar de native API staat nu open op je lokale netwerk.";
+    }
+    return "Er is nog geen API-sleutel opgeslagen.";
+  }
+
+  function getApiSecurityActionLabel() {
+    const status = state.apiSecurityStatus;
+    if (!status) {
+      return "Laden...";
+    }
+    if (status.enabled) {
+      return "Uitschakelen";
+    }
+    return status.key ? "Inschakelen" : "Genereer en schakel in";
   }
 
   function renderSettingsBackupSection() {
