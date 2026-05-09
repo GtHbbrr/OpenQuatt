@@ -2427,46 +2427,51 @@ const OPENQUATT_RESUME_CLEAR_VALUE = "2000-01-01 00:00:00";
           <p class="oq-helper-modal-copy">${escapeHtml(getApiSecurityModalCopy())}</p>
           ${modalNotice ? `<div class="oq-helper-modal-success oq-helper-modal-success--compact" aria-live="polite"><strong>Status</strong><span>${escapeHtml(modalNotice)}</span></div>` : ""}
           ${errorMarkup}
-          <div class="oq-api-security-key-block">
-            <div class="oq-api-security-status-line">
-              <span>Status</span>
-              <strong>${escapeHtml(getApiSecurityStatusLabel())}</strong>
+          <div class="oq-settings-api-security-shell oq-settings-api-security-shell--modal">
+            <div class="oq-settings-quickstart-status-row oq-settings-api-security-status-row">
+              <div>
+                <p class="oq-settings-quickstart-status-label">Huidige status</p>
+                <strong class="oq-settings-quickstart-status-value">${escapeHtml(getApiSecurityStatusLabel())}</strong>
+                <p class="oq-settings-quickstart-status-copy">${escapeHtml(getApiSecurityStatusDetail())}</p>
+              </div>
+              <button
+                class="oq-helper-button oq-helper-button--primary"
+                type="button"
+                data-oq-action="${enabled ? "disable-api-security" : "enable-api-security"}"
+                ${state.apiSecurityBusy || !status.csrf_token ? "disabled" : ""}
+              >
+                ${escapeHtml(getApiSecurityToggleLabel())}
+              </button>
             </div>
-            <div class="oq-api-security-key-head">
-              <strong>API-sleutel</strong>
-              <span>${escapeHtml(hasKey ? "Gebruik deze sleutel in Home Assistant voor de ESPHome-integratie." : "Inschakelen maakt direct een nieuwe sleutel aan.")}</span>
+            <div class="oq-settings-api-security-key">
+              <div class="oq-settings-field-head">
+                <h3>API-sleutel</h3>
+              </div>
+              <p class="oq-settings-action-note">${escapeHtml(hasKey ? "Gebruik deze sleutel in Home Assistant voor de ESPHome-integratie." : "Inschakelen maakt direct een nieuwe sleutel aan.")}</p>
+              ${hasKey ? `<div class="oq-settings-api-security-key-row"><div class="oq-settings-api-security-key-value">${escapeHtml(status.key)}</div></div>` : ""}
+              ${hasKey
+                ? `
+                  <div class="oq-settings-api-security-actions">
+                    <button
+                      class="oq-helper-button oq-helper-button--ghost"
+                      type="button"
+                      data-oq-action="rotate-api-security"
+                      ${state.apiSecurityBusy || !status.csrf_token ? "disabled" : ""}
+                    >
+                      ${escapeHtml(getApiSecurityRotateLabel())}
+                    </button>
+                    <button
+                      class="oq-helper-button oq-helper-button--ghost"
+                      type="button"
+                      data-oq-action="copy-api-security-key"
+                      ${state.apiSecurityBusy ? "disabled" : ""}
+                    >
+                      Kopieer sleutel
+                    </button>
+                  </div>
+                `
+                : ""}
             </div>
-            ${hasKey ? `<div class="oq-settings-api-security-key-value">${escapeHtml(status.key)}</div>` : ""}
-          </div>
-          <div class="oq-settings-api-security-actions">
-            <button
-              class="oq-helper-button oq-helper-button--primary"
-              type="button"
-              data-oq-action="${enabled ? "disable-api-security" : "enable-api-security"}"
-              ${state.apiSecurityBusy || !status.csrf_token ? "disabled" : ""}
-            >
-              ${escapeHtml(getApiSecurityToggleLabel())}
-            </button>
-            ${hasKey
-              ? `
-                <button
-                  class="oq-helper-button oq-helper-button--ghost"
-                  type="button"
-                  data-oq-action="rotate-api-security"
-                  ${state.apiSecurityBusy || !status.csrf_token ? "disabled" : ""}
-                >
-                  ${escapeHtml(getApiSecurityRotateLabel())}
-                </button>
-                <button
-                  class="oq-helper-button oq-helper-button--ghost"
-                  type="button"
-                  data-oq-action="copy-api-security-key"
-                  ${state.apiSecurityBusy ? "disabled" : ""}
-                >
-                  Kopieer sleutel
-                </button>
-              `
-              : ""}
           </div>
           <div class="oq-helper-modal-actions">
             <button class="oq-helper-button oq-helper-button--ghost" type="button" data-oq-action="close-system-modal" ${state.apiSecurityBusy ? "disabled" : ""}>Gereed</button>
