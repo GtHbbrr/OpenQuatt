@@ -31,6 +31,7 @@ debug:
 
 api:
   reboot_timeout: 0s
+  encryption:
 
 ota:
   - platform: esphome

@@ -393,6 +393,60 @@
   line-height: 1.55;
 }
 
+.oq-settings-api-security-shell {
+  display: grid;
+  gap: 14px;
+}
+
+.oq-settings-api-security-status-row {
+  align-items: flex-start;
+}
+
+.oq-settings-api-security-key {
+  display: grid;
+  gap: 12px;
+  padding: 16px 18px;
+  border-radius: var(--oq-helper-radius-lg);
+  border: 1px solid var(--oq-helper-line);
+  background: linear-gradient(180deg, rgba(255, 247, 237, 0.7), rgba(255, 255, 255, 0.96));
+}
+
+.oq-helper-shell--dark .oq-settings-api-security-key {
+  background: linear-gradient(180deg, rgba(66, 32, 14, 0.34), rgba(22, 33, 49, 0.94));
+}
+
+.oq-settings-api-security-key-row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.oq-settings-api-security-key-value {
+  min-width: 0;
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: var(--oq-helper-radius-md);
+  border: 1px solid var(--oq-helper-line);
+  background: var(--oq-helper-card-muted);
+  color: var(--oq-helper-ink);
+  font-family: "SFMono-Regular", "Consolas", "Liberation Mono", "Menlo", monospace;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  word-break: break-all;
+  overflow-wrap: anywhere;
+}
+
+.oq-helper-shell--dark .oq-settings-api-security-key-value {
+  background: rgba(15, 23, 42, 0.28);
+  color: #f8fafc;
+}
+
+.oq-settings-api-security-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
 .oq-settings-installation-summary,
 .oq-settings-system-row {
   display: flex;

@@ -402,6 +402,7 @@
                 renderSettingsQuickStartSection(),
                 renderSettingsTrendSection(),
                 renderSettingsLoginSection(),
+                renderSettingsApiSecuritySection(),
                 renderSettingsBackupSection(),
                 renderSettingsDiagnosticsSection(),
               ];
@@ -1360,6 +1361,96 @@
             </button>
           </div>
           <p class="oq-settings-quickstart-status-copy">${escapeHtml(getWebAuthStatusDetail())}</p>
+        </div>
+      `,
+    );
+  }
+
+  function getApiSecurityStatusLabel() {
+    const status = state.apiSecurityStatus;
+    if (!status) {
+      return "Laden...";
+    }
+    return status.enabled ? "Aan" : "Uit";
+  }
+
+  function getApiSecurityStatusDetail() {
+    const status = state.apiSecurityStatus;
+    if (!status) {
+      return "API-encryptie wordt geladen.";
+    }
+    if (status.enabled) {
+      return "API-encryptie staat aan. Gebruik dezelfde sleutel in Home Assistant.";
+    }
+    if (status.key) {
+      return "De sleutel blijft opgeslagen, maar de native API staat nu open op je lokale netwerk.";
+    }
+    return "Er is nog geen API-sleutel opgeslagen.";
+  }
+
+  function getApiSecurityActionLabel() {
+    const status = state.apiSecurityStatus;
+    if (!status) {
+      return "Laden...";
+    }
+    if (status.enabled) {
+      return "Uitschakelen";
+    }
+    return status.key ? "Inschakelen" : "Genereer en schakel in";
+  }
+
+  function renderSettingsApiSecuritySection() {
+    return renderSettingsSection(
+      "Toegang",
+      "ESPHome API encryption",
+      "Beheer hier de native ESPHome API-sleutel. De sleutel blijft zichtbaar in deze web-app zodra je hem hebt aangemaakt.",
+      `
+        <div class="oq-settings-api-security-shell">
+          <div class="oq-settings-quickstart-status-row oq-settings-api-security-status-row">
+            <div>
+              <p class="oq-settings-quickstart-status-label">Huidige status</p>
+              <strong class="oq-settings-quickstart-status-value">${escapeHtml(getApiSecurityStatusLabel())}</strong>
+              <p class="oq-settings-quickstart-status-copy">${escapeHtml(getApiSecurityStatusDetail())}</p>
+            </div>
+            <button
+              class="oq-helper-button oq-helper-button--ghost"
+              type="button"
+              data-oq-action="${state.apiSecurityStatus?.enabled ? "disable-api-security" : "enable-api-security"}"
+              ${state.apiSecurityBusy || !state.apiSecurityStatus ? "disabled" : ""}
+            >
+              ${escapeHtml(getApiSecurityActionLabel())}
+            </button>
+          </div>
+
+          <div class="oq-settings-api-security-key">
+            <div class="oq-settings-field-head">
+              <h3>API-sleutel</h3>
+            </div>
+            <div class="oq-settings-api-security-key-row">
+              <div class="oq-settings-api-security-key-value">${escapeHtml(state.apiSecurityStatus?.key || "Nog geen sleutel ingesteld")}</div>
+            </div>
+            <div class="oq-settings-api-security-actions">
+              <button
+              class="oq-helper-button oq-helper-button--ghost"
+              type="button"
+              data-oq-action="rotate-api-security"
+                ${state.apiSecurityBusy || !state.apiSecurityStatus ? "disabled" : ""}
+              >
+                Roteer sleutel
+              </button>
+              <button
+                class="oq-helper-button oq-helper-button--ghost"
+                type="button"
+                data-oq-action="copy-api-security-key"
+                ${state.apiSecurityBusy || !state.apiSecurityStatus?.key ? "disabled" : ""}
+              >
+                Kopieer sleutel
+              </button>
+            </div>
+            ${state.apiSecurityNotice ? `<p class="oq-settings-action-note">${escapeHtml(state.apiSecurityNotice)}</p>` : ""}
+            ${state.apiSecurityError ? `<p class="oq-settings-action-note oq-settings-action-note--error">${escapeHtml(state.apiSecurityError)}</p>` : ""}
+            <p class="oq-settings-action-note">Home Assistant moet deze sleutel gebruiken om weer met de native API te verbinden.</p>
+          </div>
         </div>
       `,
     );
