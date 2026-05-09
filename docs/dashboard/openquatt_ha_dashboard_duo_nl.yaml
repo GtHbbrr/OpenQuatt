@@ -1312,13 +1312,6 @@ views:
                 name: Cooling supply error
               - entity: sensor.openquatt_cooling_demand_raw
                 name: Cooling demand (raw)
-              - entity: number.openquatt_cooling_minimum_supply_temp
-                name: Cooling minimum supply temp
-              - entity: number.openquatt_cooling_demand_max
-                name: Cooling demand max
-              - entity: number.openquatt_cooling_safety_margin
-                name: Cooling safety margin
-                icon: mdi:delta
     cards: []
     header:
       card:
@@ -2668,6 +2661,44 @@ views:
                 name: Stooklijn-PID Ki
               - entity: number.openquatt_heating_curve_pid_kd
                 name: Stooklijn-PID Kd
+      - type: grid
+        cards:
+          - type: heading
+            icon: mdi:snowflake
+            heading: Koelingsinstellingen
+            heading_style: title
+          - type: markdown
+            content: >-
+              <details>
+
+              <summary><strong>Uitleg parameters</strong></summary>
+
+
+              - **Cooling Minimum Supply Temp** begrenst de minimale koel-aanvoertemperatuur.
+              - **Cooling Demand Max** begrenst de maximale koelvraag.
+              - **Cooling Safety Margin** bepaalt de marge boven het geselecteerde dauwpunt.
+              - **Cooling PID Kp/Ki/Kd** stuurt de koel-PID:
+                - Kp: directe reactie.
+                - Ki: langdurige correctie.
+                - Kd: demping.
+
+              </details>
+            text_only: true
+          - type: entities
+            show_header_toggle: false
+            entities:
+              - entity: number.openquatt_cooling_minimum_supply_temp
+                name: Cooling minimum supply temp
+              - entity: number.openquatt_cooling_demand_max
+                name: Cooling demand max
+              - entity: number.openquatt_cooling_safety_margin
+                name: Cooling safety margin
+              - entity: number.openquatt_cooling_pid_kp
+                name: Cooling PID Kp
+              - entity: number.openquatt_cooling_pid_ki
+                name: Cooling PID Ki
+              - entity: number.openquatt_cooling_pid_kd
+                name: Cooling PID Kd
       - type: grid
         cards:
           - type: heading
