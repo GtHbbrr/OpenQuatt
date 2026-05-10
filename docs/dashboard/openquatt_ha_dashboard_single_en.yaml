@@ -2547,8 +2547,8 @@ views:
               - Then choose exactly one commissioning task: **Boiler power
               test** or **Flow autotune**.
 
-              - The task buttons can also request CM100 themselves, but the
-              recommended workflow is: start CM100 first, then start the task.
+              - Start **CM100** first. Only then can you start exactly one
+              commissioning task.
 
 
               </details>
@@ -2581,7 +2581,7 @@ views:
 
               - Measures the effective boiler output at stable flow.
 
-              - Prefer starting the test from an already active **CM100**.
+              - Start the test only while **CM100** is already active.
 
               - Apply the measured value only if it looks sensible.
 
@@ -2618,8 +2618,8 @@ views:
               <summary><strong>Parameter explanation</strong></summary>
 
 
-              - Start **Flow autotune** preferably from an already active
-              **CM100**.
+              - Start **Flow autotune** only while **CM100** is already
+              active.
 
               - In CM100, autotune starts the flow itself and then measures
               the response.

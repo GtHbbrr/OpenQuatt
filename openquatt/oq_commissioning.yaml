@@ -196,9 +196,9 @@ button:
       sorting_group_id: oq_boiler
     on_press:
       - lambda: |-
-          // Boiler test can start directly inside CM100, otherwise it requests CM100 first.
+          // Boiler test may only start while the system is already in CM100.
           const int cm_code = id(oq_control_mode_code);
-          const bool cm100_ready = (cm_code == 100) && id(oq_commissioning_active) && id(oq_commissioning_task_code) == 0;
+          const bool cm100_ready = (cm_code == 100);
           const bool task_running = id(oq_commissioning_active) && id(oq_commissioning_task_code) != 0;
           if (task_running) {
             id(oq_boiler_power_test_status).publish_state("REFUSED: BUSY");
@@ -220,12 +220,18 @@ button:
             id(oq_boiler_power_test_status).publish_state("REFUSED: flow setpoint unavailable");
             return;
           }
+          if (!cm100_ready) {
+            id(oq_boiler_power_test_status).publish_state("REFUSED: not CM100");
+            return;
+          }
 
           id(oq_commissioning_task_code) = 1;
-          id(oq_commissioning_request_pending) = !cm100_ready;
-          id(oq_commissioning_active) = cm100_ready;
+          id(oq_commissioning_request_pending) = false;
+          id(oq_commissioning_active) = true;
           id(oq_commissioning_abort_requested) = false;
           id(oq_commissioning_state_code) = 1;
+          id(oq_commissioning_started_ms) = (uint32_t) millis();
+          id(oq_commissioning_state_since_ms) = (uint32_t) millis();
           id(oq_commissioning_boiler_request) = false;
           id(oq_commissioning_sample_count) = 0;
           id(oq_commissioning_flow_stable_count) = 0;
@@ -241,15 +247,7 @@ button:
           set_flow.set_value(800.0f);
           set_flow.perform();
 
-          if (cm100_ready) {
-            id(oq_commissioning_started_ms) = (uint32_t) millis();
-            id(oq_commissioning_state_since_ms) = (uint32_t) millis();
-            id(oq_commissioning_status).publish_state("CM100 READY -> BOILER TEST");
-          } else {
-            id(oq_commissioning_started_ms) = 0;
-            id(oq_commissioning_state_since_ms) = 0;
-            id(oq_commissioning_status).publish_state("BOILER TEST REQUESTED");
-          }
+          id(oq_commissioning_status).publish_state("BOILER TEST STARTED");
           id(oq_boiler_power_test_status).publish_state("REQUESTED");
 
   - platform: template
@@ -492,7 +490,10 @@ interval:
                 publish_status("CM100 READY");
                 id(oq_commissioning_status).publish_state("CM100 READY");
               }
-            } else if (id(oq_commissioning_active) && in_cm100) {
+            } else if (in_cm100) {
+              if (!id(oq_commissioning_active)) {
+                id(oq_commissioning_active) = true;
+              }
               publish_status("CM100 READY");
               id(oq_commissioning_status).publish_state("CM100 READY");
             }

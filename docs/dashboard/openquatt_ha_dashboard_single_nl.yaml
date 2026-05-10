@@ -2638,8 +2638,8 @@ views:
               - Kies daarna precies één commissioningtaak: **Boiler power test**
               of **Flow autotune**.
 
-              - De taakknoppen kunnen CM100 ook zelf aanvragen, maar de
-              aanbevolen workflow is: eerst CM100 starten, daarna de taak.
+              - Start eerst **CM100**. Pas daarna kun je precies één
+              commissioningtaak starten.
 
 
               </details>
@@ -2672,7 +2672,7 @@ views:
 
               - Meet het effectieve ketelvermogen bij stabiele flow.
 
-              - Start de test liefst vanuit een al actieve **CM100**.
+              - Start de test alleen terwijl **CM100** al actief is.
 
               - Pas de gemeten waarde toe als die logisch oogt.
 
@@ -2709,9 +2709,9 @@ views:
               <summary><strong>Uitleg parameters</strong></summary>
 
 
-              - Start **Flow autotune** liefst vanuit een al actieve **CM100**.
+              - Start **Flow autotune** alleen terwijl **CM100** al actief is.
 
-              - In CM100 start de autotune zelf de flow op en meet daarna de
+              - In CM100 start autotune zelf de flow op en meet daarna de
               respons.
 
               - Autotune gebruikt een vaste duur en een adaptieve stap-preset.
