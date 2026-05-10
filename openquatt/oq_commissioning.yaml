@@ -130,6 +130,11 @@ button:
               return;
             }
           }
+          ESP_LOGI("quatt.cm100", "CM100 requested via dashboard (override=%s task=%d active=%d pending=%d)",
+                   id(oq_cm_override).state.c_str(),
+                   id(oq_commissioning_task_code),
+                   (int) id(oq_commissioning_active),
+                   (int) id(oq_commissioning_request_pending));
           if (id(oq_commissioning_active) && id(oq_commissioning_task_code) != 0) {
             id(oq_commissioning_status).publish_state("REFUSED: BUSY");
             return;
@@ -223,6 +228,18 @@ button:
             id(oq_boiler_power_test_status).publish_state("REFUSED: not CM100");
             return;
           }
+          if (id(oq_boot_startup_inhibit_active)) {
+            id(oq_boiler_power_test_status).publish_state("REFUSED: startup inhibit active");
+            ESP_LOGW("quatt.cm100.boiler", "Boiler power test refused: startup inhibit active");
+            return;
+          }
+          ESP_LOGI("quatt.cm100.boiler",
+                   "Boiler power test requested (cm=%d flow_mode=%s flow_sp=%.0fL/h current_task=%d active=%d)",
+                   cm_code,
+                   id(oq_flow_control_mode).state.c_str(),
+                   id(oq_flow_setpoint_lph).state,
+                   id(oq_commissioning_task_code),
+                   (int) id(oq_commissioning_active));
 
           id(oq_commissioning_task_code) = 1;
           id(oq_commissioning_request_pending) = false;
@@ -242,6 +259,10 @@ button:
 
           id(oq_commissioning_prev_flow_setpoint_lph) = id(oq_flow_setpoint_lph).state;
           id(oq_commissioning_flow_setpoint_saved) = true;
+          ESP_LOGI("quatt.cm100.boiler",
+                   "Boiler test armed: target_flow=800L/h saved_flow=%.0fL/h state=%d",
+                   id(oq_commissioning_prev_flow_setpoint_lph),
+                   id(oq_commissioning_state_code));
           auto set_flow = id(oq_flow_setpoint_lph).make_call();
           set_flow.set_value(800.0f);
           set_flow.perform();
@@ -420,6 +441,31 @@ interval:
           const bool task_is_boiler = (id(oq_commissioning_task_code) == 1);
           const bool task_is_flow_autotune = (id(oq_commissioning_task_code) == 2);
           const bool boiler_test_running = id(oq_commissioning_active) && task_is_boiler;
+          const float flow_lph = id(flow_rate_selected).state;
+          const bool flow_valid = !isnan(flow_lph) && flow_lph > 0.0f;
+          const bool flow_on_target = flow_valid && fabsf(flow_lph - kTargetFlowLph) <= kFlowBandLph;
+          const bool flow_stable_now = flow_on_target;
+          const float heat_w = id(boiler_heat_power).state;
+          const bool heat_valid = !isnan(heat_w) && heat_w >= 0.0f;
+          const uint32_t commissioning_elapsed_ms =
+              (id(oq_commissioning_started_ms) == 0) ? 0 : (now_ms - id(oq_commissioning_started_ms));
+          static int last_boiler_state_logged = -1;
+          if (task_is_boiler && id(oq_commissioning_state_code) != last_boiler_state_logged) {
+            ESP_LOGI("quatt.cm100.boiler",
+                     "state=%d cm=%d active=%d pending=%d flow=%.0fL/h target=800L/h stable=%d/%d boiler_req=%d boiler_active=%d heat=%.0fW elapsed=%lus",
+                     id(oq_commissioning_state_code),
+                     cm_code,
+                     (int) id(oq_commissioning_active),
+                     (int) id(oq_commissioning_request_pending),
+                     flow_lph,
+                     (int) id(oq_commissioning_flow_stable_count),
+                     (int) kStableFlowSamples,
+                     (int) id(oq_commissioning_boiler_request),
+                     (int) id(boiler_active).state,
+                     heat_w,
+                     (unsigned long) (commissioning_elapsed_ms / 1000UL));
+            last_boiler_state_logged = id(oq_commissioning_state_code);
+          }
 
           auto restore_flow_setpoint = [&]() {
             if (!id(oq_commissioning_flow_setpoint_saved)) return;
@@ -461,6 +507,9 @@ interval:
           };
 
           if (id(oq_commissioning_abort_requested)) {
+            ESP_LOGW("quatt.cm100.boiler", "Boiler test abort requested (state=%d cm=%d active=%d pending=%d)",
+                     id(oq_commissioning_state_code), cm_code,
+                     (int) id(oq_commissioning_active), (int) id(oq_commissioning_request_pending));
             finish_task("ABORTED", 7, true);
             return;
           }
@@ -468,6 +517,7 @@ interval:
           if (task_is_flow_autotune) {
             if (id(oq_commissioning_request_pending)) {
               if (in_cm100) {
+                ESP_LOGI("quatt.cm100.autotune", "Autotune request accepted in CM100; activating commissioning container");
                 id(oq_commissioning_active) = true;
                 id(oq_commissioning_request_pending) = false;
                 id(oq_commissioning_started_ms) = now_ms;
@@ -482,7 +532,9 @@ interval:
               if (!in_cm100) {
                 publish_status("WAITING_FOR_CM100");
                 id(oq_commissioning_status).publish_state("WAITING_FOR_CM100");
+                ESP_LOGI("quatt.cm100", "CM100 request pending while not in CM100; waiting");
               } else {
+                ESP_LOGI("quatt.cm100", "CM100 request accepted; entering neutral commissioning container");
                 id(oq_commissioning_active) = true;
                 id(oq_commissioning_request_pending) = false;
                 id(oq_commissioning_started_ms) = now_ms;
@@ -498,7 +550,9 @@ interval:
             if (id(oq_commissioning_request_pending)) {
               if (!in_cm100) {
                 publish_status("WAITING_FOR_CM100");
+                ESP_LOGI("quatt.cm100.boiler", "Boiler test waiting for CM100");
               } else {
+                ESP_LOGI("quatt.cm100.boiler", "Boiler test request accepted in CM100; entering FLOW_SETTLING");
                 id(oq_commissioning_active) = true;
                 id(oq_commissioning_request_pending) = false;
                 id(oq_commissioning_started_ms) = now_ms;
@@ -526,19 +580,13 @@ interval:
             return;
           }
 
-          const float flow_lph = id(flow_rate_selected).state;
-          const bool flow_valid = !isnan(flow_lph) && flow_lph > 0.0f;
-          const bool flow_on_target = flow_valid && fabsf(flow_lph - kTargetFlowLph) <= kFlowBandLph;
-          const bool flow_stable_now = flow_on_target;
-
-          const float heat_w = id(boiler_heat_power).state;
-          const bool heat_valid = !isnan(heat_w) && heat_w >= 0.0f;
-
           if (id(oq_water_temp_hard_trip_active)) {
+            ESP_LOGW("quatt.cm100.boiler", "Boiler test failed: hard trip active");
             finish_task("FAILED: hard trip active", 8, false);
             return;
           }
           if (id(oq_water_temp_boiler_inhibit_active)) {
+            ESP_LOGW("quatt.cm100.boiler", "Boiler test failed: boiler inhibit active");
             finish_task("FAILED: boiler inhibit active", 8, false);
             return;
           }
@@ -553,6 +601,10 @@ interval:
               id(oq_commissioning_state_code) = 3;
               id(oq_commissioning_state_since_ms) = now_ms;
               id(oq_commissioning_flow_stable_count) = 0;
+              ESP_LOGI("quatt.cm100.boiler",
+                       "Flow settled at %.0fL/h after %lus; requesting boiler relay",
+                       flow_lph,
+                       (unsigned long) ((now_ms - id(oq_commissioning_started_ms)) / 1000UL));
               publish_status("BOILER_SETTLING");
             } else {
               publish_status("FLOW_SETTLING");
@@ -566,6 +618,11 @@ interval:
 
             if (!id(boiler_active).state) {
               if ((now_ms - id(oq_commissioning_state_since_ms)) >= kBoilerSettleMinMs) {
+                ESP_LOGW("quatt.cm100.boiler",
+                         "Boiler did not start in time (flow=%.0fL/h boiler_req=%d elapsed=%lus)",
+                         flow_lph,
+                         (int) id(oq_commissioning_boiler_request),
+                         (unsigned long) ((now_ms - id(oq_commissioning_state_since_ms)) / 1000UL));
                 finish_task("FAILED: boiler did not start", 8, false);
                 return;
               }
@@ -578,6 +635,9 @@ interval:
               id(oq_commissioning_state_code) = 4;
               id(oq_commissioning_state_since_ms) = now_ms;
               reset_measurement();
+              ESP_LOGI("quatt.cm100.boiler",
+                       "Boiler settled; starting measurement window (flow=%.0fL/h heat=%.0fW boiler_active=%d)",
+                       flow_lph, heat_w, (int) id(boiler_active).state);
               publish_status("MEASURING");
             } else {
               publish_status("BOILER_SETTLING");
@@ -619,6 +679,9 @@ interval:
               id(oq_commissioning_state_code) = 5;
               id(oq_commissioning_state_since_ms) = now_ms;
               id(oq_commissioning_boiler_request) = false;
+              ESP_LOGI("quatt.cm100.boiler",
+                       "Measurement complete: avg=%.0fW min=%.0fW max=%.0fW samples=%u conf=%.0f%%",
+                       avg_w, min_w, max_w, (unsigned int) id(oq_commissioning_sample_count), confidence);
               restore_flow_setpoint();
               publish_status("COOLDOWN");
             } else {
@@ -632,6 +695,7 @@ interval:
               char msg[128];
               snprintf(msg, sizeof(msg), "DONE: %.0fW (conf %.0f%%)",
                        id(oq_commissioning_result_w), id(oq_commissioning_result_confidence));
+              ESP_LOGI("quatt.cm100.boiler", "Cooldown complete; finishing boiler test (%s)", msg);
               finish_task(msg, 6, true);
             } else {
               publish_status("COOLDOWN");
