@@ -524,6 +524,7 @@ interval:
               id(oq_commissioning_result_confidence) = 0.0f;
             }
             publish_status(status);
+            id(oq_commissioning_status).publish_state(keep_cm100 ? "CM100 READY" : "IDLE");
           };
 
           if (id(oq_commissioning_abort_requested)) {

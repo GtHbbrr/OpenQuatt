@@ -255,6 +255,7 @@ interval:
             id(oq_commissioning_state_code) = 0;
             id(oq_commissioning_started_ms) = 0;
             id(oq_commissioning_state_since_ms) = 0;
+            id(oq_commissioning_status).publish_state(keep_cm100 ? "CM100 READY" : "IDLE");
           };
 
           // Abort button always works
