@@ -95,7 +95,7 @@ This prevents hidden control coupling and keeps debugging deterministic.
 | Power House | `${oq_heat_loop_tick_s}` with effective cadence `${oq_heat_loop_powerhouse_s}` | Power model, filtered demand, and Power House compressor requests |
 | Cooling | `${oq_heat_loop_tick_s}` | Cooling target, PI demand, and cooling compressor requests |
 | Thermal request control | Tick `${oq_heat_loop_tick_s}` (default 5s), effective cadence `${oq_heat_loop_curve_s}` (Curve) / `${oq_heat_loop_powerhouse_s}` (Power House) | Shared request control, guards, and actuator input |
-| Flow control | `${oq_flow_loop_s}` (default 5s) | Pump iPWM control (AUTO/MANUAL/FROST/autotune override) |
+| Flow control | `${oq_flow_loop_s}` (default 5s) | Pump iPWM control (AUTO/MANUAL/FROST/CM100 autotune override) |
 | Boiler control | `${oq_boiler_loop_s}` (default 5s) | CM3 gating plus CM100 boiler test under the shared water-temperature guardrail |
 | CIC polling tick | `${cic_poll_tick_ms}` (default 5s) | Poll scheduler, stale detection, feed invalidation |
 
@@ -246,7 +246,7 @@ Power House duo request selection works in simple steps:
 Flow control execution priority:
 
 1. CM0 early return
-2. autotune override (CM1 only)
+2. autotune override (CM100 commissioning task only)
 3. manual/frost fixed iPWM
 4. AUTO PI path
 

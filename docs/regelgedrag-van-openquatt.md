@@ -53,7 +53,7 @@ In gewone taal:
 
 De ketel springt dus normaal niet op elk kort dipje direct bij.
 
-`CM100` is iets anders: dat is een expliciete service- of commissioningstand voor metingen zoals het boilervermogentestje. Daar hoort geen normale warmtevraaglogica bij.
+`CM100` is iets anders: dat is een expliciete service- of commissioningstand voor metingen zoals het boilervermogentestje of flow-autotune. Daar hoort geen normale warmtevraaglogica bij.
 
 ## Waarom blijft het systeem soms juist te lang in een tussenstand?
 

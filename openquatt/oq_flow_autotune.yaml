@@ -10,7 +10,7 @@
 #   - Flow control remains the owner of iPWM.
 #   - This package only requests a temporary PWM override via:
 #       * globals: oq_flow_autotune_active, oq_flow_autotune_pwm (added in flow_control)
-#   - Autotune is only allowed in CM1 (pre/postflow), not in CM0/CM2/CM3/CM98.
+#   - Autotune is only allowed in CM100 together with commissioning task FLOW_AUTOTUNE.
 #
 # Operation (high level):
 #   1) Arm/Settle: force baseline PWM (last_good_pwm) and wait for stable flow
@@ -110,11 +110,38 @@ button:
       sorting_group_id: oq_tuning_flow
     on_press:
       - lambda: |-
-          if (id(oq_flow_autotune_state) != 0 || id(oq_flow_autotune_active)) {
+          // Start a CM100 commissioning request and reset the autotune state.
+          if (id(oq_flow_autotune_state) != 0 ||
+              id(oq_flow_autotune_active) ||
+              id(oq_flow_autotune_req) ||
+              id(oq_commissioning_request_pending) ||
+              id(oq_commissioning_active)) {
             id(oq_flow_autotune_status).publish_state("REFUSED: BUSY");
             return;
           }
+          id(oq_commissioning_task_code) = 2;
+          id(oq_commissioning_request_pending) = true;
+          id(oq_commissioning_active) = false;
+          id(oq_commissioning_abort_requested) = false;
+          id(oq_commissioning_state_code) = 0;
+          id(oq_commissioning_started_ms) = 0;
+          id(oq_commissioning_state_since_ms) = 0;
           id(oq_flow_autotune_req) = true;
+          id(oq_flow_autotune_abort) = false;
+          id(oq_flow_autotune_state) = 0;
+          id(oq_flow_at_t) = 0;
+          id(oq_flow_at_pwm0) = 850;
+          id(oq_flow_at_pwm_step) = 850;
+          id(oq_flow_at_pv0) = NAN;
+          id(oq_flow_at_pv_ss) = NAN;
+          id(oq_flow_at_pv63_time_s) = NAN;
+          id(oq_flow_at_w0) = NAN;
+          id(oq_flow_at_w1) = NAN;
+          id(oq_flow_at_w2) = NAN;
+          id(oq_flow_at_ss_confirm_cnt) = 0;
+          id(oq_flow_autotune_active) = false;
+          id(oq_flow_autotune_pwm) = id(oq_flow_last_good_pwm);
+          id(oq_flow_autotune_status).publish_state("REQUESTED");
 
   - platform: template
     id: oq_flow_autotune_abort_btn
@@ -211,7 +238,19 @@ interval:
             return value;
           };
           auto in_valid_autotune_mode = []() -> bool {
-            return id(oq_control_mode_code) == 1;
+            return id(oq_control_mode_code) == 100 && id(oq_commissioning_task_code) == 2;
+          };
+          auto release_commissioning = [&]() {
+            id(oq_flow_autotune_active) = false;
+            id(oq_flow_autotune_abort) = false;
+            id(oq_flow_autotune_req) = false;
+            id(oq_commissioning_request_pending) = false;
+            id(oq_commissioning_active) = false;
+            id(oq_commissioning_abort_requested) = false;
+            id(oq_commissioning_task_code) = 0;
+            id(oq_commissioning_state_code) = 0;
+            id(oq_commissioning_started_ms) = 0;
+            id(oq_commissioning_state_since_ms) = 0;
           };
 
           // Abort button always works
@@ -227,10 +266,19 @@ interval:
           if (!id(oq_flow_autotune_enable).state) {
             id(oq_flow_autotune_active) = false;
             id(oq_flow_autotune_req) = false;
+            id(oq_flow_autotune_abort) = false;
+            id(oq_commissioning_request_pending) = false;
+            id(oq_commissioning_active) = false;
+            id(oq_commissioning_abort_requested) = false;
+            id(oq_commissioning_task_code) = 0;
+            id(oq_commissioning_state_code) = 0;
+            id(oq_commissioning_started_ms) = 0;
+            id(oq_commissioning_state_since_ms) = 0;
             id(oq_flow_at_w0) = NAN;
             id(oq_flow_at_w1) = NAN;
             id(oq_flow_at_w2) = NAN;
             id(oq_flow_at_ss_confirm_cnt) = 0;
+            id(oq_flow_autotune_pwm) = clamp_ipwm((int) id(oq_flow_last_pwm));
             if (id(oq_flow_autotune_state) != 0) {
               id(oq_flow_autotune_state) = 0;
               id(oq_flow_autotune_status).publish_state("DISABLED");
@@ -249,13 +297,15 @@ interval:
           // IDLE
           if (st == 0) {
             if (id(oq_flow_autotune_req)) {
-              id(oq_flow_autotune_req) = false;
-
               if (!in_valid_autotune_mode()) {
-                id(oq_flow_autotune_status).publish_state("REFUSED: not CM1");
+                id(oq_commissioning_request_pending) = true;
+                id(oq_commissioning_active) = false;
+                id(oq_flow_autotune_status).publish_state("WAITING_FOR_CM100");
                 return;
               }
+              id(oq_flow_autotune_req) = false;
               if (!flow_valid) {
+                release_commissioning();
                 id(oq_flow_autotune_status).publish_state("REFUSED: FLOW_INVALID");
                 return;
               }
@@ -276,6 +326,11 @@ interval:
               id(oq_flow_at_pwm0) = pwm0;
               id(oq_flow_autotune_pwm) = pwm0;
               id(oq_flow_autotune_active) = true;
+              id(oq_commissioning_request_pending) = false;
+              id(oq_commissioning_active) = true;
+              id(oq_commissioning_abort_requested) = false;
+              id(oq_commissioning_started_ms) = (uint32_t) millis();
+              id(oq_commissioning_state_since_ms) = (uint32_t) millis();
 
               id(oq_flow_autotune_status).publish_state("SETTLING");
               id(oq_flow_autotune_state) = 1;
@@ -285,7 +340,7 @@ interval:
 
           // ARM
           if (st == 1) {
-            if (!in_valid_autotune_mode()) { st = 4; id(oq_flow_autotune_status).publish_state("ABORT: not CM1"); }
+            if (!in_valid_autotune_mode()) { st = 4; id(oq_flow_autotune_status).publish_state("ABORT: not CM100"); }
             else if (!flow_valid) { st = 4; id(oq_flow_autotune_status).publish_state("ABORT: FLOW_INVALID"); }
             else {
               // Keep baseline override active while settling.
@@ -347,7 +402,7 @@ interval:
 
           // STEP / MEASURE
           if (st == 2) {
-            if (!in_valid_autotune_mode()) { st = 4; id(oq_flow_autotune_status).publish_state("ABORT: not CM1"); }
+            if (!in_valid_autotune_mode()) { st = 4; id(oq_flow_autotune_status).publish_state("ABORT: not CM100"); }
             else if (!flow_valid) { st = 4; id(oq_flow_autotune_status).publish_state("ABORT: FLOW_INVALID"); }
             else {
               const float pv0 = id(oq_flow_at_pv0);
@@ -429,6 +484,7 @@ interval:
 
             if (isnan(pv0) || isnan(pv_ss) || du <= 0.0f) {
               id(oq_flow_autotune_status).publish_state("FAILED: NO_RESPONSE");
+              release_commissioning();
               id(oq_flow_autotune_state) = 0;
               return;
             }
@@ -437,6 +493,7 @@ interval:
             const float K = dpv / du;  // (L/h)/iPWM
             if (!(K > 0.0f)) {
               id(oq_flow_autotune_status).publish_state("FAILED: INVALID_GAIN");
+              release_commissioning();
               id(oq_flow_autotune_state) = 0;
               return;
             }
@@ -488,6 +545,7 @@ interval:
             id(oq_flow_at_w1) = NAN;
             id(oq_flow_at_w2) = NAN;
             id(oq_flow_at_ss_confirm_cnt) = 0;
+            release_commissioning();
 
             id(oq_flow_autotune_state) = 0;
             return;
@@ -501,6 +559,7 @@ interval:
             id(oq_flow_at_w1) = NAN;
             id(oq_flow_at_w2) = NAN;
             id(oq_flow_at_ss_confirm_cnt) = 0;
+            release_commissioning();
             id(oq_flow_autotune_status).publish_state("ABORTED");
             id(oq_flow_autotune_state) = 0;
             return;

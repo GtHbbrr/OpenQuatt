@@ -5,11 +5,9 @@
 # Goal:
 #   Provides temporary service modes outside normal heating behavior.
 #
-# Current task:
+# Current tasks:
 #   - Boiler power test: measure effective boiler heat output at stable flow.
-#
-# Future task:
-#   - Flow autotune can join the same CM100 container later.
+#   - Flow autotune: use the same CM100 container for the step-test flow tuning routine.
 #
 # Safety:
 #   - CM100 is only entered by an explicit request.
@@ -40,7 +38,7 @@ globals:
   - id: oq_commissioning_task_code
     type: int
     restore_value: false
-    initial_value: '0'   # 0=NONE, 1=BOILER_POWER_TEST, 2=FLOW_AUTOTUNE (later)
+    initial_value: '0'   # 0=NONE, 1=BOILER_POWER_TEST, 2=FLOW_AUTOTUNE
 
   - id: oq_commissioning_state_code
     type: int
@@ -288,6 +286,7 @@ interval:
           const bool in_cm3 = (cm_code == 3);
           const bool in_cm100 = (cm_code == 100);
           const bool task_is_boiler = (id(oq_commissioning_task_code) == 1);
+          const bool task_is_flow_autotune = (id(oq_commissioning_task_code) == 2);
           const bool boiler_test_running = id(oq_commissioning_active) && task_is_boiler;
 
           auto restore_flow_setpoint = [&]() {
@@ -320,6 +319,7 @@ interval:
             id(oq_commissioning_request_pending) = false;
             id(oq_commissioning_active) = false;
             id(oq_commissioning_abort_requested) = false;
+            id(oq_commissioning_task_code) = 0;
             id(oq_commissioning_state_code) = next_state;
             if (!keep_result) {
               id(oq_commissioning_result_w) = NAN;
@@ -330,6 +330,18 @@ interval:
 
           if (id(oq_commissioning_abort_requested)) {
             finish_task("ABORTED", 7, true);
+            return;
+          }
+
+          if (task_is_flow_autotune) {
+            if (id(oq_commissioning_request_pending)) {
+              if (in_cm100) {
+                id(oq_commissioning_active) = true;
+                id(oq_commissioning_request_pending) = false;
+                id(oq_commissioning_started_ms) = now_ms;
+                id(oq_commissioning_state_since_ms) = now_ms;
+              }
+            }
             return;
           }
 
