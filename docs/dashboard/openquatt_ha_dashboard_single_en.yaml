@@ -2635,8 +2635,6 @@ views:
           - type: entities
             show_header_toggle: false
             entities:
-              - entity: switch.openquatt_flow_autotune_enable
-                name: Flow autotune enable
               - entity: button.openquatt_flow_autotune_start
                 name: Flow autotune start
               - entity: button.openquatt_flow_autotune_abort

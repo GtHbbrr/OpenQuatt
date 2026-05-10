@@ -89,17 +89,6 @@ globals:
 # ----------------------------
 # CONTROL INPUTS
 # ----------------------------
-switch:
-  - platform: template
-    id: oq_flow_autotune_enable
-    name: "Flow Autotune Enable"
-    icon: mdi:auto-fix
-    restore_mode: RESTORE_DEFAULT_OFF
-    optimistic: true
-    entity_category: config
-    web_server:
-      sorting_group_id: oq_tuning_flow
-
 button:
   - platform: template
     id: oq_flow_autotune_start
@@ -268,30 +257,6 @@ interval:
 
           const float pv = id(flow_rate_selected).state;
           const bool flow_valid = !(isnan(pv) || pv <= 0.0f);
-
-          // Only run when enabled
-          if (!id(oq_flow_autotune_enable).state) {
-            id(oq_flow_autotune_active) = false;
-            id(oq_flow_autotune_req) = false;
-            id(oq_flow_autotune_abort) = false;
-            id(oq_commissioning_request_pending) = false;
-            id(oq_commissioning_active) = false;
-            id(oq_commissioning_abort_requested) = false;
-            id(oq_commissioning_task_code) = 0;
-            id(oq_commissioning_state_code) = 0;
-            id(oq_commissioning_started_ms) = 0;
-            id(oq_commissioning_state_since_ms) = 0;
-            id(oq_flow_at_w0) = NAN;
-            id(oq_flow_at_w1) = NAN;
-            id(oq_flow_at_w2) = NAN;
-            id(oq_flow_at_ss_confirm_cnt) = 0;
-            id(oq_flow_autotune_pwm) = clamp_ipwm((int) id(oq_flow_last_pwm));
-            if (id(oq_flow_autotune_state) != 0) {
-              id(oq_flow_autotune_state) = 0;
-              id(oq_flow_autotune_status).publish_state("DISABLED");
-            }
-            return;
-          }
 
           int st = id(oq_flow_autotune_state);
 
