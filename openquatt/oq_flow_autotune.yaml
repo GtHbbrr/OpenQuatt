@@ -111,21 +111,21 @@ button:
     on_press:
       - lambda: |-
           // Start a CM100 commissioning request and reset the autotune state.
+          const int cm_code = id(oq_control_mode_code);
+          const bool cm100_ready = (cm_code == 100) && id(oq_commissioning_active) && id(oq_commissioning_task_code) == 0;
+          const bool task_running = id(oq_commissioning_active) && id(oq_commissioning_task_code) != 0;
           if (id(oq_flow_autotune_state) != 0 ||
               id(oq_flow_autotune_active) ||
               id(oq_flow_autotune_req) ||
-              id(oq_commissioning_request_pending) ||
-              id(oq_commissioning_active)) {
+              task_running) {
             id(oq_flow_autotune_status).publish_state("REFUSED: BUSY");
             return;
           }
           id(oq_commissioning_task_code) = 2;
-          id(oq_commissioning_request_pending) = true;
-          id(oq_commissioning_active) = false;
+          id(oq_commissioning_request_pending) = !cm100_ready;
+          id(oq_commissioning_active) = cm100_ready;
           id(oq_commissioning_abort_requested) = false;
           id(oq_commissioning_state_code) = 0;
-          id(oq_commissioning_started_ms) = 0;
-          id(oq_commissioning_state_since_ms) = 0;
           id(oq_flow_autotune_req) = true;
           id(oq_flow_autotune_abort) = false;
           id(oq_flow_autotune_state) = 0;
@@ -141,6 +141,15 @@ button:
           id(oq_flow_at_ss_confirm_cnt) = 0;
           id(oq_flow_autotune_active) = false;
           id(oq_flow_autotune_pwm) = id(oq_flow_last_good_pwm);
+          if (cm100_ready) {
+            id(oq_commissioning_started_ms) = (uint32_t) millis();
+            id(oq_commissioning_state_since_ms) = (uint32_t) millis();
+            id(oq_commissioning_status).publish_state("CM100 READY -> FLOW AUTOTUNE");
+          } else {
+            id(oq_commissioning_started_ms) = 0;
+            id(oq_commissioning_state_since_ms) = 0;
+            id(oq_commissioning_status).publish_state("FLOW AUTOTUNE REQUESTED");
+          }
           id(oq_flow_autotune_status).publish_state("REQUESTED");
 
   - platform: template

@@ -110,6 +110,84 @@ globals:
 # ----------------------------
 button:
   - platform: template
+    id: oq_commissioning_cm100_start
+    name: "CM100 Start"
+    icon: mdi:play-circle-outline
+    entity_category: config
+    web_server:
+      sorting_group_id: oq_boiler
+    on_press:
+      - lambda: |-
+          // Request CM100 as a neutral service state with no task yet.
+          if (!id(oq_enabled).state) {
+            id(oq_boiler_power_test_status).publish_state("REFUSED: OpenQuatt disabled");
+            return;
+          }
+          if (id(oq_cm_override).has_state() && id(oq_cm_override).current_option() != "Auto") {
+            id(oq_boiler_power_test_status).publish_state("REFUSED: CM Override not Auto");
+            return;
+          }
+          if (id(oq_commissioning_active) && id(oq_commissioning_task_code) != 0) {
+            id(oq_commissioning_status).publish_state("REFUSED: BUSY");
+            return;
+          }
+
+          id(oq_commissioning_task_code) = 0;
+          id(oq_commissioning_request_pending) = true;
+          id(oq_commissioning_active) = false;
+          id(oq_commissioning_abort_requested) = false;
+          id(oq_commissioning_state_code) = 0;
+          id(oq_commissioning_started_ms) = 0;
+          id(oq_commissioning_state_since_ms) = 0;
+          id(oq_commissioning_boiler_request) = false;
+          id(oq_flow_autotune_req) = false;
+          id(oq_flow_autotune_abort) = false;
+          id(oq_flow_autotune_active) = false;
+          id(oq_flow_autotune_state) = 0;
+          id(oq_commissioning_status).publish_state("CM100 REQUESTED");
+
+  - platform: template
+    id: oq_commissioning_cm100_stop
+    name: "CM100 Stop"
+    icon: mdi:stop-circle-outline
+    entity_category: config
+    web_server:
+      sorting_group_id: oq_boiler
+    on_press:
+      - lambda: |-
+          // Stop CM100 immediately when no task is active; otherwise abort the running task.
+          const int cm_code = id(oq_control_mode_code);
+          const int task_code = id(oq_commissioning_task_code);
+          if (id(oq_commissioning_active) && task_code != 0) {
+            if (task_code == 2) {
+              id(oq_flow_autotune_abort) = true;
+            } else {
+              id(oq_commissioning_abort_requested) = true;
+            }
+            id(oq_commissioning_status).publish_state("ABORT REQUESTED");
+            return;
+          }
+          if (task_code == 2 || id(oq_flow_autotune_req)) {
+            id(oq_flow_autotune_abort) = true;
+            id(oq_commissioning_abort_requested) = true;
+            id(oq_commissioning_status).publish_state("ABORT REQUESTED");
+            return;
+          }
+          id(oq_commissioning_request_pending) = false;
+          id(oq_commissioning_active) = false;
+          id(oq_commissioning_abort_requested) = false;
+          id(oq_commissioning_task_code) = 0;
+          id(oq_commissioning_state_code) = 0;
+          id(oq_commissioning_started_ms) = 0;
+          id(oq_commissioning_state_since_ms) = 0;
+          id(oq_commissioning_boiler_request) = false;
+          id(oq_flow_autotune_req) = false;
+          id(oq_flow_autotune_abort) = false;
+          id(oq_flow_autotune_active) = false;
+          id(oq_flow_autotune_state) = 0;
+          id(oq_commissioning_status).publish_state("IDLE");
+
+  - platform: template
     id: oq_boiler_power_test_start
     name: "Boiler Power Test Start"
     icon: mdi:play-circle-outline
@@ -118,11 +196,11 @@ button:
       sorting_group_id: oq_boiler
     on_press:
       - lambda: |-
-          // Commissioning starts by taking the flow setpoint temporarily to 800 L/h.
-          const bool busy =
-              id(oq_commissioning_request_pending) ||
-              id(oq_commissioning_active);
-          if (busy) {
+          // Boiler test can start directly inside CM100, otherwise it requests CM100 first.
+          const int cm_code = id(oq_control_mode_code);
+          const bool cm100_ready = (cm_code == 100) && id(oq_commissioning_active) && id(oq_commissioning_task_code) == 0;
+          const bool task_running = id(oq_commissioning_active) && id(oq_commissioning_task_code) != 0;
+          if (task_running) {
             id(oq_boiler_power_test_status).publish_state("REFUSED: BUSY");
             return;
           }
@@ -144,12 +222,10 @@ button:
           }
 
           id(oq_commissioning_task_code) = 1;
-          id(oq_commissioning_request_pending) = true;
-          id(oq_commissioning_active) = false;
+          id(oq_commissioning_request_pending) = !cm100_ready;
+          id(oq_commissioning_active) = cm100_ready;
           id(oq_commissioning_abort_requested) = false;
           id(oq_commissioning_state_code) = 1;
-          id(oq_commissioning_started_ms) = 0;
-          id(oq_commissioning_state_since_ms) = 0;
           id(oq_commissioning_boiler_request) = false;
           id(oq_commissioning_sample_count) = 0;
           id(oq_commissioning_flow_stable_count) = 0;
@@ -165,6 +241,15 @@ button:
           set_flow.set_value(800.0f);
           set_flow.perform();
 
+          if (cm100_ready) {
+            id(oq_commissioning_started_ms) = (uint32_t) millis();
+            id(oq_commissioning_state_since_ms) = (uint32_t) millis();
+            id(oq_commissioning_status).publish_state("CM100 READY -> BOILER TEST");
+          } else {
+            id(oq_commissioning_started_ms) = 0;
+            id(oq_commissioning_state_since_ms) = 0;
+            id(oq_commissioning_status).publish_state("BOILER TEST REQUESTED");
+          }
           id(oq_boiler_power_test_status).publish_state("REQUESTED");
 
   - platform: template
@@ -176,7 +261,37 @@ button:
       sorting_group_id: oq_boiler
     on_press:
       - lambda: |-
-          id(oq_commissioning_abort_requested) = true;
+          // Abort the running commissioning task, or clear a pending CM100 request.
+          const int task_code = id(oq_commissioning_task_code);
+          const bool task_running = id(oq_commissioning_active) && task_code != 0;
+          if (task_running) {
+            if (task_code == 2) {
+              id(oq_flow_autotune_abort) = true;
+            } else {
+              id(oq_commissioning_abort_requested) = true;
+            }
+            id(oq_commissioning_status).publish_state("ABORT REQUESTED");
+            return;
+          }
+          if (task_code == 2 || id(oq_flow_autotune_req)) {
+            id(oq_flow_autotune_abort) = true;
+            id(oq_commissioning_abort_requested) = true;
+            id(oq_commissioning_status).publish_state("ABORT REQUESTED");
+            return;
+          }
+          id(oq_commissioning_request_pending) = false;
+          id(oq_commissioning_active) = false;
+          id(oq_commissioning_abort_requested) = false;
+          id(oq_commissioning_task_code) = 0;
+          id(oq_commissioning_state_code) = 0;
+          id(oq_commissioning_started_ms) = 0;
+          id(oq_commissioning_state_since_ms) = 0;
+          id(oq_commissioning_boiler_request) = false;
+          id(oq_flow_autotune_req) = false;
+          id(oq_flow_autotune_abort) = false;
+          id(oq_flow_autotune_active) = false;
+          id(oq_flow_autotune_state) = 0;
+          id(oq_commissioning_status).publish_state("IDLE");
 
   - platform: template
     id: oq_boiler_power_test_apply
@@ -244,6 +359,16 @@ sensor:
 
 binary_sensor:
   - platform: template
+    id: oq_commissioning_cm100_active
+    name: "CM100 active"
+    icon: mdi:state-machine
+    entity_category: diagnostic
+    web_server:
+      sorting_group_id: oq_boiler
+    lambda: |-
+      return id(oq_control_mode_code) == 100 && id(oq_commissioning_active);
+
+  - platform: template
     id: oq_boiler_power_test_active
     name: "Boiler power test active"
     icon: mdi:test-tube
@@ -254,6 +379,14 @@ binary_sensor:
       return id(oq_commissioning_active) && id(oq_commissioning_task_code) == 1;
 
 text_sensor:
+  - platform: template
+    id: oq_commissioning_status
+    name: "Commissioning status"
+    icon: mdi:state-machine
+    update_interval: never
+    web_server:
+      sorting_group_id: oq_boiler
+
   - platform: template
     id: oq_boiler_power_test_status
     name: "Boiler power test status"
@@ -285,6 +418,7 @@ interval:
           const int cm_code = id(oq_control_mode_code);
           const bool in_cm3 = (cm_code == 3);
           const bool in_cm100 = (cm_code == 100);
+          const bool task_is_none = (id(oq_commissioning_task_code) == 0);
           const bool task_is_boiler = (id(oq_commissioning_task_code) == 1);
           const bool task_is_flow_autotune = (id(oq_commissioning_task_code) == 2);
           const bool boiler_test_running = id(oq_commissioning_active) && task_is_boiler;
@@ -341,6 +475,26 @@ interval:
                 id(oq_commissioning_started_ms) = now_ms;
                 id(oq_commissioning_state_since_ms) = now_ms;
               }
+            }
+            return;
+          }
+
+          if (task_is_none) {
+            if (id(oq_commissioning_request_pending)) {
+              if (!in_cm100) {
+                publish_status("WAITING_FOR_CM100");
+                id(oq_commissioning_status).publish_state("WAITING_FOR_CM100");
+              } else {
+                id(oq_commissioning_active) = true;
+                id(oq_commissioning_request_pending) = false;
+                id(oq_commissioning_started_ms) = now_ms;
+                id(oq_commissioning_state_since_ms) = now_ms;
+                publish_status("CM100 READY");
+                id(oq_commissioning_status).publish_state("CM100 READY");
+              }
+            } else if (id(oq_commissioning_active) && in_cm100) {
+              publish_status("CM100 READY");
+              id(oq_commissioning_status).publish_state("CM100 READY");
             }
             return;
           }
