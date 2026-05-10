@@ -1,0 +1,487 @@
+# ==============================================================================
+# OpenQuatt - Commissioning / Service Tasks
+# ==============================================================================
+#
+# Goal:
+#   Provides temporary service modes outside normal heating behavior.
+#
+# Current task:
+#   - Boiler power test: measure effective boiler heat output at stable flow.
+#
+# Future task:
+#   - Flow autotune can join the same CM100 container later.
+#
+# Safety:
+#   - CM100 is only entered by an explicit request.
+#   - Normal heating/cooling request generation is suppressed while a task runs.
+#   - Boiler and flow remain behind the existing water-temperature and flow guards.
+#
+# ==============================================================================
+
+# ----------------------------
+# INTERNAL STATE
+# ----------------------------
+globals:
+  - id: oq_commissioning_request_pending
+    type: bool
+    restore_value: false
+    initial_value: 'false'
+
+  - id: oq_commissioning_active
+    type: bool
+    restore_value: false
+    initial_value: 'false'
+
+  - id: oq_commissioning_abort_requested
+    type: bool
+    restore_value: false
+    initial_value: 'false'
+
+  - id: oq_commissioning_task_code
+    type: int
+    restore_value: false
+    initial_value: '0'   # 0=NONE, 1=BOILER_POWER_TEST, 2=FLOW_AUTOTUNE (later)
+
+  - id: oq_commissioning_state_code
+    type: int
+    restore_value: false
+    initial_value: '0'   # 0=IDLE,1=REQUESTED,2=FLOW_SETTLE,3=BOILER_SETTLE,4=MEASURE,5=COOLDOWN,6=DONE,7=ABORT,8=FAILED
+
+  - id: oq_commissioning_started_ms
+    type: uint32_t
+    restore_value: false
+    initial_value: '0'
+
+  - id: oq_commissioning_state_since_ms
+    type: uint32_t
+    restore_value: false
+    initial_value: '0'
+
+  - id: oq_commissioning_flow_setpoint_saved
+    type: bool
+    restore_value: false
+    initial_value: 'false'
+
+  - id: oq_commissioning_prev_flow_setpoint_lph
+    type: float
+    restore_value: false
+    initial_value: 'NAN'
+
+  - id: oq_commissioning_boiler_request
+    type: bool
+    restore_value: false
+    initial_value: 'false'
+
+  - id: oq_commissioning_result_w
+    type: float
+    restore_value: false
+    initial_value: 'NAN'
+
+  - id: oq_commissioning_result_confidence
+    type: float
+    restore_value: false
+    initial_value: '0.0'
+
+  - id: oq_commissioning_sample_count
+    type: int
+    restore_value: false
+    initial_value: '0'
+
+  - id: oq_commissioning_flow_stable_count
+    type: int
+    restore_value: false
+    initial_value: '0'
+
+  - id: oq_commissioning_result_sum_w
+    type: float
+    restore_value: false
+    initial_value: '0.0'
+
+  - id: oq_commissioning_result_min_w
+    type: float
+    restore_value: false
+    initial_value: 'NAN'
+
+  - id: oq_commissioning_result_max_w
+    type: float
+    restore_value: false
+    initial_value: 'NAN'
+
+# ----------------------------
+# CONTROL INPUTS
+# ----------------------------
+button:
+  - platform: template
+    id: oq_boiler_power_test_start
+    name: "Boiler Power Test Start"
+    icon: mdi:play-circle-outline
+    entity_category: config
+    web_server:
+      sorting_group_id: oq_boiler
+    on_press:
+      - lambda: |-
+          // Commissioning starts by taking the flow setpoint temporarily to 800 L/h.
+          const bool busy =
+              id(oq_commissioning_request_pending) ||
+              id(oq_commissioning_active);
+          if (busy) {
+            id(oq_boiler_power_test_status).publish_state("REFUSED: BUSY");
+            return;
+          }
+          if (!id(oq_enabled).state) {
+            id(oq_boiler_power_test_status).publish_state("REFUSED: OpenQuatt disabled");
+            return;
+          }
+          if (id(oq_cm_override).has_state() && id(oq_cm_override).current_option() != "Auto") {
+            id(oq_boiler_power_test_status).publish_state("REFUSED: CM Override not Auto");
+            return;
+          }
+          if (!id(oq_flow_control_mode).has_state() || id(oq_flow_control_mode).current_option() != "Flow Setpoint") {
+            id(oq_boiler_power_test_status).publish_state("REFUSED: Flow mode must be Flow Setpoint");
+            return;
+          }
+          if (!id(oq_flow_setpoint_lph).has_state()) {
+            id(oq_boiler_power_test_status).publish_state("REFUSED: flow setpoint unavailable");
+            return;
+          }
+
+          id(oq_commissioning_task_code) = 1;
+          id(oq_commissioning_request_pending) = true;
+          id(oq_commissioning_active) = false;
+          id(oq_commissioning_abort_requested) = false;
+          id(oq_commissioning_state_code) = 1;
+          id(oq_commissioning_started_ms) = 0;
+          id(oq_commissioning_state_since_ms) = 0;
+          id(oq_commissioning_boiler_request) = false;
+          id(oq_commissioning_sample_count) = 0;
+          id(oq_commissioning_flow_stable_count) = 0;
+          id(oq_commissioning_result_sum_w) = 0.0f;
+          id(oq_commissioning_result_min_w) = NAN;
+          id(oq_commissioning_result_max_w) = NAN;
+          id(oq_commissioning_result_w) = NAN;
+          id(oq_commissioning_result_confidence) = 0.0f;
+
+          id(oq_commissioning_prev_flow_setpoint_lph) = id(oq_flow_setpoint_lph).state;
+          id(oq_commissioning_flow_setpoint_saved) = true;
+          auto set_flow = id(oq_flow_setpoint_lph).make_call();
+          set_flow.set_value(800.0f);
+          set_flow.perform();
+
+          id(oq_boiler_power_test_status).publish_state("REQUESTED");
+
+  - platform: template
+    id: oq_boiler_power_test_abort
+    name: "Boiler Power Test Abort"
+    icon: mdi:stop-circle-outline
+    entity_category: config
+    web_server:
+      sorting_group_id: oq_boiler
+    on_press:
+      - lambda: |-
+          id(oq_commissioning_abort_requested) = true;
+
+  - platform: template
+    id: oq_boiler_power_test_apply
+    name: "Apply Boiler Power Test"
+    icon: mdi:check-circle-outline
+    entity_category: config
+    web_server:
+      sorting_group_id: oq_boiler
+    on_press:
+      - lambda: |-
+          const float result = id(oq_commissioning_result_w);
+          if (!isnan(result) && result > 0.0f) {
+            auto call = id(oq_boiler_rated_heat_power).make_call();
+            call.set_value(result);
+            call.perform();
+            id(oq_boiler_power_test_status).publish_state("APPLIED");
+          } else {
+            id(oq_boiler_power_test_status).publish_state("APPLY_FAILED");
+          }
+
+number:
+  - platform: template
+    id: oq_boiler_rated_heat_power
+    name: "Boiler rated heat power"
+    icon: mdi:radiator
+    unit_of_measurement: "W"
+    mode: slider
+    min_value: 1000
+    max_value: 20000
+    step: 10
+    restore_value: true
+    optimistic: true
+    initial_value: 6000
+    entity_category: config
+    web_server:
+      sorting_group_id: oq_boiler
+
+sensor:
+  - platform: template
+    id: oq_boiler_power_test_result
+    name: "Boiler power test result"
+    icon: mdi:chart-line
+    unit_of_measurement: "W"
+    device_class: power
+    state_class: measurement
+    accuracy_decimals: 0
+    update_interval: 5s
+    web_server:
+      sorting_group_id: oq_boiler
+    lambda: |-
+      return id(oq_commissioning_result_w);
+
+  - platform: template
+    id: oq_boiler_power_test_confidence
+    name: "Boiler power test confidence"
+    icon: mdi:percent-outline
+    unit_of_measurement: "%"
+    state_class: measurement
+    accuracy_decimals: 0
+    update_interval: 5s
+    web_server:
+      sorting_group_id: oq_boiler
+    lambda: |-
+      return id(oq_commissioning_result_confidence);
+
+binary_sensor:
+  - platform: template
+    id: oq_boiler_power_test_active
+    name: "Boiler power test active"
+    icon: mdi:test-tube
+    entity_category: diagnostic
+    web_server:
+      sorting_group_id: oq_boiler
+    lambda: |-
+      return id(oq_commissioning_active) && id(oq_commissioning_task_code) == 1;
+
+text_sensor:
+  - platform: template
+    id: oq_boiler_power_test_status
+    name: "Boiler power test status"
+    icon: mdi:information-outline
+    update_interval: never
+    web_server:
+      sorting_group_id: oq_boiler
+
+# ----------------------------
+# MAIN LOOP
+# ----------------------------
+interval:
+  - interval: ${oq_boiler_loop_s}s
+    startup_delay: 4600ms
+    then:
+      - lambda: |-
+          // Phase-based boiler commissioning: request CM100, settle flow, measure output, then restore flow.
+          constexpr uint32_t kMaxRuntimeMs = 15UL * 60UL * 1000UL;
+          constexpr uint32_t kFlowSettleMinMs = 20UL * 1000UL;
+          constexpr uint32_t kBoilerSettleMinMs = 30UL * 1000UL;
+          constexpr uint32_t kMeasureMinMs = 60UL * 1000UL;
+          constexpr uint32_t kCooldownMs = 15UL * 1000UL;
+          constexpr float kTargetFlowLph = 800.0f;
+          constexpr float kFlowBandLph = 40.0f;
+          constexpr int kStableFlowSamples = 4;
+          constexpr int kMeasureMinSamples = 8;
+
+          const uint32_t now_ms = (uint32_t) millis();
+          const int cm_code = id(oq_control_mode_code);
+          const bool in_cm3 = (cm_code == 3);
+          const bool in_cm100 = (cm_code == 100);
+          const bool task_is_boiler = (id(oq_commissioning_task_code) == 1);
+          const bool boiler_test_running = id(oq_commissioning_active) && task_is_boiler;
+
+          auto restore_flow_setpoint = [&]() {
+            if (!id(oq_commissioning_flow_setpoint_saved)) return;
+            auto call = id(oq_flow_setpoint_lph).make_call();
+            call.set_value(id(oq_commissioning_prev_flow_setpoint_lph));
+            call.perform();
+            id(oq_commissioning_flow_setpoint_saved) = false;
+          };
+
+          auto publish_status = [&](const std::string &status) {
+            static std::string last_status;
+            if (status != last_status) {
+              id(oq_boiler_power_test_status).publish_state(status.c_str());
+              last_status = status;
+            }
+          };
+
+          auto reset_measurement = [&]() {
+            id(oq_commissioning_sample_count) = 0;
+            id(oq_commissioning_flow_stable_count) = 0;
+            id(oq_commissioning_result_sum_w) = 0.0f;
+            id(oq_commissioning_result_min_w) = NAN;
+            id(oq_commissioning_result_max_w) = NAN;
+          };
+
+          auto finish_task = [&](const char *status, int next_state, bool keep_result) {
+            id(oq_commissioning_boiler_request) = false;
+            restore_flow_setpoint();
+            id(oq_commissioning_request_pending) = false;
+            id(oq_commissioning_active) = false;
+            id(oq_commissioning_abort_requested) = false;
+            id(oq_commissioning_state_code) = next_state;
+            if (!keep_result) {
+              id(oq_commissioning_result_w) = NAN;
+              id(oq_commissioning_result_confidence) = 0.0f;
+            }
+            publish_status(status);
+          };
+
+          if (id(oq_commissioning_abort_requested)) {
+            finish_task("ABORTED", 7, true);
+            return;
+          }
+
+          if (!boiler_test_running) {
+            if (id(oq_commissioning_request_pending)) {
+              if (!in_cm100) {
+                publish_status("WAITING_FOR_CM100");
+              } else {
+                id(oq_commissioning_active) = true;
+                id(oq_commissioning_request_pending) = false;
+                id(oq_commissioning_started_ms) = now_ms;
+                id(oq_commissioning_state_since_ms) = now_ms;
+                id(oq_commissioning_state_code) = 2;
+                publish_status("FLOW_SETTLING");
+              }
+            }
+            return;
+          }
+
+          if (!in_cm100) {
+            finish_task("ABORTED: CM100 exited", 7, true);
+            return;
+          }
+
+          if (id(oq_commissioning_started_ms) == 0) {
+            id(oq_commissioning_started_ms) = now_ms;
+            id(oq_commissioning_state_since_ms) = now_ms;
+          }
+
+          const uint32_t elapsed_ms = now_ms - id(oq_commissioning_started_ms);
+          if (elapsed_ms >= kMaxRuntimeMs) {
+            finish_task("FAILED: timeout", 8, false);
+            return;
+          }
+
+          const float flow_lph = id(flow_rate_selected).state;
+          const bool flow_valid = !isnan(flow_lph) && flow_lph > 0.0f;
+          const bool flow_on_target = flow_valid && fabsf(flow_lph - kTargetFlowLph) <= kFlowBandLph;
+          const bool flow_stable_now = flow_on_target;
+
+          const float heat_w = id(boiler_heat_power).state;
+          const bool heat_valid = !isnan(heat_w) && heat_w >= 0.0f;
+
+          if (id(oq_water_temp_hard_trip_active)) {
+            finish_task("FAILED: hard trip active", 8, false);
+            return;
+          }
+          if (id(oq_water_temp_boiler_inhibit_active)) {
+            finish_task("FAILED: boiler inhibit active", 8, false);
+            return;
+          }
+
+          if (id(oq_commissioning_state_code) == 2) {
+            if (flow_stable_now) id(oq_commissioning_flow_stable_count)++;
+            else id(oq_commissioning_flow_stable_count) = 0;
+
+            if (id(oq_commissioning_flow_stable_count) >= kStableFlowSamples &&
+                (now_ms - id(oq_commissioning_state_since_ms)) >= kFlowSettleMinMs) {
+              id(oq_commissioning_boiler_request) = true;
+              id(oq_commissioning_state_code) = 3;
+              id(oq_commissioning_state_since_ms) = now_ms;
+              id(oq_commissioning_flow_stable_count) = 0;
+              publish_status("BOILER_SETTLING");
+            } else {
+              publish_status("FLOW_SETTLING");
+            }
+            return;
+          }
+
+          if (id(oq_commissioning_state_code) == 3) {
+            if (flow_stable_now) id(oq_commissioning_flow_stable_count)++;
+            else id(oq_commissioning_flow_stable_count) = 0;
+
+            if (!id(boiler_active).state) {
+              if ((now_ms - id(oq_commissioning_state_since_ms)) >= kBoilerSettleMinMs) {
+                finish_task("FAILED: boiler did not start", 8, false);
+                return;
+              }
+              publish_status("BOILER_SETTLING");
+              return;
+            }
+
+            if (id(oq_commissioning_flow_stable_count) >= kStableFlowSamples &&
+                (now_ms - id(oq_commissioning_state_since_ms)) >= kBoilerSettleMinMs) {
+              id(oq_commissioning_state_code) = 4;
+              id(oq_commissioning_state_since_ms) = now_ms;
+              reset_measurement();
+              publish_status("MEASURING");
+            } else {
+              publish_status("BOILER_SETTLING");
+            }
+            return;
+          }
+
+          if (id(oq_commissioning_state_code) == 4) {
+            if (flow_stable_now && heat_valid && heat_w > 0.0f) {
+              id(oq_commissioning_sample_count)++;
+              id(oq_commissioning_result_sum_w) += heat_w;
+              if (isnan(id(oq_commissioning_result_min_w)) || heat_w < id(oq_commissioning_result_min_w)) {
+                id(oq_commissioning_result_min_w) = heat_w;
+              }
+              if (isnan(id(oq_commissioning_result_max_w)) || heat_w > id(oq_commissioning_result_max_w)) {
+                id(oq_commissioning_result_max_w) = heat_w;
+              }
+            }
+
+            const uint32_t measure_age_ms = now_ms - id(oq_commissioning_state_since_ms);
+            const bool enough_samples = id(oq_commissioning_sample_count) >= kMeasureMinSamples;
+            const bool enough_time = measure_age_ms >= kMeasureMinMs;
+
+            if (enough_samples && enough_time) {
+              const float sample_count_f = (float) id(oq_commissioning_sample_count);
+              const float avg_w = id(oq_commissioning_result_sum_w) / sample_count_f;
+              const float min_w = id(oq_commissioning_result_min_w);
+              const float max_w = id(oq_commissioning_result_max_w);
+              const float spread_w = max_w - min_w;
+              float confidence = 100.0f;
+              if (sample_count_f < 10.0f) confidence -= (10.0f - sample_count_f) * 4.0f;
+              if (spread_w > avg_w * 0.05f) confidence -= 15.0f;
+              if (spread_w > avg_w * 0.10f) confidence -= 20.0f;
+              if (confidence < 0.0f) confidence = 0.0f;
+              if (confidence > 100.0f) confidence = 100.0f;
+
+              id(oq_commissioning_result_w) = avg_w;
+              id(oq_commissioning_result_confidence) = confidence;
+              id(oq_commissioning_state_code) = 5;
+              id(oq_commissioning_state_since_ms) = now_ms;
+              id(oq_commissioning_boiler_request) = false;
+              restore_flow_setpoint();
+              publish_status("COOLDOWN");
+            } else {
+              publish_status("MEASURING");
+            }
+            return;
+          }
+
+          if (id(oq_commissioning_state_code) == 5) {
+            if ((now_ms - id(oq_commissioning_state_since_ms)) >= kCooldownMs) {
+              char msg[128];
+              snprintf(msg, sizeof(msg), "DONE: %.0fW (conf %.0f%%)",
+                       id(oq_commissioning_result_w), id(oq_commissioning_result_confidence));
+              finish_task(msg, 6, true);
+            } else {
+              publish_status("COOLDOWN");
+            }
+            return;
+          }
+
+          if (id(oq_commissioning_state_code) == 6) {
+            char msg[128];
+            snprintf(msg, sizeof(msg), "DONE: %.0fW (conf %.0f%%)",
+                     id(oq_commissioning_result_w), id(oq_commissioning_result_confidence));
+            publish_status(msg);
+            return;
+          }

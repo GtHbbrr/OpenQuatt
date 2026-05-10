@@ -23,7 +23,7 @@
 #   - Pump output is correctly configured for PWM
 #
 # Interaction with Control Modes:
-#   - Active in CM1/CM2/CM3 (AUTO=PI, MANUAL=fixed iPWM)
+#   - Active in CM1/CM2/CM3/CM100 (AUTO=PI, MANUAL=fixed iPWM)
 #   - CM0: early return (supervisory owns pump state in idle)
 #   - CM98: fixed frost PWM path
 #

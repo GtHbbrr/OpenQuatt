@@ -33,7 +33,7 @@
 #
 # Interaction with Control Modes:
 #   - Active in CM2/CM3 (heating)
-#   - In CM0/CM1/CM98, compressor levels are forced to 0
+#   - In CM0/CM1/CM98/CM100, compressor levels are forced to 0
 #
 # Safety / fail-safe:
 #   - With inactive CM: compressor levels 0 (no heat production)
