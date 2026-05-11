@@ -983,7 +983,7 @@
         mock: isMockData,
         windowHours,
         series: [
-          { id: "flow", sampleKey: "flow", label: "Flow", tone: "sky", decimals: 0, unit: " L/h" },
+          { id: "flow", sampleKey: "flow", label: "Flow", tone: "sky", decimals: 0, unit: " L/h", axisTickStep: 50 },
         ],
       },
     ];
@@ -1036,18 +1036,58 @@
       return { min: 0, max: 1 };
     }
 
-    let min = Math.min(...values);
-    let max = Math.max(...values);
-    if (min === max) {
-      const offset = Math.max(Math.abs(min) * 0.1, 1);
-      min -= offset;
-      max += offset;
-    } else {
-      const pad = Math.max((max - min) * 0.12, 1);
-      min -= pad;
-      max += pad;
+    return {
+      min: Math.min(...values),
+      max: Math.max(...values),
+    };
+  }
+
+  function getNiceTickStep(rawStep) {
+    if (!Number.isFinite(rawStep) || rawStep <= 0) {
+      return 1;
     }
-    return { min, max };
+    const exponent = Math.floor(Math.log10(rawStep));
+    const fraction = rawStep / (10 ** exponent);
+    let niceFraction;
+    if (fraction <= 1) {
+      niceFraction = 1;
+    } else if (fraction <= 2) {
+      niceFraction = 2;
+    } else if (fraction <= 5) {
+      niceFraction = 5;
+    } else {
+      niceFraction = 10;
+    }
+    return niceFraction * (10 ** exponent);
+  }
+
+  function getOverviewTrendAxisTicks(range, series) {
+    const rangeMin = Number.isFinite(range?.min) ? range.min : 0;
+    const rangeMax = Number.isFinite(range?.max) ? range.max : 1;
+    const rangeSpan = Math.max(rangeMax - rangeMin, 1);
+    const explicitTickStep = Array.isArray(series)
+      ? series.map((item) => Number(item?.axisTickStep)).find((value) => Number.isFinite(value) && value > 0)
+      : Number.NaN;
+    const tickStep = Math.max(1, Number.isFinite(explicitTickStep) ? explicitTickStep : getNiceTickStep(rangeSpan / 4));
+    const tickRatio = rangeSpan / tickStep;
+    const tickCount = tickRatio <= 1.8 ? 3 : (tickRatio <= 4.25 ? 5 : 7);
+    const halfCount = Math.floor(tickCount / 2);
+    const midpoint = (rangeMin + rangeMax) / 2;
+    const centerTick = Math.round(midpoint / tickStep) * tickStep;
+    const ticks = [];
+
+    for (let index = -halfCount; index <= halfCount; index += 1) {
+      ticks.push(centerTick + (index * tickStep));
+    }
+
+    const axisMin = ticks[0];
+    const axisMax = ticks[ticks.length - 1];
+    return {
+      ticks,
+      axisMin,
+      axisMax,
+      axisDecimals: 0,
+    };
   }
 
   function getOverviewTrendChartModel(samples, series, options = {}) {
@@ -1056,7 +1096,7 @@
     const windowMs = getOverviewTrendWindowMs(windowHours);
     const width = 640;
     const height = 220;
-    const left = 22;
+    const left = 46;
     const right = 18;
     const top = 18;
     const bottom = 34;
@@ -1070,19 +1110,36 @@
     const startTime = mockData ? 0 : (endTime - windowMs);
     const span = Math.max(endTime - startTime, 1);
     const uptimeMs = span;
-    const range = getOverviewTrendRange(samples, series);
+    const rawRange = getOverviewTrendRange(samples, series);
+    const displayRange = rawRange.min === rawRange.max
+      ? {
+          min: rawRange.min - 1,
+          max: rawRange.max + 1,
+        }
+      : {
+          min: rawRange.min - Math.max((rawRange.max - rawRange.min) * 0.12, 1),
+          max: rawRange.max + Math.max((rawRange.max - rawRange.min) * 0.12, 1),
+        };
+    const axisTicks = getOverviewTrendAxisTicks(rawRange, series);
 
     const xOf = (timestamp) => left + (((timestamp - startTime) / span) * plotWidth);
     const yOf = (value) => {
       if (!Number.isFinite(value)) {
         return Number.NaN;
       }
-      const ratio = (value - range.min) / Math.max(range.max - range.min, 1);
+      const ratio = (value - displayRange.min) / Math.max(displayRange.max - displayRange.min, 1);
       return top + ((1 - Math.min(1, Math.max(0, ratio))) * plotHeight);
     };
 
     const gridXs = [0, 0.5, 1].map((fraction) => left + (plotWidth * fraction));
-    const gridYs = [0.25, 0.5, 0.75].map((fraction) => top + (plotHeight * fraction));
+    const gridYs = axisTicks.ticks.map((value) => yOf(value));
+    const yAxisLabels = axisTicks.ticks.map((value, index) => {
+      return {
+        x: left - 10,
+        y: gridYs[index],
+        text: formatNumericState(value, axisTicks.axisDecimals),
+      };
+    });
 
     const points = samples.map((sample) => {
       const x = xOf(sample.t);
@@ -1163,9 +1220,11 @@
       startTime,
       span,
       windowHours,
-      range,
+      range: rawRange,
+      displayRange,
       gridXs,
       gridYs,
+      yAxisLabels,
       points,
       tracks,
       series,
@@ -1250,6 +1309,15 @@
         ${model.gridXs.map((x) => `<line x1="${x.toFixed(1)}" y1="${model.top}" x2="${x.toFixed(1)}" y2="${model.height - model.bottom}" class="oq-overview-trend-grid oq-overview-trend-grid--vertical"></line>`).join("")}
         ${model.gridYs.map((y) => `<line x1="${model.left}" y1="${y.toFixed(1)}" x2="${model.width - model.right}" y2="${y.toFixed(1)}" class="oq-overview-trend-grid oq-overview-trend-grid--horizontal"></line>`).join("")}
         ${seriesPaths}
+        ${model.yAxisLabels.map((label) => `
+          <text
+            x="${label.x}"
+            y="${label.y.toFixed(1)}"
+            class="oq-overview-trend-axis-label oq-overview-trend-axis-label--y"
+            text-anchor="end"
+            dominant-baseline="middle"
+          >${escapeHtml(label.text)}</text>
+        `).join("")}
         <g class="oq-overview-trend-hover-layer" data-oq-trend-hover-layer hidden>
           <line x1="${model.left}" y1="${model.top}" x2="${model.left}" y2="${model.height - model.bottom}" class="oq-overview-trend-hover-line"></line>
           ${series.map((item) => `
