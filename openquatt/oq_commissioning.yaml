@@ -119,10 +119,6 @@ button:
     on_press:
       - lambda: |-
           // Request CM100 as a neutral service state with no task yet.
-          if (!id(oq_enabled).state) {
-            id(oq_boiler_power_test_status).publish_state("REFUSED: OpenQuatt disabled");
-            return;
-          }
           if (id(oq_cm_override).has_state()) {
             const std::string override_mode = id(oq_cm_override).current_option();
             if (override_mode != "Auto") {
@@ -131,7 +127,7 @@ button:
             }
           }
           ESP_LOGI("quatt.cm100", "CM100 requested via dashboard (override=%s task=%d active=%d pending=%d)",
-                   id(oq_cm_override).state.c_str(),
+                   id(oq_cm_override).current_option().c_str(),
                    id(oq_commissioning_task_code),
                    (int) id(oq_commissioning_active),
                    (int) id(oq_commissioning_request_pending));
@@ -212,10 +208,6 @@ button:
             id(oq_boiler_power_test_status).publish_state("REFUSED: BUSY");
             return;
           }
-          if (!id(oq_enabled).state) {
-            id(oq_boiler_power_test_status).publish_state("REFUSED: OpenQuatt disabled");
-            return;
-          }
           if (!id(oq_flow_control_mode).has_state() || id(oq_flow_control_mode).current_option() != "Flow Setpoint") {
             id(oq_boiler_power_test_status).publish_state("REFUSED: Flow mode must be Flow Setpoint");
             return;
@@ -231,7 +223,7 @@ button:
           ESP_LOGI("quatt.cm100.boiler",
                    "Boiler power test requested (cm=%d flow_mode=%s flow_sp=%.0fL/h current_task=%d active=%d)",
                    cm_code,
-                   id(oq_flow_control_mode).state.c_str(),
+                   id(oq_flow_control_mode).current_option().c_str(),
                    id(oq_flow_setpoint_lph).state,
                    id(oq_commissioning_task_code),
                    (int) id(oq_commissioning_active));
