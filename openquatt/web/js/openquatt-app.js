@@ -10855,7 +10855,7 @@ function renderWebServerLogsModal() {
     const windowMs = getOverviewTrendWindowMs(windowHours);
     const width = 640;
     const height = 220;
-    const left = 22;
+    const left = 46;
     const right = 18;
     const top = 18;
     const bottom = 34;
@@ -10881,7 +10881,20 @@ function renderWebServerLogsModal() {
     };
 
     const gridXs = [0, 0.5, 1].map((fraction) => left + (plotWidth * fraction));
-    const gridYs = [0.25, 0.5, 0.75].map((fraction) => top + (plotHeight * fraction));
+    const gridFractions = [0.25, 0.5, 0.75];
+    const gridYs = gridFractions.map((fraction) => top + (plotHeight * fraction));
+    const axisDecimals = series.reduce((max, item) => {
+      const decimals = Number(item?.decimals);
+      return Math.max(max, Number.isFinite(decimals) ? decimals : 0);
+    }, 0);
+    const yAxisLabels = gridFractions.map((fraction, index) => {
+      const value = range.max - ((range.max - range.min) * fraction);
+      return {
+        x: 6,
+        y: gridYs[index],
+        text: formatNumericState(value, axisDecimals),
+      };
+    });
 
     const points = samples.map((sample) => {
       const x = xOf(sample.t);
@@ -10965,6 +10978,7 @@ function renderWebServerLogsModal() {
       range,
       gridXs,
       gridYs,
+      yAxisLabels,
       points,
       tracks,
       series,
@@ -11049,6 +11063,15 @@ function renderWebServerLogsModal() {
         ${model.gridXs.map((x) => `<line x1="${x.toFixed(1)}" y1="${model.top}" x2="${x.toFixed(1)}" y2="${model.height - model.bottom}" class="oq-overview-trend-grid oq-overview-trend-grid--vertical"></line>`).join("")}
         ${model.gridYs.map((y) => `<line x1="${model.left}" y1="${y.toFixed(1)}" x2="${model.width - model.right}" y2="${y.toFixed(1)}" class="oq-overview-trend-grid oq-overview-trend-grid--horizontal"></line>`).join("")}
         ${seriesPaths}
+        ${model.yAxisLabels.map((label) => `
+          <text
+            x="${label.x}"
+            y="${label.y.toFixed(1)}"
+            class="oq-overview-trend-axis-label oq-overview-trend-axis-label--y"
+            text-anchor="start"
+            dominant-baseline="middle"
+          >${escapeHtml(label.text)}</text>
+        `).join("")}
         <g class="oq-overview-trend-hover-layer" data-oq-trend-hover-layer hidden>
           <line x1="${model.left}" y1="${model.top}" x2="${model.left}" y2="${model.height - model.bottom}" class="oq-overview-trend-hover-line"></line>
           ${series.map((item) => `
