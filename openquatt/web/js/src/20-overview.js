@@ -983,7 +983,7 @@
         mock: isMockData,
         windowHours,
         series: [
-          { id: "flow", sampleKey: "flow", label: "Flow", tone: "sky", decimals: 0, unit: " L/h", axisTickStep: 50 },
+          { id: "flow", sampleKey: "flow", label: "Flow", tone: "sky", decimals: 0, unit: " L/h", axisMin: 0, axisTickStep: 250 },
         ],
       },
     ];
@@ -1065,19 +1065,35 @@
     const rangeMin = Number.isFinite(range?.min) ? range.min : 0;
     const rangeMax = Number.isFinite(range?.max) ? range.max : 1;
     const rangeSpan = Math.max(rangeMax - rangeMin, 1);
+    const explicitAxisMin = Array.isArray(series)
+      ? series.map((item) => Number(item?.axisMin)).find((value) => Number.isFinite(value))
+      : Number.NaN;
+    const explicitAxisMax = Array.isArray(series)
+      ? series.map((item) => Number(item?.axisMax)).find((value) => Number.isFinite(value))
+      : Number.NaN;
     const explicitTickStep = Array.isArray(series)
       ? series.map((item) => Number(item?.axisTickStep)).find((value) => Number.isFinite(value) && value > 0)
       : Number.NaN;
     const tickStep = Math.max(1, Number.isFinite(explicitTickStep) ? explicitTickStep : getNiceTickStep(rangeSpan / 4));
-    const tickRatio = rangeSpan / tickStep;
-    const tickCount = tickRatio <= 1.8 ? 3 : (tickRatio <= 4.25 ? 5 : 7);
-    const halfCount = Math.floor(tickCount / 2);
-    const midpoint = (rangeMin + rangeMax) / 2;
-    const centerTick = Math.round(midpoint / tickStep) * tickStep;
     const ticks = [];
 
-    for (let index = -halfCount; index <= halfCount; index += 1) {
-      ticks.push(centerTick + (index * tickStep));
+    if (Number.isFinite(explicitAxisMin) || Number.isFinite(explicitAxisMax)) {
+      const axisMin = Number.isFinite(explicitAxisMin) ? explicitAxisMin : 0;
+      const axisMax = Number.isFinite(explicitAxisMax) ? explicitAxisMax : Math.ceil(rangeMax / tickStep) * tickStep;
+      const firstTick = Math.floor(axisMin / tickStep) * tickStep;
+      const lastTick = Math.ceil(axisMax / tickStep) * tickStep;
+      for (let value = firstTick; value <= lastTick + (tickStep * 0.5); value += tickStep) {
+        ticks.push(value);
+      }
+    } else {
+      const tickRatio = rangeSpan / tickStep;
+      const tickCount = tickRatio <= 1.8 ? 3 : (tickRatio <= 4.25 ? 5 : 7);
+      const halfCount = Math.floor(tickCount / 2);
+      const midpoint = (rangeMin + rangeMax) / 2;
+      const centerTick = Math.round(midpoint / tickStep) * tickStep;
+      for (let index = -halfCount; index <= halfCount; index += 1) {
+        ticks.push(centerTick + (index * tickStep));
+      }
     }
 
     const axisMin = ticks[0];
