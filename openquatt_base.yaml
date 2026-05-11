@@ -37,6 +37,8 @@ esphome:
     - ${thermal_request_logic_header}
     - ${heating_curve_logic_header}
   platformio_options:
+    extra_scripts:
+      - pre:../../../scripts/normalize_factory_merge_inputs.py
     build_flags:
       # Hard-pinned for Duo entrypoints to prevent accidental topology drift.
       - -DOQ_TOPOLOGY_DUO=1
