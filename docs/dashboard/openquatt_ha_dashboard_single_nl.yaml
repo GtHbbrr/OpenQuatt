@@ -14,7 +14,7 @@ views:
             heading: Live prestaties
             heading_style: title
           - type: markdown
-            content: >-
+            content: |-
               <details>
 
               <summary><strong>Uitleg</strong></summary>
@@ -90,7 +90,7 @@ views:
             heading: Systeemstatus
             icon: mdi:state-machine
           - type: markdown
-            content: >-
+            content: |-
               <details>
 
               <summary><strong>Uitleg</strong></summary>
@@ -143,7 +143,7 @@ views:
             heading: Bediening
             heading_style: title
           - type: markdown
-            content: >-
+            content: |-
               <details>
 
               <summary><strong>Uitleg</strong></summary>
@@ -200,7 +200,7 @@ views:
             heading: Debug
             heading_style: title
           - type: markdown
-            content: >-
+            content: |-
               <details>
 
               <summary><strong>Uitleg</strong></summary><ha-alert
@@ -229,7 +229,7 @@ views:
             heading_style: title
             icon: mdi:home-thermometer
           - type: markdown
-            content: >-
+            content: |-
               <details>
 
               <summary><strong>Uitleg</strong></summary>
@@ -274,7 +274,7 @@ views:
             heading: Instellingen stille modus
             icon: mdi:volume-off
           - type: markdown
-            content: >-
+            content: |-
               <details>
 
               <summary><strong>Uitleg</strong></summary>
@@ -330,7 +330,7 @@ views:
             heading: Performance (12h)
             heading_style: title
           - type: markdown
-            content: >-
+            content: |-
               <details>
 
               <summary><strong>Uitleg</strong></summary>
@@ -606,7 +606,7 @@ views:
             heading: Energietrends (7d/30d)
             heading_style: title
           - type: markdown
-            content: >-
+            content: |-
               <details>
 
 
@@ -783,7 +783,7 @@ views:
     header:
       card:
         type: markdown
-        content: >-
+        content: |-
           # <ha-icon icon="mdi:lightning-bolt-circle"></ha-icon> Energie
 
           Energie-overzicht van Warmtepomp, boiler en totaal systeem (dag +
@@ -805,7 +805,7 @@ views:
             heading: Status
             heading_style: subtitle
           - type: markdown
-            content: >-
+            content: |-
               <details>
 
               <summary><strong>Uitleg</strong></summary>
@@ -853,7 +853,7 @@ views:
             heading: Regeling
             heading_style: subtitle
           - type: markdown
-            content: >-
+            content: |-
               <details>
 
               <summary><strong>Uitleg</strong></summary>
@@ -969,7 +969,7 @@ views:
             heading: Regelinstellingen
             heading_style: subtitle
           - type: markdown
-            content: >-
+            content: |-
               <details>
 
               <summary><strong>Uitleg</strong></summary>
@@ -1013,7 +1013,7 @@ views:
             heading: Kern KPI
             heading_style: subtitle
           - type: markdown
-            content: >-
+            content: |-
               <details>
 
               <summary><strong>Uitleg</strong></summary>
@@ -1112,7 +1112,7 @@ views:
             heading: Trends
             heading_style: title
           - type: markdown
-            content: >-
+            content: |-
               <details>
 
 
@@ -1491,6 +1491,58 @@ views:
                       font-size: 0.75em
                       transform: none
                     prefix: 'COP: '
+                  - type: conditional
+                    conditions:
+                      - entity: binary_sensor.openquatt_hp1_defrost
+                        state: 'on'
+                    elements:
+                      - type: icon
+                        icon: mdi:snowflake-melt
+                        entity: binary_sensor.openquatt_hp1_defrost
+                        style:
+                          top: 82%
+                          left: 15%
+                          transform: none
+                          color: white
+                  - type: conditional
+                    conditions:
+                      - entity: binary_sensor.openquatt_hp1_defrost
+                        state: 'off'
+                    elements:
+                      - type: icon
+                        icon: mdi:snowflake-melt
+                        entity: binary_sensor.openquatt_hp1_defrost
+                        style:
+                          top: 82%
+                          left: 15%
+                          transform: none
+                          color: grey
+                  - type: conditional
+                    conditions:
+                      - entity: binary_sensor.openquatt_hp1_bottom_plate_heater
+                        state: 'on'
+                    elements:
+                      - type: icon
+                        icon: mdi:heating-coil
+                        entity: binary_sensor.openquatt_hp1_bottom_plate_heater
+                        style:
+                          top: 82%
+                          left: 8%
+                          transform: none
+                          color: white
+                  - type: conditional
+                    conditions:
+                      - entity: binary_sensor.openquatt_hp1_bottom_plate_heater
+                        state: 'off'
+                    elements:
+                      - type: icon
+                        icon: mdi:heating-coil
+                        entity: binary_sensor.openquatt_hp1_bottom_plate_heater
+                        style:
+                          top: 82%
+                          left: 8%
+                          transform: none
+                          color: grey
             grid_options:
               columns: 12
               rows: auto
@@ -1536,7 +1588,7 @@ views:
     header:
       card:
         type: markdown
-        content: >-
+        content: |-
           # <ha-icon icon="mdi:heat-pump-outline"></ha-icon> Overzicht HP1
 
           Deze tab toont een technische momentopname van HP1 op
@@ -1770,7 +1822,7 @@ views:
                 heading: HA proxywaarden en validiteit
                 heading_style: subtitle
               - type: markdown
-                content: >-
+                content: |-
                   <details>
 
                   <summary><strong>Uitleg</strong></summary>
@@ -2166,7 +2218,7 @@ views:
     header:
       card:
         type: markdown
-        content: >-
+        content: |-
           # <ha-icon icon="mdi:source-branch"></ha-icon> Sensorconfiguratie
 
 
@@ -2189,7 +2241,7 @@ views:
             heading: Quatt Hybrid-versie
             heading_style: title
           - type: markdown
-            content: >-
+            content: |-
               <details>
 
               <summary><strong>Uitleg</strong></summary>
@@ -2211,7 +2263,7 @@ views:
             heading: Instellingen stille modus
             heading_style: title
           - type: markdown
-            content: >-
+            content: |-
               <details>
 
               <summary><strong>Uitleg parameters</strong></summary>
@@ -2244,7 +2296,7 @@ views:
             heading: Huismodel (PH)
             heading_style: title
           - type: markdown
-            content: >-
+            content: |-
               <details>
 
               <summary><strong>Uitleg parameters</strong></summary>
@@ -2313,7 +2365,7 @@ views:
             heading: Stooklijnregeling
             heading_style: title
           - type: markdown
-            content: >-
+            content: |-
               <details>
 
               <summary><strong>Uitleg parameters</strong></summary>
@@ -2368,11 +2420,42 @@ views:
       - type: grid
         cards:
           - type: heading
+            icon: mdi:water-thermometer
+            heading: Watertempbegrenzing
+            heading_style: title
+          - type: markdown
+            content: |-
+              <details>
+
+              <summary><strong>Uitleg parameters</strong></summary>
+
+
+              - Gebruikt `Water Supply Temp (Selected)` als gemeten begrenzingsbron.
+
+              - **Maximum water temperature** is het normale plafond voor de
+              gemeten aanvoertemperatuur.
+
+              - OpenQuatt leidt uit die instelling intern zelf een
+              terugregelband en een harde trip op `max + 5°C` af. In `CM3`
+              valt eerst de boiler weg; alleen bij aanhoudende overshoot volgt
+              daarna een harde HP-stop.
+
+
+              </details>
+            text_only: true
+          - type: entities
+            show_header_toggle: false
+            entities:
+              - entity: number.openquatt_maximum_water_temperature
+                name: Maximum water temperature
+      - type: grid
+        cards:
+          - type: heading
             icon: mdi:snowflake
             heading: Koelingsinstellingen
             heading_style: title
           - type: markdown
-            content: >-
+            content: |-
               <details>
 
               <summary><strong>Uitleg parameters</strong></summary>
@@ -2406,42 +2489,11 @@ views:
       - type: grid
         cards:
           - type: heading
-            icon: mdi:water-thermometer
-            heading: Watertempbegrenzing
-            heading_style: title
-          - type: markdown
-            content: >-
-              <details>
-
-              <summary><strong>Uitleg parameters</strong></summary>
-
-
-              - Gebruikt `Water Supply Temp (Selected)` als gemeten begrenzingsbron.
-
-              - **Maximum water temperature** is het normale plafond voor de
-              gemeten aanvoertemperatuur.
-
-              - OpenQuatt leidt uit die instelling intern zelf een
-              terugregelband en een harde trip op `max + 5°C` af. In `CM3`
-              valt eerst de boiler weg; alleen bij aanhoudende overshoot volgt
-              daarna een harde HP-stop.
-
-
-              </details>
-            text_only: true
-          - type: entities
-            show_header_toggle: false
-            entities:
-              - entity: number.openquatt_maximum_water_temperature
-                name: Maximum water temperature
-      - type: grid
-        cards:
-          - type: heading
             icon: mdi:heat-wave
             heading: Thermal request control
             heading_style: title
           - type: markdown
-            content: >-
+            content: |-
               <details>
 
               <summary><strong>Uitleg parameters</strong></summary>
@@ -2469,7 +2521,7 @@ views:
             heading: Flow afstellen
             heading_style: title
           - type: markdown
-            content: >-
+            content: |-
               <details>
 
               <summary><strong>Uitleg parameters</strong></summary>
@@ -2495,21 +2547,25 @@ views:
             heading: Ketelregeling
             heading_style: title
           - type: markdown
-            content: >-
+            content: |-
               <details>
 
               <summary><strong>Uitleg parameters</strong></summary>
 
-              - **CM3 deficit ON/OFF thresholds** bepalen wanneer boiler-assist
-              mag inschakelen/uitschakelen.
+              - **Nominaal ketelvermogen** is de referentie voor
+              boiler-assist en de boiler power test.
+
+              - De **CM3-tekort inschakel- en uitschakeldrempels** bepalen
+              wanneer boiler-assist mag inschakelen/uitschakelen.
 
               - Boiler-assist wordt daarnaast geblokkeerd door de
               watertempbegrenzing als de gemeten aanvoer te hoog wordt.
 
-              - Houd ON duidelijk hoger dan OFF om schakelen rond de grens te
-              beperken.
+              - Houd de inschakeldrempel duidelijk hoger dan de
+              uitschakeldrempel om schakelen rond de grens te beperken.
 
-              - Bij te agressief gedrag: ON verhogen of OFF verlagen.
+              - Bij te agressief gedrag: inschakeldrempel verhogen of
+              uitschakeldrempel verlagen.
 
 
               </details>
@@ -2517,10 +2573,12 @@ views:
           - type: entities
             show_header_toggle: false
             entities:
+              - entity: number.openquatt_boiler_rated_heat_power
+                name: Nominaal ketelvermogen
               - entity: number.openquatt_cm3_deficit_on_threshold
-                name: CM3 deficit ON threshold
+                name: CM3-tekort inschakeldrempel
               - entity: number.openquatt_cm3_deficit_off_threshold
-                name: CM3 deficit OFF threshold
+                name: CM3-tekort uitschakeldrempel
       - type: grid
         column_span: 2
         cards:
@@ -2529,7 +2587,7 @@ views:
             heading: Uitgesloten compressorlevels
             heading_style: title
           - type: markdown
-            content: >-
+            content: |-
               <details>
 
               <summary><strong>Uitleg parameters</strong></summary>
@@ -2568,7 +2626,7 @@ views:
     header:
       card:
         type: markdown
-        content: >-
+        content: |-
           # <ha-icon icon="mdi:tune-vertical"></ha-icon> Instellingen
 
           Structurele regelinstellingen voor limieten, huismodel, stooklijn,
@@ -2587,7 +2645,7 @@ views:
             heading: Runtime / draaiuren
             heading_style: title
           - type: markdown
-            content: >-
+            content: |-
               <details>
 
               <summary><strong>Uitleg parameters</strong></summary>
@@ -2626,7 +2684,7 @@ views:
             heading: CM100 commissioning
             heading_style: title
           - type: markdown
-            content: >-
+            content: |-
               <details>
 
               <summary><strong>Uitleg parameters</strong></summary>
@@ -2660,50 +2718,21 @@ views:
       - type: grid
         cards:
           - type: heading
-            icon: mdi:water-boiler
-            heading: Boiler power test
-            heading_style: title
-          - type: markdown
-            content: >-
-              <details>
-
-              <summary><strong>Uitleg parameters</strong></summary>
-
-
-              - Meet het effectieve ketelvermogen bij stabiele flow.
-
-              - Start de test alleen terwijl **CM100** al actief is.
-
-              - Pas de gemeten waarde toe als die logisch oogt.
-
-
-              </details>
-            text_only: true
-          - type: entities
-            show_header_toggle: false
-            entities:
-              - entity: button.openquatt_boiler_power_test_start
-                name: Boiler power test starten
-              - entity: button.openquatt_boiler_power_test_abort
-                name: Boiler power test afbreken
-              - entity: button.openquatt_boiler_power_test_apply
-                name: Pas boilervermogen toe
-              - entity: number.openquatt_boiler_rated_heat_power
-                name: Boiler rated heat power
-              - entity: sensor.openquatt_boiler_power_test_result
-                name: Boiler power test resultaat
-              - entity: sensor.openquatt_boiler_power_test_confidence
-                name: Boiler power test confidence
-              - entity: sensor.openquatt_boiler_power_test_status
-                name: Boiler power test status
-      - type: grid
-        cards:
-          - type: heading
             icon: mdi:tools
-            heading: Flow autotune
+            heading: CM100 - Flow autotune
             heading_style: title
+            grid_options:
+              columns: 12
+              rows: 1
+          - type: heading
+            icon: mdi:water-boiler
+            heading: CM100 - Boiler power test
+            heading_style: title
+            grid_options:
+              columns: 12
+              rows: auto
           - type: markdown
-            content: >-
+            content: |-
               <details>
 
               <summary><strong>Uitleg parameters</strong></summary>
@@ -2723,6 +2752,22 @@ views:
 
               </details>
             text_only: true
+          - type: markdown
+            content: |-
+              <details>
+
+              <summary><strong>Uitleg parameters</strong></summary>
+
+
+              - Meet het effectieve ketelvermogen bij stabiele flow.
+
+              - Start de test alleen terwijl **CM100** al actief is.
+
+              - Pas de gemeten waarde toe als die logisch oogt.
+
+
+              </details>
+            text_only: true
           - type: entities
             show_header_toggle: false
             entities:
@@ -2738,6 +2783,28 @@ views:
                 name: Autotune Ki voorstel
               - entity: sensor.openquatt_flow_autotune_status
                 name: Autotune status
+          - type: entities
+            show_header_toggle: false
+            entities:
+              - entity: button.openquatt_boiler_power_test_start
+                name: Boiler power test starten
+              - entity: button.openquatt_boiler_power_test_abort
+                name: Boiler power test afbreken
+              - entity: button.openquatt_boiler_power_test_apply
+                name: Pas boilervermogen toe
+              - entity: number.openquatt_boiler_rated_heat_power
+                name: Nominaal ketelvermogen
+              - entity: sensor.openquatt_boiler_power_test_result
+                name: Boiler power test resultaat
+              - entity: sensor.openquatt_boiler_power_test_confidence
+                name: Boiler power test confidence
+              - entity: sensor.openquatt_boiler_power_test_status
+                name: Boiler power test status
+        visibility:
+          - condition: state
+            entity: binary_sensor.openquatt_cm100_active
+            state: 'on'
+        column_span: 2
     header:
       card:
         type: markdown
@@ -2846,7 +2913,7 @@ views:
             heading: PH-diagnose
             heading_style: title
           - type: markdown
-            content: >-
+            content: |-
               <details>
 
 
@@ -2890,7 +2957,7 @@ views:
             heading: Stooklijndiagnose
             heading_style: title
           - type: markdown
-            content: >-
+            content: |-
               <details>
 
               <summary><strong>Uitleg</strong></summary>
