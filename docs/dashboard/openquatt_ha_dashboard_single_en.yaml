@@ -14,7 +14,7 @@ views:
             heading: Live performance
             heading_style: title
           - type: markdown
-            content: >-
+            content: |-
               <details>
 
               <summary><strong>Explanation</strong></summary>
@@ -87,7 +87,7 @@ views:
             heading: Supervisory status
             icon: mdi:state-machine
           - type: markdown
-            content: >-
+            content: |-
               <details>
 
               <summary><strong>Explanation</strong></summary>
@@ -139,7 +139,7 @@ views:
             heading: Controls
             heading_style: title
           - type: markdown
-            content: >-
+            content: |-
               <details>
 
               <summary><strong>Explanation</strong></summary>
@@ -196,7 +196,7 @@ views:
             heading: Debug
             heading_style: title
           - type: markdown
-            content: >-
+            content: |-
               <details>
 
               <summary><strong>Explanation</strong></summary><ha-alert
@@ -225,7 +225,7 @@ views:
             heading_style: title
             icon: mdi:home-thermometer
           - type: markdown
-            content: >-
+            content: |-
               <details>
 
               <summary><strong>Explanation</strong></summary>
@@ -269,7 +269,7 @@ views:
             heading: Silent mode settings
             icon: mdi:volume-off
           - type: markdown
-            content: >-
+            content: |-
               <details>
 
               <summary><strong>Explanation</strong></summary>
@@ -769,7 +769,7 @@ views:
     header:
       card:
         type: markdown
-        content: >-
+        content: |-
           # <ha-icon icon="mdi:lightning-bolt-circle"></ha-icon> Energy
 
           Energy overview of heat pump, boiler, and total system (daily + cumulative).
@@ -1428,6 +1428,58 @@ views:
                       font-size: 0.75em
                       transform: none
                     prefix: 'COP: '
+                  - type: conditional
+                    conditions:
+                      - entity: binary_sensor.openquatt_hp1_defrost
+                        state: 'on'
+                    elements:
+                      - type: icon
+                        icon: mdi:snowflake-melt
+                        entity: binary_sensor.openquatt_hp1_defrost
+                        style:
+                          top: 82%
+                          left: 15%
+                          transform: none
+                          color: white
+                  - type: conditional
+                    conditions:
+                      - entity: binary_sensor.openquatt_hp1_defrost
+                        state: 'off'
+                    elements:
+                      - type: icon
+                        icon: mdi:snowflake-melt
+                        entity: binary_sensor.openquatt_hp1_defrost
+                        style:
+                          top: 82%
+                          left: 15%
+                          transform: none
+                          color: grey
+                  - type: conditional
+                    conditions:
+                      - entity: binary_sensor.openquatt_hp1_bottom_plate_heater
+                        state: 'on'
+                    elements:
+                      - type: icon
+                        icon: mdi:heating-coil
+                        entity: binary_sensor.openquatt_hp1_bottom_plate_heater
+                        style:
+                          top: 82%
+                          left: 8%
+                          transform: none
+                          color: white
+                  - type: conditional
+                    conditions:
+                      - entity: binary_sensor.openquatt_hp1_bottom_plate_heater
+                        state: 'off'
+                    elements:
+                      - type: icon
+                        icon: mdi:heating-coil
+                        entity: binary_sensor.openquatt_hp1_bottom_plate_heater
+                        style:
+                          top: 82%
+                          left: 8%
+                          transform: none
+                          color: grey
             grid_options:
               columns: 12
               rows: auto
@@ -1473,7 +1525,7 @@ views:
     header:
       card:
         type: markdown
-        content: >-
+        content: |-
           # <ha-icon icon="mdi:heat-pump-outline"></ha-icon> Overview HP1
 
           This tab shows a technical snapshot of HP1 refrigerant/water-side behavior. Use it mainly for diagnostics.
@@ -2108,7 +2160,7 @@ views:
             heading: Quatt Hybrid version
             heading_style: title
           - type: markdown
-            content: >-
+            content: |-
               <details>
 
               <summary><strong>Explanation</strong></summary>
@@ -2130,7 +2182,7 @@ views:
             heading: Silent mode settings
             heading_style: title
           - type: markdown
-            content: >-
+            content: |-
               <details>
 
               <summary><strong>Parameter explanation</strong></summary>
@@ -2162,7 +2214,7 @@ views:
             heading: House model (PH)
             heading_style: title
           - type: markdown
-            content: >-
+            content: |-
               <details>
 
               <summary><strong>Parameter explanation</strong></summary>
@@ -2230,7 +2282,7 @@ views:
             heading: Heating curve control
             heading_style: title
           - type: markdown
-            content: >-
+            content: |-
               <details>
 
               <summary><strong>Parameter explanation</strong></summary>
@@ -2284,11 +2336,41 @@ views:
       - type: grid
         cards:
           - type: heading
+            icon: mdi:water-thermometer
+            heading: Water temperature limit
+            heading_style: title
+          - type: markdown
+            content: |-
+              <details>
+
+              <summary><strong>Parameter explanation</strong></summary>
+
+
+              - Uses `Water Supply Temp (Selected)` as the measured limit source.
+
+              - **Maximum water temperature** is the normal ceiling for measured
+              supply temperature.
+
+              - OpenQuatt derives an internal rollback band and a hard trip at
+              `max + 5°C` from that setting. In `CM3` the boiler drops out
+              first; a hard HP stop follows only if the overshoot persists.
+
+
+              </details>
+            text_only: true
+          - type: entities
+            show_header_toggle: false
+            entities:
+              - entity: number.openquatt_maximum_water_temperature
+                name: Maximum water temperature
+      - type: grid
+        cards:
+          - type: heading
             icon: mdi:snowflake
             heading: Cooling settings
             heading_style: title
           - type: markdown
-            content: >-
+            content: |-
               <details>
 
               <summary><strong>Parameter explanation</strong></summary>
@@ -2322,41 +2404,11 @@ views:
       - type: grid
         cards:
           - type: heading
-            icon: mdi:water-thermometer
-            heading: Water temperature limit
-            heading_style: title
-          - type: markdown
-            content: >-
-              <details>
-
-              <summary><strong>Parameter explanation</strong></summary>
-
-
-              - Uses `Water Supply Temp (Selected)` as the measured limit source.
-
-              - **Maximum water temperature** is the normal ceiling for measured
-              supply temperature.
-
-              - OpenQuatt derives an internal rollback band and a hard trip at
-              `max + 5°C` from that setting. In `CM3` the boiler drops out
-              first; a hard HP stop follows only if the overshoot persists.
-
-
-              </details>
-            text_only: true
-          - type: entities
-            show_header_toggle: false
-            entities:
-              - entity: number.openquatt_maximum_water_temperature
-                name: Maximum water temperature
-      - type: grid
-        cards:
-          - type: heading
             icon: mdi:heat-wave
             heading: Thermal request control
             heading_style: title
           - type: markdown
-            content: >-
+            content: |-
               <details>
 
               <summary><strong>Parameter explanation</strong></summary>
@@ -2379,7 +2431,7 @@ views:
             heading: Flow tuning
             heading_style: title
           - type: markdown
-            content: >-
+            content: |-
               <details>
 
               <summary><strong>Parameter explanation</strong></summary>
@@ -2405,21 +2457,25 @@ views:
             heading: Boiler control
             heading_style: title
           - type: markdown
-            content: >-
+            content: |-
               <details>
 
               <summary><strong>Parameter explanation</strong></summary>
 
-              - **CM3 deficit ON/OFF thresholds** define when boiler assist may
-              switch on/off.
+              - **Boiler rated power** is the reference for boiler assist and
+              the boiler power test.
+
+              - The **CM3 deficit turn-on and turn-off thresholds** define
+              when boiler assist may switch on/off.
 
               - Boiler assist is still blocked by the water temperature limit
               when measured supply temperature gets too high.
 
-              - Keep ON clearly higher than OFF to reduce toggling around the
-              threshold.
+              - Keep the turn-on threshold clearly higher than the turn-off
+              threshold to reduce toggling around the boundary.
 
-              - If behavior is too aggressive: increase ON or decrease OFF.
+              - If behavior is too aggressive: increase the turn-on threshold
+              or decrease the turn-off threshold.
 
 
               </details>
@@ -2427,10 +2483,12 @@ views:
           - type: entities
             show_header_toggle: false
             entities:
+              - entity: number.openquatt_boiler_rated_heat_power
+                name: Boiler rated power
               - entity: number.openquatt_cm3_deficit_on_threshold
-                name: CM3 deficit ON threshold
+                name: CM3 deficit turn-on threshold
               - entity: number.openquatt_cm3_deficit_off_threshold
-                name: CM3 deficit OFF threshold
+                name: CM3 deficit turn-off threshold
       - type: grid
         column_span: 2
         cards:
@@ -2439,7 +2497,7 @@ views:
             heading: Excluded compressor levels
             heading_style: title
           - type: markdown
-            content: >-
+            content: |-
               <details>
 
               <summary><strong>Parameter explanation</strong></summary>
@@ -2478,7 +2536,7 @@ views:
     header:
       card:
         type: markdown
-        content: >-
+        content: |-
           # <ha-icon icon="mdi:tune-vertical"></ha-icon> Tuning
 
           Structural control tuning for limits, house model, heating curve, heat
@@ -2497,7 +2555,7 @@ views:
             heading: Runtime / hours
             heading_style: title
           - type: markdown
-            content: >-
+            content: |-
               <details>
 
               <summary><strong>Parameter explanation</strong></summary>
@@ -2535,7 +2593,7 @@ views:
             heading: CM100 commissioning
             heading_style: title
           - type: markdown
-            content: >-
+            content: |-
               <details>
 
               <summary><strong>Parameter explanation</strong></summary>
@@ -2569,50 +2627,21 @@ views:
       - type: grid
         cards:
           - type: heading
-            icon: mdi:water-boiler
-            heading: Boiler power test
-            heading_style: title
-          - type: markdown
-            content: >-
-              <details>
-
-              <summary><strong>Parameter explanation</strong></summary>
-
-
-              - Measures the effective boiler output at stable flow.
-
-              - Start the test only while **CM100** is already active.
-
-              - Apply the measured value only if it looks sensible.
-
-
-              </details>
-            text_only: true
-          - type: entities
-            show_header_toggle: false
-            entities:
-              - entity: button.openquatt_boiler_power_test_start
-                name: Start boiler power test
-              - entity: button.openquatt_boiler_power_test_abort
-                name: Abort boiler power test
-              - entity: button.openquatt_boiler_power_test_apply
-                name: Apply boiler power
-              - entity: number.openquatt_boiler_rated_heat_power
-                name: Boiler rated heat power
-              - entity: sensor.openquatt_boiler_power_test_result
-                name: Boiler power test result
-              - entity: sensor.openquatt_boiler_power_test_confidence
-                name: Boiler power test confidence
-              - entity: sensor.openquatt_boiler_power_test_status
-                name: Boiler power test status
-      - type: grid
-        cards:
-          - type: heading
             icon: mdi:tools
-            heading: Flow autotune
+            heading: CM100 - Flow autotune
             heading_style: title
+            grid_options:
+              columns: 12
+              rows: 1
+          - type: heading
+            icon: mdi:water-boiler
+            heading: CM100 - Boiler power test
+            heading_style: title
+            grid_options:
+              columns: 12
+              rows: auto
           - type: markdown
-            content: >-
+            content: |-
               <details>
 
               <summary><strong>Parameter explanation</strong></summary>
@@ -2632,6 +2661,22 @@ views:
 
               </details>
             text_only: true
+          - type: markdown
+            content: |-
+              <details>
+
+              <summary><strong>Parameter explanation</strong></summary>
+
+
+              - Measures the effective boiler output at stable flow.
+
+              - Start the test only while **CM100** is already active.
+
+              - Apply the measured value only if it looks sensible.
+
+
+              </details>
+            text_only: true
           - type: entities
             show_header_toggle: false
             entities:
@@ -2647,10 +2692,32 @@ views:
                 name: Autotune Ki suggested
               - entity: sensor.openquatt_flow_autotune_status
                 name: Autotune status
+          - type: entities
+            show_header_toggle: false
+            entities:
+              - entity: button.openquatt_boiler_power_test_start
+                name: Start boiler power test
+              - entity: button.openquatt_boiler_power_test_abort
+                name: Abort boiler power test
+              - entity: button.openquatt_boiler_power_test_apply
+                name: Apply boiler power
+              - entity: number.openquatt_boiler_rated_heat_power
+                name: Boiler rated power
+              - entity: sensor.openquatt_boiler_power_test_result
+                name: Boiler power test result
+              - entity: sensor.openquatt_boiler_power_test_confidence
+                name: Boiler power test confidence
+              - entity: sensor.openquatt_boiler_power_test_status
+                name: Boiler power test status
+        visibility:
+          - condition: state
+            entity: binary_sensor.openquatt_cm100_active
+            state: 'on'
+        column_span: 2
     header:
       card:
         type: markdown
-        content: >-
+        content: |-
           # <ha-icon icon="mdi:toolbox-outline"></ha-icon> Service & Test
 
           Manual service actions.
@@ -2756,7 +2823,7 @@ views:
             heading: PH diagnostics
             heading_style: title
           - type: markdown
-            content: >-
+            content: |-
               <details>
 
 
@@ -2800,7 +2867,7 @@ views:
             heading: Heating Curve diagnostics
             heading_style: title
           - type: markdown
-            content: >-
+            content: |-
               <details>
 
               <summary><strong>Explanation</strong></summary>
