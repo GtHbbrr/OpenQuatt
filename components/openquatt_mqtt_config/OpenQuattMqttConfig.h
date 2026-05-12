@@ -17,6 +17,10 @@ enum class PublishProfile : uint8_t {
   STANDARD = 2,
 };
 
+inline constexpr PublishProfile OFF = PublishProfile::OFF;
+inline constexpr PublishProfile ESSENTIAL = PublishProfile::ESSENTIAL;
+inline constexpr PublishProfile STANDARD = PublishProfile::STANDARD;
+
 class OpenQuattMqttConfig : public Component {
  public:
   void set_mqtt_client(mqtt::MQTTClientComponent *mqtt_client) { this->mqtt_client_ = mqtt_client; }
