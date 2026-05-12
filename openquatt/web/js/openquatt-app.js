@@ -3199,6 +3199,8 @@ const OPENQUATT_RESUME_CLEAR_VALUE = "2000-01-01 00:00:00";
       const enabled = isEntityActive("openquattEnabled");
       const busy = state.busyAction === "openquatt-regulation";
       const hasResumeEntity = hasEntity("openquattResumeAt");
+      const resumeEntityPending = state.loadingEntities || state.entitySyncInFlight;
+      const resumeEntityReady = hasResumeEntity || !resumeEntityPending;
       const resumeScheduled = hasOpenQuattResumeSchedule();
       const resumeLabel = formatOpenQuattResumeDateTime(getEntityValue("openquattResumeAt"));
       const draftValue = getOpenQuattPauseDraftValue();
@@ -3223,7 +3225,9 @@ const OPENQUATT_RESUME_CLEAR_VALUE = "2000-01-01 00:00:00";
                 </div>`
               : ""
             }
-            ${hasResumeEntity
+            ${!resumeEntityReady
+              ? `<p class="oq-helper-modal-note" aria-live="polite">Hervatopties laden...</p>`
+              : hasResumeEntity
               ? `
                 <div class="oq-helper-modal-presets">
                   <button class="oq-helper-button" type="button" data-oq-action="apply-openquatt-preset" data-pause-preset="2h" ${busy ? "disabled" : ""}>2 uur</button>
