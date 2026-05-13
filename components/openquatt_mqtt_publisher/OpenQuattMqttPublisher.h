@@ -1,6 +1,8 @@
 #pragma once
 
+#include <initializer_list>
 #include <string>
+#include <utility>
 
 #include "esphome/components/binary_sensor/binary_sensor.h"
 #include "esphome/components/json/json_util.h"
@@ -20,6 +22,19 @@ namespace openquatt_mqtt_publisher {
 
 class OpenQuattMqttPublisher : public Component, public mqtt::CustomMQTTDevice {
  public:
+  struct HeatPumpRefs {
+    const sensor::Sensor *working_mode{nullptr};
+    const text_sensor::TextSensor *working_mode_label{nullptr};
+    const sensor::Sensor *compressor_level{nullptr};
+    const sensor::Sensor *power_input{nullptr};
+    const sensor::Sensor *heat_power{nullptr};
+    const sensor::Sensor *flow{nullptr};
+    const sensor::Sensor *water_in_temp{nullptr};
+    const sensor::Sensor *water_out_temp{nullptr};
+    const binary_sensor::BinarySensor *defrost{nullptr};
+    const binary_sensor::BinarySensor *fault{nullptr};
+  };
+
   void set_config(openquatt_mqtt_config::OpenQuattMqttConfig *config) { this->config_ = config; }
   void set_has_secondary_hp(bool has_secondary_hp) { this->has_secondary_hp_ = has_secondary_hp; }
 
@@ -115,17 +130,42 @@ class OpenQuattMqttPublisher : public Component, public mqtt::CustomMQTTDevice {
   float get_setup_priority() const override;
 
  protected:
+  template<typename Builder>
+  void publish_json_if_changed_(const std::string &topic, std::string &last_signature, uint32_t &last_publish_ms,
+                                bool force, uint32_t now_ms, uint32_t interval_ms, bool retain,
+                                const std::string &signature, Builder &&builder) {
+    const bool interval_due = last_publish_ms != 0U &&
+                              static_cast<uint32_t>(now_ms - last_publish_ms) >= interval_ms;
+    if (!force && signature == last_signature && !interval_due) {
+      return;
+    }
+    this->publish_json(topic, std::forward<Builder>(builder), 0, retain);
+    last_signature = signature;
+    last_publish_ms = now_ms;
+  }
+
   void publish_schema_();
   void publish_state_(bool force, uint32_t now_ms, uint32_t interval_ms);
   void publish_heat_pumps_(bool force, uint32_t now_ms, uint32_t interval_ms);
   void publish_diagnostics_(bool force, uint32_t now_ms, uint32_t interval_ms);
   void clear_topic_(const std::string &base_topic, const char *suffix);
   std::string topic_for_(const std::string &base_topic, const char *suffix) const;
+  void publish_heat_pump_(JsonObject root, const HeatPumpRefs &refs) const;
   std::string build_config_signature_() const;
   std::string build_state_signature_() const;
   std::string build_heat_pumps_signature_() const;
   std::string build_diagnostics_signature_() const;
   bool is_fault_active_() const;
+  static void set_text_fields_(
+      JsonObject root, std::initializer_list<std::pair<const char *, const text_sensor::TextSensor *>> fields);
+  static void set_bool_fields_(
+      JsonObject root, std::initializer_list<std::pair<const char *, const binary_sensor::BinarySensor *>> fields);
+  static void set_sensor_fields_(
+      JsonObject root, std::initializer_list<std::pair<const char *, const sensor::Sensor *>> fields);
+  static void set_select_fields_(
+      JsonObject root, std::initializer_list<std::pair<const char *, const select::Select *>> fields);
+  static void set_int_fields_(
+      JsonObject root, std::initializer_list<std::pair<const char *, const sensor::Sensor *>> fields);
   static void set_number_or_null_(JsonObject root, const char *key, const sensor::Sensor *sensor);
   static void set_bool_or_null_(JsonObject root, const char *key, const binary_sensor::BinarySensor *binary_sensor);
   static void set_text_or_null_(JsonObject root, const char *key, const text_sensor::TextSensor *sensor);

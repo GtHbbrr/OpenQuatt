@@ -119,33 +119,26 @@ void OpenQuattMqttPublisher::publish_state_(bool force, uint32_t now_ms, uint32_
   const bool retain = this->config_->get_retain_snapshots();
   const bool fault_active = this->is_fault_active_();
   const std::string signature = this->build_state_signature_();
-  const bool interval_due = this->last_state_publish_ms_ != 0U &&
-                            static_cast<uint32_t>(now_ms - this->last_state_publish_ms_) >= interval_ms;
-
-  if (!force && signature == this->last_state_signature_ && !interval_due) {
-    return;
-  }
-
-  this->publish_json(topic, [this, fault_active](JsonObject root) {
+  this->publish_json_if_changed_(
+      topic, this->last_state_signature_, this->last_state_publish_ms_, force, now_ms, interval_ms, retain, signature,
+      [this, fault_active](JsonObject root) {
     root["schema"] = "openquatt.state.v1";
-    set_text_or_null_(root, "control_mode", this->control_mode_text_sensor_);
-    set_text_or_null_(root, "strategy", this->strategy_text_sensor_);
-    set_bool_or_null_(root, "heat_request", this->heat_request_binary_sensor_);
-    set_bool_or_null_(root, "cool_request", this->cooling_request_binary_sensor_);
-    set_number_or_null_(root, "demand_f", this->demand_sensor_);
-    set_number_or_null_(root, "outside_temp_c", this->outside_temp_sensor_);
-    set_number_or_null_(root, "room_temp_c", this->room_temp_sensor_);
-    set_number_or_null_(root, "room_setpoint_c", this->room_setpoint_sensor_);
-    set_number_or_null_(root, "supply_temp_c", this->supply_temp_sensor_);
-    set_number_or_null_(root, "supply_target_c", this->supply_target_sensor_);
-    set_number_or_null_(root, "flow_lph", this->flow_sensor_);
-    set_number_or_null_(root, "total_power_input_w", this->total_power_input_sensor_);
-    set_number_or_null_(root, "total_heat_power_w", this->total_heat_power_sensor_);
-    set_number_or_null_(root, "cop", this->total_cop_sensor_);
+    set_text_fields_(root, {{"control_mode", this->control_mode_text_sensor_},
+                            {"strategy", this->strategy_text_sensor_}});
+    set_bool_fields_(root, {{"heat_request", this->heat_request_binary_sensor_},
+                            {"cool_request", this->cooling_request_binary_sensor_}});
+    set_sensor_fields_(root, {{"demand_f", this->demand_sensor_},
+                               {"outside_temp_c", this->outside_temp_sensor_},
+                               {"room_temp_c", this->room_temp_sensor_},
+                               {"room_setpoint_c", this->room_setpoint_sensor_},
+                               {"supply_temp_c", this->supply_temp_sensor_},
+                               {"supply_target_c", this->supply_target_sensor_},
+                               {"flow_lph", this->flow_sensor_},
+                               {"total_power_input_w", this->total_power_input_sensor_},
+                               {"total_heat_power_w", this->total_heat_power_sensor_},
+                               {"cop", this->total_cop_sensor_}});
     root["fault_active"] = fault_active;
-  }, 0, retain);
-  this->last_state_signature_ = signature;
-  this->last_state_publish_ms_ = now_ms;
+  });
 
   (void) now_ms;
 }
@@ -157,44 +150,26 @@ void OpenQuattMqttPublisher::publish_heat_pumps_(bool force, uint32_t now_ms, ui
   const std::string topic = this->topic_for_(this->config_->get_base_topic(), "heat_pumps");
   const bool retain = this->config_->get_retain_snapshots();
   const std::string signature = this->build_heat_pumps_signature_();
-  const bool interval_due = this->last_heat_pumps_publish_ms_ != 0U &&
-                            static_cast<uint32_t>(now_ms - this->last_heat_pumps_publish_ms_) >= interval_ms;
-
-  if (!force && signature == this->last_heat_pumps_signature_ && !interval_due) {
-    return;
-  }
-
-  this->publish_json(topic, [this](JsonObject root) {
+  this->publish_json_if_changed_(
+      topic, this->last_heat_pumps_signature_, this->last_heat_pumps_publish_ms_, force, now_ms, interval_ms, retain,
+      signature, [this](JsonObject root) {
     root["schema"] = "openquatt.heat_pumps.v1";
-
-    JsonObject hp1 = root["hp1"].to<JsonObject>();
-    set_int_or_null_(hp1, "working_mode", this->hp1_working_mode_sensor_);
-    set_text_or_null_(hp1, "working_mode_text", this->hp1_working_mode_label_text_sensor_);
-    set_int_or_null_(hp1, "compressor_level", this->hp1_compressor_level_sensor_);
-    set_number_or_null_(hp1, "power_input_w", this->hp1_power_input_sensor_);
-    set_number_or_null_(hp1, "heat_power_w", this->hp1_heat_power_sensor_);
-    set_number_or_null_(hp1, "flow_lph", this->hp1_flow_sensor_);
-    set_number_or_null_(hp1, "water_in_c", this->hp1_water_in_temp_sensor_);
-    set_number_or_null_(hp1, "water_out_c", this->hp1_water_out_temp_sensor_);
-    set_bool_or_null_(hp1, "defrost", this->hp1_defrost_binary_sensor_);
-    set_bool_or_null_(hp1, "fault_active", this->hp1_fault_binary_sensor_);
+    this->publish_heat_pump_(root["hp1"].to<JsonObject>(),
+                             {this->hp1_working_mode_sensor_, this->hp1_working_mode_label_text_sensor_,
+                              this->hp1_compressor_level_sensor_, this->hp1_power_input_sensor_,
+                              this->hp1_heat_power_sensor_, this->hp1_flow_sensor_,
+                              this->hp1_water_in_temp_sensor_, this->hp1_water_out_temp_sensor_,
+                              this->hp1_defrost_binary_sensor_, this->hp1_fault_binary_sensor_});
 
     if (this->has_secondary_hp_) {
-      JsonObject hp2 = root["hp2"].to<JsonObject>();
-      set_int_or_null_(hp2, "working_mode", this->hp2_working_mode_sensor_);
-      set_text_or_null_(hp2, "working_mode_text", this->hp2_working_mode_label_text_sensor_);
-      set_int_or_null_(hp2, "compressor_level", this->hp2_compressor_level_sensor_);
-      set_number_or_null_(hp2, "power_input_w", this->hp2_power_input_sensor_);
-      set_number_or_null_(hp2, "heat_power_w", this->hp2_heat_power_sensor_);
-      set_number_or_null_(hp2, "flow_lph", this->hp2_flow_sensor_);
-      set_number_or_null_(hp2, "water_in_c", this->hp2_water_in_temp_sensor_);
-      set_number_or_null_(hp2, "water_out_c", this->hp2_water_out_temp_sensor_);
-      set_bool_or_null_(hp2, "defrost", this->hp2_defrost_binary_sensor_);
-      set_bool_or_null_(hp2, "fault_active", this->hp2_fault_binary_sensor_);
+      this->publish_heat_pump_(root["hp2"].to<JsonObject>(),
+                               {this->hp2_working_mode_sensor_, this->hp2_working_mode_label_text_sensor_,
+                                this->hp2_compressor_level_sensor_, this->hp2_power_input_sensor_,
+                                this->hp2_heat_power_sensor_, this->hp2_flow_sensor_,
+                                this->hp2_water_in_temp_sensor_, this->hp2_water_out_temp_sensor_,
+                                this->hp2_defrost_binary_sensor_, this->hp2_fault_binary_sensor_});
     }
-  }, 0, retain);
-  this->last_heat_pumps_signature_ = signature;
-  this->last_heat_pumps_publish_ms_ = now_ms;
+  });
 
   (void) now_ms;
 }
@@ -205,30 +180,23 @@ void OpenQuattMqttPublisher::publish_diagnostics_(bool force, uint32_t now_ms, u
   }
   const std::string topic = this->topic_for_(this->config_->get_base_topic(), "diagnostics");
   const std::string signature = this->build_diagnostics_signature_();
-  const bool interval_due = this->last_diagnostics_publish_ms_ != 0U &&
-                            static_cast<uint32_t>(now_ms - this->last_diagnostics_publish_ms_) >= interval_ms;
-
-  if (!force && signature == this->last_diagnostics_signature_ && !interval_due) {
-    return;
-  }
-
-  this->publish_json(topic, [this](JsonObject root) {
+  this->publish_json_if_changed_(
+      topic, this->last_diagnostics_signature_, this->last_diagnostics_publish_ms_, force, now_ms, interval_ms, false,
+      signature, [this](JsonObject root) {
     root["schema"] = "openquatt.diagnostics.v1";
-    set_text_or_null_(root, "strategy_phase", this->strategy_phase_text_sensor_);
-    set_text_or_null_(root, "strategy_debug_state", this->strategy_debug_state_text_sensor_);
-    set_text_or_null_(root, "request_reason", this->request_reason_text_sensor_);
-    set_text_or_null_(root, "heating_debug_state", this->heating_debug_state_text_sensor_);
-    set_text_or_null_(root, "duo_optimizer_reason", this->duo_optimizer_reason_text_sensor_);
-    set_select_or_null_(root, "flow_control_mode", this->flow_control_mode_select_);
-    set_text_or_null_(root, "flow_mode", this->flow_mode_text_sensor_);
-    set_bool_or_null_(root, "flow_mismatch", this->flow_mismatch_binary_sensor_);
-    set_text_or_null_(root, "commissioning_status", this->commissioning_status_text_sensor_);
-    set_text_or_null_(root, "flow_autotune_status", this->flow_autotune_status_text_sensor_);
-    set_text_or_null_(root, "firmware_update_status", this->firmware_update_status_text_sensor_);
-    set_number_or_null_(root, "firmware_update_progress", this->firmware_update_progress_sensor_);
-  }, 0, false);
-  this->last_diagnostics_signature_ = signature;
-  this->last_diagnostics_publish_ms_ = now_ms;
+    set_text_fields_(root, {{"strategy_phase", this->strategy_phase_text_sensor_},
+                            {"strategy_debug_state", this->strategy_debug_state_text_sensor_},
+                            {"request_reason", this->request_reason_text_sensor_},
+                            {"heating_debug_state", this->heating_debug_state_text_sensor_},
+                            {"duo_optimizer_reason", this->duo_optimizer_reason_text_sensor_},
+                            {"flow_mode", this->flow_mode_text_sensor_},
+                            {"commissioning_status", this->commissioning_status_text_sensor_},
+                            {"flow_autotune_status", this->flow_autotune_status_text_sensor_},
+                            {"firmware_update_status", this->firmware_update_status_text_sensor_}});
+    set_select_fields_(root, {{"flow_control_mode", this->flow_control_mode_select_}});
+    set_bool_fields_(root, {{"flow_mismatch", this->flow_mismatch_binary_sensor_}});
+    set_sensor_fields_(root, {{"firmware_update_progress", this->firmware_update_progress_sensor_}});
+  });
 
   (void) now_ms;
 }
@@ -245,6 +213,52 @@ std::string OpenQuattMqttPublisher::topic_for_(const std::string &base_topic, co
     return std::string();
   }
   return base_topic + "/" + suffix;
+}
+
+void OpenQuattMqttPublisher::publish_heat_pump_(JsonObject root, const HeatPumpRefs &refs) const {
+  set_int_fields_(root, {{"working_mode", refs.working_mode}, {"compressor_level", refs.compressor_level}});
+  set_text_fields_(root, {{"working_mode_text", refs.working_mode_label}});
+  set_sensor_fields_(root, {{"power_input_w", refs.power_input},
+                            {"heat_power_w", refs.heat_power},
+                            {"flow_lph", refs.flow},
+                            {"water_in_c", refs.water_in_temp},
+                            {"water_out_c", refs.water_out_temp}});
+  set_bool_fields_(root, {{"defrost", refs.defrost}, {"fault_active", refs.fault}});
+}
+
+void OpenQuattMqttPublisher::set_text_fields_(
+    JsonObject root, std::initializer_list<std::pair<const char *, const text_sensor::TextSensor *>> fields) {
+  for (const auto &field : fields) {
+    set_text_or_null_(root, field.first, field.second);
+  }
+}
+
+void OpenQuattMqttPublisher::set_bool_fields_(
+    JsonObject root, std::initializer_list<std::pair<const char *, const binary_sensor::BinarySensor *>> fields) {
+  for (const auto &field : fields) {
+    set_bool_or_null_(root, field.first, field.second);
+  }
+}
+
+void OpenQuattMqttPublisher::set_sensor_fields_(
+    JsonObject root, std::initializer_list<std::pair<const char *, const sensor::Sensor *>> fields) {
+  for (const auto &field : fields) {
+    set_number_or_null_(root, field.first, field.second);
+  }
+}
+
+void OpenQuattMqttPublisher::set_select_fields_(
+    JsonObject root, std::initializer_list<std::pair<const char *, const select::Select *>> fields) {
+  for (const auto &field : fields) {
+    set_select_or_null_(root, field.first, field.second);
+  }
+}
+
+void OpenQuattMqttPublisher::set_int_fields_(
+    JsonObject root, std::initializer_list<std::pair<const char *, const sensor::Sensor *>> fields) {
+  for (const auto &field : fields) {
+    set_int_or_null_(root, field.first, field.second);
+  }
 }
 
 std::string OpenQuattMqttPublisher::build_config_signature_() const {
