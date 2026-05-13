@@ -864,6 +864,25 @@ body.oq-surface-native {
   margin-bottom: 10px;
 }
 
+.oq-mqtt-modal-head-copy {
+  min-width: 0;
+  flex: 1 1 auto;
+  display: grid;
+  gap: 8px;
+}
+
+.oq-mqtt-modal-head-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+
+.oq-mqtt-modal-head-meta .oq-helper-modal-kicker {
+  margin-bottom: 0;
+}
+
 .oq-helper-modal-kicker {
   margin: 0 0 4px;
   color: var(--oq-helper-accent);

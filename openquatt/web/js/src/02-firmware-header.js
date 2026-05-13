@@ -1128,8 +1128,10 @@
         <section class="oq-helper-modal oq-helper-modal--wide oq-helper-modal--scrollable oq-mqtt-modal${loading ? " oq-mqtt-modal--loading" : ""}" role="dialog" aria-modal="true" aria-labelledby="oq-mqtt-modal-title">
           <div class="oq-helper-modal-head">
             <div class="oq-mqtt-modal-head-copy">
-              <p class="oq-helper-modal-kicker">Integratie</p>
-              <span class="oq-settings-section-badge oq-settings-section-badge--experimental">Experimenteel</span>
+              <div class="oq-mqtt-modal-head-meta">
+                <p class="oq-helper-modal-kicker">Integratie</p>
+                <span class="oq-settings-section-badge oq-settings-section-badge--experimental">Experimenteel</span>
+              </div>
               <h2 class="oq-helper-modal-title" id="oq-mqtt-modal-title">MQTT-configuratie</h2>
             </div>
             <button class="oq-helper-modal-close" type="button" data-oq-action="close-system-modal" aria-label="Sluit MQTT-popup" ${busy ? "disabled" : ""}>×</button>
