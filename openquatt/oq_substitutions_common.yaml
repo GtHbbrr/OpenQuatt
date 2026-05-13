@@ -34,6 +34,7 @@ mqtt_default_enabled: false                           # MQTT starts disabled unt
 mqtt_default_publish_profile: "standard"              # MQTT publish profile: off / essential / standard.
 mqtt_essential_interval_s: "10"                       # Publish interval for essential state telemetry [s].
 mqtt_standard_interval_s: "30"                        # Publish interval for standard state + heat pump telemetry [s].
+mqtt_diagnostic_interval_s: "60"                      # Publish interval for diagnostic telemetry [s].
 mqtt_retain_snapshots: "true"                         # Retain schema/state/heat_pumps snapshots on the broker.
 
 # ----------------------------

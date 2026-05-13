@@ -36,6 +36,7 @@ openquatt_mqtt_config:
   default_publish_profile: "${mqtt_default_publish_profile}"
   default_essential_interval_s: ${mqtt_essential_interval_s}
   default_standard_interval_s: ${mqtt_standard_interval_s}
+  default_diagnostic_interval_s: ${mqtt_diagnostic_interval_s}
   default_retain_snapshots: ${mqtt_retain_snapshots}
 
 openquatt_mqtt_publisher:
@@ -57,6 +58,18 @@ openquatt_mqtt_publisher:
   total_heat_power_sensor: oq_total_heat_power
   total_cop_sensor: oq_total_cop
   lowflow_fault_binary_sensor: oq_lowflow_fault_active_bs
+  strategy_phase_text_sensor: oq_strategy_phase_text
+  strategy_debug_state_text_sensor: oq_strategy_debug_state
+  request_reason_text_sensor: oq_request_reason
+  heating_debug_state_text_sensor: oq_heating_debug_state
+  duo_optimizer_reason_text_sensor: oq_duo_optimizer_reason
+  flow_control_mode_select: oq_flow_control_mode
+  flow_mode_text_sensor: oq_flow_mode
+  flow_mismatch_binary_sensor: oq_flow_mismatch
+  commissioning_status_text_sensor: oq_commissioning_status
+  flow_autotune_status_text_sensor: oq_flow_autotune_status
+  firmware_update_status_text_sensor: oq_firmware_update_status
+  firmware_update_progress_sensor: oq_firmware_update_progress
   hp1_working_mode_sensor: hp1_working_mode
   hp1_working_mode_label_text_sensor: hp1_working_mode_label
   hp1_compressor_level_sensor: oq_hp1_compressor_level_sensor

@@ -98,6 +98,7 @@
     mqttDraftPublishProfile: "standard",
     mqttDraftEssentialIntervalS: "10",
     mqttDraftStandardIntervalS: "30",
+    mqttDraftDiagnosticIntervalS: "60",
     mqttDraftRetainSnapshots: true,
     mqttBusy: false,
     mqttNotice: "",

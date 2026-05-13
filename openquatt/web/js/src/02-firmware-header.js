@@ -1102,6 +1102,7 @@
     const passwordValue = String(state.mqttDraftPassword || "");
     const essentialIntervalValue = String(state.mqttDraftEssentialIntervalS || "10");
     const standardIntervalValue = String(state.mqttDraftStandardIntervalS || "30");
+    const diagnosticIntervalValue = String(state.mqttDraftDiagnosticIntervalS || "60");
 
     return `
       <div class="oq-helper-modal-backdrop oq-helper-modal-backdrop--top${state.overviewTheme === "dark" ? " oq-helper-modal-backdrop--dark" : ""}" data-oq-modal="system">
@@ -1130,7 +1131,7 @@
                 ${renderLoginStatusRow("Status", getMqttStatusLabel(), getMqttStatusDetail())}
                 ${renderLoginStatusRow("Broker", String(status.broker || "").trim() || "Geen broker", status.connected ? "MQTT publiceert en ontvangt via deze broker." : "Nog geen actieve verbinding.")}
                 ${renderLoginStatusRow("Base topic", String(status.base_topic || "").trim() || "openquatt", "Alle compacte telemetry-topics hangen hieronder.")}
-                ${renderLoginStatusRow("Publish-profiel", formatMqttPublishProfile(status.publish_profile), `Essential: ${Number(status.essential_interval_s || 10)}s, Standard: ${Number(status.standard_interval_s || 30)}s`)}
+                ${renderLoginStatusRow("Publish-profiel", formatMqttPublishProfile(status.publish_profile), `Essential: ${Number(status.essential_interval_s || 10)}s, Standard: ${Number(status.standard_interval_s || 30)}s, Diagnostic: ${Number(status.diagnostic_interval_s || 60)}s`)}
                 ${renderLoginStatusRow("Gebruiker", String(status.username || "").trim() || "Anoniem", status.password_set ? "Er is een wachtwoord opgeslagen." : "Er is nog geen wachtwoord opgeslagen.")}
                 ${renderLoginStatusRow("Retain snapshots", status.retain_snapshots !== false ? "Aan" : "Uit", status.retain_snapshots !== false ? "Nieuwe subscribers zien meteen de laatste snapshot." : "Alleen live berichten worden doorgestuurd.")}
               `
@@ -1181,6 +1182,7 @@
                     <option value="off" ${String(state.mqttDraftPublishProfile || "") === "off" ? "selected" : ""}>Uit</option>
                     <option value="essential" ${String(state.mqttDraftPublishProfile || "") === "essential" ? "selected" : ""}>Essential</option>
                     <option value="standard" ${String(state.mqttDraftPublishProfile || "") === "standard" ? "selected" : ""}>Standard</option>
+                    <option value="diagnostic" ${String(state.mqttDraftPublishProfile || "") === "diagnostic" ? "selected" : ""}>Diagnostic</option>
                   </select>
                 </label>
                 <label class="oq-helper-modal-channel oq-helper-modal-channel--toggle oq-mqtt-setting-card oq-mqtt-setting-card--toggle">
@@ -1197,6 +1199,10 @@
                 <label class="oq-helper-modal-channel oq-mqtt-field">
                   <span class="oq-helper-modal-label">Standard interval</span>
                   <input class="oq-helper-input" type="number" min="1" max="3600" step="1" inputmode="numeric" autocomplete="off" data-oq-mqtt-field="standardIntervalS" value="${escapeHtml(standardIntervalValue)}" ${formBusy ? "disabled" : ""}>
+                </label>
+                <label class="oq-helper-modal-channel oq-mqtt-field">
+                  <span class="oq-helper-modal-label">Diagnostic interval</span>
+                  <input class="oq-helper-input" type="number" min="1" max="3600" step="1" inputmode="numeric" autocomplete="off" data-oq-mqtt-field="diagnosticIntervalS" value="${escapeHtml(diagnosticIntervalValue)}" ${formBusy ? "disabled" : ""}>
                 </label>
               </div>
             </div>

@@ -5,6 +5,7 @@
 #include "esphome/components/binary_sensor/binary_sensor.h"
 #include "esphome/components/json/json_util.h"
 #include "esphome/components/mqtt/custom_mqtt_device.h"
+#include "esphome/components/select/select.h"
 #include "esphome/components/sensor/sensor.h"
 #include "esphome/components/text_sensor/text_sensor.h"
 #include "esphome/core/component.h"
@@ -42,6 +43,36 @@ class OpenQuattMqttPublisher : public Component, public mqtt::CustomMQTTDevice {
   void set_total_cop_sensor(sensor::Sensor *sensor) { this->total_cop_sensor_ = sensor; }
   void set_lowflow_fault_binary_sensor(binary_sensor::BinarySensor *binary_sensor) {
     this->lowflow_fault_binary_sensor_ = binary_sensor;
+  }
+  void set_strategy_phase_text_sensor(text_sensor::TextSensor *sensor) { this->strategy_phase_text_sensor_ = sensor; }
+  void set_strategy_debug_state_text_sensor(text_sensor::TextSensor *sensor) {
+    this->strategy_debug_state_text_sensor_ = sensor;
+  }
+  void set_request_reason_text_sensor(text_sensor::TextSensor *sensor) { this->request_reason_text_sensor_ = sensor; }
+  void set_heating_debug_state_text_sensor(text_sensor::TextSensor *sensor) {
+    this->heating_debug_state_text_sensor_ = sensor;
+  }
+  void set_duo_optimizer_reason_text_sensor(text_sensor::TextSensor *sensor) {
+    this->duo_optimizer_reason_text_sensor_ = sensor;
+  }
+  void set_flow_control_mode_select(select::Select *select) {
+    this->flow_control_mode_select_ = select;
+  }
+  void set_flow_mode_text_sensor(text_sensor::TextSensor *sensor) { this->flow_mode_text_sensor_ = sensor; }
+  void set_flow_mismatch_binary_sensor(binary_sensor::BinarySensor *binary_sensor) {
+    this->flow_mismatch_binary_sensor_ = binary_sensor;
+  }
+  void set_commissioning_status_text_sensor(text_sensor::TextSensor *sensor) {
+    this->commissioning_status_text_sensor_ = sensor;
+  }
+  void set_flow_autotune_status_text_sensor(text_sensor::TextSensor *sensor) {
+    this->flow_autotune_status_text_sensor_ = sensor;
+  }
+  void set_firmware_update_status_text_sensor(text_sensor::TextSensor *sensor) {
+    this->firmware_update_status_text_sensor_ = sensor;
+  }
+  void set_firmware_update_progress_sensor(sensor::Sensor *sensor) {
+    this->firmware_update_progress_sensor_ = sensor;
   }
 
   void set_hp1_working_mode_sensor(sensor::Sensor *sensor) { this->hp1_working_mode_sensor_ = sensor; }
@@ -84,16 +115,20 @@ class OpenQuattMqttPublisher : public Component, public mqtt::CustomMQTTDevice {
   float get_setup_priority() const override;
 
  protected:
-  void publish_schema_();
-  void publish_state_();
-  void publish_heat_pumps_();
+  void publish_schema_(bool force);
+  void publish_state_(bool force, uint32_t now_ms, uint32_t interval_ms);
+  void publish_heat_pumps_(bool force, uint32_t now_ms, uint32_t interval_ms);
+  void publish_diagnostics_(bool force, uint32_t now_ms, uint32_t interval_ms);
   void clear_topic_(const std::string &base_topic, const char *suffix);
   std::string topic_for_(const std::string &base_topic, const char *suffix) const;
   std::string build_config_signature_() const;
   bool is_fault_active_() const;
+  bool publish_cached_json_(const std::string &topic, const json::json_build_t &builder, bool retain, bool force,
+                            uint32_t interval_ms, std::string *last_payload, uint32_t *last_publish_ms);
   static void set_number_or_null_(JsonObject root, const char *key, const sensor::Sensor *sensor);
   static void set_bool_or_null_(JsonObject root, const char *key, const binary_sensor::BinarySensor *binary_sensor);
   static void set_text_or_null_(JsonObject root, const char *key, const text_sensor::TextSensor *sensor);
+  static void set_select_or_null_(JsonObject root, const char *key, const select::Select *select);
   static void set_int_or_null_(JsonObject root, const char *key, const sensor::Sensor *sensor);
 
   openquatt_mqtt_config::OpenQuattMqttConfig *config_{nullptr};
@@ -114,6 +149,18 @@ class OpenQuattMqttPublisher : public Component, public mqtt::CustomMQTTDevice {
   sensor::Sensor *total_heat_power_sensor_{nullptr};
   sensor::Sensor *total_cop_sensor_{nullptr};
   binary_sensor::BinarySensor *lowflow_fault_binary_sensor_{nullptr};
+  text_sensor::TextSensor *strategy_phase_text_sensor_{nullptr};
+  text_sensor::TextSensor *strategy_debug_state_text_sensor_{nullptr};
+  text_sensor::TextSensor *request_reason_text_sensor_{nullptr};
+  text_sensor::TextSensor *heating_debug_state_text_sensor_{nullptr};
+  text_sensor::TextSensor *duo_optimizer_reason_text_sensor_{nullptr};
+  select::Select *flow_control_mode_select_{nullptr};
+  text_sensor::TextSensor *flow_mode_text_sensor_{nullptr};
+  binary_sensor::BinarySensor *flow_mismatch_binary_sensor_{nullptr};
+  text_sensor::TextSensor *commissioning_status_text_sensor_{nullptr};
+  text_sensor::TextSensor *flow_autotune_status_text_sensor_{nullptr};
+  text_sensor::TextSensor *firmware_update_status_text_sensor_{nullptr};
+  sensor::Sensor *firmware_update_progress_sensor_{nullptr};
 
   sensor::Sensor *hp1_working_mode_sensor_{nullptr};
   text_sensor::TextSensor *hp1_working_mode_label_text_sensor_{nullptr};
@@ -142,6 +189,11 @@ class OpenQuattMqttPublisher : public Component, public mqtt::CustomMQTTDevice {
   std::string last_base_topic_{};
   uint32_t last_state_publish_ms_{0};
   uint32_t last_heat_pumps_publish_ms_{0};
+  uint32_t last_diagnostics_publish_ms_{0};
+  std::string last_schema_payload_{};
+  std::string last_state_payload_{};
+  std::string last_heat_pumps_payload_{};
+  std::string last_diagnostics_payload_{};
 };
 
 }  // namespace openquatt_mqtt_publisher

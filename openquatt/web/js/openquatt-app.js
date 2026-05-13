@@ -892,6 +892,7 @@ const OPENQUATT_RESUME_CLEAR_VALUE = "2000-01-01 00:00:00";
     mqttDraftPublishProfile: "standard",
     mqttDraftEssentialIntervalS: "10",
     mqttDraftStandardIntervalS: "30",
+    mqttDraftDiagnosticIntervalS: "60",
     mqttDraftRetainSnapshots: true,
     mqttBusy: false,
     mqttNotice: "",
@@ -2617,6 +2618,7 @@ const OPENQUATT_RESUME_CLEAR_VALUE = "2000-01-01 00:00:00";
     const passwordValue = String(state.mqttDraftPassword || "");
     const essentialIntervalValue = String(state.mqttDraftEssentialIntervalS || "10");
     const standardIntervalValue = String(state.mqttDraftStandardIntervalS || "30");
+    const diagnosticIntervalValue = String(state.mqttDraftDiagnosticIntervalS || "60");
 
     return `
       <div class="oq-helper-modal-backdrop oq-helper-modal-backdrop--top${state.overviewTheme === "dark" ? " oq-helper-modal-backdrop--dark" : ""}" data-oq-modal="system">
@@ -2645,7 +2647,7 @@ const OPENQUATT_RESUME_CLEAR_VALUE = "2000-01-01 00:00:00";
                 ${renderLoginStatusRow("Status", getMqttStatusLabel(), getMqttStatusDetail())}
                 ${renderLoginStatusRow("Broker", String(status.broker || "").trim() || "Geen broker", status.connected ? "MQTT publiceert en ontvangt via deze broker." : "Nog geen actieve verbinding.")}
                 ${renderLoginStatusRow("Base topic", String(status.base_topic || "").trim() || "openquatt", "Alle compacte telemetry-topics hangen hieronder.")}
-                ${renderLoginStatusRow("Publish-profiel", formatMqttPublishProfile(status.publish_profile), `Essential: ${Number(status.essential_interval_s || 10)}s, Standard: ${Number(status.standard_interval_s || 30)}s`)}
+                ${renderLoginStatusRow("Publish-profiel", formatMqttPublishProfile(status.publish_profile), `Essential: ${Number(status.essential_interval_s || 10)}s, Standard: ${Number(status.standard_interval_s || 30)}s, Diagnostic: ${Number(status.diagnostic_interval_s || 60)}s`)}
                 ${renderLoginStatusRow("Gebruiker", String(status.username || "").trim() || "Anoniem", status.password_set ? "Er is een wachtwoord opgeslagen." : "Er is nog geen wachtwoord opgeslagen.")}
                 ${renderLoginStatusRow("Retain snapshots", status.retain_snapshots !== false ? "Aan" : "Uit", status.retain_snapshots !== false ? "Nieuwe subscribers zien meteen de laatste snapshot." : "Alleen live berichten worden doorgestuurd.")}
               `
@@ -2696,6 +2698,7 @@ const OPENQUATT_RESUME_CLEAR_VALUE = "2000-01-01 00:00:00";
                     <option value="off" ${String(state.mqttDraftPublishProfile || "") === "off" ? "selected" : ""}>Uit</option>
                     <option value="essential" ${String(state.mqttDraftPublishProfile || "") === "essential" ? "selected" : ""}>Essential</option>
                     <option value="standard" ${String(state.mqttDraftPublishProfile || "") === "standard" ? "selected" : ""}>Standard</option>
+                    <option value="diagnostic" ${String(state.mqttDraftPublishProfile || "") === "diagnostic" ? "selected" : ""}>Diagnostic</option>
                   </select>
                 </label>
                 <label class="oq-helper-modal-channel oq-helper-modal-channel--toggle oq-mqtt-setting-card oq-mqtt-setting-card--toggle">
@@ -2712,6 +2715,10 @@ const OPENQUATT_RESUME_CLEAR_VALUE = "2000-01-01 00:00:00";
                 <label class="oq-helper-modal-channel oq-mqtt-field">
                   <span class="oq-helper-modal-label">Standard interval</span>
                   <input class="oq-helper-input" type="number" min="1" max="3600" step="1" inputmode="numeric" autocomplete="off" data-oq-mqtt-field="standardIntervalS" value="${escapeHtml(standardIntervalValue)}" ${formBusy ? "disabled" : ""}>
+                </label>
+                <label class="oq-helper-modal-channel oq-mqtt-field">
+                  <span class="oq-helper-modal-label">Diagnostic interval</span>
+                  <input class="oq-helper-input" type="number" min="1" max="3600" step="1" inputmode="numeric" autocomplete="off" data-oq-mqtt-field="diagnosticIntervalS" value="${escapeHtml(diagnosticIntervalValue)}" ${formBusy ? "disabled" : ""}>
                 </label>
               </div>
             </div>
@@ -4075,6 +4082,7 @@ const OPENQUATT_RESUME_CLEAR_VALUE = "2000-01-01 00:00:00";
       String(status.publish_profile || ""),
       String(status.essential_interval_s || ""),
       String(status.standard_interval_s || ""),
+      String(status.diagnostic_interval_s || ""),
       status.retain_snapshots ? "retain" : "volatile",
       status.password_set ? "set" : "empty",
       String(status.source || ""),
@@ -4093,6 +4101,7 @@ const OPENQUATT_RESUME_CLEAR_VALUE = "2000-01-01 00:00:00";
     state.mqttDraftPublishProfile = String(status.publish_profile || "standard");
     state.mqttDraftEssentialIntervalS = String(status.essential_interval_s ?? 10);
     state.mqttDraftStandardIntervalS = String(status.standard_interval_s ?? 30);
+    state.mqttDraftDiagnosticIntervalS = String(status.diagnostic_interval_s ?? 60);
     state.mqttDraftRetainSnapshots = status.retain_snapshots !== false;
     state.mqttNotice = "";
     state.mqttError = "";
@@ -4105,6 +4114,9 @@ const OPENQUATT_RESUME_CLEAR_VALUE = "2000-01-01 00:00:00";
     }
     if (normalized === "essential") {
       return "Essential";
+    }
+    if (normalized === "diagnostic") {
+      return "Diagnostic";
     }
     return "Standard";
   }
@@ -4410,6 +4422,7 @@ const OPENQUATT_RESUME_CLEAR_VALUE = "2000-01-01 00:00:00";
     const publishProfile = String(state.mqttDraftPublishProfile || "standard").trim().toLowerCase();
     const essentialIntervalS = Number(String(state.mqttDraftEssentialIntervalS || "").trim());
     const standardIntervalS = Number(String(state.mqttDraftStandardIntervalS || "").trim());
+    const diagnosticIntervalS = Number(String(state.mqttDraftDiagnosticIntervalS || "").trim());
     const retainSnapshots = Boolean(state.mqttDraftRetainSnapshots);
 
     if (!baseTopic) {
@@ -4432,7 +4445,7 @@ const OPENQUATT_RESUME_CLEAR_VALUE = "2000-01-01 00:00:00";
       render();
       return;
     }
-    if (!["off", "essential", "standard"].includes(publishProfile)) {
+    if (!["off", "essential", "standard", "diagnostic"].includes(publishProfile)) {
       state.mqttError = "Kies een geldig publish-profiel.";
       render();
       return;
@@ -4444,6 +4457,11 @@ const OPENQUATT_RESUME_CLEAR_VALUE = "2000-01-01 00:00:00";
     }
     if (!Number.isFinite(standardIntervalS) || standardIntervalS < 1 || standardIntervalS > 3600) {
       state.mqttError = "Vul een geldig standard interval in.";
+      render();
+      return;
+    }
+    if (!Number.isFinite(diagnosticIntervalS) || diagnosticIntervalS < 1 || diagnosticIntervalS > 3600) {
+      state.mqttError = "Vul een geldig diagnostic interval in.";
       render();
       return;
     }
@@ -4465,6 +4483,7 @@ const OPENQUATT_RESUME_CLEAR_VALUE = "2000-01-01 00:00:00";
       params.set("publish_profile", publishProfile);
       params.set("essential_interval_s", String(essentialIntervalS));
       params.set("standard_interval_s", String(standardIntervalS));
+      params.set("diagnostic_interval_s", String(diagnosticIntervalS));
       params.set("retain_snapshots", retainSnapshots ? "true" : "false");
 
       const response = await fetch("/mqtt/save", {
@@ -5524,6 +5543,8 @@ const OPENQUATT_RESUME_CLEAR_VALUE = "2000-01-01 00:00:00";
           state.mqttDraftEssentialIntervalS = String(event.target.value || "");
         } else if (mqttField === "standardIntervalS") {
           state.mqttDraftStandardIntervalS = String(event.target.value || "");
+        } else if (mqttField === "diagnosticIntervalS") {
+          state.mqttDraftDiagnosticIntervalS = String(event.target.value || "");
         } else if (mqttField === "retainSnapshots") {
           state.mqttDraftRetainSnapshots = Boolean(event.target.checked);
         }
@@ -5652,6 +5673,8 @@ const OPENQUATT_RESUME_CLEAR_VALUE = "2000-01-01 00:00:00";
       state.mqttDraftEssentialIntervalS = String(event.target.value || "");
     } else if (mqttField === "standardIntervalS") {
       state.mqttDraftStandardIntervalS = String(event.target.value || "");
+    } else if (mqttField === "diagnosticIntervalS") {
+      state.mqttDraftDiagnosticIntervalS = String(event.target.value || "");
     } else if (mqttField === "retainSnapshots") {
       state.mqttDraftRetainSnapshots = Boolean(event.target.checked);
     }

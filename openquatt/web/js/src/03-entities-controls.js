@@ -651,6 +651,7 @@
       String(status.publish_profile || ""),
       String(status.essential_interval_s || ""),
       String(status.standard_interval_s || ""),
+      String(status.diagnostic_interval_s || ""),
       status.retain_snapshots ? "retain" : "volatile",
       status.password_set ? "set" : "empty",
       String(status.source || ""),
@@ -669,6 +670,7 @@
     state.mqttDraftPublishProfile = String(status.publish_profile || "standard");
     state.mqttDraftEssentialIntervalS = String(status.essential_interval_s ?? 10);
     state.mqttDraftStandardIntervalS = String(status.standard_interval_s ?? 30);
+    state.mqttDraftDiagnosticIntervalS = String(status.diagnostic_interval_s ?? 60);
     state.mqttDraftRetainSnapshots = status.retain_snapshots !== false;
     state.mqttNotice = "";
     state.mqttError = "";
@@ -681,6 +683,9 @@
     }
     if (normalized === "essential") {
       return "Essential";
+    }
+    if (normalized === "diagnostic") {
+      return "Diagnostic";
     }
     return "Standard";
   }
@@ -986,6 +991,7 @@
     const publishProfile = String(state.mqttDraftPublishProfile || "standard").trim().toLowerCase();
     const essentialIntervalS = Number(String(state.mqttDraftEssentialIntervalS || "").trim());
     const standardIntervalS = Number(String(state.mqttDraftStandardIntervalS || "").trim());
+    const diagnosticIntervalS = Number(String(state.mqttDraftDiagnosticIntervalS || "").trim());
     const retainSnapshots = Boolean(state.mqttDraftRetainSnapshots);
 
     if (!baseTopic) {
@@ -1008,7 +1014,7 @@
       render();
       return;
     }
-    if (!["off", "essential", "standard"].includes(publishProfile)) {
+    if (!["off", "essential", "standard", "diagnostic"].includes(publishProfile)) {
       state.mqttError = "Kies een geldig publish-profiel.";
       render();
       return;
@@ -1020,6 +1026,11 @@
     }
     if (!Number.isFinite(standardIntervalS) || standardIntervalS < 1 || standardIntervalS > 3600) {
       state.mqttError = "Vul een geldig standard interval in.";
+      render();
+      return;
+    }
+    if (!Number.isFinite(diagnosticIntervalS) || diagnosticIntervalS < 1 || diagnosticIntervalS > 3600) {
+      state.mqttError = "Vul een geldig diagnostic interval in.";
       render();
       return;
     }
@@ -1041,6 +1052,7 @@
       params.set("publish_profile", publishProfile);
       params.set("essential_interval_s", String(essentialIntervalS));
       params.set("standard_interval_s", String(standardIntervalS));
+      params.set("diagnostic_interval_s", String(diagnosticIntervalS));
       params.set("retain_snapshots", retainSnapshots ? "true" : "false");
 
       const response = await fetch("/mqtt/save", {
@@ -2100,6 +2112,8 @@
           state.mqttDraftEssentialIntervalS = String(event.target.value || "");
         } else if (mqttField === "standardIntervalS") {
           state.mqttDraftStandardIntervalS = String(event.target.value || "");
+        } else if (mqttField === "diagnosticIntervalS") {
+          state.mqttDraftDiagnosticIntervalS = String(event.target.value || "");
         } else if (mqttField === "retainSnapshots") {
           state.mqttDraftRetainSnapshots = Boolean(event.target.checked);
         }
@@ -2228,6 +2242,8 @@
       state.mqttDraftEssentialIntervalS = String(event.target.value || "");
     } else if (mqttField === "standardIntervalS") {
       state.mqttDraftStandardIntervalS = String(event.target.value || "");
+    } else if (mqttField === "diagnosticIntervalS") {
+      state.mqttDraftDiagnosticIntervalS = String(event.target.value || "");
     } else if (mqttField === "retainSnapshots") {
       state.mqttDraftRetainSnapshots = Boolean(event.target.checked);
     }

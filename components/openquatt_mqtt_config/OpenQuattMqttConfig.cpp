@@ -126,6 +126,10 @@ static bool parse_publish_profile_value_(const std::string &value, PublishProfil
     *profile = PublishProfile::STANDARD;
     return true;
   }
+  if (normalized == "diagnostic") {
+    *profile = PublishProfile::DIAGNOSTIC;
+    return true;
+  }
   return false;
 }
 
@@ -181,12 +185,13 @@ class OpenQuattMqttConfigRequestHandler : public AsyncWebHandler {
       const std::string source = json_escape_(this->parent_->get_config_source());
       const std::string csrf_token = json_escape_(this->parent_->get_csrf_token());
       stream->printf(
-          R"({"enabled":%s,"connected":%s,"broker":"%s","port":%u,"username":"%s","base_topic":"%s","publish_profile":"%s","essential_interval_s":%u,"standard_interval_s":%u,"retain_snapshots":%s,"password_set":%s,"source":"%s","csrf_token":"%s"})",
+          R"({"enabled":%s,"connected":%s,"broker":"%s","port":%u,"username":"%s","base_topic":"%s","publish_profile":"%s","essential_interval_s":%u,"standard_interval_s":%u,"diagnostic_interval_s":%u,"retain_snapshots":%s,"password_set":%s,"source":"%s","csrf_token":"%s"})",
           this->parent_->is_enabled() ? "true" : "false", this->parent_->is_connected() ? "true" : "false",
           broker.c_str(), this->parent_->get_port(), username.c_str(), base_topic.c_str(),
           this->parent_->get_publish_profile_name(), this->parent_->get_essential_interval_s(),
-          this->parent_->get_standard_interval_s(), this->parent_->get_retain_snapshots() ? "true" : "false",
-          this->parent_->has_password() ? "true" : "false", source.c_str(), csrf_token.c_str());
+          this->parent_->get_standard_interval_s(), this->parent_->get_diagnostic_interval_s(),
+          this->parent_->get_retain_snapshots() ? "true" : "false", this->parent_->has_password() ? "true" : "false",
+          source.c_str(), csrf_token.c_str());
       request->send(stream);
       return;
     }
@@ -205,6 +210,7 @@ class OpenQuattMqttConfigRequestHandler : public AsyncWebHandler {
       const std::string profile_arg = request->arg("publish_profile");
       const std::string essential_interval_arg = request->arg("essential_interval_s");
       const std::string standard_interval_arg = request->arg("standard_interval_s");
+      const std::string diagnostic_interval_arg = request->arg("diagnostic_interval_s");
       const std::string retain_snapshots_arg = request->arg("retain_snapshots");
       const std::string enabled_arg = request->arg("enabled");
 
@@ -242,6 +248,7 @@ class OpenQuattMqttConfigRequestHandler : public AsyncWebHandler {
       const uint16_t port = parse_port();
       const uint16_t essential_interval_s = parse_interval(essential_interval_arg);
       const uint16_t standard_interval_s = parse_interval(standard_interval_arg);
+      const uint16_t diagnostic_interval_s = parse_interval(diagnostic_interval_arg);
       if (enabled && broker.empty()) {
         request->send(409, "application/json", R"({"ok":false,"error":"missing_broker"})");
         return;
@@ -259,7 +266,8 @@ class OpenQuattMqttConfigRequestHandler : public AsyncWebHandler {
         return;
       }
       if (!this->parent_->set_runtime_config(broker, port, username, password, base_topic, enabled, publish_profile,
-                                             essential_interval_s, standard_interval_s, retain_snapshots)) {
+                                             essential_interval_s, standard_interval_s, diagnostic_interval_s,
+                                             retain_snapshots)) {
         request->send(500, "application/json", R"({"ok":false,"error":"persist_failed"})");
         return;
       }
@@ -295,6 +303,8 @@ void OpenQuattMqttConfig::setup() {
   this->rotate_csrf_token_();
   this->register_http_handlers_();
   this->pref_ = global_preferences->make_preference<Storage>(STORAGE_KEY, true);
+  this->diagnostic_interval_pref_ =
+      global_preferences->make_preference<uint16_t>(DIAGNOSTIC_INTERVAL_KEY, true);
 
   Storage storage{};
   if (!this->load_storage_(&storage)) {
@@ -307,11 +317,15 @@ void OpenQuattMqttConfig::setup() {
       return;
     }
     this->apply_storage_(storage, "bootstrap");
-    return;
+  } else if (!this->apply_storage_(storage, "stored")) {
+    ESP_LOGE(TAG, "Stored MQTT configuration could not be applied");
   }
 
-  if (!this->apply_storage_(storage, "stored")) {
-    ESP_LOGE(TAG, "Stored MQTT configuration could not be applied");
+  if (!this->load_diagnostic_interval_()) {
+    this->diagnostic_interval_s_ = this->default_diagnostic_interval_s_;
+    if (!this->save_diagnostic_interval_(this->diagnostic_interval_s_)) {
+      ESP_LOGW(TAG, "Diagnostic interval could not be initialized; using default in-memory value");
+    }
   }
 }
 
@@ -324,6 +338,7 @@ void OpenQuattMqttConfig::dump_config() {
   ESP_LOGCONFIG(TAG, "  Publish profile: %s", this->get_publish_profile_name());
   ESP_LOGCONFIG(TAG, "  Essential interval: %" PRIu16 "s", this->essential_interval_s_);
   ESP_LOGCONFIG(TAG, "  Standard interval: %" PRIu16 "s", this->standard_interval_s_);
+  ESP_LOGCONFIG(TAG, "  Diagnostic interval: %" PRIu16 "s", this->diagnostic_interval_s_);
   ESP_LOGCONFIG(TAG, "  Retain snapshots: %s", YESNO(this->retain_snapshots_));
   ESP_LOGCONFIG(TAG, "  Runtime source: %s", this->config_source_.empty() ? "<unknown>" : this->config_source_.c_str());
   ESP_LOGCONFIG(TAG, "  HTTP handlers registered: %s", YESNO(this->handlers_registered_));
@@ -338,7 +353,8 @@ const char *OpenQuattMqttConfig::get_publish_profile_name() const {
 bool OpenQuattMqttConfig::set_runtime_config(const std::string &broker, uint16_t port, const std::string &username,
                                              const std::string &password, const std::string &base_topic, bool enabled,
                                              PublishProfile publish_profile, uint16_t essential_interval_s,
-                                             uint16_t standard_interval_s, bool retain_snapshots) {
+                                             uint16_t standard_interval_s, uint16_t diagnostic_interval_s,
+                                             bool retain_snapshots) {
   Storage storage{};
   if (!this->load_storage_(&storage)) {
     if (!this->build_storage_(this->bootstrap_broker_, this->bootstrap_port_, this->bootstrap_username_,
@@ -355,6 +371,9 @@ bool OpenQuattMqttConfig::set_runtime_config(const std::string &broker, uint16_t
     return false;
   }
   if (!this->save_storage_(storage)) {
+    return false;
+  }
+  if (!this->save_diagnostic_interval_(diagnostic_interval_s)) {
     return false;
   }
   return this->apply_storage_(storage, "runtime");
@@ -377,6 +396,35 @@ bool OpenQuattMqttConfig::save_storage_(const Storage &storage) {
   }
   if (!global_preferences->sync()) {
     ESP_LOGE(TAG, "Failed to sync MQTT configuration to preferences");
+    return false;
+  }
+  return true;
+}
+
+bool OpenQuattMqttConfig::load_diagnostic_interval_() {
+  uint16_t diagnostic_interval_s = this->default_diagnostic_interval_s_;
+  if (!this->diagnostic_interval_pref_.load(&diagnostic_interval_s)) {
+    return false;
+  }
+  if (diagnostic_interval_s == 0U || diagnostic_interval_s > 3600U) {
+    diagnostic_interval_s = this->default_diagnostic_interval_s_;
+  }
+  this->diagnostic_interval_s_ = diagnostic_interval_s;
+  return true;
+}
+
+bool OpenQuattMqttConfig::save_diagnostic_interval_(uint16_t diagnostic_interval_s) {
+  if (diagnostic_interval_s == 0U || diagnostic_interval_s > 3600U) {
+    ESP_LOGE(TAG, "Invalid diagnostic interval");
+    return false;
+  }
+  this->diagnostic_interval_s_ = diagnostic_interval_s;
+  if (!this->diagnostic_interval_pref_.save(&this->diagnostic_interval_s_)) {
+    ESP_LOGE(TAG, "Failed to save MQTT diagnostic interval to preferences");
+    return false;
+  }
+  if (!global_preferences->sync()) {
+    ESP_LOGE(TAG, "Failed to sync MQTT diagnostic interval to preferences");
     return false;
   }
   return true;
@@ -488,7 +536,7 @@ bool OpenQuattMqttConfig::is_valid_storage_(const Storage &storage) const {
   if (storage.enabled > 1U || storage.retain_snapshots > 1U) {
     return false;
   }
-  if (storage.publish_profile > static_cast<uint8_t>(PublishProfile::STANDARD)) {
+  if (storage.publish_profile > static_cast<uint8_t>(PublishProfile::DIAGNOSTIC)) {
     return false;
   }
   if (storage.port == 0U || storage.essential_interval_s == 0U || storage.standard_interval_s == 0U) {
@@ -542,6 +590,8 @@ const char *OpenQuattMqttConfig::publish_profile_to_string_(PublishProfile profi
       return "off";
     case PublishProfile::ESSENTIAL:
       return "essential";
+    case PublishProfile::DIAGNOSTIC:
+      return "diagnostic";
     case PublishProfile::STANDARD:
     default:
       return "standard";

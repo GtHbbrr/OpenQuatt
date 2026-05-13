@@ -15,11 +15,13 @@ enum class PublishProfile : uint8_t {
   OFF = 0,
   ESSENTIAL = 1,
   STANDARD = 2,
+  DIAGNOSTIC = 3,
 };
 
 inline constexpr PublishProfile OFF = PublishProfile::OFF;
 inline constexpr PublishProfile ESSENTIAL = PublishProfile::ESSENTIAL;
 inline constexpr PublishProfile STANDARD = PublishProfile::STANDARD;
+inline constexpr PublishProfile DIAGNOSTIC = PublishProfile::DIAGNOSTIC;
 
 class OpenQuattMqttConfig : public Component {
  public:
@@ -38,6 +40,9 @@ class OpenQuattMqttConfig : public Component {
   }
   void set_default_standard_interval_s(uint16_t default_standard_interval_s) {
     this->default_standard_interval_s_ = default_standard_interval_s;
+  }
+  void set_default_diagnostic_interval_s(uint16_t default_diagnostic_interval_s) {
+    this->default_diagnostic_interval_s_ = default_diagnostic_interval_s;
   }
   void set_default_retain_snapshots(bool default_retain_snapshots) {
     this->default_retain_snapshots_ = default_retain_snapshots;
@@ -60,16 +65,18 @@ class OpenQuattMqttConfig : public Component {
   const char *get_publish_profile_name() const;
   uint16_t get_essential_interval_s() const { return this->essential_interval_s_; }
   uint16_t get_standard_interval_s() const { return this->standard_interval_s_; }
+  uint16_t get_diagnostic_interval_s() const { return this->diagnostic_interval_s_; }
   bool get_retain_snapshots() const { return this->retain_snapshots_; }
 
   bool set_runtime_config(const std::string &broker, uint16_t port, const std::string &username,
                           const std::string &password, const std::string &base_topic, bool enabled,
                           PublishProfile publish_profile, uint16_t essential_interval_s, uint16_t standard_interval_s,
-                          bool retain_snapshots);
+                          uint16_t diagnostic_interval_s, bool retain_snapshots);
 
  protected:
   static constexpr uint32_t STORAGE_MAGIC = 0x4F514D54;
   static constexpr uint16_t STORAGE_VERSION = 2;
+  static constexpr uint32_t DIAGNOSTIC_INTERVAL_KEY = 0x6f716d74;
   static constexpr size_t BROKER_MAX_LEN = 64;
   static constexpr size_t USERNAME_MAX_LEN = 64;
   static constexpr size_t PASSWORD_MAX_LEN = 128;
@@ -92,6 +99,8 @@ class OpenQuattMqttConfig : public Component {
 
   bool load_storage_(Storage *storage);
   bool save_storage_(const Storage &storage);
+  bool load_diagnostic_interval_();
+  bool save_diagnostic_interval_(uint16_t diagnostic_interval_s);
   bool apply_storage_(const Storage &storage, const char *source);
   bool build_storage_(const std::string &broker, uint16_t port, const std::string &username,
                       const std::string &password, const std::string &base_topic, bool enabled,
@@ -114,6 +123,7 @@ class OpenQuattMqttConfig : public Component {
   PublishProfile default_publish_profile_{PublishProfile::STANDARD};
   uint16_t default_essential_interval_s_{10};
   uint16_t default_standard_interval_s_{30};
+  uint16_t default_diagnostic_interval_s_{60};
   bool default_retain_snapshots_{true};
 
   std::string broker_;
@@ -125,10 +135,12 @@ class OpenQuattMqttConfig : public Component {
   PublishProfile publish_profile_{PublishProfile::STANDARD};
   uint16_t essential_interval_s_{10};
   uint16_t standard_interval_s_{30};
+  uint16_t diagnostic_interval_s_{60};
   bool retain_snapshots_{true};
   std::string config_source_;
   std::string csrf_token_;
   ESPPreferenceObject pref_;
+  ESPPreferenceObject diagnostic_interval_pref_;
   bool handlers_registered_{false};
 };
 

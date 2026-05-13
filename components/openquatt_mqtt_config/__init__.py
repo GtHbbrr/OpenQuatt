@@ -13,6 +13,7 @@ CONF_DEFAULT_ENABLED = "default_enabled"
 CONF_DEFAULT_PUBLISH_PROFILE = "default_publish_profile"
 CONF_DEFAULT_ESSENTIAL_INTERVAL_S = "default_essential_interval_s"
 CONF_DEFAULT_STANDARD_INTERVAL_S = "default_standard_interval_s"
+CONF_DEFAULT_DIAGNOSTIC_INTERVAL_S = "default_diagnostic_interval_s"
 CONF_DEFAULT_RETAIN_SNAPSHOTS = "default_retain_snapshots"
 
 openquatt_mqtt_config_ns = cg.esphome_ns.namespace("openquatt_mqtt_config")
@@ -25,6 +26,7 @@ PUBLISH_PROFILE_ENUM = {
     "off": PublishProfile.OFF,
     "essential": PublishProfile.ESSENTIAL,
     "standard": PublishProfile.STANDARD,
+    "diagnostic": PublishProfile.DIAGNOSTIC,
 }
 
 CONFIG_SCHEMA = cv.Schema(
@@ -40,6 +42,7 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Optional(CONF_DEFAULT_PUBLISH_PROFILE, default="standard"): cv.enum(PUBLISH_PROFILE_ENUM, lower=True),
         cv.Optional(CONF_DEFAULT_ESSENTIAL_INTERVAL_S, default=10): cv.int_range(min=1, max=3600),
         cv.Optional(CONF_DEFAULT_STANDARD_INTERVAL_S, default=30): cv.int_range(min=1, max=3600),
+        cv.Optional(CONF_DEFAULT_DIAGNOSTIC_INTERVAL_S, default=60): cv.int_range(min=1, max=3600),
         cv.Optional(CONF_DEFAULT_RETAIN_SNAPSHOTS, default=True): cv.boolean,
     }
 ).extend(cv.COMPONENT_SCHEMA)
@@ -61,4 +64,5 @@ async def to_code(config):
     cg.add(var.set_default_publish_profile(config[CONF_DEFAULT_PUBLISH_PROFILE]))
     cg.add(var.set_default_essential_interval_s(config[CONF_DEFAULT_ESSENTIAL_INTERVAL_S]))
     cg.add(var.set_default_standard_interval_s(config[CONF_DEFAULT_STANDARD_INTERVAL_S]))
+    cg.add(var.set_default_diagnostic_interval_s(config[CONF_DEFAULT_DIAGNOSTIC_INTERVAL_S]))
     cg.add(var.set_default_retain_snapshots(config[CONF_DEFAULT_RETAIN_SNAPSHOTS]))

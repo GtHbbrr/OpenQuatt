@@ -1,6 +1,6 @@
 import esphome.codegen as cg
 import esphome.config_validation as cv
-from esphome.components import binary_sensor, sensor, text_sensor
+from esphome.components import binary_sensor, select, sensor, text_sensor
 from esphome.const import CONF_ID
 
 CONF_CONFIG_ID = "config_id"
@@ -20,6 +20,18 @@ CONF_TOTAL_POWER_INPUT_SENSOR = "total_power_input_sensor"
 CONF_TOTAL_HEAT_POWER_SENSOR = "total_heat_power_sensor"
 CONF_TOTAL_COP_SENSOR = "total_cop_sensor"
 CONF_LOWFLOW_FAULT_BINARY_SENSOR = "lowflow_fault_binary_sensor"
+CONF_STRATEGY_PHASE_TEXT_SENSOR = "strategy_phase_text_sensor"
+CONF_STRATEGY_DEBUG_STATE_TEXT_SENSOR = "strategy_debug_state_text_sensor"
+CONF_REQUEST_REASON_TEXT_SENSOR = "request_reason_text_sensor"
+CONF_HEATING_DEBUG_STATE_TEXT_SENSOR = "heating_debug_state_text_sensor"
+CONF_DUO_OPTIMIZER_REASON_TEXT_SENSOR = "duo_optimizer_reason_text_sensor"
+CONF_FLOW_CONTROL_MODE_SELECT = "flow_control_mode_select"
+CONF_FLOW_MODE_TEXT_SENSOR = "flow_mode_text_sensor"
+CONF_FLOW_MISMATCH_BINARY_SENSOR = "flow_mismatch_binary_sensor"
+CONF_COMMISSIONING_STATUS_TEXT_SENSOR = "commissioning_status_text_sensor"
+CONF_FLOW_AUTOTUNE_STATUS_TEXT_SENSOR = "flow_autotune_status_text_sensor"
+CONF_FIRMWARE_UPDATE_STATUS_TEXT_SENSOR = "firmware_update_status_text_sensor"
+CONF_FIRMWARE_UPDATE_PROGRESS_SENSOR = "firmware_update_progress_sensor"
 CONF_HP1_WORKING_MODE_SENSOR = "hp1_working_mode_sensor"
 CONF_HP1_WORKING_MODE_LABEL_TEXT_SENSOR = "hp1_working_mode_label_text_sensor"
 CONF_HP1_COMPRESSOR_LEVEL_SENSOR = "hp1_compressor_level_sensor"
@@ -69,6 +81,18 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Required(CONF_TOTAL_HEAT_POWER_SENSOR): cv.use_id(sensor.Sensor),
         cv.Required(CONF_TOTAL_COP_SENSOR): cv.use_id(sensor.Sensor),
         cv.Required(CONF_LOWFLOW_FAULT_BINARY_SENSOR): cv.use_id(binary_sensor.BinarySensor),
+        cv.Required(CONF_STRATEGY_PHASE_TEXT_SENSOR): cv.use_id(text_sensor.TextSensor),
+        cv.Required(CONF_STRATEGY_DEBUG_STATE_TEXT_SENSOR): cv.use_id(text_sensor.TextSensor),
+        cv.Required(CONF_REQUEST_REASON_TEXT_SENSOR): cv.use_id(text_sensor.TextSensor),
+        cv.Required(CONF_HEATING_DEBUG_STATE_TEXT_SENSOR): cv.use_id(text_sensor.TextSensor),
+        cv.Required(CONF_DUO_OPTIMIZER_REASON_TEXT_SENSOR): cv.use_id(text_sensor.TextSensor),
+        cv.Required(CONF_FLOW_CONTROL_MODE_SELECT): cv.use_id(select.Select),
+        cv.Required(CONF_FLOW_MODE_TEXT_SENSOR): cv.use_id(text_sensor.TextSensor),
+        cv.Required(CONF_FLOW_MISMATCH_BINARY_SENSOR): cv.use_id(binary_sensor.BinarySensor),
+        cv.Required(CONF_COMMISSIONING_STATUS_TEXT_SENSOR): cv.use_id(text_sensor.TextSensor),
+        cv.Required(CONF_FLOW_AUTOTUNE_STATUS_TEXT_SENSOR): cv.use_id(text_sensor.TextSensor),
+        cv.Required(CONF_FIRMWARE_UPDATE_STATUS_TEXT_SENSOR): cv.use_id(text_sensor.TextSensor),
+        cv.Required(CONF_FIRMWARE_UPDATE_PROGRESS_SENSOR): cv.use_id(sensor.Sensor),
         cv.Required(CONF_HP1_WORKING_MODE_SENSOR): cv.use_id(sensor.Sensor),
         cv.Required(CONF_HP1_WORKING_MODE_LABEL_TEXT_SENSOR): cv.use_id(text_sensor.TextSensor),
         cv.Required(CONF_HP1_COMPRESSOR_LEVEL_SENSOR): cv.use_id(sensor.Sensor),
@@ -115,6 +139,18 @@ async def to_code(config):
         (CONF_TOTAL_HEAT_POWER_SENSOR, "set_total_heat_power_sensor"),
         (CONF_TOTAL_COP_SENSOR, "set_total_cop_sensor"),
         (CONF_LOWFLOW_FAULT_BINARY_SENSOR, "set_lowflow_fault_binary_sensor"),
+        (CONF_STRATEGY_PHASE_TEXT_SENSOR, "set_strategy_phase_text_sensor"),
+        (CONF_STRATEGY_DEBUG_STATE_TEXT_SENSOR, "set_strategy_debug_state_text_sensor"),
+        (CONF_REQUEST_REASON_TEXT_SENSOR, "set_request_reason_text_sensor"),
+        (CONF_HEATING_DEBUG_STATE_TEXT_SENSOR, "set_heating_debug_state_text_sensor"),
+        (CONF_DUO_OPTIMIZER_REASON_TEXT_SENSOR, "set_duo_optimizer_reason_text_sensor"),
+        (CONF_FLOW_CONTROL_MODE_SELECT, "set_flow_control_mode_select"),
+        (CONF_FLOW_MODE_TEXT_SENSOR, "set_flow_mode_text_sensor"),
+        (CONF_FLOW_MISMATCH_BINARY_SENSOR, "set_flow_mismatch_binary_sensor"),
+        (CONF_COMMISSIONING_STATUS_TEXT_SENSOR, "set_commissioning_status_text_sensor"),
+        (CONF_FLOW_AUTOTUNE_STATUS_TEXT_SENSOR, "set_flow_autotune_status_text_sensor"),
+        (CONF_FIRMWARE_UPDATE_STATUS_TEXT_SENSOR, "set_firmware_update_status_text_sensor"),
+        (CONF_FIRMWARE_UPDATE_PROGRESS_SENSOR, "set_firmware_update_progress_sensor"),
         (CONF_HP1_WORKING_MODE_SENSOR, "set_hp1_working_mode_sensor"),
         (CONF_HP1_WORKING_MODE_LABEL_TEXT_SENSOR, "set_hp1_working_mode_label_text_sensor"),
         (CONF_HP1_COMPRESSOR_LEVEL_SENSOR, "set_hp1_compressor_level_sensor"),
