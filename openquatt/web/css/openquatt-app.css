@@ -1202,7 +1202,8 @@ body.oq-surface-native {
 .oq-mqtt-status-grid .oq-helper-modal-row {
   display: grid;
   align-content: start;
-  min-height: 92px;
+  min-height: 74px;
+  padding: 10px 12px;
 }
 
 .oq-helper-modal-row {
@@ -1213,7 +1214,7 @@ body.oq-surface-native {
 }
 
 .oq-helper-modal-row--loading {
-  min-height: 86px;
+  min-height: 72px;
 }
 
 .oq-helper-shell--dark .oq-helper-modal-row,
@@ -1260,8 +1261,8 @@ body.oq-surface-native {
 
 .oq-mqtt-form {
   display: grid;
-  gap: 14px;
-  margin-top: 16px;
+  gap: 10px;
+  margin-top: 12px;
 }
 
 .oq-mqtt-form--loading {
@@ -1270,7 +1271,7 @@ body.oq-surface-native {
 
 .oq-mqtt-section {
   display: grid;
-  gap: 8px;
+  gap: 6px;
 }
 
 .oq-mqtt-section-title {
@@ -1293,19 +1294,19 @@ body.oq-surface-native {
 
 .oq-mqtt-setting-card {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(150px, 190px);
+  grid-template-columns: minmax(0, 1fr) minmax(132px, 170px);
   align-items: center;
-  gap: 12px;
-  min-height: 76px;
+  gap: 10px;
+  min-height: 60px;
   margin-top: 0;
-  padding: 12px 14px;
+  padding: 10px 12px;
   border: 1px solid var(--oq-helper-line);
   border-radius: var(--oq-helper-radius-md);
   background: rgba(255, 255, 255, 0.84);
 }
 
 .oq-mqtt-setting-card.oq-helper-modal-channel--span-2 {
-  min-height: 74px;
+  min-height: 58px;
 }
 
 .oq-mqtt-setting-card--toggle {
@@ -1318,7 +1319,7 @@ body.oq-surface-native {
 
 .oq-mqtt-setting-card .oq-helper-select {
   width: 100%;
-  min-height: 38px;
+  min-height: 36px;
 }
 
 .oq-helper-shell--dark .oq-mqtt-setting-card,
@@ -1380,6 +1381,19 @@ body.oq-surface-native {
 .oq-mqtt-setting-card.oq-helper-modal-channel--toggle input[type="checkbox"] {
   justify-self: end;
   margin-top: 0;
+}
+
+.oq-mqtt-setting-card .oq-helper-input,
+.oq-mqtt-setting-card .oq-helper-select,
+.oq-mqtt-field .oq-helper-input {
+  min-height: 40px;
+  font-size: 0.95rem;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+.oq-mqtt-setting-card .oq-helper-select {
+  min-height: 36px;
 }
 
 .oq-helper-modal-channel select {
