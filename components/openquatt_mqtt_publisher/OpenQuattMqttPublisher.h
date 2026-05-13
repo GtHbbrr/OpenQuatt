@@ -122,6 +122,9 @@ class OpenQuattMqttPublisher : public Component, public mqtt::CustomMQTTDevice {
   void clear_topic_(const std::string &base_topic, const char *suffix);
   std::string topic_for_(const std::string &base_topic, const char *suffix) const;
   std::string build_config_signature_() const;
+  std::string build_state_signature_() const;
+  std::string build_heat_pumps_signature_() const;
+  std::string build_diagnostics_signature_() const;
   bool is_fault_active_() const;
   bool publish_cached_json_(const std::string &topic, const json::json_build_t &builder, bool retain, bool force,
                             uint32_t interval_ms, std::string *last_payload, uint32_t *last_publish_ms);
@@ -191,8 +194,11 @@ class OpenQuattMqttPublisher : public Component, public mqtt::CustomMQTTDevice {
   uint32_t last_heat_pumps_publish_ms_{0};
   uint32_t last_diagnostics_publish_ms_{0};
   std::string last_schema_payload_{};
+  std::string last_state_signature_{};
   std::string last_state_payload_{};
+  std::string last_heat_pumps_signature_{};
   std::string last_heat_pumps_payload_{};
+  std::string last_diagnostics_signature_{};
   std::string last_diagnostics_payload_{};
 };
 

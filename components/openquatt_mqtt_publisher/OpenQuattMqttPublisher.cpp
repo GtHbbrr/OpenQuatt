@@ -22,8 +22,11 @@ void OpenQuattMqttPublisher::setup() {
   this->last_heat_pumps_publish_ms_ = 0;
   this->last_diagnostics_publish_ms_ = 0;
   this->last_schema_payload_.clear();
+  this->last_state_signature_.clear();
   this->last_state_payload_.clear();
+  this->last_heat_pumps_signature_.clear();
   this->last_heat_pumps_payload_.clear();
+  this->last_diagnostics_signature_.clear();
   this->last_diagnostics_payload_.clear();
 }
 
@@ -119,6 +122,13 @@ void OpenQuattMqttPublisher::publish_state_(bool force, uint32_t now_ms, uint32_
   const std::string topic = this->topic_for_(this->config_->get_base_topic(), "state");
   const bool retain = this->config_->get_retain_snapshots();
   const bool fault_active = this->is_fault_active_();
+  const std::string signature = this->build_state_signature_();
+  const bool interval_due = this->last_state_publish_ms_ != 0U &&
+                            static_cast<uint32_t>(now_ms - this->last_state_publish_ms_) >= interval_ms;
+
+  if (!force && signature == this->last_state_signature_ && !interval_due) {
+    return;
+  }
 
   this->publish_cached_json_(topic, [this, fault_active](JsonObject root) {
     root["schema"] = "openquatt.state.v1";
@@ -138,6 +148,7 @@ void OpenQuattMqttPublisher::publish_state_(bool force, uint32_t now_ms, uint32_
     set_number_or_null_(root, "cop", this->total_cop_sensor_);
     root["fault_active"] = fault_active;
   }, retain, force, interval_ms, &this->last_state_payload_, &this->last_state_publish_ms_);
+  this->last_state_signature_ = signature;
 
   (void) now_ms;
 }
@@ -148,6 +159,13 @@ void OpenQuattMqttPublisher::publish_heat_pumps_(bool force, uint32_t now_ms, ui
   }
   const std::string topic = this->topic_for_(this->config_->get_base_topic(), "heat_pumps");
   const bool retain = this->config_->get_retain_snapshots();
+  const std::string signature = this->build_heat_pumps_signature_();
+  const bool interval_due = this->last_heat_pumps_publish_ms_ != 0U &&
+                            static_cast<uint32_t>(now_ms - this->last_heat_pumps_publish_ms_) >= interval_ms;
+
+  if (!force && signature == this->last_heat_pumps_signature_ && !interval_due) {
+    return;
+  }
 
   this->publish_cached_json_(topic, [this](JsonObject root) {
     root["schema"] = "openquatt.heat_pumps.v1";
@@ -178,6 +196,7 @@ void OpenQuattMqttPublisher::publish_heat_pumps_(bool force, uint32_t now_ms, ui
       set_bool_or_null_(hp2, "fault_active", this->hp2_fault_binary_sensor_);
     }
   }, retain, force, interval_ms, &this->last_heat_pumps_payload_, &this->last_heat_pumps_publish_ms_);
+  this->last_heat_pumps_signature_ = signature;
 
   (void) now_ms;
 }
@@ -187,6 +206,13 @@ void OpenQuattMqttPublisher::publish_diagnostics_(bool force, uint32_t now_ms, u
     return;
   }
   const std::string topic = this->topic_for_(this->config_->get_base_topic(), "diagnostics");
+  const std::string signature = this->build_diagnostics_signature_();
+  const bool interval_due = this->last_diagnostics_publish_ms_ != 0U &&
+                            static_cast<uint32_t>(now_ms - this->last_diagnostics_publish_ms_) >= interval_ms;
+
+  if (!force && signature == this->last_diagnostics_signature_ && !interval_due) {
+    return;
+  }
 
   this->publish_cached_json_(topic, [this](JsonObject root) {
     root["schema"] = "openquatt.diagnostics.v1";
@@ -203,6 +229,7 @@ void OpenQuattMqttPublisher::publish_diagnostics_(bool force, uint32_t now_ms, u
     set_text_or_null_(root, "firmware_update_status", this->firmware_update_status_text_sensor_);
     set_number_or_null_(root, "firmware_update_progress", this->firmware_update_progress_sensor_);
   }, false, force, interval_ms, &this->last_diagnostics_payload_, &this->last_diagnostics_publish_ms_);
+  this->last_diagnostics_signature_ = signature;
 
   (void) now_ms;
 }
@@ -264,6 +291,117 @@ std::string OpenQuattMqttPublisher::build_config_signature_() const {
          std::to_string(this->config_->get_diagnostic_interval_s()) + "|" +
          (this->config_->get_retain_snapshots() ? "retain" : "volatile") + "|" +
          (this->config_->is_enabled() ? "enabled" : "disabled");
+}
+
+static inline void append_sensor_signature_(std::string &out, const sensor::Sensor *sensor) {
+  if (sensor == nullptr || !sensor->has_state() || std::isnan(sensor->state)) {
+    out += "|n";
+    return;
+  }
+  out += "|";
+  out += std::to_string(sensor->state);
+}
+
+static inline void append_int_signature_(std::string &out, const sensor::Sensor *sensor) {
+  if (sensor == nullptr || !sensor->has_state() || std::isnan(sensor->state)) {
+    out += "|n";
+    return;
+  }
+  out += "|";
+  out += std::to_string(static_cast<int>(std::lround(sensor->state)));
+}
+
+static inline void append_bool_signature_(std::string &out, const binary_sensor::BinarySensor *binary_sensor) {
+  if (binary_sensor == nullptr || !binary_sensor->has_state()) {
+    out += "|n";
+    return;
+  }
+  out += binary_sensor->state ? "|1" : "|0";
+}
+
+static inline void append_text_signature_(std::string &out, const text_sensor::TextSensor *sensor) {
+  if (sensor == nullptr || !sensor->has_state()) {
+    out += "|n";
+    return;
+  }
+  out += "|";
+  out += sensor->state;
+}
+
+static inline void append_select_signature_(std::string &out, const select::Select *select) {
+  if (select == nullptr || !select->has_state()) {
+    out += "|n";
+    return;
+  }
+  out += "|";
+  out += std::string(select->current_option().c_str());
+}
+
+std::string OpenQuattMqttPublisher::build_state_signature_() const {
+  std::string out;
+  out.reserve(192);
+  append_text_signature_(out, this->control_mode_text_sensor_);
+  append_text_signature_(out, this->strategy_text_sensor_);
+  append_bool_signature_(out, this->heat_request_binary_sensor_);
+  append_bool_signature_(out, this->cooling_request_binary_sensor_);
+  append_sensor_signature_(out, this->demand_sensor_);
+  append_sensor_signature_(out, this->outside_temp_sensor_);
+  append_sensor_signature_(out, this->room_temp_sensor_);
+  append_sensor_signature_(out, this->room_setpoint_sensor_);
+  append_sensor_signature_(out, this->supply_temp_sensor_);
+  append_sensor_signature_(out, this->supply_target_sensor_);
+  append_sensor_signature_(out, this->flow_sensor_);
+  append_sensor_signature_(out, this->total_power_input_sensor_);
+  append_sensor_signature_(out, this->total_heat_power_sensor_);
+  append_sensor_signature_(out, this->total_cop_sensor_);
+  append_bool_signature_(out, this->lowflow_fault_binary_sensor_);
+  return out;
+}
+
+std::string OpenQuattMqttPublisher::build_heat_pumps_signature_() const {
+  std::string out;
+  out.reserve(256);
+  append_int_signature_(out, this->hp1_working_mode_sensor_);
+  append_text_signature_(out, this->hp1_working_mode_label_text_sensor_);
+  append_int_signature_(out, this->hp1_compressor_level_sensor_);
+  append_sensor_signature_(out, this->hp1_power_input_sensor_);
+  append_sensor_signature_(out, this->hp1_heat_power_sensor_);
+  append_sensor_signature_(out, this->hp1_flow_sensor_);
+  append_sensor_signature_(out, this->hp1_water_in_temp_sensor_);
+  append_sensor_signature_(out, this->hp1_water_out_temp_sensor_);
+  append_bool_signature_(out, this->hp1_defrost_binary_sensor_);
+  append_bool_signature_(out, this->hp1_fault_binary_sensor_);
+  if (this->has_secondary_hp_) {
+    append_int_signature_(out, this->hp2_working_mode_sensor_);
+    append_text_signature_(out, this->hp2_working_mode_label_text_sensor_);
+    append_int_signature_(out, this->hp2_compressor_level_sensor_);
+    append_sensor_signature_(out, this->hp2_power_input_sensor_);
+    append_sensor_signature_(out, this->hp2_heat_power_sensor_);
+    append_sensor_signature_(out, this->hp2_flow_sensor_);
+    append_sensor_signature_(out, this->hp2_water_in_temp_sensor_);
+    append_sensor_signature_(out, this->hp2_water_out_temp_sensor_);
+    append_bool_signature_(out, this->hp2_defrost_binary_sensor_);
+    append_bool_signature_(out, this->hp2_fault_binary_sensor_);
+  }
+  return out;
+}
+
+std::string OpenQuattMqttPublisher::build_diagnostics_signature_() const {
+  std::string out;
+  out.reserve(256);
+  append_text_signature_(out, this->strategy_phase_text_sensor_);
+  append_text_signature_(out, this->strategy_debug_state_text_sensor_);
+  append_text_signature_(out, this->request_reason_text_sensor_);
+  append_text_signature_(out, this->heating_debug_state_text_sensor_);
+  append_text_signature_(out, this->duo_optimizer_reason_text_sensor_);
+  append_select_signature_(out, this->flow_control_mode_select_);
+  append_text_signature_(out, this->flow_mode_text_sensor_);
+  append_bool_signature_(out, this->flow_mismatch_binary_sensor_);
+  append_text_signature_(out, this->commissioning_status_text_sensor_);
+  append_text_signature_(out, this->flow_autotune_status_text_sensor_);
+  append_text_signature_(out, this->firmware_update_status_text_sensor_);
+  append_sensor_signature_(out, this->firmware_update_progress_sensor_);
+  return out;
 }
 
 bool OpenQuattMqttPublisher::is_fault_active_() const {
