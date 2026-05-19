@@ -65,6 +65,7 @@
     quickStartModalOpen: true,
     loadingEntities: true,
     entities: {},
+    optionalMissingEntities: {},
     settingsInfoOpen: "",
     settingsInteractionLock: false,
     settingsRenderSignature: "",

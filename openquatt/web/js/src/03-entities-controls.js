@@ -272,6 +272,7 @@
   const INITIAL_SETTINGS_READY_POLL_MS = 250;
   const INITIAL_CORE_UI_KEYS = [
     "installationTopology",
+    ...TOPOLOGY_HINT_KEYS,
     "hpGeneration",
     "openquattEnabled",
     "flowControlMode",
@@ -646,13 +647,23 @@
     results.forEach((result, index) => {
       const key = keys[index];
       if (result.status === "fulfilled") {
+        if (state.optionalMissingEntities) {
+          delete state.optionalMissingEntities[key];
+        }
         const { payload } = result.value;
         state.entities[key] = {
           ...(state.entities[key] || {}),
           ...payload,
         };
-      } else if (!ENTITY_DEFS[key]?.optional && !firstError) {
-        firstError = result.reason.message || String(result.reason);
+      } else {
+        const message = result.reason.message || String(result.reason);
+        if (ENTITY_DEFS[key]?.optional) {
+          if (message.includes("HTTP 404")) {
+            state.optionalMissingEntities[key] = true;
+          }
+        } else if (!firstError) {
+          firstError = message;
+        }
       }
     });
 
@@ -2099,6 +2110,9 @@
   function getEntitySignatureFragment(key) {
     const entity = state.entities[key];
     if (!entity) {
+      if (state.optionalMissingEntities?.[key]) {
+        return `${key}:__optional_missing__`;
+      }
       return `${key}:__missing__`;
     }
 

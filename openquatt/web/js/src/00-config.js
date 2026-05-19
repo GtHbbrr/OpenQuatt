@@ -426,6 +426,7 @@ const LOGO_MARKUP = `
   const SILENT_SETTING_KEYS = ["silentStartTime", "silentEndTime", "silentMax", "dayMax"];
   const FIRMWARE_ENTITY_KEYS = ["firmwareUpdate", "firmwareUpdateChannel", "firmwareUpdateProgress", "firmwareUpdateStatus"];
   const FIRMWARE_MODAL_KEYS = [...FIRMWARE_ENTITY_KEYS, "projectVersionText", "releaseChannelText"];
+  const TOPOLOGY_HINT_KEYS = ["hp2ExcludedA", "hp2ExcludedB", "hp2Power", "hp2WaterOut"];
   const HEADER_ENTITY_KEYS = [
     "status",
     "uptime",

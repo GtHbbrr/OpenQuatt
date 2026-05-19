@@ -636,7 +636,7 @@ text_sensor:
     name: OpenQuatt Version
     icon: mdi:tag-text-outline
     entity_category: diagnostic
-    update_interval: never
+    update_interval: 60s
     lambda: |-
       return {"${project_version}"};
     web_server:
@@ -646,7 +646,7 @@ text_sensor:
     name: OpenQuatt Installation Topology
     icon: mdi:home-analytics
     entity_category: diagnostic
-    update_interval: never
+    update_interval: 60s
     lambda: |-
       #if OQ_TOPOLOGY_DUO
       return {"duo"};
@@ -660,7 +660,7 @@ text_sensor:
     name: OpenQuatt Release Channel
     icon: mdi:source-branch
     entity_category: diagnostic
-    update_interval: never
+    update_interval: 60s
     lambda: |-
       return {"${release_channel}"};
     web_server:

@@ -430,6 +430,7 @@ const LOGO_MARKUP = `
   const SILENT_SETTING_KEYS = ["silentStartTime", "silentEndTime", "silentMax", "dayMax"];
   const FIRMWARE_ENTITY_KEYS = ["firmwareUpdate", "firmwareUpdateChannel", "firmwareUpdateProgress", "firmwareUpdateStatus"];
   const FIRMWARE_MODAL_KEYS = [...FIRMWARE_ENTITY_KEYS, "projectVersionText", "releaseChannelText"];
+  const TOPOLOGY_HINT_KEYS = ["hp2ExcludedA", "hp2ExcludedB", "hp2Power", "hp2WaterOut"];
   const HEADER_ENTITY_KEYS = [
     "status",
     "uptime",
@@ -924,6 +925,7 @@ const OPENQUATT_RESUME_CLEAR_VALUE = "2000-01-01 00:00:00";
     quickStartModalOpen: true,
     loadingEntities: true,
     entities: {},
+    optionalMissingEntities: {},
     settingsInfoOpen: "",
     settingsInteractionLock: false,
     settingsRenderSignature: "",
@@ -1617,8 +1619,30 @@ const OPENQUATT_RESUME_CLEAR_VALUE = "2000-01-01 00:00:00";
     return "";
   }
 
+  function normalizeInstallationTopologyLabel(value) {
+    const normalized = String(value || "").trim().toLowerCase();
+    if (normalized === "single" || normalized.includes("quatt single") || normalized.includes("openquatt single")) {
+      return "single";
+    }
+    if (normalized === "duo" || normalized.includes("quatt duo") || normalized.includes("openquatt duo")) {
+      return "duo";
+    }
+    return "";
+  }
+
+  function inferInstallationTopologyFromEntities() {
+    if (!Array.isArray(TOPOLOGY_HINT_KEYS)) {
+      return "";
+    }
+    if (TOPOLOGY_HINT_KEYS.some((key) => hasEntity(key))) {
+      return "duo";
+    }
+    const missingHints = state.optionalMissingEntities || {};
+    return TOPOLOGY_HINT_KEYS.every((key) => missingHints[key]) ? "single" : "";
+  }
+
   function rememberInstallationTopology(topology) {
-    const normalized = String(topology || "").trim().toLowerCase();
+    const normalized = normalizeInstallationTopologyLabel(topology);
     if ((normalized === "single" || normalized === "duo") && typeof state !== "undefined" && state && typeof state === "object") {
       state.lastKnownInstallationTopology = normalized;
     }
@@ -1636,14 +1660,19 @@ const OPENQUATT_RESUME_CLEAR_VALUE = "2000-01-01 00:00:00";
   }
 
   function getInstallationTopology() {
-    const entityTopology = String(getEntityValue("installationTopology") || "").trim().toLowerCase();
+    const entityTopology = normalizeInstallationTopologyLabel(getEntityValue("installationTopology"));
     if (entityTopology === "single" || entityTopology === "duo") {
       return rememberInstallationTopology(entityTopology);
     }
 
-    const metaTopology = String(getDeviceMeta().installation || "").trim().toLowerCase();
+    const metaTopology = normalizeInstallationTopologyLabel(getDeviceMeta().installation);
     if (metaTopology === "single" || metaTopology === "duo") {
       return rememberInstallationTopology(metaTopology);
+    }
+
+    const inferredTopology = inferInstallationTopologyFromEntities();
+    if (inferredTopology) {
+      return rememberInstallationTopology(inferredTopology);
     }
 
     return getCachedInstallationTopology();
@@ -3803,6 +3832,7 @@ const OPENQUATT_RESUME_CLEAR_VALUE = "2000-01-01 00:00:00";
   const INITIAL_SETTINGS_READY_POLL_MS = 250;
   const INITIAL_CORE_UI_KEYS = [
     "installationTopology",
+    ...TOPOLOGY_HINT_KEYS,
     "hpGeneration",
     "openquattEnabled",
     "flowControlMode",
@@ -4177,13 +4207,23 @@ const OPENQUATT_RESUME_CLEAR_VALUE = "2000-01-01 00:00:00";
     results.forEach((result, index) => {
       const key = keys[index];
       if (result.status === "fulfilled") {
+        if (state.optionalMissingEntities) {
+          delete state.optionalMissingEntities[key];
+        }
         const { payload } = result.value;
         state.entities[key] = {
           ...(state.entities[key] || {}),
           ...payload,
         };
-      } else if (!ENTITY_DEFS[key]?.optional && !firstError) {
-        firstError = result.reason.message || String(result.reason);
+      } else {
+        const message = result.reason.message || String(result.reason);
+        if (ENTITY_DEFS[key]?.optional) {
+          if (message.includes("HTTP 404")) {
+            state.optionalMissingEntities[key] = true;
+          }
+        } else if (!firstError) {
+          firstError = message;
+        }
       }
     });
 
@@ -5630,6 +5670,9 @@ const OPENQUATT_RESUME_CLEAR_VALUE = "2000-01-01 00:00:00";
   function getEntitySignatureFragment(key) {
     const entity = state.entities[key];
     if (!entity) {
+      if (state.optionalMissingEntities?.[key]) {
+        return `${key}:__optional_missing__`;
+      }
       return `${key}:__missing__`;
     }
 

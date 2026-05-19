@@ -30,8 +30,30 @@
     return "";
   }
 
+  function normalizeInstallationTopologyLabel(value) {
+    const normalized = String(value || "").trim().toLowerCase();
+    if (normalized === "single" || normalized.includes("quatt single") || normalized.includes("openquatt single")) {
+      return "single";
+    }
+    if (normalized === "duo" || normalized.includes("quatt duo") || normalized.includes("openquatt duo")) {
+      return "duo";
+    }
+    return "";
+  }
+
+  function inferInstallationTopologyFromEntities() {
+    if (!Array.isArray(TOPOLOGY_HINT_KEYS)) {
+      return "";
+    }
+    if (TOPOLOGY_HINT_KEYS.some((key) => hasEntity(key))) {
+      return "duo";
+    }
+    const missingHints = state.optionalMissingEntities || {};
+    return TOPOLOGY_HINT_KEYS.every((key) => missingHints[key]) ? "single" : "";
+  }
+
   function rememberInstallationTopology(topology) {
-    const normalized = String(topology || "").trim().toLowerCase();
+    const normalized = normalizeInstallationTopologyLabel(topology);
     if ((normalized === "single" || normalized === "duo") && typeof state !== "undefined" && state && typeof state === "object") {
       state.lastKnownInstallationTopology = normalized;
     }
@@ -49,14 +71,19 @@
   }
 
   function getInstallationTopology() {
-    const entityTopology = String(getEntityValue("installationTopology") || "").trim().toLowerCase();
+    const entityTopology = normalizeInstallationTopologyLabel(getEntityValue("installationTopology"));
     if (entityTopology === "single" || entityTopology === "duo") {
       return rememberInstallationTopology(entityTopology);
     }
 
-    const metaTopology = String(getDeviceMeta().installation || "").trim().toLowerCase();
+    const metaTopology = normalizeInstallationTopologyLabel(getDeviceMeta().installation);
     if (metaTopology === "single" || metaTopology === "duo") {
       return rememberInstallationTopology(metaTopology);
+    }
+
+    const inferredTopology = inferInstallationTopologyFromEntities();
+    if (inferredTopology) {
+      return rememberInstallationTopology(inferredTopology);
     }
 
     return getCachedInstallationTopology();
