@@ -240,35 +240,16 @@
       "flowControlMode",
       "flowSetpoint",
       "manualIpwm",
-      "flowKp",
-      "flowKi",
-      "commissioningStatus",
-      "cm100Active",
-      "commissioningCm100Start",
-      "commissioningCm100Stop",
-      "boilerPowerTestStart",
-      "boilerPowerTestAbort",
-      "boilerPowerTestApply",
-      "boilerPowerTestStatus",
-      "boilerPowerTestResult",
-      "boilerPowerTestActive",
-      "boilerHeatPower",
-      "flowAutotuneStart",
-      "flowAutotuneAbort",
-      "flowAutotuneApply",
-      "flowAutotuneStatus",
-      "flowKpSuggested",
-      "flowKiSuggested",
       "silentStartTime",
       "silentEndTime",
       "maxWater",
     ],
     heating: ["strategy"],
-    cooling: ["coolingWithoutDewPointMode"],
+    cooling: ["manualCoolingEnable", "coolingWithoutDewPointMode"],
     advanced: ["minRuntime"],
-    system: ["setupComplete"],
+    system: ["setupComplete", "projectVersionText", "releaseChannelText", "firmwareUpdateChannel"],
   };
-  const INITIAL_SETTINGS_READY_TIMEOUT_MS = 3500;
+  const INITIAL_SETTINGS_READY_TIMEOUT_MS = 5000;
   const INITIAL_SETTINGS_READY_POLL_MS = 250;
   const INITIAL_CORE_UI_KEYS = [
     "installationTopology",
@@ -746,6 +727,14 @@
     state.mqttError = "";
   }
 
+  function shouldRefreshSupplementaryStatus(lastRefreshAt, options = {}) {
+    if (options.force === true) {
+      return true;
+    }
+    const lastAt = Number(lastRefreshAt || 0);
+    return !lastAt || (Date.now() - lastAt) >= SUPPLEMENTARY_STATUS_REFRESH_INTERVAL_MS;
+  }
+
   function formatMqttPublishProfile(profile) {
     const normalized = String(profile || "").trim().toLowerCase();
     if (normalized === "off") {
@@ -760,7 +749,11 @@
     return "Standard";
   }
 
-  async function refreshAuthStatus() {
+  async function refreshAuthStatus(options = {}) {
+    if (!shouldRefreshSupplementaryStatus(state.lastAuthStatusRefreshAt, options)) {
+      return false;
+    }
+    state.lastAuthStatusRefreshAt = Date.now();
     try {
       const response = await fetch("/auth/status", { cache: "no-store" });
       if (!response.ok) {
@@ -792,7 +785,11 @@
     }
   }
 
-  async function refreshApiSecurityStatus() {
+  async function refreshApiSecurityStatus(options = {}) {
+    if (!shouldRefreshSupplementaryStatus(state.lastApiSecurityStatusRefreshAt, options)) {
+      return false;
+    }
+    state.lastApiSecurityStatusRefreshAt = Date.now();
     try {
       const response = await fetch("/api-security/status", { cache: "no-store" });
       if (!response.ok) {
@@ -863,7 +860,11 @@
     return "Er is nog geen broker opgeslagen.";
   }
 
-  async function refreshMqttStatus() {
+  async function refreshMqttStatus(options = {}) {
+    if (!shouldRefreshSupplementaryStatus(state.lastMqttStatusRefreshAt, options)) {
+      return false;
+    }
+    state.lastMqttStatusRefreshAt = Date.now();
     try {
       const response = await fetch("/mqtt/status", { cache: "no-store" });
       if (!response.ok) {
@@ -965,7 +966,7 @@
       if (!response.ok || !payload.ok) {
         throw new Error(payload.error || `HTTP ${response.status}`);
       }
-      await refreshApiSecurityStatus();
+      await refreshApiSecurityStatus({ force: true });
       state.apiSecurityNotice = "API-beveiliging is opgeslagen. Kopieer de sleutel en kies daarna Opslaan en herstarten.";
       state.apiSecurityError = "";
       render();
@@ -1004,7 +1005,7 @@
       if (!response.ok || !payload.ok) {
         throw new Error(payload.error || `HTTP ${response.status}`);
       }
-      await refreshApiSecurityStatus();
+      await refreshApiSecurityStatus({ force: true });
       state.apiSecurityNotice = "API-sleutel is opgeslagen. Kopieer de nieuwe sleutel en kies daarna Opslaan en herstarten.";
       state.apiSecurityError = "";
       render();
@@ -1049,7 +1050,7 @@
       if (!response.ok || !payload.ok) {
         throw new Error(payload.error || `HTTP ${response.status}`);
       }
-      await refreshApiSecurityStatus();
+      await refreshApiSecurityStatus({ force: true });
       state.apiSecurityNotice = "API-beveiliging is opgeslagen. Kies daarna Opslaan en herstarten om dit toe te passen.";
       state.apiSecurityError = "";
       render();
@@ -1146,7 +1147,7 @@
       if (!response.ok || !payload.ok) {
         throw new Error(payload.error || `HTTP ${response.status}`);
       }
-      await refreshMqttStatus();
+      await refreshMqttStatus({ force: true });
       state.mqttNotice = enabled ? "MQTT staat nu aan." : "MQTT-configuratie opgeslagen.";
       state.mqttError = "";
       render();
@@ -1874,10 +1875,10 @@
       if (state.appView === "overview" || state.appView === "trends") {
         await refreshTrendHistoryData({ force: true });
       }
-      await refreshAuthStatus();
+      await refreshAuthStatus({ force: true });
       if (state.appView === "settings") {
-        await refreshApiSecurityStatus();
-        await refreshMqttStatus();
+        await refreshApiSecurityStatus({ force: true });
+        await refreshMqttStatus({ force: true });
       }
     } finally {
       if (state.mounted && !state.nativeOpen) {
@@ -2469,7 +2470,7 @@
       state.authNotice = "";
       state.authError = "";
       render();
-      void refreshAuthStatus();
+      void refreshAuthStatus({ force: true });
       return;
     }
 
@@ -2478,7 +2479,7 @@
       state.apiSecurityNotice = "";
       state.apiSecurityError = "";
       render();
-      void refreshApiSecurityStatus();
+      void refreshApiSecurityStatus({ force: true });
       return;
     }
 
@@ -2486,7 +2487,7 @@
       state.systemModal = "mqtt";
       syncMqttDraftsFromStatus();
       render();
-      void refreshMqttStatus();
+      void refreshMqttStatus({ force: true });
       return;
     }
 
@@ -3316,7 +3317,7 @@
       if (!response.ok || !payload.ok) {
         throw new Error(payload.error || `HTTP ${response.status}`);
       }
-      await refreshAuthStatus();
+      await refreshAuthStatus({ force: true });
       state.authDraftCurrentPassword = "";
       state.authDraftNewPassword = "";
       state.authDraftConfirmPassword = "";
@@ -3375,7 +3376,7 @@
       if (!response.ok || !payload.ok) {
         throw new Error(payload.error || `HTTP ${response.status}`);
       }
-      await refreshAuthStatus();
+      await refreshAuthStatus({ force: true });
       state.authDraftCurrentPassword = "";
       state.authDraftNewPassword = "";
       state.authDraftConfirmPassword = "";

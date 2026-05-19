@@ -20,12 +20,12 @@ function renderSettingsView() {
               <h2 class="oq-helper-modal-title" id="oq-loading-modal-title">OpenQuatt laden</h2>
             </div>
           </div>
-          <p class="oq-helper-modal-copy">We halen de eerste gegevens op en zetten de interface klaar. De rest vullen we meteen daarna aan op de achtergrond.</p>
+          <p class="oq-helper-modal-copy">We wachten tot de zichtbare gegevens compleet zijn, zodat de interface niet half gevuld verschijnt. Dit kan enkele seconden duren.</p>
           <div class="oq-helper-reconnect-status oq-helper-loading-status">
             <span class="oq-helper-reconnect-spinner" aria-hidden="true"></span>
             <div>
               <strong>Eerste synchronisatie</strong>
-              <span>De belangrijkste data wordt nu opgehaald.</span>
+              <span>De velden op dit scherm worden compleet klaargezet.</span>
             </div>
           </div>
         </section>
