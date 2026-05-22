@@ -859,7 +859,9 @@ const LOGO_MARKUP = `
   const FAST_POLL_INTERVAL_MS = 5000;
   const BULK_POLL_INTERVAL_MS = 10000;
   const STATIC_POLL_INTERVAL_MS = 60000;
+  const CONNECTIVITY_PROBE_TIMEOUT_MS = 1500;
   const SUPPLEMENTARY_STATUS_REFRESH_INTERVAL_MS = 30000;
+  const LOGIN_MODAL_AUTH_STATUS_REFRESH_INTERVAL_MS = 1000;
   const HIDDEN_POLL_INTERVAL_MS = 30000;
   const POLL_JITTER_MIN_MS = 250;
   const POLL_JITTER_MAX_MS = 750;
@@ -886,6 +888,7 @@ const OPENQUATT_RESUME_CLEAR_VALUE = "2000-01-01 00:00:00";
     lastBulkEntitySyncAt: 0,
     lastStaticEntitySyncAt: 0,
     lastAuthStatusRefreshAt: 0,
+    loginAuthStatusPollTimer: null,
     lastApiSecurityStatusRefreshAt: 0,
     lastMqttStatusRefreshAt: 0,
     summary: "",
@@ -914,6 +917,7 @@ const OPENQUATT_RESUME_CLEAR_VALUE = "2000-01-01 00:00:00";
     deviceReconnectLastError: "",
     entitySyncFailureCount: 0,
     lastEntitySyncAt: 0,
+    lastEntityResponseAt: 0,
     overviewMetadataHydrated: false,
     overviewMetadataHydrating: false,
     busyAction: "",
@@ -1540,6 +1544,13 @@ const OPENQUATT_RESUME_CLEAR_VALUE = "2000-01-01 00:00:00";
     const runningBoards = state.root.querySelectorAll(".oq-hp-schematic-board.is-running");
     runningBoards.forEach((board) => {
       board.querySelectorAll(".oq-hp-tech-pipe-flow").forEach((node) => {
+        state.motionTargets.pipeFlows.push(node);
+      });
+    });
+
+    const waterFlowBoards = state.root.querySelectorAll(".oq-hp-schematic-board.is-water-flowing:not(.is-running)");
+    waterFlowBoards.forEach((board) => {
+      board.querySelectorAll('.oq-hp-tech-pipe-flow[data-oq-flow-variant="water"]').forEach((node) => {
         state.motionTargets.pipeFlows.push(node);
       });
     });
@@ -2512,19 +2523,27 @@ const OPENQUATT_RESUME_CLEAR_VALUE = "2000-01-01 00:00:00";
       getEntitySignatureFragment("hpGeneration"),
       getEntitySignatureFragment("projectVersionText"),
       getEntitySignatureFragment("releaseChannelText"),
+      getConnectivityStatus(),
     ].join("|");
   }
 
   function getConnectivityStatus() {
-    if (hasEntity("status") && !isEntityActive("status")) {
-      return "Offline";
+    const lastEntityResponseAt = Math.max(Number(state.lastEntityResponseAt || 0), Number(state.lastEntitySyncAt || 0));
+    const reconnectStartedAt = Number(state.deviceReconnectStartedAt || 0);
+    if (state.entitySyncFailureCount > 0 && !state.deviceReconnectMode) {
+      return "Bezig";
+    }
+    if (lastEntityResponseAt > 0 && (!state.deviceReconnectMode || lastEntityResponseAt >= reconnectStartedAt)) {
+      return "Verbonden";
     }
     if (state.deviceReconnectMode) {
-      return isDeviceReconnectRecovering() ? "Verbonden" : "Bezig";
+      if (isDeviceReconnectRecovering()) {
+        return "Verbonden";
+      }
+      return state.deviceReconnectMode === "reconnect" ? "Offline" : "Bezig";
     }
-    const ip = getDeviceIpAddress();
-    if (ip && ip !== "—") {
-      return "Verbonden";
+    if (hasEntity("status") && !isEntityActive("status")) {
+      return "Offline";
     }
     return "Bezig";
   }
@@ -4184,6 +4203,48 @@ const OPENQUATT_RESUME_CLEAR_VALUE = "2000-01-01 00:00:00";
     }
   }
 
+  async function refreshConnectivityProbe() {
+    const entity = ENTITY_DEFS.status || ENTITY_DEFS.setupComplete;
+    if (!entity) {
+      return { ok: true, message: "" };
+    }
+    const timeoutMs = state.deviceReconnectMode ? RECONNECT_ENTITY_REQUEST_TIMEOUT_MS : CONNECTIVITY_PROBE_TIMEOUT_MS;
+    const url = buildEntityPath(entity.domain, entity.name);
+
+    if (typeof AbortController === "function") {
+      const controller = new AbortController();
+      const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        const response = await fetch(url, { cache: "no-store", signal: controller.signal });
+        state.lastEntityResponseAt = Date.now();
+        return {
+          ok: response.ok || response.status === 404,
+          message: response.ok || response.status === 404 ? "" : `${entity.name} HTTP ${response.status}`,
+        };
+      } catch (error) {
+        return {
+          ok: false,
+          message: controller.signal.aborted
+            ? `${entity.name} request timed out after ${timeoutMs}ms`
+            : error.message || String(error),
+        };
+      } finally {
+        window.clearTimeout(timeoutId);
+      }
+    }
+
+    try {
+      const response = await fetch(url, { cache: "no-store" });
+      state.lastEntityResponseAt = Date.now();
+      return {
+        ok: response.ok || response.status === 404,
+        message: response.ok || response.status === 404 ? "" : `${entity.name} HTTP ${response.status}`,
+      };
+    } catch (error) {
+      return { ok: false, message: error.message || String(error) };
+    }
+  }
+
   async function refreshEntities(keys, detail = "state", options = {}) {
     const requestedConcurrency = Number(options.concurrency);
     const concurrency = Number.isFinite(requestedConcurrency) && requestedConcurrency > 0
@@ -4196,6 +4257,10 @@ const OPENQUATT_RESUME_CLEAR_VALUE = "2000-01-01 00:00:00";
         batch.map(async (key) => ({ key, payload: await fetchEntityPayload(key, detail) }))
       );
       results.push(...batchResults);
+    }
+
+    if (results.some((result) => result.status === "fulfilled")) {
+      state.lastEntityResponseAt = Date.now();
     }
 
     let firstError = "";
@@ -4357,6 +4422,58 @@ const OPENQUATT_RESUME_CLEAR_VALUE = "2000-01-01 00:00:00";
       }
       return false;
     }
+  }
+
+  function shouldPollLoginAuthStatus() {
+    if (state.nativeOpen || state.systemModal !== "login") {
+      return false;
+    }
+    const status = state.authStatus || {};
+    return status.setup_window_active !== true;
+  }
+
+  function stopLoginAuthStatusPolling() {
+    if (!state.loginAuthStatusPollTimer) {
+      return;
+    }
+    window.clearTimeout(state.loginAuthStatusPollTimer);
+    state.loginAuthStatusPollTimer = null;
+  }
+
+  function scheduleLoginAuthStatusPolling(delayMs = LOGIN_MODAL_AUTH_STATUS_REFRESH_INTERVAL_MS) {
+    if (state.loginAuthStatusPollTimer || !shouldPollLoginAuthStatus()) {
+      return;
+    }
+
+    state.loginAuthStatusPollTimer = window.setTimeout(async () => {
+      state.loginAuthStatusPollTimer = null;
+      if (!shouldPollLoginAuthStatus()) {
+        return;
+      }
+      const previousAuthError = state.authError;
+      const changed = await refreshAuthStatus({ force: true });
+      if ((changed || state.authError !== previousAuthError) && state.systemModal === "login") {
+        render();
+      }
+      if (shouldPollLoginAuthStatus()) {
+        scheduleLoginAuthStatusPolling();
+      }
+    }, Math.max(0, Number(delayMs) || 0));
+  }
+
+  async function refreshLoginModalAuthStatus(options = {}) {
+    if (state.systemModal !== "login") {
+      return false;
+    }
+    const previousAuthError = state.authError;
+    const changed = await refreshAuthStatus({ force: true });
+    if ((changed || state.authError !== previousAuthError) && state.systemModal === "login") {
+      render();
+    }
+    if (options.poll !== false && shouldPollLoginAuthStatus()) {
+      scheduleLoginAuthStatusPolling();
+    }
+    return changed;
   }
 
   async function refreshApiSecurityStatus(options = {}) {
@@ -5551,6 +5668,14 @@ const OPENQUATT_RESUME_CLEAR_VALUE = "2000-01-01 00:00:00";
     state.lastEntitySyncAttemptAt = now;
     try {
       const reconnectModeBefore = state.deviceReconnectMode;
+      const probe = await refreshConnectivityProbe();
+      if (!probe.ok) {
+        noteEntityRefreshFailure(probe.message);
+        if (!isPrefetchOverview) {
+          render();
+        }
+        return;
+      }
       await refreshEntities([...new Set(keys)], isPrefetchOverview ? "state" : appView === "settings" ? "all" : "state", {
         concurrency: forceFast && isOverviewLike ? FAST_VIEW_ENTITY_REFRESH_CONCURRENCY : ENTITY_REFRESH_CONCURRENCY,
       });
@@ -5961,6 +6086,7 @@ const OPENQUATT_RESUME_CLEAR_VALUE = "2000-01-01 00:00:00";
         }
         if (state.systemModal) {
           clearSettingsBackupDraft();
+          stopLoginAuthStatusPolling();
           state.systemModal = "";
           shouldRender = true;
         }
@@ -6044,7 +6170,7 @@ const OPENQUATT_RESUME_CLEAR_VALUE = "2000-01-01 00:00:00";
       state.authNotice = "";
       state.authError = "";
       render();
-      void refreshAuthStatus({ force: true });
+      void refreshLoginModalAuthStatus({ poll: true });
       return;
     }
 
@@ -6265,6 +6391,7 @@ const OPENQUATT_RESUME_CLEAR_VALUE = "2000-01-01 00:00:00";
     }
 
     if (action === "close-system-modal") {
+      stopLoginAuthStatusPolling();
       state.systemModal = "";
       state.authDraftCurrentPassword = "";
       state.authDraftNewPassword = "";
@@ -6319,6 +6446,7 @@ const OPENQUATT_RESUME_CLEAR_VALUE = "2000-01-01 00:00:00";
       state.controlNotice = "";
       state.settingsInfoOpen = "";
       state.updateModalOpen = false;
+      stopLoginAuthStatusPolling();
       state.systemModal = "";
       if (state.nativeOpen) {
         void ensureNativeFrontendLoaded();
@@ -7095,6 +7223,7 @@ const OPENQUATT_RESUME_CLEAR_VALUE = "2000-01-01 00:00:00";
         "flowAutotuneApply",
       ].includes(key);
       if (!keepCommissioningModalOpen) {
+        stopLoginAuthStatusPolling();
         state.systemModal = "";
       }
       state.controlNotice = options.successNotice || `${entity.name} gestart.`;
@@ -13492,15 +13621,19 @@ function renderWebServerLogsModal() {
     const powerValue = getEntityNumericValue(keys.power);
     const heatValue = getEntityNumericValue(keys.heat);
     const coolingValue = getEntityNumericValue(keys.cooling);
+    const flowValue = getEntityNumericValue(keys.flow);
     const thermalValue = mode === "Koelen" ? coolingValue : heatValue;
     const animated = running || (!Number.isNaN(freqValue) && freqValue > 0) || (!Number.isNaN(powerValue) && powerValue > 80) || (!Number.isNaN(heatValue) && heatValue > 150);
+    const waterFlowActive = !Number.isNaN(flowValue) && flowValue > 0;
     const statusText = getHeatPumpPanelStatusLabel(mode, animated);
     const failureText = failures === "Geen actieve storingen" ? "Geen storingen" : failures;
     const warningActive = failureText !== "Geen storingen";
     const defrostText = defrostActive ? "Actief" : "Uit";
     const waterOutText = formatHeatPumpReading(keys.waterOut, 1, "°C");
     const waterInText = formatHeatPumpReading(keys.waterIn, 1, "°C");
-    const flowText = formatHeatPumpReading(keys.flow, 0, "L/h");
+    const flowText = Number.isNaN(flowValue)
+      ? getEntityStateText(keys.flow)
+      : formatNumericState(flowValue, 0, getEntityDisplayUnit(keys.flow, "L/h"));
     const evaporatorCoilTempText = formatHeatPumpReading(keys.evaporatorCoilTemp, 1, "°C");
     const innerCoilTempText = formatHeatPumpReading(keys.innerCoilTemp, 1, "°C");
     const outsideTempText = formatHeatPumpReading(keys.outsideTemp, 1, "°C");
@@ -13552,6 +13685,7 @@ function renderWebServerLogsModal() {
       "oq-hp-schematic-board",
       `oq-hp-schematic-board--${accent}`,
       animated ? "is-running" : "",
+      waterFlowActive ? "is-water-flowing" : "",
       fanRunning ? "is-fan-running" : "",
       reverseCycle ? "is-reversed" : "",
       defrostActive ? "is-defrost" : "",
@@ -13563,6 +13697,7 @@ function renderWebServerLogsModal() {
       statusText,
       failureText,
       warningActive,
+      waterFlowActive,
       defrostActive,
       defrostText,
       mode,
@@ -13900,6 +14035,7 @@ function renderWebServerLogsModal() {
       : (!Number.isNaN(heatValue) && heatValue > 20);
     const flowActive = !Number.isNaN(flowValue) && flowValue > 0;
     const heatText = formatNumericState(heatValue, 0, "W");
+    const flowText = formatNumericState(flowValue, 0, "L/h");
     const returnTempText = formatNumericState(getEntityNumericValue(getBoilerReturnTemperatureKey()), 1, "°C");
     const supplyTempText = formatNumericState(getEntityNumericValue("supplyTemp"), 1, "°C");
     const statusText = active ? "Aan" : "Uit";
@@ -13915,6 +14051,7 @@ function renderWebServerLogsModal() {
       active,
       flowActive,
       heatText,
+      flowText,
       returnTempText,
       supplyTempText,
       statusText,
@@ -13926,7 +14063,8 @@ function renderWebServerLogsModal() {
 
   function getBoilerPanelRenderSignature(model = getBoilerPanelModel()) {
     return getRenderSignature({
-      version: "hp-pipe-colors-v1",
+      version: "boiler-visual-mode-v1",
+      visualMode: state.hpVisualMode,
       boardClass: "oq-boiler-card",
     });
   }
@@ -13960,6 +14098,11 @@ function renderWebServerLogsModal() {
     if (heatValue && heatValue.textContent !== model.heatText) {
       heatValue.textContent = model.heatText;
     }
+    panel.querySelectorAll("[data-oq-boiler-flow-value]").forEach((flowValue) => {
+      if (flowValue.textContent !== model.flowText) {
+        flowValue.textContent = model.flowText;
+      }
+    });
     const statusValue = panel.querySelector("[data-oq-boiler-status-value]");
     if (statusValue && statusValue.textContent !== model.statusCopy) {
       statusValue.textContent = model.statusCopy;
@@ -13974,12 +14117,46 @@ function renderWebServerLogsModal() {
     }
   }
 
+  function renderBoilerCompactPanel(model) {
+    return `
+      <section class="oq-overview-hp oq-overview-boiler oq-overview-boiler--compact" data-oq-boiler-panel data-render-signature="${escapeHtml(getBoilerPanelRenderSignature(model))}">
+        <div class="oq-overview-hp-head">
+          <div>
+            <h3>CV-ketel / boiler</h3>
+          </div>
+          <span class="oq-overview-chip oq-overview-chip--${model.active ? "active" : "neutral"}">${escapeHtml(model.statusText)}</span>
+        </div>
+        <div class="oq-overview-hp-stats">
+          <article class="oq-overview-stat oq-overview-stat--orange">
+            <p>Warmteafgifte</p>
+            <strong data-oq-boiler-heat-value>${escapeHtml(model.heatText)}</strong>
+            <span>afgegeven warmte</span>
+          </article>
+          <article class="oq-overview-stat oq-overview-stat--blue">
+            <p>Water in</p>
+            <strong data-oq-bind="boiler-return-value">${escapeHtml(model.returnTempText)}</strong>
+            <span>retour naar boiler</span>
+          </article>
+          <article class="oq-overview-stat oq-overview-stat--sky">
+            <p>Water out</p>
+            <strong data-oq-bind="boiler-supply-value">${escapeHtml(model.supplyTempText)}</strong>
+            <span>naar het systeem</span>
+          </article>
+        </div>
+      </section>
+    `;
+  }
+
   function renderBoilerPanel() {
     if (!shouldRenderBoilerPanel()) {
       return "";
     }
 
     const model = getBoilerPanelModel();
+    if (state.hpVisualMode !== "schematic") {
+      return renderBoilerCompactPanel(model);
+    }
+
     return `
       <section class="oq-overview-hp oq-overview-boiler" data-oq-boiler-panel data-render-signature="${escapeHtml(getBoilerPanelRenderSignature(model))}">
         <div class="${escapeHtml([model.boardClass, model.flowPathClass].filter(Boolean).join(" "))}">

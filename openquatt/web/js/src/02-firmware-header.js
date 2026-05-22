@@ -909,19 +909,27 @@
       getEntitySignatureFragment("hpGeneration"),
       getEntitySignatureFragment("projectVersionText"),
       getEntitySignatureFragment("releaseChannelText"),
+      getConnectivityStatus(),
     ].join("|");
   }
 
   function getConnectivityStatus() {
-    if (hasEntity("status") && !isEntityActive("status")) {
-      return "Offline";
+    const lastEntityResponseAt = Math.max(Number(state.lastEntityResponseAt || 0), Number(state.lastEntitySyncAt || 0));
+    const reconnectStartedAt = Number(state.deviceReconnectStartedAt || 0);
+    if (state.entitySyncFailureCount > 0 && !state.deviceReconnectMode) {
+      return "Bezig";
+    }
+    if (lastEntityResponseAt > 0 && (!state.deviceReconnectMode || lastEntityResponseAt >= reconnectStartedAt)) {
+      return "Verbonden";
     }
     if (state.deviceReconnectMode) {
-      return isDeviceReconnectRecovering() ? "Verbonden" : "Bezig";
+      if (isDeviceReconnectRecovering()) {
+        return "Verbonden";
+      }
+      return state.deviceReconnectMode === "reconnect" ? "Offline" : "Bezig";
     }
-    const ip = getDeviceIpAddress();
-    if (ip && ip !== "—") {
-      return "Verbonden";
+    if (hasEntity("status") && !isEntityActive("status")) {
+      return "Offline";
     }
     return "Bezig";
   }

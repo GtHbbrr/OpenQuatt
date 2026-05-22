@@ -15,6 +15,7 @@
     lastBulkEntitySyncAt: 0,
     lastStaticEntitySyncAt: 0,
     lastAuthStatusRefreshAt: 0,
+    loginAuthStatusPollTimer: null,
     lastApiSecurityStatusRefreshAt: 0,
     lastMqttStatusRefreshAt: 0,
     summary: "",
@@ -43,6 +44,7 @@
     deviceReconnectLastError: "",
     entitySyncFailureCount: 0,
     lastEntitySyncAt: 0,
+    lastEntityResponseAt: 0,
     overviewMetadataHydrated: false,
     overviewMetadataHydrating: false,
     busyAction: "",
@@ -669,6 +671,13 @@
     const runningBoards = state.root.querySelectorAll(".oq-hp-schematic-board.is-running");
     runningBoards.forEach((board) => {
       board.querySelectorAll(".oq-hp-tech-pipe-flow").forEach((node) => {
+        state.motionTargets.pipeFlows.push(node);
+      });
+    });
+
+    const waterFlowBoards = state.root.querySelectorAll(".oq-hp-schematic-board.is-water-flowing:not(.is-running)");
+    waterFlowBoards.forEach((board) => {
+      board.querySelectorAll('.oq-hp-tech-pipe-flow[data-oq-flow-variant="water"]').forEach((node) => {
         state.motionTargets.pipeFlows.push(node);
       });
     });

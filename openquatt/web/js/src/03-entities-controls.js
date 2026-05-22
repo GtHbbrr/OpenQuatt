@@ -610,6 +610,48 @@
     }
   }
 
+  async function refreshConnectivityProbe() {
+    const entity = ENTITY_DEFS.status || ENTITY_DEFS.setupComplete;
+    if (!entity) {
+      return { ok: true, message: "" };
+    }
+    const timeoutMs = state.deviceReconnectMode ? RECONNECT_ENTITY_REQUEST_TIMEOUT_MS : CONNECTIVITY_PROBE_TIMEOUT_MS;
+    const url = buildEntityPath(entity.domain, entity.name);
+
+    if (typeof AbortController === "function") {
+      const controller = new AbortController();
+      const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        const response = await fetch(url, { cache: "no-store", signal: controller.signal });
+        state.lastEntityResponseAt = Date.now();
+        return {
+          ok: response.ok || response.status === 404,
+          message: response.ok || response.status === 404 ? "" : `${entity.name} HTTP ${response.status}`,
+        };
+      } catch (error) {
+        return {
+          ok: false,
+          message: controller.signal.aborted
+            ? `${entity.name} request timed out after ${timeoutMs}ms`
+            : error.message || String(error),
+        };
+      } finally {
+        window.clearTimeout(timeoutId);
+      }
+    }
+
+    try {
+      const response = await fetch(url, { cache: "no-store" });
+      state.lastEntityResponseAt = Date.now();
+      return {
+        ok: response.ok || response.status === 404,
+        message: response.ok || response.status === 404 ? "" : `${entity.name} HTTP ${response.status}`,
+      };
+    } catch (error) {
+      return { ok: false, message: error.message || String(error) };
+    }
+  }
+
   async function refreshEntities(keys, detail = "state", options = {}) {
     const requestedConcurrency = Number(options.concurrency);
     const concurrency = Number.isFinite(requestedConcurrency) && requestedConcurrency > 0
@@ -622,6 +664,10 @@
         batch.map(async (key) => ({ key, payload: await fetchEntityPayload(key, detail) }))
       );
       results.push(...batchResults);
+    }
+
+    if (results.some((result) => result.status === "fulfilled")) {
+      state.lastEntityResponseAt = Date.now();
     }
 
     let firstError = "";
@@ -783,6 +829,58 @@
       }
       return false;
     }
+  }
+
+  function shouldPollLoginAuthStatus() {
+    if (state.nativeOpen || state.systemModal !== "login") {
+      return false;
+    }
+    const status = state.authStatus || {};
+    return status.setup_window_active !== true;
+  }
+
+  function stopLoginAuthStatusPolling() {
+    if (!state.loginAuthStatusPollTimer) {
+      return;
+    }
+    window.clearTimeout(state.loginAuthStatusPollTimer);
+    state.loginAuthStatusPollTimer = null;
+  }
+
+  function scheduleLoginAuthStatusPolling(delayMs = LOGIN_MODAL_AUTH_STATUS_REFRESH_INTERVAL_MS) {
+    if (state.loginAuthStatusPollTimer || !shouldPollLoginAuthStatus()) {
+      return;
+    }
+
+    state.loginAuthStatusPollTimer = window.setTimeout(async () => {
+      state.loginAuthStatusPollTimer = null;
+      if (!shouldPollLoginAuthStatus()) {
+        return;
+      }
+      const previousAuthError = state.authError;
+      const changed = await refreshAuthStatus({ force: true });
+      if ((changed || state.authError !== previousAuthError) && state.systemModal === "login") {
+        render();
+      }
+      if (shouldPollLoginAuthStatus()) {
+        scheduleLoginAuthStatusPolling();
+      }
+    }, Math.max(0, Number(delayMs) || 0));
+  }
+
+  async function refreshLoginModalAuthStatus(options = {}) {
+    if (state.systemModal !== "login") {
+      return false;
+    }
+    const previousAuthError = state.authError;
+    const changed = await refreshAuthStatus({ force: true });
+    if ((changed || state.authError !== previousAuthError) && state.systemModal === "login") {
+      render();
+    }
+    if (options.poll !== false && shouldPollLoginAuthStatus()) {
+      scheduleLoginAuthStatusPolling();
+    }
+    return changed;
   }
 
   async function refreshApiSecurityStatus(options = {}) {
@@ -1977,6 +2075,14 @@
     state.lastEntitySyncAttemptAt = now;
     try {
       const reconnectModeBefore = state.deviceReconnectMode;
+      const probe = await refreshConnectivityProbe();
+      if (!probe.ok) {
+        noteEntityRefreshFailure(probe.message);
+        if (!isPrefetchOverview) {
+          render();
+        }
+        return;
+      }
       await refreshEntities([...new Set(keys)], isPrefetchOverview ? "state" : appView === "settings" ? "all" : "state", {
         concurrency: forceFast && isOverviewLike ? FAST_VIEW_ENTITY_REFRESH_CONCURRENCY : ENTITY_REFRESH_CONCURRENCY,
       });
@@ -2387,6 +2493,7 @@
         }
         if (state.systemModal) {
           clearSettingsBackupDraft();
+          stopLoginAuthStatusPolling();
           state.systemModal = "";
           shouldRender = true;
         }
@@ -2470,7 +2577,7 @@
       state.authNotice = "";
       state.authError = "";
       render();
-      void refreshAuthStatus({ force: true });
+      void refreshLoginModalAuthStatus({ poll: true });
       return;
     }
 
@@ -2691,6 +2798,7 @@
     }
 
     if (action === "close-system-modal") {
+      stopLoginAuthStatusPolling();
       state.systemModal = "";
       state.authDraftCurrentPassword = "";
       state.authDraftNewPassword = "";
@@ -2745,6 +2853,7 @@
       state.controlNotice = "";
       state.settingsInfoOpen = "";
       state.updateModalOpen = false;
+      stopLoginAuthStatusPolling();
       state.systemModal = "";
       if (state.nativeOpen) {
         void ensureNativeFrontendLoaded();
@@ -3521,6 +3630,7 @@
         "flowAutotuneApply",
       ].includes(key);
       if (!keepCommissioningModalOpen) {
+        stopLoginAuthStatusPolling();
         state.systemModal = "";
       }
       state.controlNotice = options.successNotice || `${entity.name} gestart.`;
