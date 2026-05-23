@@ -149,6 +149,7 @@ const LOGO_MARKUP = `
     coolingDemandRaw: { domain: "sensor", name: "Cooling Demand (raw)", optional: true },
     coolingMinimumSupplyTemp: { domain: "number", name: "Cooling Minimum Supply Temp", optional: true },
     coolingDemandMax: { domain: "number", name: "Cooling Demand Max", optional: true },
+    coolingRestartDelta: { domain: "number", name: "Cooling Restart Delta", optional: true },
     coolingSafetyMargin: { domain: "number", name: "Cooling Safety Margin", optional: true },
     coolingRequestOnDelta: { domain: "number", name: "Cooling Request On Delta", optional: true },
     coolingRequestOffDelta: { domain: "number", name: "Cooling Request Off Delta", optional: true },
@@ -430,6 +431,7 @@ const LOGO_MARKUP = `
   const COOLING_SETTING_KEYS = [
     "coolingMinimumSupplyTemp",
     "coolingDemandMax",
+    "coolingRestartDelta",
     "coolingRequestOnDelta",
     "coolingRequestOffDelta",
     "coolingSafetyMargin",
@@ -860,6 +862,7 @@ const LOGO_MARKUP = `
       keys: [
         "coolingMinimumSupplyTemp",
         "coolingDemandMax",
+        "coolingRestartDelta",
         "coolingRequestOnDelta",
         "coolingRequestOffDelta",
         "coolingSafetyMargin",
@@ -7698,6 +7701,32 @@ const OPENQUATT_RESUME_CLEAR_VALUE = "2000-01-01 00:00:00";
     return Number.isNaN(value) ? NaN : value;
   }
 
+  function isEfficiencyKey(key) {
+    const normalized = String(key || "").toLowerCase();
+    return normalized.includes("cop") || normalized.includes("eer");
+  }
+
+  function getDerivedEfficiencyValue(key) {
+    const normalized = String(key || "");
+    if (normalized === "totalEer") {
+      const output = getEntityNumericValue("totalCoolingPower");
+      const input = getEntityNumericValue("coolingPowerInput");
+      const fallbackInput = Number.isNaN(input) ? getEntityNumericValue("totalPower") : input;
+      return (!Number.isNaN(output) && !Number.isNaN(fallbackInput) && fallbackInput >= 5.0)
+        ? output / fallbackInput
+        : NaN;
+    }
+    if (normalized === "totalCop") {
+      const output = getEntityNumericValue("totalHeat");
+      const input = getEntityNumericValue("heatingPowerInput");
+      const fallbackInput = Number.isNaN(input) ? getEntityNumericValue("totalPower") : input;
+      return (!Number.isNaN(output) && !Number.isNaN(fallbackInput) && fallbackInput >= 5.0)
+        ? output / fallbackInput
+        : NaN;
+    }
+    return NaN;
+  }
+
   function getEntityDisplayUnit(key, fallbackUnit = "") {
     const entityUnit = String(state.entities[key]?.uom || "").trim();
     if (entityUnit) {
@@ -7747,15 +7776,20 @@ const OPENQUATT_RESUME_CLEAR_VALUE = "2000-01-01 00:00:00";
 
   function formatOverviewStatValue(key) {
     const entity = state.entities[key];
+    const derived = getDerivedEfficiencyValue(key);
     if (!entity) {
-      return "—";
+      return Number.isNaN(derived) ? "—" : formatNumericState(derived, 1, getEntityDisplayUnit(key));
     }
     const numeric = getEntityNumericValue(key);
     if (Number.isNaN(numeric)) {
+      if (!Number.isNaN(derived)) {
+        return formatNumericState(derived, 1, getEntityDisplayUnit(key));
+      }
       return getEntityStateText(key);
     }
-    const decimals = key.toLowerCase().includes("cop") ? 1 : 0;
-    return formatNumericState(numeric, decimals, getEntityDisplayUnit(key));
+    const value = numeric > 0 || Number.isNaN(derived) ? numeric : derived;
+    const decimals = isEfficiencyKey(key) ? 1 : 0;
+    return formatNumericState(value, decimals, getEntityDisplayUnit(key));
   }
 
   function isEntityActive(key) {
@@ -9289,13 +9323,16 @@ function renderWebServerLogsModal() {
     return renderSettingsFieldCard(key, title, copy, controlMarkup, className, options.footerMarkup || "");
   }
 
-  function renderSettingsSliderField(key, title, copy, className = "") {
+  function renderSettingsSliderField(key, title, copy, className = "", options = {}) {
     if (!hasEntity(key)) {
       return "";
     }
     const meta = getNumberMeta(key);
     const value = normalizeNumber(key, getEntityValue(key));
-    return renderSettingsFieldCard(key, title, copy, `<label class="oq-helper-slider-field"><div class="oq-helper-slider-meta"><span>${escapeHtml(meta.min)}${escapeHtml(meta.uom || "")}</span><strong>${escapeHtml(formatValue(key, value))}</strong><span>${escapeHtml(meta.max)}${escapeHtml(meta.uom || "")}</span></div><input class="oq-helper-range" type="range" data-oq-field="${escapeHtml(key)}" min="${meta.min}" max="${meta.max}" step="${meta.step}" value="${value}" ${state.loadingEntities ? "disabled" : ""}></label>`, className);
+    const minLabel = options.minLabel || `${meta.min}${meta.uom || ""}`;
+    const maxLabel = options.maxLabel || `${meta.max}${meta.uom || ""}`;
+    const valueLabel = options.valueLabel || formatValue(key, value);
+    return renderSettingsFieldCard(key, title, copy, `<label class="oq-helper-slider-field"><div class="oq-helper-slider-meta"><span>${escapeHtml(minLabel)}</span><strong>${escapeHtml(valueLabel)}</strong><span>${escapeHtml(maxLabel)}</span></div><input class="oq-helper-range" type="range" data-oq-field="${escapeHtml(key)}" min="${meta.min}" max="${meta.max}" step="${meta.step}" value="${value}" ${state.loadingEntities ? "disabled" : ""}></label>`, className);
   }
 
   function renderSettingsMiniNumberField(key, title, copy, options = {}) {
@@ -11286,8 +11323,13 @@ function renderWebServerLogsModal() {
 
   function renderSettingsCoolingSection() {
     const tuningFields = [
-      renderSettingsNumberField("coolingMinimumSupplyTemp", "Minimale koel-aanvoer", "Ondergrens voor de aanvoertemperatuur waar de koelregeling op mag mikken."),
-      renderSettingsNumberField("coolingDemandMax", "Maximale koelvraag", "Bovengrens voor de koelvraag die de regelaar mag opbouwen."),
+      renderSettingsNumberField("coolingMinimumSupplyTemp", "Minimale koel-aanvoer", "Ondergrens voor het koeldoel. OpenQuatt gebruikt de hoogste waarde van deze instelling en de dauwpuntveilige grens."),
+      renderSettingsSliderField("coolingDemandMax", "Maximale koelsterkte", "Bepaalt hoe krachtig OpenQuatt mag koelen. Lager geeft langere, rustigere runs; hoger geeft meer koelvermogen bij warm weer.", "", {
+        minLabel: "Rustig",
+        maxLabel: "Krachtig",
+        valueLabel: `${formatValue("coolingDemandMax")} max`,
+      }),
+      renderSettingsNumberField("coolingRestartDelta", "Herstartmarge watertemperatuur", "Na het bereiken van het koel-aanvoerdoel start de watercyclus pas opnieuw zodra de aanvoer deze marge boven het doel ligt."),
       renderSettingsNumberField("coolingRequestOnDelta", "Koelvraag start boven setpoint", "Koelvraag wordt actief zodra de kamer warmer is dan setpoint plus deze marge."),
       renderSettingsNumberField("coolingRequestOffDelta", "Koelvraag stopt boven setpoint", "Koelvraag valt weer af zodra de kamer koeler is dan setpoint plus deze marge."),
       renderSettingsNumberField("coolingSafetyMargin", "Dauwpunt veiligheidsmarge", "Extra marge boven het geselecteerde dauwpunt voor de minimale veilige watertemperatuur."),
@@ -11312,72 +11354,72 @@ function renderWebServerLogsModal() {
     return renderSettingsSection(
       "Koeling",
       "Koelingsinstellingen",
-      "Stel hier in wanneer koelvraag ontstaat, hoe ver de regeling mag koelen en welke dauwpuntmarge gebruikt wordt.",
+      "Stel hier in wanneer koelvraag ontstaat, hoe koud het water mag worden en hoeveel het water mag opwarmen voor herstart.",
       `
         ${tuningFields.length ? `
           <div class="oq-settings-grid">
             ${tuningFields.join("")}
           </div>
         ` : ""}
-        ${hasFallbackSettings ? `
-          <details class="oq-settings-callout oq-settings-callout--cooling">
-          <summary>Fallback-regel bekijken</summary>
-          <div class="oq-settings-callout-body">
-            <p>Onder de 20°C buiten blijft fallback-cooling uit. Daarboven gebruikt OpenQuatt 19/20/21/22°C als minimum water, met extra correctie voor warme nachten.</p>
-            <div class="oq-settings-rule-groups">
-              <section class="oq-settings-rule-group">
-                <h4>Buitentemperatuur</h4>
-                <div class="oq-settings-rule-table">
-                  <div class="oq-settings-rule-row">
-                    <span class="oq-settings-rule-key">Onder 20°C</span>
-                    <span class="oq-settings-rule-value">Uit</span>
-                  </div>
-                  <div class="oq-settings-rule-row">
-                    <span class="oq-settings-rule-key">20-24°C</span>
-                    <span class="oq-settings-rule-value">Min. water 19°C</span>
-                  </div>
-                  <div class="oq-settings-rule-row">
-                    <span class="oq-settings-rule-key">24-28°C</span>
-                    <span class="oq-settings-rule-value">Min. water 20°C</span>
-                  </div>
-                  <div class="oq-settings-rule-row">
-                    <span class="oq-settings-rule-key">28-32°C</span>
-                    <span class="oq-settings-rule-value">Min. water 21°C</span>
-                  </div>
-                  <div class="oq-settings-rule-row">
-                    <span class="oq-settings-rule-key">Boven 32°C</span>
-                    <span class="oq-settings-rule-value">Min. water 22°C</span>
-                  </div>
-                </div>
-              </section>
-              <section class="oq-settings-rule-group">
-                <h4>Nachtcorrectie</h4>
-                <div class="oq-settings-rule-table">
-                  <div class="oq-settings-rule-row">
-                    <span class="oq-settings-rule-key">Onder 18°C</span>
-                    <span class="oq-settings-rule-value">+0°C</span>
-                  </div>
-                  <div class="oq-settings-rule-row">
-                    <span class="oq-settings-rule-key">18-19°C</span>
-                    <span class="oq-settings-rule-value">+1°C</span>
-                  </div>
-                  <div class="oq-settings-rule-row">
-                    <span class="oq-settings-rule-key">19-20°C</span>
-                    <span class="oq-settings-rule-value">+2°C</span>
-                  </div>
-                  <div class="oq-settings-rule-row">
-                    <span class="oq-settings-rule-key">Vanaf 20°C</span>
-                    <span class="oq-settings-rule-value">Fallback uit</span>
-                  </div>
-                </div>
-              </section>
-            </div>
-          </div>
-        </details>
-        ` : ""}
         ${(hasFallbackSettings || fallbackStatusFields.length) ? `
           <div class="oq-settings-grid">
             ${hasFallbackSettings ? renderSettingsOptionCardsField("coolingWithoutDewPointMode", "Koeling zonder dauwpuntbeveiliging", "Kies of OpenQuatt zonder dauwpuntbron volledig moet blokkeren, of een conservatieve fallback mag gebruiken.", fallbackModeCopy, "oq-settings-field--span-2") : ""}
+            ${hasFallbackSettings ? `
+              <details class="oq-settings-callout oq-settings-callout--cooling oq-settings-callout--inline">
+              <summary>Fallback-regel bekijken</summary>
+              <div class="oq-settings-callout-body">
+                <p>Onder de 20°C buiten blijft fallback-cooling uit. Daarboven gebruikt OpenQuatt 19/20/21/22°C als minimum water, met extra correctie voor warme nachten.</p>
+                <div class="oq-settings-rule-groups">
+                  <section class="oq-settings-rule-group">
+                    <h4>Buitentemperatuur</h4>
+                    <div class="oq-settings-rule-table">
+                      <div class="oq-settings-rule-row">
+                        <span class="oq-settings-rule-key">Onder 20°C</span>
+                        <span class="oq-settings-rule-value">Uit</span>
+                      </div>
+                      <div class="oq-settings-rule-row">
+                        <span class="oq-settings-rule-key">20-24°C</span>
+                        <span class="oq-settings-rule-value">Min. water 19°C</span>
+                      </div>
+                      <div class="oq-settings-rule-row">
+                        <span class="oq-settings-rule-key">24-28°C</span>
+                        <span class="oq-settings-rule-value">Min. water 20°C</span>
+                      </div>
+                      <div class="oq-settings-rule-row">
+                        <span class="oq-settings-rule-key">28-32°C</span>
+                        <span class="oq-settings-rule-value">Min. water 21°C</span>
+                      </div>
+                      <div class="oq-settings-rule-row">
+                        <span class="oq-settings-rule-key">Boven 32°C</span>
+                        <span class="oq-settings-rule-value">Min. water 22°C</span>
+                      </div>
+                    </div>
+                  </section>
+                  <section class="oq-settings-rule-group">
+                    <h4>Nachtcorrectie</h4>
+                    <div class="oq-settings-rule-table">
+                      <div class="oq-settings-rule-row">
+                        <span class="oq-settings-rule-key">Onder 18°C</span>
+                        <span class="oq-settings-rule-value">+0°C</span>
+                      </div>
+                      <div class="oq-settings-rule-row">
+                        <span class="oq-settings-rule-key">18-19°C</span>
+                        <span class="oq-settings-rule-value">+1°C</span>
+                      </div>
+                      <div class="oq-settings-rule-row">
+                        <span class="oq-settings-rule-key">19-20°C</span>
+                        <span class="oq-settings-rule-value">+2°C</span>
+                      </div>
+                      <div class="oq-settings-rule-row">
+                        <span class="oq-settings-rule-key">Vanaf 20°C</span>
+                        <span class="oq-settings-rule-value">Fallback uit</span>
+                      </div>
+                    </div>
+                  </section>
+                </div>
+              </div>
+            </details>
+            ` : ""}
             ${fallbackStatusFields.join("")}
           </div>
         ` : ""}
@@ -12603,7 +12645,7 @@ function renderWebServerLogsModal() {
     if (isCoolingOverviewActive()) {
       return {
         title: "Koeltemperaturen",
-        copy: "De belangrijkste temperaturen voor koeldoel, dauwpuntveiligheid en comfort.",
+        copy: "De belangrijkste temperaturen voor kamercomfort, koeldoel en dauwpuntveiligheid.",
         rows: [
           { label: "Kamertemperatuur", key: "roomTemp" },
           { label: "Kamer setpoint", key: "roomSetpoint" },
@@ -13532,13 +13574,15 @@ function renderWebServerLogsModal() {
 
 /* --- js/src/30-energy.js --- */
   function renderOverviewEnergyRow([label, key]) {
-    if (!hasEntity(key)) {
+    const derived = getDerivedEfficiencyValue(key);
+    if (!hasEntity(key) && Number.isNaN(derived)) {
       return "";
     }
+    const value = isEfficiencyKey(key) ? formatOverviewStatValue(key) : getEntityStateText(key);
     return `
       <div class="oq-overview-energy-row">
         <span>${escapeHtml(label)}</span>
-        <strong>${escapeHtml(getEntityStateText(key))}</strong>
+        <strong>${escapeHtml(value)}</strong>
       </div>
     `;
   }

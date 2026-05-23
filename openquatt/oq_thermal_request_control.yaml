@@ -505,7 +505,7 @@ sensor:
     unit_of_measurement: "lvl"
     state_class: measurement
     accuracy_decimals: 0
-    update_interval: ${oq_diagnostic_update_interval_s}s
+    update_interval: 5s
     web_server:
       sorting_group_id: oq_heating_strategy
     lambda: |-
@@ -522,7 +522,7 @@ sensor:
     unit_of_measurement: "lvl"
     state_class: measurement
     accuracy_decimals: 0
-    update_interval: ${oq_diagnostic_update_interval_s}s
+    update_interval: 5s
     web_server:
       sorting_group_id: oq_heating_strategy
     lambda: |-
@@ -634,7 +634,12 @@ interval:
           const int control_flavor_code = is_cooling_mode ? 2 : heat_mode_code;
           const char* active_thermal_mode_opt = is_cooling_mode ? "Cooling" : "Heating";
           const int active_thermal_mode_code = is_cooling_mode ? 1 : 2;
-          const uint32_t loop_target_ms = (uint32_t) ((is_curve_mode ? ${oq_heat_loop_curve_s} : ${oq_heat_loop_powerhouse_s}) * 1000UL);
+          // Cooling has its own water-side dwell/limiter and must react quickly
+          // after that limiter changes demand. Do not route CM5 through the
+          // slower heating-curve cadence.
+          const uint32_t loop_target_ms = (uint32_t) (
+              (is_cooling_mode ? ${oq_heat_loop_tick_s} :
+               (is_curve_mode ? ${oq_heat_loop_curve_s} : ${oq_heat_loop_powerhouse_s})) * 1000UL);
 
           // After any controller reboot we intentionally keep the compressors blocked for a while.
           // This makes the compressor restart guard reboot-safe without relying on lost pre-crash timestamps.
@@ -1171,10 +1176,10 @@ interval:
 
           // =========================
           // 4b) Explicit per-HP slew-rate limiting for non-Power-House modes.
-          //    - max 1 level step per change
-          //    - asymmetrical hold: slower up, faster down
-          //    - the strategy owns curve dispatch semantics; this block only
-          //      shapes physical actuator movement
+          //    - Heating Curve keeps its profile hold times here.
+          //    - Cooling already has water-side dwell/limiter timing upstream, so
+          //      this layer only prevents multi-level upward jumps and lets
+          //      downward corrections pass immediately.
           // =========================
           if (!is_power_house) {
             const int curve_regime = id(oq_curve_regime_code);
@@ -1194,8 +1199,10 @@ interval:
 
               int limited = req_level;
               if (limited > prev + 1) limited = prev + 1;
-              if (limited < prev - 1) limited = prev - 1;
+              if (!is_cooling_mode && limited < prev - 1) limited = prev - 1;
               if (limited == prev) return limited;
+
+              if (is_cooling_mode) return limited;
 
               const bool moving_up = limited > prev;
               const uint32_t hold_ms = (uint32_t) ((moving_up ? up_hold_s : down_hold_s) * 1000UL);
