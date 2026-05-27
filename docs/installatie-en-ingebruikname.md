@@ -31,7 +31,7 @@ Gebruik [Handmatige installatie](handmatige-installatie.md) alleen als fallback.
 ## Benodigdheden
 
 - een ondersteund ESP32-bord:
-  - Electropaultje Heatpump Controller Q-edition, aanbevolen voor nieuwe installaties
+  - [Electropaultje Heatpump Controller Q-edition](https://electropaultje.nl/product/heatpump-controller-quatt-edition/), aanbevolen voor nieuwe installaties
   - Waveshare ESP32-S3-Relay-1CH
   - Electropaultje Heatpump Listener
 - een USB-kabel voor de eerste flash
@@ -41,7 +41,7 @@ Gebruik [Handmatige installatie](handmatige-installatie.md) alleen als fallback.
 
 ## Kies het juiste profiel in de installer
 
-Kies in de installer altijd exact de combinatie van je opstelling, hardware en verbinding. Voor nieuwe installaties is de Heatpump Controller Q-edition de voorkeursmodule.
+Kies in de installer altijd exact de combinatie van je opstelling, hardware en verbinding. Voor nieuwe installaties is de [Heatpump Controller Q-edition](https://electropaultje.nl/product/heatpump-controller-quatt-edition/) de voorkeursmodule.
 
 OpenQuatt ondersteunt Quatt Hybrid V1, V1.5 en V2. Die versie kies je na het flashen in de Quick Start van de web-app.
 

@@ -276,7 +276,7 @@ Hardware profile substitutions are split into dedicated files:
 
 - `openquatt/profiles/waveshare.yaml` ([Waveshare ESP32-S3-Relay-1CH](https://www.waveshare.com/esp32-s3-relay-1ch.htm))
 - `openquatt/profiles/heatpump_listener.yaml` ([Electropaultje Heatpump Listener](https://electropaultje.nl/product/heatpump-listener/))
-- `openquatt/profiles/heatpump_controller_q.yaml` (Electropaultje Heatpump Controller Q-edition)
+- `openquatt/profiles/heatpump_controller_q.yaml` ([Electropaultje Heatpump Controller Q-edition](https://electropaultje.nl/product/heatpump-controller-quatt-edition/))
 
 Shared non-hardware constants are in `openquatt/oq_substitutions_common.yaml`.
 
