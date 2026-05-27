@@ -1304,14 +1304,19 @@ return "";
 }
 return view;
 }
+function normalizeUrlToken(value) {
+return String(value || "").trim().toLowerCase();
+}
 function getUrlAppView() {
 try {
 const url = new URL(window.location.href);
-const queryView = normalizeAppView(url.searchParams.get("view") || "");
+const rawQueryView = normalizeUrlToken(url.searchParams.get("view") || "");
+const queryView = normalizeAppView(rawQueryView);
 if (queryView) {
 return queryView;
 }
-const hashView = normalizeAppView(url.hash.replace(/^#/, ""));
+const rawHashView = normalizeUrlToken(url.hash.replace(/^#/, ""));
+const hashView = normalizeAppView(rawHashView);
 return hashView || "";
 } catch (_error) {
 return "";
@@ -1320,8 +1325,15 @@ return "";
 function getUrlSettingsGroup() {
 try {
 const url = new URL(window.location.href);
-const group = String(url.searchParams.get("section") || "");
-return SETTINGS_GROUP_IDS.has(group) ? group : "";
+const section = normalizeUrlToken(url.searchParams.get("section") || "");
+if (SETTINGS_GROUP_IDS.has(section)) {
+return section;
+}
+const legacyGroup = normalizeUrlToken(url.searchParams.get("group") || "");
+if (SETTINGS_GROUP_IDS.has(legacyGroup)) {
+return legacyGroup;
+}
+return "";
 } catch (_error) {
 return "";
 }
@@ -1455,14 +1467,12 @@ root.addEventListener("mouseout", handleSettingsInteractionEnd);
 root.addEventListener("pointerdown", handlePointerDown);
 state.root = root;
 bindReducedMotionPreference();
-const initialUrlView = getUrlAppView();
+const initialUrlView = getUrlAppView() || getDefaultAppView();
 const initialUrlSettingsGroup = initialUrlView === "settings" ? getUrlSettingsGroup() : "";
 if (initialUrlSettingsGroup) {
 setSettingsGroup(initialUrlSettingsGroup, { syncUrl: false });
 }
-if (initialUrlView) {
 setAppView(initialUrlView, { syncMode: "replace", forceSync: true });
-}
 clearLegacyMotionVariables();
 render();
 }
@@ -3788,7 +3798,7 @@ const INITIAL_OVERVIEW_READY_KEYS = [
 "totalCoolingPower",
 ];
 const INITIAL_OVERVIEW_TEXT_KEYS = ["strategy", "controlModeLabel", "hpGeneration"];
-const INITIAL_OVERVIEW_NUMERIC_KEYS = ["totalPower", "flowSelected", "totalCop"];
+const INITIAL_OVERVIEW_NUMERIC_KEYS = ["totalPower", "flowSelected"];
 const INITIAL_OVERVIEW_THERMAL_KEYS = ["totalHeat", "totalCoolingPower"];
 const INITIAL_OVERVIEW_READY_TIMEOUT_MS = 2000;
 const INITIAL_OVERVIEW_READY_POLL_MS = 250;
@@ -14276,6 +14286,15 @@ return `
 </div>
 `;
 }
+function renderCurrentAppView() {
+return state.appView === "overview"
+? renderOverviewView()
+: state.appView === "trends"
+? renderTrendsView()
+: state.appView === "energy"
+? renderEnergyView()
+: renderSettingsView();
+}
 function getActiveDevControlSelect() {
 const active = typeof document !== "undefined" ? document.activeElement : null;
 if (!active || typeof active.matches !== "function") {
@@ -14333,15 +14352,10 @@ queueCm100CommissioningScrollRestore(cm100CommissioningScrollState);
 queueQuickStartScrollRestore(quickStartScrollState);
 return;
 }
+const currentViewContent = renderCurrentAppView();
 const mainContent = state.loadingEntities
-? renderInitialLoadingView()
-: state.appView === "overview"
-? renderOverviewView()
-: state.appView === "trends"
-? renderTrendsView()
-: state.appView === "energy"
-? renderEnergyView()
-: renderSettingsView();
+? `${currentViewContent}${renderInitialLoadingView()}`
+: currentViewContent;
 const wideFlushCard = state.appView === "overview" || state.appView === "trends" || state.appView === "energy";
 state.root.innerHTML = `
 ${renderDevPanel()}

@@ -232,7 +232,7 @@
     "totalCoolingPower",
   ];
   const INITIAL_OVERVIEW_TEXT_KEYS = ["strategy", "controlModeLabel", "hpGeneration"];
-  const INITIAL_OVERVIEW_NUMERIC_KEYS = ["totalPower", "flowSelected", "totalCop"];
+  const INITIAL_OVERVIEW_NUMERIC_KEYS = ["totalPower", "flowSelected"];
   const INITIAL_OVERVIEW_THERMAL_KEYS = ["totalHeat", "totalCoolingPower"];
   const INITIAL_OVERVIEW_READY_TIMEOUT_MS = 2000;
   const INITIAL_OVERVIEW_READY_POLL_MS = 250;

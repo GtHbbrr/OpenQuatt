@@ -441,15 +441,21 @@
     return view;
   }
 
+  function normalizeUrlToken(value) {
+    return String(value || "").trim().toLowerCase();
+  }
+
   function getUrlAppView() {
     try {
       const url = new URL(window.location.href);
-      const queryView = normalizeAppView(url.searchParams.get("view") || "");
+      const rawQueryView = normalizeUrlToken(url.searchParams.get("view") || "");
+      const queryView = normalizeAppView(rawQueryView);
       if (queryView) {
         return queryView;
       }
 
-      const hashView = normalizeAppView(url.hash.replace(/^#/, ""));
+      const rawHashView = normalizeUrlToken(url.hash.replace(/^#/, ""));
+      const hashView = normalizeAppView(rawHashView);
       return hashView || "";
     } catch (_error) {
       return "";
@@ -459,8 +465,17 @@
   function getUrlSettingsGroup() {
     try {
       const url = new URL(window.location.href);
-      const group = String(url.searchParams.get("section") || "");
-      return SETTINGS_GROUP_IDS.has(group) ? group : "";
+      const section = normalizeUrlToken(url.searchParams.get("section") || "");
+      if (SETTINGS_GROUP_IDS.has(section)) {
+        return section;
+      }
+
+      const legacyGroup = normalizeUrlToken(url.searchParams.get("group") || "");
+      if (SETTINGS_GROUP_IDS.has(legacyGroup)) {
+        return legacyGroup;
+      }
+
+      return "";
     } catch (_error) {
       return "";
     }
@@ -614,14 +629,12 @@
     root.addEventListener("pointerdown", handlePointerDown);
     state.root = root;
     bindReducedMotionPreference();
-    const initialUrlView = getUrlAppView();
+    const initialUrlView = getUrlAppView() || getDefaultAppView();
     const initialUrlSettingsGroup = initialUrlView === "settings" ? getUrlSettingsGroup() : "";
     if (initialUrlSettingsGroup) {
       setSettingsGroup(initialUrlSettingsGroup, { syncUrl: false });
     }
-    if (initialUrlView) {
-      setAppView(initialUrlView, { syncMode: "replace", forceSync: true });
-    }
+    setAppView(initialUrlView, { syncMode: "replace", forceSync: true });
     clearLegacyMotionVariables();
     render();
   }

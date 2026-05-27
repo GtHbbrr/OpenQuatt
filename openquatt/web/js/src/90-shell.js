@@ -33,6 +33,16 @@ function renderSettingsView() {
     `;
   }
 
+  function renderCurrentAppView() {
+    return state.appView === "overview"
+      ? renderOverviewView()
+      : state.appView === "trends"
+      ? renderTrendsView()
+      : state.appView === "energy"
+      ? renderEnergyView()
+      : renderSettingsView();
+  }
+
   function getActiveDevControlSelect() {
     const active = typeof document !== "undefined" ? document.activeElement : null;
     if (!active || typeof active.matches !== "function") {
@@ -97,15 +107,10 @@ function renderSettingsView() {
       return;
     }
 
+    const currentViewContent = renderCurrentAppView();
     const mainContent = state.loadingEntities
-      ? renderInitialLoadingView()
-      : state.appView === "overview"
-      ? renderOverviewView()
-      : state.appView === "trends"
-      ? renderTrendsView()
-      : state.appView === "energy"
-      ? renderEnergyView()
-      : renderSettingsView();
+      ? `${currentViewContent}${renderInitialLoadingView()}`
+      : currentViewContent;
     const wideFlushCard = state.appView === "overview" || state.appView === "trends" || state.appView === "energy";
 
     state.root.innerHTML = `
