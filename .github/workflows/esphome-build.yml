@@ -43,7 +43,7 @@ jobs:
     needs: target-matrix
     strategy:
       fail-fast: false
-      max-parallel: 4
+      max-parallel: 8
       matrix: ${{ fromJson(needs.target-matrix.outputs.matrix) }}
 
     steps:
@@ -70,21 +70,6 @@ jobs:
           ESPHOME_VERSION="$(cat .github/requirements-esphome.txt | sed 's/^esphome==//')"
           pip install --upgrade "esphome==${ESPHOME_VERSION}"
           esphome version
-
-      - name: Validate config
-        run: |
-          EXTRA_ARGS=()
-          if [[ -n "${{ inputs.project_version }}" ]]; then
-            EXTRA_ARGS+=(-s project_version "${{ inputs.project_version }}")
-          fi
-          if [[ -n "${{ inputs.release_channel }}" ]]; then
-            EXTRA_ARGS+=(-s release_channel "${{ inputs.release_channel }}")
-          fi
-          if [[ -n "${{ inputs.release_manifest_tag }}" ]]; then
-            RELEASE_MANIFEST_URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${{ inputs.release_manifest_tag }}/${{ matrix.target.manifest_name }}"
-            EXTRA_ARGS+=(-s release_manifest_url "${RELEASE_MANIFEST_URL}")
-          fi
-          esphome "${EXTRA_ARGS[@]}" config "${{ matrix.target.config }}"
 
       - name: Compile firmware
         run: |
