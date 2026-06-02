@@ -167,6 +167,34 @@ flowControlMode: { domain: "select", name: "Flow Control Mode" },
 flowSetpoint: { domain: "number", name: "Flow Setpoint" },
 coolingFlowSetpoint: { domain: "number", name: "Cooling Flow Setpoint", optional: true },
 manualIpwm: { domain: "number", name: "Manual iPWM" },
+compressorStarts2hWarningLimit: { domain: "number", name: "Compressor starts 2h warning limit", optional: true },
+compressorStarts72hWarningLimit: { domain: "number", name: "Compressor starts 72h warning limit", optional: true },
+compressorCyclingWarning2h: { domain: "binary_sensor", name: "Compressor cycling warning 2h", optional: true },
+compressorCyclingWarning72h: { domain: "binary_sensor", name: "Compressor cycling warning 72h", optional: true },
+alternatingCompressorStartsWarning: { domain: "binary_sensor", name: "Alternating compressor starts warning", optional: true },
+compressorCyclingAlertLatched: { domain: "binary_sensor", name: "Compressor cycling alert latched", optional: true },
+compressorCyclingAlertAlternating: { domain: "binary_sensor", name: "Compressor cycling alert alternating", optional: true },
+compressorCyclingAlertFirstSeen: { domain: "sensor", name: "Compressor cycling alert first seen", optional: true },
+compressorCyclingAlertLastSeen: { domain: "sensor", name: "Compressor cycling alert last seen", optional: true },
+compressorCyclingAlertHp1Peak2h: { domain: "sensor", name: "Compressor cycling alert HP1 peak 2h", optional: true },
+compressorCyclingAlertHp1Peak72h: { domain: "sensor", name: "Compressor cycling alert HP1 peak 72h", optional: true },
+compressorCyclingAlertHp2Peak2h: { domain: "sensor", name: "Compressor cycling alert HP2 peak 2h", optional: true },
+compressorCyclingAlertHp2Peak72h: { domain: "sensor", name: "Compressor cycling alert HP2 peak 72h", optional: true },
+acknowledgeCompressorCyclingAlert: { domain: "button", name: "Acknowledge compressor cycling alert", optional: true },
+hp1CompressorStarts2h: { domain: "sensor", name: "HP1 - Compressor starts 2h", optional: true },
+hp1CompressorStarts6h: { domain: "sensor", name: "HP1 - Compressor starts 6h", optional: true },
+hp1CompressorStarts24h: { domain: "sensor", name: "HP1 - Compressor starts 24h", optional: true },
+hp1CompressorStarts72h: { domain: "sensor", name: "HP1 - Compressor starts 72h", optional: true },
+hp1CompressorLastStartAge: { domain: "sensor", name: "HP1 - Compressor last start age", optional: true },
+hp2CompressorStarts2h: { domain: "sensor", name: "HP2 - Compressor starts 2h", optional: true },
+hp2CompressorStarts6h: { domain: "sensor", name: "HP2 - Compressor starts 6h", optional: true },
+hp2CompressorStarts24h: { domain: "sensor", name: "HP2 - Compressor starts 24h", optional: true },
+hp2CompressorStarts72h: { domain: "sensor", name: "HP2 - Compressor starts 72h", optional: true },
+hp2CompressorLastStartAge: { domain: "sensor", name: "HP2 - Compressor last start age", optional: true },
+lowflowFaultActive: { domain: "binary_sensor", name: "Lowflow fault active", optional: true },
+flowMismatch: { domain: "binary_sensor", name: "Flow mismatch (HP1 vs HP2)", optional: true },
+cicDataStale: { domain: "binary_sensor", name: "CIC - Data stale", optional: true },
+otLinkProblem: { domain: "binary_sensor", name: "OT - Link Problem", optional: true },
 flowKp: { domain: "number", name: "Flow PI Kp", optional: true },
 flowKi: { domain: "number", name: "Flow PI Ki", optional: true },
 boilerRatedHeatPower: { domain: "number", name: "Boiler rated heat power", optional: true },
@@ -442,6 +470,50 @@ const POWER_HOUSE_KEYS = [
 const LIMIT_KEYS = ["dayMax", "silentMax", "maxWater"];
 const FLOW_SETTING_KEYS = ["flowControlMode", "flowSetpoint", "coolingFlowSetpoint", "manualIpwm"];
 const FLOW_TUNING_KEYS = ["flowKp", "flowKi"];
+const INSTALLATION_MONITORING_STATE_KEYS = [
+"compressorStarts2hWarningLimit",
+"compressorStarts72hWarningLimit",
+"compressorCyclingWarning2h",
+"compressorCyclingWarning72h",
+"alternatingCompressorStartsWarning",
+"compressorCyclingAlertLatched",
+"compressorCyclingAlertAlternating",
+"compressorCyclingAlertFirstSeen",
+"compressorCyclingAlertLastSeen",
+"compressorCyclingAlertHp1Peak2h",
+"compressorCyclingAlertHp1Peak72h",
+"compressorCyclingAlertHp2Peak2h",
+"compressorCyclingAlertHp2Peak72h",
+"acknowledgeCompressorCyclingAlert",
+"hp1CompressorStarts2h",
+"hp1CompressorStarts6h",
+"hp1CompressorStarts24h",
+"hp1CompressorStarts72h",
+"hp1CompressorLastStartAge",
+"hp2CompressorStarts2h",
+"hp2CompressorStarts6h",
+"hp2CompressorStarts24h",
+"hp2CompressorStarts72h",
+"hp2CompressorLastStartAge",
+"lowflowFaultActive",
+"flowMismatch",
+"cicDataStale",
+"otLinkProblem",
+"hp1Failures",
+"hp2Failures",
+];
+const INSTALLATION_MONITORING_OVERVIEW_KEYS = [
+"compressorCyclingWarning2h",
+"compressorCyclingWarning72h",
+"alternatingCompressorStartsWarning",
+"compressorCyclingAlertLatched",
+"lowflowFaultActive",
+"flowMismatch",
+"cicDataStale",
+"otLinkProblem",
+"hp1Failures",
+"hp2Failures",
+];
 const COMMISSIONING_STATE_KEYS = [
 "commissioningStatus",
 "cm100Active",
@@ -688,6 +760,7 @@ const FAST_OVERVIEW_KEYS = [
 "hp2Mode",
 "hp2Flow",
 "hp2WaterOut",
+...INSTALLATION_MONITORING_OVERVIEW_KEYS,
 ];
 const OVERVIEW_METADATA_KEYS = [
 "coolingDewPointSelected",
@@ -836,6 +909,7 @@ const SETTINGS_KEYS = [
 ...CIC_COMPATIBILITY_KEYS,
 ...FLOW_SETTING_KEYS,
 ...FLOW_TUNING_KEYS,
+...INSTALLATION_MONITORING_STATE_KEYS,
 ...COOLING_SETTING_KEYS,
 ...LIMIT_KEYS,
 ...POWER_HOUSE_KEYS,
@@ -938,7 +1012,7 @@ keys: [
 {
 id: "compressor",
 label: "Compressor",
-keys: ["minRuntime", "hp1ExcludedA", "hp1ExcludedB", "hp2ExcludedA", "hp2ExcludedB"],
+keys: ["minRuntime", "compressorStarts2hWarningLimit", "compressorStarts72hWarningLimit", "hp1ExcludedA", "hp1ExcludedB", "hp2ExcludedA", "hp2ExcludedB"],
 },
 {
 id: "system",
@@ -1044,6 +1118,8 @@ loadingEntities: true,
 entities: {},
 optionalMissingEntities: {},
 settingsInfoOpen: "",
+installationMonitoringDetailsOpen: false,
+installationMonitoringProblemSignature: "",
 settingsInteractionLock: false,
 settingsRenderSignature: "",
 settingsBackupDraft: null,
@@ -3879,7 +3955,15 @@ installation: [
 "silentEndTime",
 "maxWater",
 ],
-service: ["commissioningStatus", "cm100Active"],
+service: [
+"compressorStarts2hWarningLimit",
+"compressorStarts72hWarningLimit",
+"compressorCyclingWarning2h",
+"compressorCyclingWarning72h",
+"alternatingCompressorStartsWarning",
+"commissioningStatus",
+"cm100Active",
+],
 heating: ["strategy"],
 cooling: ["manualCoolingEnable", "coolingWithoutDewPointMode"],
 advanced: ["minRuntime"],
@@ -3911,6 +3995,7 @@ installation: [
 "maxWater",
 ],
 service: [
+...INSTALLATION_MONITORING_STATE_KEYS,
 ...COMMISSIONING_STATE_KEYS,
 "boilerCvAssistEnabled",
 "boilerRatedHeatPower",
@@ -4307,6 +4392,7 @@ firstError = message;
 }
 });
 applyDerivedState();
+syncInstallationMonitoringDetailsState(getInstallationMonitoringModel());
 if (firstError) {
 noteEntityRefreshFailure(firstError);
 if (state.deviceReconnectMode) {
@@ -6034,6 +6120,13 @@ setDevPanelOpen(!state.devPanelOpen);
 render();
 return;
 }
+if (action === "toggle-installation-monitoring-details") {
+event.preventDefault();
+const details = button.closest(".oq-settings-monitoring-details");
+state.installationMonitoringDetailsOpen = !(details && details.hasAttribute("open"));
+render();
+return;
+}
 if (action === "select-view") {
 if ((button.dataset.viewId || "") === "trends" && !isTrendHistoryEnabled()) {
 return;
@@ -6223,6 +6316,14 @@ render();
 syncEntities({ forceBulk: true });
 return;
 }
+if (action === "open-installation-monitoring") {
+state.systemModal = "";
+setAppView("settings");
+setSettingsGroup("service");
+render();
+syncEntities({ forceBulk: true });
+return;
+}
 if (action === "open-service-task-modal") {
 const taskKey = String(button.dataset.serviceTask || "").trim();
 if (["autotune", "boiler", "purge", "manual-flow", "manual-hp"].includes(taskKey)) {
@@ -6296,7 +6397,9 @@ state.commissioningTaskLock = "manual-hp";
 state.commissioningTaskLock = "manual-hp";
 }
 const refreshKeys = [];
-if (buttonKey === "commissioningCm100Start" || buttonKey === "commissioningCm100Stop") {
+if (buttonKey === "acknowledgeCompressorCyclingAlert") {
+refreshKeys.push(...INSTALLATION_MONITORING_STATE_KEYS);
+} else if (buttonKey === "commissioningCm100Start" || buttonKey === "commissioningCm100Stop") {
 refreshKeys.push(
 "commissioningStatus",
 "cm100Active",
@@ -9038,7 +9141,10 @@ renderSettingsSilentSection(),
 renderSettingsWaterSection(),
 ]
 : activeGroup === "service"
-? [renderSettingsServiceSection()]
+? [
+renderSettingsInstallationMonitoringSection(),
+renderSettingsServiceSection(),
+]
 : activeGroup === "heating"
 ? [renderSettingsHeatingSection()]
 : activeGroup === "cooling"
@@ -9890,6 +9996,320 @@ ${flowTuning ? `
 ${flowTuning}
 </div>
 ` : ""}
+`,
+);
+}
+function isInstallationMonitoringBinaryActive(key) {
+return hasEntity(key) && isEntityActive(key);
+}
+function getInstallationMonitoringFailureText(key) {
+if (!hasEntity(key)) {
+return "";
+}
+return formatFailures(getEntityStateText(key, "None"));
+}
+function isInstallationMonitoringFailureActive(key) {
+const normalized = getInstallationMonitoringFailureText(key).trim().toLowerCase();
+return Boolean(normalized) && normalized !== "geen actieve storingen";
+}
+function getInstallationMonitoringModel() {
+const problems = [];
+const cyclingActive = isInstallationMonitoringBinaryActive("compressorCyclingWarning2h")
+|| isInstallationMonitoringBinaryActive("compressorCyclingWarning72h")
+|| isInstallationMonitoringBinaryActive("alternatingCompressorStartsWarning");
+const cyclingAlertLatched = isInstallationMonitoringBinaryActive("compressorCyclingAlertLatched");
+const addBinaryProblem = (key, label) => {
+if (isInstallationMonitoringBinaryActive(key)) {
+problems.push({ key, label });
+}
+};
+addBinaryProblem("compressorCyclingWarning2h", "Te veel compressorstarts in 2 uur");
+addBinaryProblem("compressorCyclingWarning72h", "Te veel compressorstarts in 72 uur");
+addBinaryProblem("alternatingCompressorStartsWarning", "Warmtepompen starten opvallend vaak om en om");
+addBinaryProblem("lowflowFaultActive", "Te lage flow");
+addBinaryProblem("flowMismatch", "Flowverschil tussen warmtepomp 1 en 2");
+addBinaryProblem("cicDataStale", "CIC-data is verouderd");
+addBinaryProblem("otLinkProblem", "OpenTherm-verbinding meldt een probleem");
+if (isInstallationMonitoringFailureActive("hp1Failures")) {
+problems.push({ key: "hp1Failures", label: `Warmtepomp 1: ${getInstallationMonitoringFailureText("hp1Failures")}` });
+}
+if (isInstallationMonitoringFailureActive("hp2Failures")) {
+problems.push({ key: "hp2Failures", label: `Warmtepomp 2: ${getInstallationMonitoringFailureText("hp2Failures")}` });
+}
+const activeProblemCount = problems.length;
+if (cyclingAlertLatched && !cyclingActive) {
+problems.unshift({
+key: "compressorCyclingAlertLatched",
+label: "Pendelen eerder gedetecteerd; melding nog niet bevestigd",
+});
+}
+return {
+problems,
+active: problems.length > 0,
+cyclingAlertLatched,
+cyclingAlertActive: cyclingActive,
+cyclingAlertRecovered: cyclingAlertLatched && !cyclingActive,
+title: activeProblemCount > 0
+? "Aandacht nodig"
+: cyclingAlertLatched ? "Eerdere waarschuwing nog niet bevestigd" : "Geen bijzonderheden",
+copy: activeProblemCount > 0
+? `${problems.length} aandachtspunt${problems.length === 1 ? "" : "en"} zichtbaar. Bekijk hieronder de details.`
+: cyclingAlertLatched
+? "Het pendelen is hersteld. De melding blijft zichtbaar totdat je haar bevestigt."
+: "OpenQuatt ziet op dit moment geen actieve aandachtspunten in de bewaakte signalen.",
+};
+}
+function renderInstallationMonitoringBadge(active, activeLabel = "Aandacht", clearLabel = "OK") {
+return `<span class="oq-settings-monitoring-badge${active ? " is-warning" : " is-clear"}">${escapeHtml(active ? activeLabel : clearLabel)}</span>`;
+}
+function renderInstallationMonitoringStatusRow({ label, value, note = "", active = false }) {
+return `
+<div class="oq-settings-monitoring-row${active ? " is-warning" : ""}">
+<div>
+<p>${escapeHtml(label)}</p>
+<strong>${escapeHtml(value)}</strong>
+${note ? `<span>${escapeHtml(note)}</span>` : ""}
+</div>
+${renderInstallationMonitoringBadge(active)}
+</div>
+`;
+}
+function getInstallationMonitoringCount(key) {
+const value = getEntityNumericValue(key);
+return Number.isNaN(value) ? "—" : String(Math.max(0, Math.round(value)));
+}
+function formatInstallationMonitoringLastStart(key) {
+const ageMinutes = getEntityNumericValue(key);
+if (Number.isNaN(ageMinutes)) {
+return "Nog niet gemeten";
+}
+if (ageMinutes < 1) {
+return "Zojuist";
+}
+if (ageMinutes < 60) {
+return `${Math.round(ageMinutes)} min geleden`;
+}
+const hours = Math.floor(ageMinutes / 60);
+const minutes = Math.round(ageMinutes % 60);
+return `${hours}u ${minutes}m geleden`;
+}
+function formatInstallationMonitoringEpoch(key) {
+const epoch = getEntityNumericValue(key);
+if (Number.isNaN(epoch) || epoch <= 0) {
+return "Tijdstip onbekend";
+}
+return new Intl.DateTimeFormat("nl-NL", {
+day: "2-digit",
+month: "short",
+hour: "2-digit",
+minute: "2-digit",
+}).format(new Date(epoch * 1000));
+}
+function renderInstallationMonitoringCyclingIncident(monitoring) {
+if (!monitoring.cyclingAlertLatched) {
+return "";
+}
+const alternating = isInstallationMonitoringBinaryActive("compressorCyclingAlertAlternating");
+const hp1Peak2h = getInstallationMonitoringCount("compressorCyclingAlertHp1Peak2h");
+const hp1Peak72h = getInstallationMonitoringCount("compressorCyclingAlertHp1Peak72h");
+const hp2Peak2h = hasEntity("compressorCyclingAlertHp2Peak2h")
+? getInstallationMonitoringCount("compressorCyclingAlertHp2Peak2h")
+: "";
+const hp2Peak72h = hasEntity("compressorCyclingAlertHp2Peak72h")
+? getInstallationMonitoringCount("compressorCyclingAlertHp2Peak72h")
+: "";
+return `
+<div class="oq-settings-monitoring-incident${monitoring.cyclingAlertActive ? " is-active" : " is-recovered"}">
+<div class="oq-settings-monitoring-incident-head">
+<div>
+<p>Pendelmelding</p>
+<strong>${monitoring.cyclingAlertActive ? "Pendelen is nu actief" : "Pendelen is niet meer actief"}</strong>
+</div>
+${renderInstallationMonitoringBadge(monitoring.cyclingAlertActive, "Actief", "Hersteld")}
+</div>
+<span>${monitoring.cyclingAlertActive
+? "De melding blijft staan nadat de starts weer rustig zijn geworden. Hier zie je de vastgelegde aantallen."
+: "OpenQuatt bewaart deze melding totdat je haar hieronder bevestigt."}</span>
+<dl>
+<div><dt>Eerste melding</dt><dd>${escapeHtml(formatInstallationMonitoringEpoch("compressorCyclingAlertFirstSeen"))}</dd></div>
+<div><dt>Laatste melding</dt><dd>${escapeHtml(formatInstallationMonitoringEpoch("compressorCyclingAlertLastSeen"))}</dd></div>
+<div><dt>HP1 2 uur</dt><dd>${escapeHtml(hp1Peak2h)} starts</dd></div>
+<div><dt>HP1 72 uur</dt><dd>${escapeHtml(hp1Peak72h)} starts</dd></div>
+${hp2Peak2h ? `<div><dt>HP2 2 uur</dt><dd>${escapeHtml(hp2Peak2h)} starts</dd></div>` : ""}
+${hp2Peak72h ? `<div><dt>HP2 72 uur</dt><dd>${escapeHtml(hp2Peak72h)} starts</dd></div>` : ""}
+${alternating ? "<div><dt>Patroon</dt><dd>Opvallend vaak om en om</dd></div>" : ""}
+</dl>
+<div class="oq-settings-monitoring-incident-action">
+${state.entities.acknowledgeCompressorCyclingAlert
+? renderNamedActionButton(
+"acknowledgeCompressorCyclingAlert",
+"Melding bevestigen",
+"oq-helper-button oq-helper-button--ghost",
+monitoring.cyclingAlertActive,
+)
+: ""}
+<span>${monitoring.cyclingAlertActive
+? "Bevestigen wordt beschikbaar zodra het pendelen is gestopt."
+: "Na bevestigen verdwijnt de herinnering uit het overzicht."}</span>
+</div>
+</div>
+`;
+}
+function renderInstallationMonitoringCompressorUnit(title, prefix) {
+if (!hasEntity(`${prefix}CompressorStarts2h`)) {
+return "";
+}
+return `
+<div class="oq-settings-monitoring-compressor-unit">
+<div>
+<p>${escapeHtml(title)}</p>
+<span>Laatste start: ${escapeHtml(formatInstallationMonitoringLastStart(`${prefix}CompressorLastStartAge`))}</span>
+</div>
+<dl>
+<div><dt>2 uur</dt><dd>${escapeHtml(getInstallationMonitoringCount(`${prefix}CompressorStarts2h`))}</dd></div>
+<div><dt>6 uur</dt><dd>${escapeHtml(getInstallationMonitoringCount(`${prefix}CompressorStarts6h`))}</dd></div>
+<div><dt>24 uur</dt><dd>${escapeHtml(getInstallationMonitoringCount(`${prefix}CompressorStarts24h`))}</dd></div>
+<div><dt>72 uur</dt><dd>${escapeHtml(getInstallationMonitoringCount(`${prefix}CompressorStarts72h`))}</dd></div>
+</dl>
+</div>
+`;
+}
+function syncInstallationMonitoringDetailsState(monitoring) {
+const problemSignature = monitoring.active
+? monitoring.problems.map((problem) => problem.key).sort().join("|")
+: "";
+if (!problemSignature) {
+state.installationMonitoringProblemSignature = "";
+return;
+}
+if (problemSignature !== state.installationMonitoringProblemSignature) {
+state.installationMonitoringProblemSignature = problemSignature;
+state.installationMonitoringDetailsOpen = true;
+}
+}
+function renderSettingsInstallationMonitoringSection() {
+const monitoring = getInstallationMonitoringModel();
+syncInstallationMonitoringDetailsState(monitoring);
+const hydraulicRows = [
+hasEntity("lowflowFaultActive") ? renderInstallationMonitoringStatusRow({
+label: "Flow",
+value: isInstallationMonitoringBinaryActive("lowflowFaultActive") ? "Te lage flow gemeld" : "Geen lage-flowmelding",
+active: isInstallationMonitoringBinaryActive("lowflowFaultActive"),
+}) : "",
+hasEntity("flowMismatch") ? renderInstallationMonitoringStatusRow({
+label: "Flowvergelijking duo",
+value: isInstallationMonitoringBinaryActive("flowMismatch") ? "Afwijking tussen warmtepompen" : "Geen afwijking gemeld",
+active: isInstallationMonitoringBinaryActive("flowMismatch"),
+}) : "",
+].filter(Boolean).join("");
+const connectionRows = [
+hasEntity("cicDataStale") ? renderInstallationMonitoringStatusRow({
+label: "CIC-data",
+value: isInstallationMonitoringBinaryActive("cicDataStale") ? "Verouderd" : "Geen probleem gemeld",
+active: isInstallationMonitoringBinaryActive("cicDataStale"),
+}) : "",
+hasEntity("otLinkProblem") ? renderInstallationMonitoringStatusRow({
+label: "OpenTherm",
+value: isInstallationMonitoringBinaryActive("otLinkProblem") ? "Verbindingsprobleem" : "Geen probleem gemeld",
+active: isInstallationMonitoringBinaryActive("otLinkProblem"),
+}) : "",
+].filter(Boolean).join("");
+const hpRows = [
+hasEntity("hp1Failures") ? renderInstallationMonitoringStatusRow({
+label: "Warmtepomp 1",
+value: getInstallationMonitoringFailureText("hp1Failures"),
+active: isInstallationMonitoringFailureActive("hp1Failures"),
+}) : "",
+hasEntity("hp2Failures") ? renderInstallationMonitoringStatusRow({
+label: "Warmtepomp 2",
+value: getInstallationMonitoringFailureText("hp2Failures"),
+active: isInstallationMonitoringFailureActive("hp2Failures"),
+}) : "",
+].filter(Boolean).join("");
+const compressorLimit2h = getEntityNumericValue("compressorStarts2hWarningLimit");
+const compressorLimit72h = getEntityNumericValue("compressorStarts72hWarningLimit");
+const compressorWarningActive = isInstallationMonitoringBinaryActive("compressorCyclingWarning2h")
+|| isInstallationMonitoringBinaryActive("compressorCyclingWarning72h")
+|| isInstallationMonitoringBinaryActive("alternatingCompressorStartsWarning")
+|| monitoring.cyclingAlertLatched;
+const hydraulicPanel = hydraulicRows ? `
+<article class="oq-settings-monitoring-card">
+<header><p>Hydrauliek</p></header>
+<div class="oq-settings-monitoring-rows">${hydraulicRows}</div>
+</article>
+` : "";
+const hpPanel = hpRows ? `
+<article class="oq-settings-monitoring-card">
+<header><p>Warmtepompen</p></header>
+<div class="oq-settings-monitoring-rows">${hpRows}</div>
+</article>
+` : "";
+const connectionPanel = connectionRows ? `
+<article class="oq-settings-monitoring-card">
+<header><p>Verbindingen</p></header>
+<div class="oq-settings-monitoring-rows">${connectionRows}</div>
+</article>
+` : "";
+return renderSettingsSection(
+"Bewaking",
+"Installatiebewaking",
+"Lokale diagnose voor compressorstarts, hydrauliek en verbindingen. Hiervoor is geen Home Assistant nodig.",
+`
+<div class="oq-settings-monitoring-summary${monitoring.active ? " is-warning" : " is-clear"}">
+<div>
+<p>Huidige status</p>
+<strong>${escapeHtml(monitoring.title)}</strong>
+<span>${escapeHtml(monitoring.copy)}</span>
+</div>
+${renderInstallationMonitoringBadge(monitoring.active, "Aandacht nodig", "Alles rustig")}
+</div>
+<details class="oq-settings-monitoring-details"${state.installationMonitoringDetailsOpen ? " open" : ""}>
+<summary data-oq-action="toggle-installation-monitoring-details">
+<strong>Geef details weer</strong>
+</summary>
+${monitoring.active ? `
+<div class="oq-settings-monitoring-active-list">
+${monitoring.problems.map((problem) => `<span>${escapeHtml(problem.label)}</span>`).join("")}
+</div>
+` : ""}
+<div class="oq-settings-monitoring-grid">
+<div class="oq-settings-monitoring-column">
+<article class="oq-settings-monitoring-card">
+<header>
+<p>Compressorstarts</p>
+${renderInstallationMonitoringBadge(
+compressorWarningActive,
+)}
+</header>
+<span>Gemeten starts sinds de laatste controllerherstart. 6 uur en 24 uur geven extra context; de waarschuwingen zelf gelden op 2 uur en 72 uur.</span>
+${renderInstallationMonitoringCyclingIncident(monitoring)}
+<div class="oq-settings-monitoring-compressor-list">
+${renderInstallationMonitoringCompressorUnit("Warmtepomp 1", "hp1")}
+${renderInstallationMonitoringCompressorUnit("Warmtepomp 2", "hp2")}
+</div>
+${renderSettingsSliderField(
+"compressorStarts2hWarningLimit",
+"Alarmwaarde voor aantal starts per 2 uur",
+"Aantal starts per warmtepomp binnen 2 uur.",
+"oq-settings-field--compact",
+{ minLabel: "1", maxLabel: "20", valueLabel: Number.isNaN(compressorLimit2h) ? "—" : `${Math.round(compressorLimit2h)} starts / 2 uur` },
+)}
+${renderSettingsSliderField(
+"compressorStarts72hWarningLimit",
+"Alarmwaarde voor aantal starts per 72 uur",
+"Aantal starts per warmtepomp binnen 72 uur.",
+"oq-settings-field--compact",
+{ minLabel: "1", maxLabel: "120", valueLabel: Number.isNaN(compressorLimit72h) ? "—" : `${Math.round(compressorLimit72h)} starts / 72 uur` },
+)}
+</article>
+${hpPanel}
+</div>
+<div class="oq-settings-monitoring-column">
+${hydraulicPanel}
+${connectionPanel}
+</div>
+</div>
+</details>
 `,
 );
 }
@@ -11735,6 +12155,19 @@ return `
 <div class="oq-overview-sectionhead">
 <h3>${escapeHtml(title)}</h3>
 </div>
+`;
+}
+function renderOverviewInstallationMonitoringNotice() {
+const monitoring = getInstallationMonitoringModel();
+return `
+<aside class="oq-overview-monitoring-notice${monitoring.active ? " is-warning" : " is-hidden"}" data-oq-monitoring-notice data-render-signature="${escapeHtml(getRenderSignature(monitoring))}">
+<div>
+<p>Installatiebewaking</p>
+<strong>${escapeHtml(monitoring.title)}</strong>
+<span>${escapeHtml(monitoring.problems.map((problem) => problem.label).join(" · "))}</span>
+</div>
+<button type="button" data-oq-action="open-installation-monitoring">Bekijk diagnose</button>
+</aside>
 `;
 }
 function renderOverviewShell({ className, title, copy, body, signature = "" }) {
@@ -14418,6 +14851,7 @@ const heatPumpControls = renderHeatPumpControlsInner(heatPumpPanels);
 return `
 <section class="oq-helper-panel oq-helper-panel--flush">
 <div class="oq-overview-board oq-overview-board--${escapeHtml(state.overviewTheme)}">
+${renderOverviewInstallationMonitoringNotice()}
 ${renderOverviewSummaryShell(strategyLabel)}
 <div class="oq-overview-main">
 ${renderOverviewNarrativePanel(getOverviewStrategySectionModel())}
@@ -14696,6 +15130,7 @@ if (board.className !== nextBoardClass) {
 board.className = nextBoardClass;
 }
 const strategyLabel = getOverviewStrategyLabel();
+const monitoringNotice = board.querySelector("[data-oq-monitoring-notice]");
 const summaryShell = board.querySelector(".oq-overview-summary-shell");
 const system = board.querySelector(".oq-overview-system");
 const temps = board.querySelector(".oq-overview-temps");
@@ -14704,6 +15139,14 @@ const hpTools = board.querySelector(".oq-overview-hp-tools");
 const hpGrid = board.querySelector(".oq-overview-hp-grid");
 const boilerPanel = board.querySelector("[data-oq-boiler-panel]");
 const heatPumpPanels = getHeatPumpPanels();
+if (monitoringNotice) {
+const monitoring = getInstallationMonitoringModel();
+replaceOuterHtmlIfSignatureChanged(
+monitoringNotice,
+getRenderSignature(monitoring),
+renderOverviewInstallationMonitoringNotice(),
+);
+}
 if (summaryShell) {
 const top = summaryShell.querySelector(".oq-overview-top");
 if (top) {
