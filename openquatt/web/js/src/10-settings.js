@@ -325,6 +325,47 @@
     return renderSettingsFieldCard(key, title, copy, `<label class="oq-settings-control oq-settings-control--select"><select class="oq-helper-select" data-oq-field="${escapeHtml(key)}" ${state.loadingEntities ? "disabled" : ""}>${options.map((option) => `<option value="${escapeHtml(option)}" ${option === value ? "selected" : ""}>${escapeHtml(formatSettingsOptionLabel(option))}</option>`).join("")}</select><span class="oq-settings-select-caret" aria-hidden="true"></span></label>`, className);
   }
 
+  function renderSettingsSwitchPill(key, enabled, onLabel = "Aan", offLabel = "Uit") {
+    return `<span class="oq-settings-integration-pill${enabled ? " is-on" : ""}" data-oq-switch-pill="${escapeHtml(key)}" data-on-label="${escapeHtml(onLabel)}" data-off-label="${escapeHtml(offLabel)}">${escapeHtml(enabled ? onLabel : offLabel)}</span>`;
+  }
+
+  function renderSettingsCompactSwitchControl(key, title, enabled, busy, onLabel = "Aan", offLabel = "Uit", showPill = true) {
+    const renderButton = (label, targetState) => {
+      const active = targetState === (enabled ? "on" : "off");
+      return `
+        <button
+          class="oq-settings-integration-toggle-button${active ? " is-active" : ""}"
+          type="button"
+          data-oq-action="toggle-overview-control"
+          data-control-key="${escapeHtml(key)}"
+          data-control-state="${escapeHtml(targetState)}"
+          aria-pressed="${active ? "true" : "false"}"
+          ${busy ? "disabled" : ""}
+        >
+          ${escapeHtml(label)}
+        </button>
+      `;
+    };
+
+    return `
+      <div class="oq-settings-compact-switch-row">
+        ${showPill ? renderSettingsSwitchPill(key, enabled, onLabel, offLabel) : ""}
+        <div class="oq-settings-integration-toggle" role="group" aria-label="${escapeHtml(title)}">
+          ${renderButton(offLabel, "off")}
+          ${renderButton(onLabel, "on")}
+        </div>
+      </div>
+    `;
+  }
+
+  function renderSettingsSwitchCopy(key, enabled, enabledCopy = "", disabledCopy = "") {
+    const copy = enabled ? enabledCopy : disabledCopy;
+    if (!copy) {
+      return "";
+    }
+    return `<p data-oq-switch-copy="${escapeHtml(key)}" data-on-copy="${escapeHtml(enabledCopy)}" data-off-copy="${escapeHtml(disabledCopy)}">${escapeHtml(copy)}</p>`;
+  }
+
   function renderSettingsSwitchField(key, title, copy, enabledCopy = "", disabledCopy = "", className = "") {
     if (!hasEntity(key)) {
       return "";
@@ -332,29 +373,14 @@
 
     const enabled = Boolean(getEntityValue(key));
     const busy = state.loadingEntities || state.busyAction === `switch-${key}`;
-    const renderToggleCard = (label, active, targetState, detail) => `
-      <button
-        class="oq-settings-choice-card${active ? " is-active" : ""}"
-        type="button"
-        data-oq-action="toggle-overview-control"
-        data-control-key="${escapeHtml(key)}"
-        data-control-state="${escapeHtml(targetState)}"
-        aria-pressed="${active ? "true" : "false"}"
-        ${busy ? "disabled" : ""}
-      >
-        <span class="oq-settings-choice-title">${escapeHtml(label)}</span>
-        ${detail ? `<span class="oq-settings-choice-copy">${escapeHtml(detail)}</span>` : ""}
-      </button>
-    `;
-
     return renderSettingsFieldCard(
       key,
       title,
       copy,
       `
-        <div class="oq-settings-choice-grid">
-          ${renderToggleCard("Uit", !enabled, "off", disabledCopy)}
-          ${renderToggleCard("Aan", enabled, "on", enabledCopy)}
+        <div class="oq-settings-compact-switch-field">
+          ${renderSettingsCompactSwitchControl(key, title, enabled, busy)}
+          ${renderSettingsSwitchCopy(key, enabled, enabledCopy, disabledCopy)}
         </div>
       `,
       className,
@@ -373,22 +399,32 @@
       title,
       copy,
       `
-        <button
-          class="oq-settings-checkbox-switch${enabled ? " is-active" : ""}"
-          type="button"
-          role="checkbox"
-          aria-checked="${enabled ? "true" : "false"}"
-          data-oq-action="toggle-overview-control"
-          data-control-key="${escapeHtml(key)}"
-          data-control-state="${enabled ? "off" : "on"}"
-          ${busy ? "disabled" : ""}
-        >
-          <span class="oq-settings-checkbox-switch-box" aria-hidden="true"></span>
-          <span>${escapeHtml(label)}</span>
-        </button>
+        <div class="oq-settings-compact-switch-field">
+          ${renderSettingsCompactSwitchControl(key, title, enabled, busy)}
+          ${label ? `<p>${escapeHtml(label)}</p>` : ""}
+        </div>
       `,
       className,
     );
+  }
+
+  function renderSettingsIntegrationSwitchCard(key, title, copy) {
+    if (!hasEntity(key)) {
+      return "";
+    }
+
+    const enabled = Boolean(getEntityValue(key));
+    const busy = state.loadingEntities || state.busyAction === `switch-${key}`;
+    return `
+      <article class="oq-settings-integration-card" data-oq-settings-field="${escapeHtml(key)}">
+        <div class="oq-settings-integration-card-head">
+          <h4>${escapeHtml(title)}</h4>
+          ${renderSettingsSwitchPill(key, enabled)}
+        </div>
+        <p>${escapeHtml(copy)}</p>
+        ${renderSettingsCompactSwitchControl(key, title, enabled, busy, "Aan", "Uit", false)}
+      </article>
+    `;
   }
 
   function renderSettingsButtonField(key, title, copy, buttonLabel, action, className = "", options = {}) {
@@ -598,6 +634,7 @@
           renderSettingsFlowSection(),
           renderSettingsSilentSection(),
           renderSettingsWaterSection(),
+          renderSettingsCompressorSection(),
         ]
       : activeGroup === "service"
         ? [
@@ -606,19 +643,18 @@
           ]
       : activeGroup === "heating"
         ? [renderSettingsHeatingSection()]
-        : activeGroup === "cooling"
-          ? [renderSettingsCoolingSection()]
-        : activeGroup === "advanced"
+      : activeGroup === "cooling"
+        ? [renderSettingsCoolingSection()]
+        : activeGroup === "integrations"
             ? [
                 renderSettingsOpenThermCicSection(),
                 renderSettingsSensorSelectionSection(),
-                renderSettingsCompressorSection(),
+                renderSettingsMqttSection(),
               ]
             : [
                 renderSettingsQuickStartSection(),
                 renderSettingsTrendSection(),
                 renderSettingsAccessSecuritySection(),
-                renderSettingsMqttSection(),
                 renderSettingsBackupSection(),
                 renderSettingsDiagnosticsSection(),
               ];
@@ -757,6 +793,30 @@
       button.classList.toggle("is-active", active);
       button.setAttribute("aria-pressed", active ? "true" : "false");
       button.disabled = state.loadingEntities || state.busyAction === `switch-${key}`;
+    });
+
+    stack.querySelectorAll("[data-oq-switch-pill]").forEach((pill) => {
+      const key = String(pill.dataset.oqSwitchPill || "");
+      const enabled = Boolean(getEntityValue(key));
+      const onLabel = String(pill.dataset.onLabel || "Aan");
+      const offLabel = String(pill.dataset.offLabel || "Uit");
+      const label = enabled ? onLabel : offLabel;
+      pill.classList.toggle("is-on", enabled);
+      if (pill.textContent !== label) {
+        pill.textContent = label;
+      }
+    });
+
+    stack.querySelectorAll("[data-oq-switch-copy]").forEach((copyNode) => {
+      const key = String(copyNode.dataset.oqSwitchCopy || "");
+      const enabled = Boolean(getEntityValue(key));
+      const onCopy = String(copyNode.dataset.onCopy || "");
+      const offCopy = String(copyNode.dataset.offCopy || "");
+      const copy = enabled ? onCopy : offCopy;
+      copyNode.hidden = !copy;
+      if (copyNode.textContent !== copy) {
+        copyNode.textContent = copy;
+      }
     });
 
     const generationStatus = stack.querySelector('button[data-oq-action="open-generation-modal"]')?.closest(".oq-settings-quickstart-status");
@@ -2462,29 +2522,24 @@
     const boilerMeta = getNumberMeta("boilerRatedHeatPower");
     const boilerValue = getInputDraftValue("boilerRatedHeatPower");
     const boilerBusy = state.loadingEntities || state.busyAction === "switch-boilerCvAssistEnabled";
-    const boilerDisabledHint = "Zet CV-ketel/boiler aanwezig aan om het vermogen in te stellen.";
     const boilerPowerMissingHint = "Deze firmware levert nog geen bewerkbare boilervermogensinstelling.";
-    const boilerPowerControl = boilerPresent
-      ? (boilerPowerEntityAvailable
-        ? renderNumberInputControl({
-            key: "boilerRatedHeatPower",
-            value: boilerValue,
-            meta: boilerMeta,
-            controlClass: "oq-helper-control oq-helper-control--suffix oq-settings-boiler-power-control",
-            unitMarkup: `<span class="oq-helper-unit-chip">W</span>`,
-          })
-        : `
-          <div class="oq-settings-boiler-power-empty">
-            <strong>Niet beschikbaar</strong>
-            <p>${escapeHtml(boilerPowerMissingHint)}</p>
-          </div>
-        `)
+    const boilerPowerControl = boilerPowerEntityAvailable
+      ? renderNumberInputControl({
+          key: "boilerRatedHeatPower",
+          value: boilerValue,
+          meta: boilerMeta,
+          controlClass: "oq-helper-control oq-helper-control--suffix oq-settings-boiler-power-control",
+          unitMarkup: `<span class="oq-helper-unit-chip">W</span>`,
+        })
       : `
         <div class="oq-settings-boiler-power-empty">
-          <strong>Niet actief</strong>
-          <p>${escapeHtml(boilerDisabledHint)}</p>
+          <strong>Niet beschikbaar</strong>
+          <p>${escapeHtml(boilerPowerMissingHint)}</p>
         </div>
       `;
+    const boilerPowerFooter = boilerPresent && boilerPowerEntityAvailable
+      ? `<p class="oq-settings-boiler-power-note">Je kunt deze waarde altijd handmatig aanpassen.</p>`
+      : "";
 
     return `
         <div class="${escapeHtml(className)}">
@@ -2493,37 +2548,14 @@
             "CV-ketel / boiler aanwezig",
             "Geef aan of OpenQuatt deze installatie als ondersteuning mag gebruiken.",
             `
-              <div class="oq-settings-boiler-choice-grid">
-                <button
-                  class="oq-settings-choice-card oq-settings-boiler-choice${boilerPresent ? "" : " is-active"}"
-                  type="button"
-                  data-oq-action="toggle-overview-control"
-                  data-control-key="boilerCvAssistEnabled"
-                  data-control-state="off"
-                  aria-pressed="${boilerPresent ? "false" : "true"}"
-                  ${boilerBusy ? "disabled" : ""}
-                >
-                  <span class="oq-settings-boiler-choice-title">Uit</span>
-                  <span class="oq-settings-boiler-choice-copy">Geen ondersteuning via boiler of CV-ketel.</span>
-                </button>
-                <button
-                  class="oq-settings-choice-card oq-settings-boiler-choice${boilerPresent ? " is-active" : ""}"
-                  type="button"
-                  data-oq-action="toggle-overview-control"
-                  data-control-key="boilerCvAssistEnabled"
-                  data-control-state="on"
-                  aria-pressed="${boilerPresent ? "true" : "false"}"
-                  ${boilerBusy ? "disabled" : ""}
-                >
-                  <span class="oq-settings-boiler-choice-title">Aan</span>
-                  <span class="oq-settings-boiler-choice-copy">OpenQuatt mag de ketel of boiler bijschakelen als dat nodig is.</span>
-                </button>
+              <div class="oq-settings-compact-switch-field">
+                ${renderSettingsCompactSwitchControl("boilerCvAssistEnabled", "CV-ketel / boiler aanwezig", boilerPresent, boilerBusy)}
               </div>
             `,
             "oq-settings-field--compact",
           )}
 
-          ${renderSettingsFieldCard(
+          ${boilerPresent ? renderSettingsFieldCard(
             "boilerRatedHeatPower",
             "Ingesteld boilervermogen",
             "Vul hier het vermogen in dat OpenQuatt mag meerekenen.",
@@ -2533,12 +2565,8 @@
               </div>
             `,
             boilerPresent && boilerPowerEntityAvailable ? "oq-settings-field--compact" : "oq-settings-field--compact is-disabled",
-            `<p class="oq-settings-boiler-power-note">${escapeHtml(
-              boilerPresent
-                ? (boilerPowerEntityAvailable ? "Je kunt deze waarde altijd handmatig aanpassen." : boilerPowerMissingHint)
-                : boilerDisabledHint,
-            )}</p>`,
-          )}
+            boilerPowerFooter,
+          ) : ""}
         </div>
       `;
   }
@@ -2548,10 +2576,13 @@
       return "";
     }
 
+    const boilerPresent = isEntityActive("boilerCvAssistEnabled");
     return renderSettingsSection(
       "Basis",
       "CV-ketel of boiler",
-      "Geef aan of OpenQuatt een CV-ketel of boiler als ondersteuning mag gebruiken en hoeveel effectief vermogen die functie heeft.",
+      boilerPresent
+        ? "Geef aan of OpenQuatt een CV-ketel of boiler als ondersteuning mag gebruiken en hoeveel effectief vermogen die functie heeft."
+        : "Geef aan of OpenQuatt een CV-ketel of boiler als ondersteuning mag gebruiken.",
       renderBoilerCvFields(),
     );
   }
@@ -2698,44 +2729,6 @@
 
     const cicPollingEnabled = isInstallationMonitoringIntegrationEnabled("cicPollingEnabled");
     const otEnabled = isInstallationMonitoringIntegrationEnabled("otEnabled");
-    const renderCompactSwitch = (key, title, copy) => {
-      if (!hasEntity(key)) {
-        return "";
-      }
-      const enabled = Boolean(getEntityValue(key));
-      const busy = state.loadingEntities || state.busyAction === `switch-${key}`;
-      const renderButton = (label, targetState) => {
-        const active = targetState === (enabled ? "on" : "off");
-        return `
-          <button
-            class="oq-settings-integration-toggle-button${active ? " is-active" : ""}"
-            type="button"
-            data-oq-action="toggle-overview-control"
-            data-control-key="${escapeHtml(key)}"
-            data-control-state="${escapeHtml(targetState)}"
-            aria-pressed="${active ? "true" : "false"}"
-            ${busy ? "disabled" : ""}
-          >
-            ${escapeHtml(label)}
-          </button>
-        `;
-      };
-
-      return `
-        <article class="oq-settings-integration-card" data-oq-settings-field="${escapeHtml(key)}">
-          <div class="oq-settings-integration-card-head">
-            <h4>${escapeHtml(title)}</h4>
-            <span class="oq-settings-integration-pill${enabled ? " is-on" : ""}">${escapeHtml(enabled ? "Aan" : "Uit")}</span>
-          </div>
-          <p>${escapeHtml(copy)}</p>
-          <div class="oq-settings-integration-toggle" role="group" aria-label="${escapeHtml(title)}">
-            ${renderButton("Uit", "off")}
-            ${renderButton("Aan", "on")}
-          </div>
-        </article>
-      `;
-    };
-
     const renderDiagnosticItem = ({ label, value, active = false }) => `
       <div class="oq-settings-integration-diagnostic-item${active ? " is-warning" : ""}">
         <dt>${escapeHtml(label)}</dt>
@@ -2859,9 +2852,9 @@
       "Configureer de directe thermostaatbus, externe CIC-feed en Quatt app-compatibiliteit.",
       `
         <div class="oq-settings-integration-grid">
-          ${renderCompactSwitch("otEnabled", "OpenTherm", "Thermostaatbus voor warmtevraag en kamerwaarden.")}
-          ${renderCompactSwitch("cicPollingEnabled", "CIC-polling", "JSON-feed uitlezen voor setpoint, kamerwaarden en flow.")}
-          ${renderCompactSwitch("cicCompatibilityMode", "CiC-compatibiliteit", "Gegevens doorgeven zodat de Quatt app kan blijven meekijken.")}
+          ${renderSettingsIntegrationSwitchCard("otEnabled", "OpenTherm", "Thermostaatbus voor warmtevraag en kamerwaarden.")}
+          ${renderSettingsIntegrationSwitchCard("cicPollingEnabled", "CIC-polling", "JSON-feed uitlezen voor setpoint, kamerwaarden en flow.")}
+          ${renderSettingsIntegrationSwitchCard("cicCompatibilityMode", "CiC-compatibiliteit", "Gegevens doorgeven zodat de Quatt app kan blijven meekijken.")}
           ${urlField}
         </div>
         ${diagnosticsPanel}
@@ -3605,7 +3598,7 @@
     ].filter(Boolean).join("");
 
     return renderSettingsSection(
-      "Geavanceerd",
+      "Installatie",
       "Compressorinstellingen",
       "Stel hier de minimale draaitijd in en bepaal per warmtepomp welke compressorstanden je wilt overslaan.",
       `
