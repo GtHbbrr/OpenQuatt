@@ -121,7 +121,7 @@ class OpenQuattTrends : public Component {
   static uint16_t encode_unsigned_(float value);
   static float decode_temp_(int16_t value);
   static float decode_unsigned_(uint16_t value);
-  static uint32_t crc32_(const uint8_t *data, size_t len);
+  static uint32_t fnv1a_hash_(const uint8_t *data, size_t len);
 
   TrendValues pack_values_(float outside_c, float supply_c, float room_c, float room_setpoint_c, float flow_lph,
                            float input_w, float output_w) const;
