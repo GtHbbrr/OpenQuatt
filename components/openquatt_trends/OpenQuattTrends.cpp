@@ -291,7 +291,7 @@ float OpenQuattTrends::decode_unsigned_(uint16_t value) {
   return value == UINT16_MAX ? NAN : static_cast<float>(value);
 }
 
-uint32_t OpenQuattTrends::crc32_(const uint8_t *data, size_t len) {
+uint32_t OpenQuattTrends::fnv1a_hash_(const uint8_t *data, size_t len) {
   uint32_t hash = 2166136261u;
   for (size_t i = 0; i < len; ++i) {
     hash ^= data[i];
@@ -574,7 +574,7 @@ bool OpenQuattTrends::write_flash_block_(const FlashBlockBuilder &builder) {
   header.sequence = builder.sequence;
   header.start_timestamp_ms = builder.start_timestamp_ms;
   header.payload_bytes = static_cast<uint32_t>(builder.sample_count * sizeof(TrendSample));
-  header.crc32 = crc32_(reinterpret_cast<const uint8_t *>(builder.samples.data()), header.payload_bytes);
+  header.crc32 = fnv1a_hash_(reinterpret_cast<const uint8_t *>(builder.samples.data()), header.payload_bytes);
   header.reserved = static_cast<uint32_t>(this->current_time_ms_() / 1000ULL);
   std::memcpy(slot_buffer.data(), &header, sizeof(header));
   std::memcpy(slot_buffer.data() + sizeof(header), builder.samples.data(), header.payload_bytes);
@@ -670,7 +670,7 @@ bool OpenQuattTrends::read_flash_block_(uint32_t slot_index, uint32_t expected_s
     return false;
   }
 
-  if (crc32_(reinterpret_cast<const uint8_t *>(samples->data()), header.payload_bytes) != header.crc32) {
+  if (fnv1a_hash_(reinterpret_cast<const uint8_t *>(samples->data()), header.payload_bytes) != header.crc32) {
     return false;
   }
 
