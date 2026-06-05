@@ -38,6 +38,46 @@ static std::string base64_encode_bytes_(const uint8_t *data, size_t length) {
   return out;
 }
 
+static std::string json_escape_string_(const std::string &value) {
+  std::string out;
+  out.reserve(value.size());
+  for (char c : value) {
+    switch (c) {
+      case '"':
+        out += "\\\"";
+        break;
+      case '\\':
+        out += "\\\\";
+        break;
+      case '\b':
+        out += "\\b";
+        break;
+      case '\f':
+        out += "\\f";
+        break;
+      case '\n':
+        out += "\\n";
+        break;
+      case '\r':
+        out += "\\r";
+        break;
+      case '\t':
+        out += "\\t";
+        break;
+      default:
+        if (static_cast<unsigned char>(c) < 0x20) {
+          char escaped[7];
+          std::snprintf(escaped, sizeof(escaped), "\\u%04x", static_cast<unsigned char>(c));
+          out += escaped;
+        } else {
+          out.push_back(c);
+        }
+        break;
+    }
+  }
+  return out;
+}
+
 static void fill_random_psk_(std::array<uint8_t, 32> *key) {
   if (key == nullptr) {
     return;
@@ -126,13 +166,16 @@ class OpenQuattWebAuthRequestHandler : public AsyncWebHandler {
     StringRef url = request->url_to(url_buf);
 
     if (url == "/auth/status" && request->method() == HTTP_GET) {
+      const std::string username = json_escape_string_(this->parent_->get_active_username());
+      const std::string source = json_escape_string_(this->parent_->get_credential_source());
+      const std::string csrf_token = json_escape_string_(this->parent_->get_csrf_token());
       auto *stream = request->beginResponseStream("application/json");
       stream->printf(R"({"enabled":%s,"setup_window_active":%s,"username":"%s","source":"%s","csrf_token":"%s"})",
                      this->parent_->is_auth_enabled() ? "true" : "false",
                      this->parent_->is_setup_window_active() ? "true" : "false",
-                     this->parent_->get_active_username().c_str(),
-                     this->parent_->get_credential_source().c_str(),
-                     this->parent_->get_csrf_token().c_str());
+                     username.c_str(),
+                     source.c_str(),
+                     csrf_token.c_str());
       request->send(stream);
       return;
     }
@@ -165,9 +208,10 @@ class OpenQuattWebAuthRequestHandler : public AsyncWebHandler {
         return;
       }
 
+      const std::string username = json_escape_string_(this->parent_->get_active_username());
+      const std::string source = json_escape_string_(this->parent_->get_credential_source());
       auto *stream = request->beginResponseStream("application/json");
-      stream->printf(R"({"ok":true,"username":"%s","source":"%s"})", this->parent_->get_active_username().c_str(),
-                     this->parent_->get_credential_source().c_str());
+      stream->printf(R"({"ok":true,"username":"%s","source":"%s"})", username.c_str(), source.c_str());
       request->send(stream);
       return;
     }
@@ -198,14 +242,17 @@ class OpenQuattWebAuthRequestHandler : public AsyncWebHandler {
     }
 
     if (url == "/api-security/status" && request->method() == HTTP_GET) {
+      const std::string key = json_escape_string_(this->parent_->get_api_security_key());
+      const std::string source = json_escape_string_(this->parent_->get_api_security_source());
+      const std::string csrf_token = json_escape_string_(this->parent_->get_csrf_token());
       auto *stream = request->beginResponseStream("application/json");
       stream->printf(R"({"enabled":%s,"transport_active":%s,"pending_restart":%s,"key":"%s","source":"%s","csrf_token":"%s"})",
                      this->parent_->is_api_security_enabled() ? "true" : "false",
                      this->parent_->is_api_security_transport_active() ? "true" : "false",
                      this->parent_->is_api_security_restart_pending() ? "true" : "false",
-                     this->parent_->get_api_security_key().c_str(),
-                     this->parent_->get_api_security_source().c_str(),
-                     this->parent_->get_csrf_token().c_str());
+                     key.c_str(),
+                     source.c_str(),
+                     csrf_token.c_str());
       request->send(stream);
       return;
     }
@@ -221,8 +268,9 @@ class OpenQuattWebAuthRequestHandler : public AsyncWebHandler {
         return;
       }
 
+      const std::string key = json_escape_string_(this->parent_->get_api_security_key());
       auto *stream = request->beginResponseStream("application/json");
-      stream->printf(R"({"ok":true,"enabled":true,"key":"%s"})", this->parent_->get_api_security_key().c_str());
+      stream->printf(R"({"ok":true,"enabled":true,"key":"%s"})", key.c_str());
       request->send(stream);
       return;
     }
@@ -238,8 +286,9 @@ class OpenQuattWebAuthRequestHandler : public AsyncWebHandler {
         return;
       }
 
+      const std::string key = json_escape_string_(this->parent_->get_api_security_key());
       auto *stream = request->beginResponseStream("application/json");
-      stream->printf(R"({"ok":true,"enabled":true,"key":"%s"})", this->parent_->get_api_security_key().c_str());
+      stream->printf(R"({"ok":true,"enabled":true,"key":"%s"})", key.c_str());
       request->send(stream);
       return;
     }
