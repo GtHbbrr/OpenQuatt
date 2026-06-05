@@ -701,14 +701,23 @@
     }
   }
 
+  function isKnownOptionalMissingEntity(key) {
+    return Boolean(ENTITY_DEFS[key]?.optional && state.optionalMissingEntities?.[key]);
+  }
+
   async function refreshEntities(keys, detail = "state", options = {}) {
+    const refreshKeys = keys.filter((key) => !isKnownOptionalMissingEntity(key));
+    if (!refreshKeys.length) {
+      return;
+    }
+
     const requestedConcurrency = Number(options.concurrency);
     const concurrency = Number.isFinite(requestedConcurrency) && requestedConcurrency > 0
       ? Math.floor(requestedConcurrency)
       : ENTITY_REFRESH_CONCURRENCY;
     const results = [];
-    for (let index = 0; index < keys.length; index += concurrency) {
-      const batch = keys.slice(index, index + concurrency);
+    for (let index = 0; index < refreshKeys.length; index += concurrency) {
+      const batch = refreshKeys.slice(index, index + concurrency);
       const batchResults = await Promise.allSettled(
         batch.map(async (key) => ({ key, payload: await fetchEntityPayload(key, detail) }))
       );
@@ -721,7 +730,7 @@
 
     let firstError = "";
     results.forEach((result, index) => {
-      const key = keys[index];
+      const key = refreshKeys[index];
       if (result.status === "fulfilled") {
         if (state.optionalMissingEntities) {
           delete state.optionalMissingEntities[key];
