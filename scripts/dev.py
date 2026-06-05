@@ -6,6 +6,7 @@ import concurrent.futures
 import fnmatch
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -571,9 +572,9 @@ def build_pages_site(site_dir: Path, factory_dir: Path, helper_python: Sequence[
 
     demo_html = (root_dir / "openquatt" / "web" / "dev.html").read_text(encoding="utf-8")
     demo_html = demo_html.replace("<title>OpenQuatt UI Preview</title>", "<title>OpenQuatt web-app demo</title>")
-    demo_html = demo_html.replace("./css/openquatt-app.css?v=q-connection-switch-v3", "../css/openquatt-app.css?v=q-pages-demo")
-    demo_html = demo_html.replace("./js/mock-device.js?v=q-connection-switch-v3", "../js/mock-device.js?v=q-pages-demo")
-    demo_html = demo_html.replace("./js/openquatt-app.js?v=q-connection-switch-v3", "../js/openquatt-app.js?v=q-pages-demo")
+    demo_html = re.sub(r"\./css/openquatt-app\.css\?v=[^\"]+", "../css/openquatt-app.css?v=q-pages-demo", demo_html)
+    demo_html = re.sub(r"\./js/mock-device\.js\?v=[^\"]+", "../js/mock-device.js?v=q-pages-demo", demo_html)
+    demo_html = re.sub(r"\./js/openquatt-app\.js\?v=[^\"]+", "../js/openquatt-app.js?v=q-pages-demo", demo_html)
     demo_dir = site_dir / "demo"
     demo_dir.mkdir(parents=True, exist_ok=True)
     (demo_dir / "index.html").write_text(demo_html, encoding="utf-8")
