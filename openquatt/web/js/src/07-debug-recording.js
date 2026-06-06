@@ -248,7 +248,11 @@ function scheduleDebugRecordingSample(delayMs = DEBUG_RECORDING_SAMPLE_INTERVAL_
 }
 
 async function captureDebugRecordingSample() {
-  if (!state.debugRecordingActive || state.debugRecordingBusy) {
+  if (!state.debugRecordingActive) {
+    return;
+  }
+  if (state.debugRecordingBusy) {
+    scheduleDebugRecordingSample(DEBUG_RECORDING_BUSY_RETRY_MS);
     return;
   }
 

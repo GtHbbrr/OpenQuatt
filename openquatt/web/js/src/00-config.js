@@ -807,6 +807,7 @@ const LOGO_MARKUP = `
   const COMPRESSOR_SETTING_KEYS = ["minRuntime", "hp1ExcludedA", "hp1ExcludedB", "hp2ExcludedA", "hp2ExcludedB"];
   const SILENT_SETTING_KEYS = ["silentStartTime", "silentEndTime", "silentMax", "dayMax"];
   const DEBUG_RECORDING_SAMPLE_INTERVAL_MS = 10000;
+  const DEBUG_RECORDING_BUSY_RETRY_MS = 1000;
   const DEBUG_RECORDING_LOG_LIMIT = 120;
   const DEBUG_RECORDING_EVENT_LIMIT = 1000;
   const DEBUG_RECORDING_DURATION_OPTIONS = [
