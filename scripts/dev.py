@@ -572,9 +572,10 @@ def build_pages_site(site_dir: Path, factory_dir: Path, helper_python: Sequence[
 
     demo_html = (root_dir / "openquatt" / "web" / "dev.html").read_text(encoding="utf-8")
     demo_html = demo_html.replace("<title>OpenQuatt UI Preview</title>", "<title>OpenQuatt web-app demo</title>")
-    demo_html = re.sub(r"\./css/openquatt-app\.css\?v=[^\"]+", "../css/openquatt-app.css?v=q-pages-demo", demo_html)
-    demo_html = re.sub(r"\./js/mock-device\.js\?v=[^\"]+", "../js/mock-device.js?v=q-pages-demo", demo_html)
-    demo_html = re.sub(r"\./js/openquatt-app\.js\?v=[^\"]+", "../js/openquatt-app.js?v=q-pages-demo", demo_html)
+    demo_html = demo_html.replace(
+        '<meta name="viewport" content="width=device-width, initial-scale=1">',
+        '<meta name="viewport" content="width=device-width, initial-scale=1">\n    <base href="../">',
+    )
     demo_dir = site_dir / "demo"
     demo_dir.mkdir(parents=True, exist_ok=True)
     (demo_dir / "index.html").write_text(demo_html, encoding="utf-8")
