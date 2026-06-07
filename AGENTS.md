@@ -55,6 +55,8 @@
 
 - Keep progress updates and final responses compact.
 - Avoid verbose explanations unless the user asks for them.
+- Do not narrate every command or small step.
+- For routine edits, give only the final result unless a decision, error, or risk needs attention.
 - Use concise technical Dutch when explaining changes.
 - Do not compress, rename, translate, or simplify code, paths, registers, YAML keys, entity IDs, constants, units, or commands.
 - Preserve technical precision over brevity.
