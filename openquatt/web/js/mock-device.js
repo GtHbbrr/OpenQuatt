@@ -94,6 +94,13 @@
     trendFlashLastFlushAt: Date.now() - (12 * 60 * 1000),
     logHistoryEnabled: true,
     logHistoryEntries: [],
+    debugRecording: {
+      active: false,
+      startedAt: 0,
+      stoppedAt: 0,
+      durationS: 15 * 60,
+      samples: [],
+    },
   };
 
   const HP2_ENTITIES = [
@@ -2778,6 +2785,143 @@
     });
   }
 
+  function getDebugRecordingElapsedS(recording = state.debugRecording) {
+    const endAt = recording.active ? Date.now() : Number(recording.stoppedAt || 0);
+    if (!recording.startedAt || !endAt) {
+      return 0;
+    }
+    return Math.max(0, Math.floor((endAt - recording.startedAt) / 1000));
+  }
+
+  function makeDebugRecordingSample(offsetS) {
+    const uptimeMs = Math.max(0, Math.round(Date.now() - state.bootedAt));
+    const wobble = Math.round(Math.sin(offsetS / 17) * 4200);
+    return {
+      offset_s: offsetS,
+      uptimeMs,
+      freeHeap: 192000 - Math.round(offsetS * 7) + wobble,
+      freePsram: 5148000 - Math.round(offsetS * 13),
+      minFreeHeap: 184000 - Math.round(offsetS * 5),
+    };
+  }
+
+  function syncDebugRecordingSamples() {
+    const recording = state.debugRecording;
+    if (!recording.startedAt) {
+      return;
+    }
+    const elapsedS = Math.min(getDebugRecordingElapsedS(recording), Number(recording.durationS || 0));
+    const nextCount = Math.floor(elapsedS / 10) + 1;
+    while (recording.samples.length < nextCount) {
+      recording.samples.push(makeDebugRecordingSample(recording.samples.length * 10));
+    }
+    if (recording.active && elapsedS >= Number(recording.durationS || 0)) {
+      recording.active = false;
+      recording.stoppedAt = recording.startedAt + Number(recording.durationS || 0) * 1000;
+    }
+  }
+
+  function getDebugRecordingStatusPayload() {
+    syncDebugRecordingSamples();
+    const recording = state.debugRecording;
+    const elapsedS = Math.min(getDebugRecordingElapsedS(recording), Number(recording.durationS || 0));
+    const remainingS = recording.active ? Math.max(0, Number(recording.durationS || 0) - elapsedS) : 0;
+    return {
+      ok: true,
+      available: true,
+      active: Boolean(recording.active),
+      storage: "psram",
+      interval_s: 10,
+      duration_s: Number(recording.durationS || 0),
+      elapsed_s: elapsedS,
+      remaining_s: remainingS,
+      sample_count: recording.samples.length,
+      sample_capacity: 361,
+      estimated_size: 520 + recording.samples.length * 48,
+      buffer: "psram",
+    };
+  }
+
+  function handleDebugRecordingStart(url) {
+    const durationS = Math.max(60, Math.min(3600, Number(url.searchParams.get("duration_s") || 15 * 60)));
+    state.debugRecording = {
+      active: true,
+      startedAt: Date.now(),
+      stoppedAt: 0,
+      durationS,
+      samples: [],
+    };
+    syncDebugRecordingSamples();
+    return mockResponse(200, getDebugRecordingStatusPayload());
+  }
+
+  function handleDebugRecordingStop() {
+    const recording = state.debugRecording;
+    syncDebugRecordingSamples();
+    if (recording.active) {
+      recording.active = false;
+      recording.stoppedAt = Date.now();
+    }
+    return mockResponse(200, getDebugRecordingStatusPayload());
+  }
+
+  function buildDebugRecordingDownloadPayload() {
+    syncDebugRecordingSamples();
+    const recording = state.debugRecording;
+    const startedAtMs = Number(recording.startedAt || Date.now());
+    const endedAtMs = recording.active ? Date.now() : Number(recording.stoppedAt || startedAtMs);
+    const initial = recording.samples[0] || null;
+    const samples = recording.samples.map((sample, index) => {
+      const previous = index > 0 ? recording.samples[index - 1] : initial;
+      const deltas = [];
+      if (previous && sample.uptimeMs !== previous.uptimeMs) {
+        deltas.push([0, sample.uptimeMs]);
+      }
+      if (previous && sample.freeHeap !== previous.freeHeap) {
+        deltas.push([1, sample.freeHeap]);
+      }
+      if (previous && sample.freePsram !== previous.freePsram) {
+        deltas.push([2, sample.freePsram]);
+      }
+      if (previous && sample.minFreeHeap !== previous.minFreeHeap) {
+        deltas.push([3, sample.minFreeHeap]);
+      }
+      return [sample.offset_s, deltas];
+    });
+    return {
+      format: "openquatt-debug-device-v1",
+      schema_version: 1,
+      kind: "openquatt_debug_recording",
+      encoding: "device-psram-delta-json-v1",
+      exported_at_ms: Date.now(),
+      source: {
+        device: "OpenQuatt",
+        storage: "psram",
+      },
+      recording: {
+        started_at_ms: startedAtMs,
+        ended_at_ms: endedAtMs,
+        active: Boolean(recording.active),
+        duration_s: Math.max(0, Math.floor((endedAtMs - startedAtMs) / 1000)),
+        interval_s: 10,
+        sample_count: recording.samples.length,
+        column_count: 4,
+        storage: "psram",
+      },
+      columns: ["uptimeMs", "freeHeap", "freePsram", "minFreeHeap"],
+      units: [[0, "ms"], [1, "B"], [2, "B"], [3, "B"]],
+      initial: initial
+        ? [[0, initial.uptimeMs], [1, initial.freeHeap], [2, initial.freePsram], [3, initial.minFreeHeap]]
+        : [],
+      samples,
+      events: [],
+    };
+  }
+
+  function handleDebugRecordingDownload() {
+    return mockResponse(200, buildDebugRecordingDownloadPayload());
+  }
+
   function parseMockRequest(input) {
     const url = new URL(String(typeof input === "string" ? input : input.url), window.location.href);
     const parts = url.pathname.split("/").filter(Boolean);
@@ -2804,6 +2948,7 @@
     const realFetch = window.fetch ? window.fetch.bind(window) : null;
     window.fetch = async function fetchMock(input, init) {
       const url = new URL(String(typeof input === "string" ? input : input.url), window.location.href);
+      const method = String(init?.method || "GET").toUpperCase();
       if (url.pathname === "/auth/status" && (!init || !init.method || String(init.method).toUpperCase() === "GET")) {
         return handleAuthStatus();
       }
@@ -2830,6 +2975,18 @@
           enabled: Boolean(state.logHistoryEnabled),
           entries: clone(state.logHistoryEntries),
         });
+      }
+      if (url.pathname.endsWith("/openquatt/debug-recording/status") && method === "GET") {
+        return mockResponse(200, getDebugRecordingStatusPayload());
+      }
+      if (url.pathname.endsWith("/openquatt/debug-recording/start") && method === "POST") {
+        return handleDebugRecordingStart(url);
+      }
+      if (url.pathname.endsWith("/openquatt/debug-recording/stop") && method === "POST") {
+        return handleDebugRecordingStop();
+      }
+      if (url.pathname.endsWith("/openquatt/debug-recording/download") && method === "GET") {
+        return handleDebugRecordingDownload();
       }
       if (url.pathname.endsWith("/openquatt/entities") && String(init?.method || "GET").toUpperCase() === "POST") {
         return handleBulkEntities(init || {});

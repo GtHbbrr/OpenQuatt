@@ -2893,11 +2893,7 @@
       state.debugRecordingError = "";
       state.debugRecordingNotice = "";
       render();
-      void refreshEntities(DEBUG_RECORDING_KEYS, "all", { concurrency: FAST_VIEW_ENTITY_REFRESH_CONCURRENCY }).then(() => {
-        if (state.systemModal === "debug-recording") {
-          render();
-        }
-      });
+      void refreshDebugRecordingDeviceStatus();
       return;
     }
 
@@ -3294,6 +3290,7 @@
 
     if (action === "close-system-modal") {
       stopLoginAuthStatusPolling();
+      clearDebugRecordingDevicePollTimer();
       state.systemModal = "";
       state.authDraftCurrentPassword = "";
       state.authDraftNewPassword = "";
@@ -3320,7 +3317,7 @@
     }
 
     if (action === "start-debug-recording") {
-      startDebugRecording(button.dataset.debugMinutes || 15);
+      void startDebugRecording(button.dataset.debugMinutes || 15);
       return;
     }
 
@@ -3330,7 +3327,7 @@
     }
 
     if (action === "stop-debug-recording") {
-      stopDebugRecording();
+      void stopDebugRecording();
       return;
     }
 
