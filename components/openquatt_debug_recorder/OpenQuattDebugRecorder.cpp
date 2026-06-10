@@ -620,6 +620,7 @@ bool OpenQuattDebugRecorder::start(uint32_t duration_s) {
     return false;
   }
   this->active_ = true;
+  this->recording_id_ = this->current_time_ms_();
   this->duration_s_ = this->sanitize_duration_s_(duration_s);
   this->started_ms_ = millis();
   this->stopped_ms_ = 0;
@@ -687,6 +688,7 @@ void OpenQuattDebugRecorder::write_status(httpd_req_t *req) const {
                                              (16U + static_cast<uint32_t>(this->field_count_) * 3U);
   if (!writer.write_literal(R"({"ok":true,"available":)") || !writer.write_bool(this->available_()) ||
       !writer.write_literal(R"(,"active":)") || !writer.write_bool(this->active_) ||
+      !writer.write_literal(R"(,"recording_id":)") || !writer.write_uint64(this->recording_id_) ||
       !writer.write_literal(R"(,"storage":")") || !writer.write_literal(this->available_() ? "psram" : "unavailable") ||
       !writer.write_literal(R"(","interval_s":)") || !writer.write_uint32(SAMPLE_INTERVAL_MS / 1000U) ||
       !writer.write_literal(R"(,"duration_s":)") || !writer.write_uint32(this->duration_s_) ||
@@ -746,6 +748,7 @@ void OpenQuattDebugRecorder::write_recording(httpd_req_t *req) const {
       !writer.write_literal(R"(,"source":{"device":"OpenQuatt","storage":")") ||
       !writer.write_literal(this->available_() ? "psram" : "unavailable") || !writer.write_literal(R"("})") ||
       !writer.write_literal(R"(,"recording":{"started_at_ms":)") || !writer.write_uint64(this->started_time_ms_()) ||
+      !writer.write_literal(R"(,"recording_id":)") || !writer.write_uint64(this->recording_id_) ||
       !writer.write_literal(R"(,"ended_at_ms":)") || !writer.write_uint64(this->ended_time_ms_()) ||
       !writer.write_literal(R"(,"active":)") || !writer.write_bool(this->active_) ||
       !writer.write_literal(R"(,"duration_s":)") || !writer.write_uint32(this->elapsed_s_()) ||

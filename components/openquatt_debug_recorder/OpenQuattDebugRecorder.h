@@ -86,6 +86,7 @@ class OpenQuattDebugRecorder : public Component {
   PsramBuffer<StringEntry> string_entries_{};
   PsramBuffer<char> string_data_{};
   bool active_{false};
+  uint64_t recording_id_{0};
   uint32_t started_ms_{0};
   uint32_t stopped_ms_{0};
   uint32_t duration_s_{DEFAULT_DURATION_S};

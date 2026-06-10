@@ -2861,6 +2861,7 @@
       ok: true,
       available: true,
       active: Boolean(recording.active),
+      recording_id: Number(recording.startedAt || 0),
       storage: "psram",
       interval_s: 10,
       duration_s: Number(recording.durationS || 0),
@@ -2950,6 +2951,7 @@
       },
       recording: {
         started_at_ms: startedAtMs,
+        recording_id: Number(recording.startedAt || 0),
         ended_at_ms: endedAtMs,
         active: Boolean(recording.active),
         duration_s: Math.max(0, Math.floor((endedAtMs - startedAtMs) / 1000)),

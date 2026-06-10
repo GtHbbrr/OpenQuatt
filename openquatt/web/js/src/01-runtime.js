@@ -83,6 +83,7 @@
     debugRecordingEvents: [],
     debugRecordingSelectedMinutes: 15,
     debugRecordingDeviceStatus: null,
+    debugRecordingAcknowledgedId: getStoredDebugRecordingAcknowledgedId(),
     debugRecordingDeviceBundle: null,
     debugRecordingDevicePollTimer: null,
     complete: false,

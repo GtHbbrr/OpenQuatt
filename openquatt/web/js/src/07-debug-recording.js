@@ -100,6 +100,34 @@ function getDebugRecordingProgressPercent() {
   return Math.max(0, Math.min(100, (elapsedMs / totalMs) * 100));
 }
 
+function getDebugRecordingId(source = state.debugRecordingDeviceStatus) {
+  return String(source?.recording_id ?? source?.recording?.recording_id ?? "").trim();
+}
+
+function getStoredDebugRecordingAcknowledgedId() {
+  try {
+    return String(window.localStorage.getItem("oq-debug-recording-acknowledged-id") || "");
+  } catch (_error) {
+    return "";
+  }
+}
+
+function acknowledgeDebugRecording(bundle) {
+  if (bundle?.recording?.active) {
+    return;
+  }
+  const recordingId = getDebugRecordingId(bundle);
+  if (!recordingId) {
+    return;
+  }
+  state.debugRecordingAcknowledgedId = recordingId;
+  try {
+    window.localStorage.setItem("oq-debug-recording-acknowledged-id", recordingId);
+  } catch (_error) {
+    // The acknowledgement still applies for the current browser session.
+  }
+}
+
 function renderDebugRecordingHeaderStatus() {
   const status = state.debugRecordingDeviceStatus;
   const sampleCount = Math.max(0, Number(status?.sample_count || 0));
@@ -108,6 +136,9 @@ function renderDebugRecordingHeaderStatus() {
   }
 
   const active = Boolean(status.active);
+  if (!active && getDebugRecordingId(status) === state.debugRecordingAcknowledgedId) {
+    return "";
+  }
   const remaining = formatDebugRecordingDuration(Math.max(0, Number(status.remaining_s || 0)) * 1000);
   const label = active ? `Debug loopt · ${remaining}` : "Debug klaar";
   const title = active ? `Debugopname loopt, nog ${remaining}` : "Debugopname klaar om te downloaden";
@@ -703,6 +734,7 @@ async function downloadDebugRecordingBundle() {
     const bundle = await response.json();
     state.debugRecordingDeviceBundle = bundle;
     downloadDebugRecordingTextFile(getDebugRecordingFilename(bundle), getDebugRecordingCompactJson(bundle));
+    acknowledgeDebugRecording(bundle);
     state.debugRecordingNotice = "Supportbestand gedownload.";
   } catch (error) {
     state.debugRecordingError = "Download mislukt. Probeer opnieuw of kopieer de data.";
@@ -735,6 +767,7 @@ async function copyDebugRecordingBundle() {
     if (!copied) {
       throw new Error("Kopiëren naar het klembord is niet gelukt.");
     }
+    acknowledgeDebugRecording(bundle);
     state.debugRecordingNotice = "Supportbestand gekopieerd.";
   } catch (error) {
     state.debugRecordingError = "Kopiëren mislukt. Probeer opnieuw of download het supportbestand.";
