@@ -1,4 +1,7 @@
 function getDebugRecordingSampleCount() {
+  if (state.debugRecordingDeviceStatus) {
+    return Math.max(0, Number(state.debugRecordingDeviceStatus.sample_count || 0));
+  }
   return Array.isArray(state.debugRecordingSamples) ? state.debugRecordingSamples.length : 0;
 }
 
@@ -17,6 +20,9 @@ function formatDebugRecordingDuration(valueMs) {
 }
 
 function getDebugRecordingDurationMs() {
+  if (state.debugRecordingDeviceStatus) {
+    return Math.max(0, Number(state.debugRecordingDeviceStatus.elapsed_s || 0) * 1000);
+  }
   if (!state.debugRecordingStartedAt) {
     return 0;
   }
@@ -25,6 +31,9 @@ function getDebugRecordingDurationMs() {
 }
 
 function getDebugRecordingStatusLabel() {
+  if (state.debugRecordingDeviceStatus && state.debugRecordingDeviceStatus.available === false) {
+    return "Niet beschikbaar";
+  }
   if (state.debugRecordingActive) {
     return "Bezig met opnemen";
   }
@@ -37,12 +46,15 @@ function getDebugRecordingStatusLabel() {
 
 function getDebugRecordingStatusCopy() {
   if (state.debugRecordingActive) {
-    return "De opname loopt in browsergeheugen. Download het supportbestand na afloop.";
+    return "De opname loopt in apparaatgeheugen. Je kunt deze pagina sluiten en later het bestand downloaden.";
   }
   if (getDebugRecordingSampleCount() > 0) {
     return "De opname is klaar. Download het supportbestand en voeg dit toe aan je supportverzoek.";
   }
-  return "Neem tijdelijk supportgegevens op voor analyse. Alleen gewijzigde waarden worden lokaal in de browser opgeslagen. Er wordt niets automatisch verzonden.";
+  if (state.debugRecordingDeviceStatus && state.debugRecordingDeviceStatus.available === false) {
+    return "Debugopname in apparaatgeheugen is niet beschikbaar op deze firmware.";
+  }
+  return "Neem tijdelijk supportgegevens op voor analyse. De opname wordt lokaal in het apparaatgeheugen opgeslagen. Er wordt niets automatisch verzonden.";
 }
 
 function getDebugRecordingSelectedMinutes() {
@@ -62,6 +74,9 @@ function setDebugRecordingSelectedMinutes(minutes) {
 }
 
 function getDebugRecordingRemainingMs() {
+  if (state.debugRecordingDeviceStatus) {
+    return Math.max(0, Number(state.debugRecordingDeviceStatus.remaining_s || 0) * 1000);
+  }
   if (!state.debugRecordingActive) {
     return 0;
   }
@@ -69,6 +84,14 @@ function getDebugRecordingRemainingMs() {
 }
 
 function getDebugRecordingProgressPercent() {
+  if (state.debugRecordingDeviceStatus) {
+    const duration = Math.max(1, Number(state.debugRecordingDeviceStatus.duration_s || 0));
+    const elapsed = Math.max(0, Number(state.debugRecordingDeviceStatus.elapsed_s || 0));
+    if (!state.debugRecordingActive && getDebugRecordingSampleCount() > 0) {
+      return 100;
+    }
+    return Math.max(0, Math.min(100, (elapsed / duration) * 100));
+  }
   if (!state.debugRecordingActive || !state.debugRecordingStartedAt || !state.debugRecordingEndsAt) {
     return getDebugRecordingSampleCount() > 0 ? 100 : 0;
   }
@@ -237,6 +260,93 @@ function clearDebugRecordingTimer() {
   }
 }
 
+function clearDebugRecordingDevicePollTimer() {
+  if (state.debugRecordingDevicePollTimer) {
+    window.clearTimeout(state.debugRecordingDevicePollTimer);
+    state.debugRecordingDevicePollTimer = null;
+  }
+}
+
+function getDebugRecordingEndpoint(path) {
+  return `${getBasePath()}/openquatt/debug-recording/${path}`;
+}
+
+function applyDebugRecordingDeviceStatus(payload) {
+  const status = payload && typeof payload === "object" ? payload : {};
+  state.debugRecordingDeviceStatus = status;
+  state.debugRecordingActive = Boolean(status.active);
+  state.debugRecordingStartedAt = status.active || Number(status.sample_count || 0) > 0
+    ? Date.now() - Math.max(0, Number(status.elapsed_s || 0) * 1000)
+    : 0;
+  state.debugRecordingEndsAt = status.active
+    ? Date.now() + Math.max(0, Number(status.remaining_s || 0) * 1000)
+    : 0;
+  state.debugRecordingLastSampleAt = Number(status.sample_count || 0) > 0 ? Date.now() : 0;
+}
+
+function applyDebugRecordingDeviceUnavailableStatus() {
+  applyDebugRecordingDeviceStatus({
+    ok: false,
+    available: false,
+    active: false,
+    storage: "unavailable",
+    interval_s: 0,
+    duration_s: 0,
+    elapsed_s: 0,
+    remaining_s: 0,
+    sample_count: 0,
+    sample_capacity: 0,
+    estimated_size: 0,
+    buffer: "unavailable",
+  });
+}
+
+async function fetchDebugRecordingDeviceStatus() {
+  const response = await window.fetch(getDebugRecordingEndpoint("status"), {
+    cache: "no-store",
+    headers: { "Cache-Control": "no-store" },
+  });
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}`);
+  }
+  const payload = await response.json();
+  applyDebugRecordingDeviceStatus(payload);
+  return payload;
+}
+
+function scheduleDebugRecordingDeviceStatusPoll(delayMs = 2000) {
+  clearDebugRecordingDevicePollTimer();
+  if (state.systemModal !== "debug-recording" || !state.debugRecordingActive) {
+    return;
+  }
+  state.debugRecordingDevicePollTimer = window.setTimeout(() => {
+    void refreshDebugRecordingDeviceStatus({ silent: true });
+  }, Math.max(0, Number(delayMs) || 0));
+}
+
+async function refreshDebugRecordingDeviceStatus(options = {}) {
+  if (!options.silent) {
+    state.debugRecordingBusy = true;
+    state.debugRecordingError = "";
+    render();
+  }
+  try {
+    await fetchDebugRecordingDeviceStatus();
+    if (!state.debugRecordingActive && options.silent) {
+      state.debugRecordingNotice = "Debugopname is afgerond.";
+    }
+    scheduleDebugRecordingDeviceStatusPoll();
+  } catch (error) {
+    applyDebugRecordingDeviceUnavailableStatus();
+    state.debugRecordingError = `Status kon niet worden opgehaald. ${error.message || String(error)}`;
+  } finally {
+    if (!options.silent) {
+      state.debugRecordingBusy = false;
+    }
+    render();
+  }
+}
+
 function scheduleDebugRecordingSample(delayMs = DEBUG_RECORDING_SAMPLE_INTERVAL_MS) {
   clearDebugRecordingTimer();
   if (!state.debugRecordingActive) {
@@ -267,7 +377,7 @@ async function captureDebugRecordingSample() {
     state.debugRecordingLastSampleAt = sample.ts;
     state.debugRecordingSamples = [...(state.debugRecordingSamples || []), sample.sample];
     if (Date.now() >= Number(state.debugRecordingEndsAt || 0)) {
-      stopDebugRecording({ completed: true });
+      void stopDebugRecording({ completed: true });
       return;
     }
     scheduleDebugRecordingSample();
@@ -280,36 +390,66 @@ async function captureDebugRecordingSample() {
   }
 }
 
-function startDebugRecording(durationMinutes) {
+async function startDebugRecording(durationMinutes) {
   const minutes = Math.max(1, Number(durationMinutes) || 15);
-  const now = Date.now();
   clearDebugRecordingTimer();
-  state.debugRecordingActive = true;
-  state.debugRecordingStartedAt = now;
-  state.debugRecordingEndsAt = now + minutes * 60 * 1000;
+  clearDebugRecordingDevicePollTimer();
+  state.debugRecordingBusy = true;
+  state.debugRecordingError = "";
+  state.debugRecordingNotice = "";
   state.debugRecordingSamples = [];
   state.debugRecordingEvents = [];
   state.debugRecordingInitialValues = null;
   state.debugRecordingLastValues = null;
-  state.debugRecordingError = "";
-  state.debugRecordingNotice = "";
+  state.debugRecordingDeviceBundle = null;
   state.debugRecordingLastSampleAt = 0;
   state.debugRecordingSequence = 0;
   render();
-  scheduleDebugRecordingSample(0);
+  try {
+    const response = await window.fetch(getDebugRecordingEndpoint(`start?duration_s=${encodeURIComponent(minutes * 60)}`), {
+      method: "POST",
+      cache: "no-store",
+      headers: { "Cache-Control": "no-store" },
+    });
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    const payload = await response.json();
+    applyDebugRecordingDeviceStatus(payload);
+    scheduleDebugRecordingDeviceStatusPoll();
+  } catch (error) {
+    applyDebugRecordingDeviceUnavailableStatus();
+    state.debugRecordingError = `Debugopname kon niet worden gestart. ${error.message || String(error)}`;
+  } finally {
+    state.debugRecordingBusy = false;
+    render();
+  }
 }
 
-function stopDebugRecording(options = {}) {
+async function stopDebugRecording(options = {}) {
   clearDebugRecordingTimer();
-  const wasActive = state.debugRecordingActive;
-  state.debugRecordingActive = false;
-  state.debugRecordingEndsAt = 0;
-  if (wasActive || options.completed) {
-    state.debugRecordingNotice = options.completed
-      ? "Debugopname is afgerond."
-      : "Debugopname is gestopt.";
-  }
+  clearDebugRecordingDevicePollTimer();
+  state.debugRecordingBusy = true;
+  state.debugRecordingError = "";
   render();
+  try {
+    const response = await window.fetch(getDebugRecordingEndpoint("stop"), {
+      method: "POST",
+      cache: "no-store",
+      headers: { "Cache-Control": "no-store" },
+    });
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    const payload = await response.json();
+    applyDebugRecordingDeviceStatus(payload);
+    state.debugRecordingNotice = options.completed ? "Debugopname is afgerond." : "Debugopname is gestopt.";
+  } catch (error) {
+    state.debugRecordingError = `Debugopname kon niet worden gestopt. ${error.message || String(error)}`;
+  } finally {
+    state.debugRecordingBusy = false;
+    render();
+  }
 }
 
 function trimDebugRecordingLogs(payload) {
@@ -394,6 +534,9 @@ function buildDebugRecordingCorePayload(extra = {}) {
 }
 
 async function buildDebugRecordingBundle() {
+  if (state.debugRecordingDeviceBundle) {
+    return state.debugRecordingDeviceBundle;
+  }
   const logs = await fetchDebugRecordingLogs();
   const source = getDebugRecordingSourceMeta();
 
@@ -405,6 +548,10 @@ function getDebugRecordingCompactJson(payload) {
 }
 
 function getDebugRecordingEstimatedBytes() {
+  const estimated = Number(state.debugRecordingDeviceStatus?.estimated_size || 0);
+  if (estimated > 0) {
+    return estimated;
+  }
   try {
     return new Blob([getDebugRecordingCompactJson(buildDebugRecordingCorePayload())]).size;
   } catch (_error) {
@@ -450,7 +597,8 @@ function downloadDebugRecordingTextFile(filename, text) {
 }
 
 function getDebugRecordingFilename(bundle) {
-  const stamp = String(bundle?.exported_at || new Date().toISOString())
+  const exportedAt = bundle?.exported_at || (bundle?.exported_at_ms ? new Date(Number(bundle.exported_at_ms)).toISOString() : new Date().toISOString());
+  const stamp = String(exportedAt)
     .replace(/[:.]/g, "-")
     .replace(/T/, "_")
     .replace(/Z$/, "Z");
@@ -468,7 +616,15 @@ async function downloadDebugRecordingBundle() {
   state.debugRecordingError = "";
   render();
   try {
-    const bundle = await buildDebugRecordingBundle();
+    const response = await window.fetch(getDebugRecordingEndpoint("download"), {
+      cache: "no-store",
+      headers: { "Cache-Control": "no-store" },
+    });
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    const bundle = await response.json();
+    state.debugRecordingDeviceBundle = bundle;
     downloadDebugRecordingTextFile(getDebugRecordingFilename(bundle), getDebugRecordingCompactJson(bundle));
     state.debugRecordingNotice = "Supportbestand gedownload.";
   } catch (error) {
@@ -489,7 +645,15 @@ async function copyDebugRecordingBundle() {
   state.debugRecordingError = "";
   render();
   try {
-    const bundle = await buildDebugRecordingBundle();
+    const response = await window.fetch(getDebugRecordingEndpoint("download"), {
+      cache: "no-store",
+      headers: { "Cache-Control": "no-store" },
+    });
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    const bundle = await response.json();
+    state.debugRecordingDeviceBundle = bundle;
     const copied = await copyTextToClipboard(getDebugRecordingCompactJson(bundle));
     if (!copied) {
       throw new Error("Kopiëren naar het klembord is niet gelukt.");
@@ -508,7 +672,9 @@ function renderDebugRecordingModal() {
   const sampleCount = getDebugRecordingSampleCount();
   const busy = state.debugRecordingBusy;
   const estimatedSize = formatDebugRecordingBytes(getDebugRecordingEstimatedBytes());
-  const eventCount = Array.isArray(state.debugRecordingEvents) ? state.debugRecordingEvents.length : 0;
+  const eventCount = Array.isArray(state.debugRecordingDeviceBundle?.events)
+    ? state.debugRecordingDeviceBundle.events.length
+    : Array.isArray(state.debugRecordingEvents) ? state.debugRecordingEvents.length : 0;
   const selectedMinutes = getDebugRecordingSelectedMinutes();
   const remainingMs = getDebugRecordingRemainingMs();
   const progressPercent = getDebugRecordingProgressPercent();
@@ -520,7 +686,7 @@ function renderDebugRecordingModal() {
     { icon: "samples", label: "Samples", value: String(sampleCount) },
     { icon: "changes", label: "Statuswijzigingen", value: String(eventCount) },
     { icon: "file", label: "Geschatte grootte", value: `± ${estimatedSize}` },
-    { icon: "storage", label: "Opslag", value: "Browser" },
+    { icon: "storage", label: "Opslag", value: state.debugRecordingDeviceStatus?.available === false ? "Niet beschikbaar" : "Apparaatgeheugen" },
   ];
   const feedback = state.debugRecordingError
     ? { kind: "error", icon: "alert", text: state.debugRecordingError }
@@ -587,7 +753,7 @@ function renderDebugRecordingModal() {
           ${active ? `
             <button class="oq-helper-button oq-helper-button--warning oq-debug-recording-primary" type="button" data-oq-action="stop-debug-recording" ${busy ? "disabled" : ""}>${renderDebugRecordingButtonIcon("stop")}Stop opname</button>
           ` : `
-            <button class="oq-helper-button oq-helper-button--primary oq-debug-recording-primary" type="button" data-oq-action="start-debug-recording" data-debug-minutes="${selectedMinutes}" ${busy ? "disabled" : ""}>${renderDebugRecordingButtonIcon("play")}Start opname</button>
+            <button class="oq-helper-button oq-helper-button--primary oq-debug-recording-primary" type="button" data-oq-action="start-debug-recording" data-debug-minutes="${selectedMinutes}" ${busy || state.debugRecordingDeviceStatus?.available === false ? "disabled" : ""}>${renderDebugRecordingButtonIcon("play")}Start opname</button>
           `}
           <button class="oq-helper-button oq-helper-button--ghost" type="button" data-oq-action="download-debug-recording" ${!hasRecording || busy ? "disabled" : ""}>${renderDebugRecordingButtonIcon("download")}Download supportbestand</button>
           <button class="oq-helper-button oq-helper-button--ghost" type="button" data-oq-action="copy-debug-recording" ${!hasRecording || busy ? "disabled" : ""}>${renderDebugRecordingButtonIcon("copy")}Kopieer data</button>
