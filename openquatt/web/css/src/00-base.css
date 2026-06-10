@@ -1705,7 +1705,7 @@ body.oq-surface-native {
 
 .oq-debug-recording-stat {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(104px, 0.58fr);
+  grid-template-columns: minmax(0, 1fr) max-content;
   align-items: center;
   gap: 12px;
   min-height: 50px;
@@ -1746,7 +1746,7 @@ body.oq-surface-native {
   font-size: 0.95rem;
   font-weight: 800;
   text-align: left;
-  overflow-wrap: anywhere;
+  white-space: nowrap;
 }
 
 .oq-helper-shell--dark .oq-debug-recording-stat dt,
