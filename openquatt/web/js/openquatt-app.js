@@ -2516,7 +2516,7 @@ Kenmerken: Flowmeter in de buitenunit ge\xEFntegreerd. Onder CV-ketel enkel een 
         <span>${i(e.label)}</span>
         <strong>${i(D(n,e.decimals,e.unit))}</strong>
       </div>
-    `}function ml(e,o){if(e?.currentKey){const n=M(e.currentKey);if(Number.isFinite(n))return n}return Jt(e,o)}function gl(e){e&&Wr().forEach(o=>{const n=e.querySelector(`[data-oq-trend-card="${o.id}"]`),r=o.samples[o.samples.length-1]||null;n&&o.series.forEach(a=>{const u=n.querySelector(`[data-oq-trend-current="${a.id}"]`)?.querySelector("strong"),d=D(ml(a,r),a.decimals,a.unit);u&&u.textContent!==d&&(u.textContent=d)})})}function Fg(e,o,n=!1,r=xe()){const a=pl(e,o,{mockData:n,windowHours:r}),s=Ir(r),u=pn(a.startTime),d=pn(a.startTime+a.span/2),c=pn(a.endTime),l=a.tracks.flatMap(p=>{if(p.points.length<2){const g=p.points[0];return g?`
+    `}function ml(e,o){if(e?.currentKey&&y(e.currentKey)){const n=M(e.currentKey);if(Number.isFinite(n))return n}return Jt(e,o)}function gl(e){e&&Wr().forEach(o=>{const n=e.querySelector(`[data-oq-trend-card="${o.id}"]`),r=o.samples[o.samples.length-1]||null;n&&o.series.forEach(a=>{const u=n.querySelector(`[data-oq-trend-current="${a.id}"]`)?.querySelector("strong"),d=D(ml(a,r),a.decimals,a.unit);u&&u.textContent!==d&&(u.textContent=d)})})}function Fg(e,o,n=!1,r=xe()){const a=pl(e,o,{mockData:n,windowHours:r}),s=Ir(r),u=pn(a.startTime),d=pn(a.startTime+a.span/2),c=pn(a.endTime),l=a.tracks.flatMap(p=>{if(p.points.length<2){const g=p.points[0];return g?`
           <circle
             cx="${g.x.toFixed(1)}"
             cy="${g.y.toFixed(1)}"

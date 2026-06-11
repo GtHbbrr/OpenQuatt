@@ -1350,7 +1350,7 @@
   }
 
   function getOverviewTrendSeriesCurrentValue(series, fallbackSample) {
-    if (series?.currentKey) {
+    if (series?.currentKey && hasEntity(series.currentKey)) {
       const current = getEntityNumericValue(series.currentKey);
       if (Number.isFinite(current)) {
         return current;
