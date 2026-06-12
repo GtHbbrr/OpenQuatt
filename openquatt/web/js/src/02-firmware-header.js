@@ -127,7 +127,11 @@
   }
 
   function getFirmwareHardwareProfile() {
-    return String(getEntityValue("hardwareProfileText") || getDeviceMeta().hardwareProfile || "").trim().toLowerCase();
+    const entityProfile = String(getEntityValue("hardwareProfileText") || "").trim().toLowerCase();
+    if (entityProfile && entityProfile !== "unknown" && entityProfile !== "onbekend") {
+      return entityProfile;
+    }
+    return String(getDeviceMeta().hardwareProfile || entityProfile).trim().toLowerCase();
   }
 
   function getFirmwareBuildConnection() {

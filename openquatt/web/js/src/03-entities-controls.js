@@ -3440,6 +3440,11 @@
       return;
     }
 
+    if (action === "refresh-quickstart-flow-signal") {
+      void refreshQuickStartFlowSignal();
+      return;
+    }
+
     if (action === "apply-quickstart-thermostat-source") {
       void applyQuickStartThermostatSourceConfiguration();
       return;
@@ -3740,6 +3745,28 @@
       await refreshEntities(QUICK_START_FLOW_SOURCE_KEYS, "all");
     } catch (error) {
       state.controlError = `Flowconfiguratie kon niet volledig worden toegepast. ${error.message}`;
+    } finally {
+      state.busyAction = "";
+      render();
+    }
+  }
+
+  async function refreshQuickStartFlowSignal() {
+    state.busyAction = "quickstart-flow-refresh";
+    state.controlNotice = "";
+    state.controlError = "";
+    render();
+
+    try {
+      await refreshEntities(QUICK_START_FLOW_SOURCE_KEYS, "all");
+      const model = getQuickStartFlowSourceModel();
+      state.controlNotice = !model.flowAvailable
+        ? "Nog geen actuele flowwaarde ontvangen."
+        : model.flowValue > 0
+          ? `Flowsignaal bijgewerkt: ${Math.round(model.flowValue)} L/h.`
+          : "Het flowsignaal is beschikbaar; momenteel is er geen circulatie.";
+    } catch (error) {
+      state.controlError = `Flowsignaal controleren mislukt. ${error.message}`;
     } finally {
       state.busyAction = "";
       render();

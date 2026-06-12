@@ -84,13 +84,57 @@
     `;
   }
 
+  function normalizeQuickStartHardwareProfile(value) {
+    const normalized = String(value || "").trim().toLowerCase();
+    if (normalized === "heatpump_controller_q" || normalized.includes("q-edition") || normalized.includes("controller q")) {
+      return "heatpump_controller_q";
+    }
+    if (normalized === "heatpump_listener" || normalized.includes("listener")) {
+      return "heatpump_listener";
+    }
+    if (normalized === "waveshare" || normalized.includes("waveshare")) {
+      return "waveshare";
+    }
+    return "";
+  }
+
+  function getQuickStartHardwareProfileModel() {
+    let profile = normalizeQuickStartHardwareProfile(getEntityValue("hardwareProfileText"));
+    let inferred = false;
+    if (!profile) {
+      profile = normalizeQuickStartHardwareProfile(getDeviceMeta().hardwareProfile);
+    }
+    if (!profile && hasEntity("qFlowSource")) {
+      profile = "heatpump_controller_q";
+      inferred = true;
+    } else if (!profile && hasEntity("flowSource") && hasEntity("cicPollingEnabled")) {
+      profile = "remote";
+      inferred = true;
+    }
+
+    return {
+      profile,
+      inferred,
+      isQEdition: profile === "heatpump_controller_q",
+      isRemoteProfile: profile === "heatpump_listener" || profile === "waveshare" || profile === "remote",
+      hardwareKnown: Boolean(profile),
+      hardwareLabel: profile === "heatpump_controller_q"
+        ? "Heatpump Controller Q-edition"
+        : profile === "heatpump_listener"
+          ? "Heatpump Listener"
+          : profile === "waveshare"
+            ? "Waveshare"
+            : profile === "remote"
+              ? "Heatpump Listener / Waveshare"
+              : "Onbekend hardwareprofiel",
+    };
+  }
+
   function getQuickStartFlowSourceModel() {
     const generation = String(getEntityValue("hpGeneration") || "").trim();
-    const hardware = String(getEntityValue("hardwareProfileText") || "").trim().toLowerCase();
+    const hardware = getQuickStartHardwareProfileModel();
     const isV1 = generation === "V1";
-    const isQEdition = hardware === "heatpump_controller_q";
-    const isRemoteProfile = hardware === "heatpump_listener" || hardware === "waveshare";
-    const hardwareKnown = isQEdition || isRemoteProfile;
+    const { isQEdition, isRemoteProfile, hardwareKnown } = hardware;
     const requiresCic = isV1 && isRemoteProfile;
     const qFlowTarget = isQEdition ? (isV1 ? "Local" : "Outdoor unit") : "";
     const flowSourceTarget = requiresCic ? "CIC" : "Outdoor unit";
@@ -118,23 +162,18 @@
     let status = hardwareKnown ? requiresCic ? "Nog configureren" : "Nog activeren" : "Hardwareprofiel niet herkend";
     if (requiresCic && configurationApplied) {
       status = cicFeedOk && flowAvailable
-        ? "Geldig"
+        ? flowValue > 0 ? "Geldig" : "Bron actief, geen circulatie"
         : cicStale
           ? "Geen actuele CiC-data"
           : cicFeedOk
             ? "Verbonden, wacht op flow"
             : "Verbinding controleren";
     } else if (!requiresCic && configurationApplied) {
-      status = flowAvailable ? "Geldig" : "Wacht op actuele flow";
+      status = flowAvailable
+        ? flowValue > 0 ? "Geldig" : "Bron actief, geen circulatie"
+        : "Wacht op actuele flow";
     }
 
-    const hardwareLabel = hardware === "heatpump_controller_q"
-      ? "Heatpump Controller Q-edition"
-      : hardware === "heatpump_listener"
-        ? "Heatpump Listener"
-        : hardware === "waveshare"
-          ? "Waveshare"
-          : hardware || "Onbekend hardwareprofiel";
     const sourceLabel = requiresCic
       ? "CiC JSON-feed"
       : isQEdition && isV1
@@ -148,7 +187,7 @@
 
     return {
       generation,
-      hardwareLabel,
+      hardwareLabel: hardware.hardwareLabel,
       requiresCic,
       qFlowTarget,
       flowSourceTarget,
@@ -167,9 +206,8 @@
   }
 
   function getQuickStartThermostatSourceModel() {
-    const hardware = String(getEntityValue("hardwareProfileText") || "").trim().toLowerCase();
-    const isQEdition = hardware === "heatpump_controller_q";
-    const isRemoteProfile = hardware === "heatpump_listener" || hardware === "waveshare";
+    const hardware = getQuickStartHardwareProfileModel();
+    const { isQEdition, isRemoteProfile } = hardware;
     const currentRoomTempSource = String(getEntityValue("roomTempSource") || "").trim();
     const currentRoomSetpointSource = String(getEntityValue("roomSetpointSource") || "").trim();
     const pairedCurrentSource = currentRoomTempSource === currentRoomSetpointSource
@@ -207,13 +245,6 @@
           : "HA-proxy's controleren";
     }
 
-    const hardwareLabel = hardware === "heatpump_controller_q"
-      ? "Heatpump Controller Q-edition"
-      : hardware === "heatpump_listener"
-        ? "Heatpump Listener"
-        : hardware === "waveshare"
-          ? "Waveshare"
-          : hardware || "Onbekend hardwareprofiel";
     const sourceLabel = selectedSource === "OT thermostat"
       ? "OpenTherm-thermostaat"
       : selectedSource === "CIC"
@@ -226,7 +257,7 @@
         : "OpenQuatt gebruikt de vaste HA-proxy's voor kamertemperatuur en kamer-setpoint.";
 
     return {
-      hardwareLabel,
+      hardwareLabel: hardware.hardwareLabel,
       isQEdition,
       isRemoteProfile,
       selectedSource,
@@ -248,8 +279,8 @@
 
   function renderFlowSourceWorkspace() {
     const model = getQuickStartFlowSourceModel();
-    const busy = state.busyAction === "quickstart-flow-source";
-    const statusClass = model.status === "Geldig" ? " is-active" : "";
+    const busy = state.busyAction === "quickstart-flow-source" || state.busyAction === "quickstart-flow-refresh";
+    const statusClass = model.status === "Geldig" || model.status === "Bron actief, geen circulatie" ? " is-active" : "";
     const flowLabel = model.flowAvailable ? `${Math.round(model.flowValue)} L/h` : "Nog geen actuele waarde";
     const cicField = model.requiresCic ? renderQuickStartCicFeedUrlField(model, busy) : "";
 
@@ -289,9 +320,18 @@
             data-oq-action="apply-quickstart-flow-source"
             ${busy || !model.canApply ? "disabled" : ""}
           >
-            ${busy ? "Flowconfiguratie opslaan..." : model.configurationApplied ? "Flowconfiguratie opnieuw opslaan" : model.requiresCic ? "CiC-flowconfiguratie opslaan" : "Flowconfiguratie activeren"}
+            ${state.busyAction === "quickstart-flow-source" ? "Flowconfiguratie opslaan..." : model.configurationApplied ? "Flowconfiguratie opnieuw opslaan" : model.requiresCic ? "CiC-flowconfiguratie opslaan" : "Flowconfiguratie activeren"}
+          </button>
+          <button
+            class="oq-helper-button oq-helper-button--ghost"
+            type="button"
+            data-oq-action="refresh-quickstart-flow-signal"
+            ${busy || !model.configurationApplied ? "disabled" : ""}
+          >
+            ${state.busyAction === "quickstart-flow-refresh" ? "Signaal controleren..." : "Signaal opnieuw controleren"}
           </button>
         </div>
+        <p class="oq-settings-action-note">0 L/h kan normaal zijn als de circulatiepomp stilstaat. Een actieve pomptest staat onder Instellingen → Installatie → Service & commissioning.</p>
         ${renderQuickStartStepNav({
           nextDisabled: !model.configurationApplied,
           nextDisabledLabel: model.requiresCic ? "Sla eerst op" : "Activeer eerst",
