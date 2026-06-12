@@ -10,6 +10,7 @@
   const state = {
     scenario: "heating",
     installation: "duo",
+    hardware: "heatpump_controller_q",
     connection: "wifi",
     boiler: "off",
     diagnostics: "clear",
@@ -790,7 +791,7 @@
     syncDevMeta();
     setEntity("text_sensor", "Summary", { state: "" });
     setEntity("text_sensor", "OpenQuatt Installation Topology", { state: state.installation, value: state.installation });
-    setEntity("text_sensor", "OpenQuatt Hardware Profile", { state: "heatpump_controller_q", value: "heatpump_controller_q" });
+    setEntity("text_sensor", "OpenQuatt Hardware Profile", { state: state.hardware, value: state.hardware });
     setEntity("text_sensor", "OpenQuatt Connection", { state: state.connection, value: state.connection });
     setEntity("button", "Check Firmware Updates", { state: "" });
     setEntity("button", "Install Firmware Update Target", { state: "" });
@@ -1263,7 +1264,7 @@
     );
     window.__OQ_DEV_META = {
       installation: state.installation,
-      hardwareProfile: "heatpump_controller_q",
+      hardwareProfile: state.hardware,
       connection: state.connection,
       ipAddress: "192.168.2.123",
       bootedAt: state.bootedAt,
@@ -3118,6 +3119,14 @@
             </select>
           </label>
           <label class="oq-helper-hub-dev-row">
+            <span class="oq-helper-hub-dev-label">Hardware</span>
+            <select class="oq-helper-hub-dev-select" data-oq-dev-control="hardware">
+              <option value="heatpump_controller_q">Q-edition</option>
+              <option value="heatpump_listener">Listener</option>
+              <option value="waveshare">Waveshare</option>
+            </select>
+          </label>
+          <label class="oq-helper-hub-dev-row">
             <span class="oq-helper-hub-dev-label">Verbinding</span>
             <select class="oq-helper-hub-dev-select" data-oq-dev-control="connection">
               <option value="wifi">Wi-Fi</option>
@@ -3171,6 +3180,18 @@
         setInstallationMode(installation.value);
         applyScenario(state.scenario);
         updateSummary();
+        notifyMockUpdated();
+        notifyDevControlsChanged();
+      };
+    }
+
+    const hardware = controlsRoot.querySelector('[data-oq-dev-control="hardware"]');
+    if (hardware) {
+      hardware.value = state.hardware;
+      hardware.onchange = () => {
+        state.hardware = hardware.value;
+        setEntity("text_sensor", "OpenQuatt Hardware Profile", { state: state.hardware, value: state.hardware });
+        syncDevMeta();
         notifyMockUpdated();
         notifyDevControlsChanged();
       };

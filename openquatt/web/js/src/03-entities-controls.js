@@ -274,6 +274,7 @@
     ...TOPOLOGY_HINT_KEYS,
     "hpGeneration",
     "openquattEnabled",
+    ...QUICK_START_FLOW_SOURCE_KEYS,
     "boilerCvAssistEnabled",
     "boilerRatedHeatPower",
     "strategy",
@@ -2292,6 +2293,9 @@
     const staticKeys = isStaticDue || state.updateInstallBusy || state.updateInstallPhaseHint
       ? FIRMWARE_ENTITY_KEYS
       : [];
+    const quickStartFlowSourceKeys = state.quickStartModalOpen && state.currentStep === "flow-source"
+      ? QUICK_START_FLOW_SOURCE_KEYS
+      : [];
     const keys = isPrefetchOverview
       ? [
           ...FAST_OVERVIEW_KEYS,
@@ -2334,7 +2338,7 @@
         }
         return;
       }
-      await refreshEntities([...new Set(keys)], isPrefetchOverview ? "state" : appView === "settings" ? "all" : "state", {
+      await refreshEntities([...new Set([...keys, ...quickStartFlowSourceKeys])], isPrefetchOverview ? "state" : appView === "settings" ? "all" : "state", {
         concurrency: forceFast && isOverviewLike ? FAST_VIEW_ENTITY_REFRESH_CONCURRENCY : ENTITY_REFRESH_CONCURRENCY,
       });
       state.lastFastEntitySyncAt = Date.now();
@@ -2565,6 +2569,10 @@
 
     const field = event.target.dataset.oqField;
     if (!field) {
+      if (event.target.dataset.oqQuickstartCicUrl !== undefined) {
+        state.quickStartCicFeedUrlDraft = String(event.target.value || "");
+        return;
+      }
       const authField = event.target.dataset.oqAuthField;
       if (!authField) {
         const mqttField = event.target.dataset.oqMqttField;
@@ -3418,6 +3426,11 @@
       return;
     }
 
+    if (action === "apply-quickstart-flow-source") {
+      void applyQuickStartFlowSourceConfiguration();
+      return;
+    }
+
     if (action === "previous-step") {
       selectQuickStepByOffset(-1);
       render();
@@ -3656,6 +3669,63 @@
     } catch (error) {
       state.controlError = `${entity.name} aanpassen mislukt (${error.message}).`;
       render();
+    } finally {
+      state.busyAction = "";
+      render();
+    }
+  }
+
+  async function applyQuickStartFlowSourceConfiguration() {
+    const model = getQuickStartFlowSourceModel();
+    if (!model.canApply) {
+      state.controlError = model.requiresCic
+        ? "Vul eerst een geldig CiC-adres of een geldige feed-URL in."
+        : "De vereiste flowbroninstelling is niet beschikbaar in deze firmware.";
+      render();
+      return;
+    }
+
+    state.busyAction = "quickstart-flow-source";
+    state.controlNotice = "";
+    state.controlError = "";
+    render();
+
+    const applyValue = async (key, value) => {
+      if (!hasEntity(key)) {
+        return;
+      }
+      const current = getEntityValue(key);
+      if ((typeof value === "boolean" && isEntityActive(key) === value)
+        || (typeof value !== "boolean" && String(current) === String(value))) {
+        return;
+      }
+      const applied = await setEntityBackupValue(key, value);
+      state.entities[key] = {
+        ...(state.entities[key] || {}),
+        value: applied,
+        state: applied,
+      };
+    };
+
+    try {
+      if (model.requiresCic) {
+        await applyValue("cicFeedUrl", model.normalizedDraftUrl);
+        await applyValue("cicPollingEnabled", true);
+        await applyValue("flowSource", "CIC");
+        state.quickStartCicFeedUrlDraft = null;
+        state.controlNotice = "CiC-flowmeting ingesteld. OpenQuatt controleert nu de JSON-feed.";
+      } else {
+        if (model.qFlowTarget) {
+          await applyValue("qFlowSource", model.qFlowTarget);
+        }
+        await applyValue("flowSource", "Outdoor unit");
+        state.controlNotice = model.qFlowTarget === "Local"
+          ? "De lokale flowmeter op de Q-edition controller is ingesteld."
+          : "De flowmeter in de buitenunit is ingesteld als Modbus-bron.";
+      }
+      await refreshEntities(QUICK_START_FLOW_SOURCE_KEYS, "all");
+    } catch (error) {
+      state.controlError = `Flowconfiguratie kon niet volledig worden toegepast. ${error.message}`;
     } finally {
       state.busyAction = "";
       render();

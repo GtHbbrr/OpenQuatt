@@ -3455,6 +3455,10 @@
   color: var(--oq-helper-accent-deep);
 }
 
+.oq-settings-source-row.is-active strong {
+  color: #15803d;
+}
+
 .oq-helper-shell--dark .oq-settings-source-card,
 .oq-helper-modal-backdrop--dark .oq-settings-source-card {
   background: rgba(15, 23, 42, 0.28);
