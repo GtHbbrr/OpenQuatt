@@ -3802,10 +3802,13 @@
       if (state.optionalMissingEntities) {
         delete state.optionalMissingEntities[key];
       }
+      delete state.entities[key];
     });
     await refreshEntities(keys, "all");
-    if (!keys.every((key) => hasEntity(key))) {
-      throw new Error("Deze firmware bevat de interne waterpomptest nog niet.");
+    const missingKeys = keys.filter((key) => !state.entities[key]);
+    if (missingKeys.length) {
+      const missingNames = missingKeys.map((key) => ENTITY_DEFS[key]?.name || key).join(", ");
+      throw new Error(`Interne waterpomptestbediening ontbreekt: ${missingNames}.`);
     }
   }
 
@@ -3851,18 +3854,22 @@
           throw new Error(`CM100 starten gaf HTTP ${response.status}`);
         }
         openedCm100 = true;
-        let ready = false;
-        for (let attempt = 0; attempt < 20; attempt += 1) {
-          await new Promise((resolve) => window.setTimeout(resolve, 500));
-          await refreshEntities(["commissioningStatus", "cm100Active"], "state");
-          if (isEntityActive("cm100Active")) {
-            ready = true;
-            break;
-          }
+      }
+
+      let ready = isEntityActive("cm100Active")
+        && String(getEntityValue("commissioningStatus") || "").trim() === "CM100 READY";
+      for (let attempt = 0; !ready && attempt < 20; attempt += 1) {
+        await new Promise((resolve) => window.setTimeout(resolve, 500));
+        await refreshEntities(["commissioningStatus", "cm100Active"], "state");
+        ready = isEntityActive("cm100Active")
+          && String(getEntityValue("commissioningStatus") || "").trim() === "CM100 READY";
+      }
+      if (!ready) {
+        const status = String(getEntityValue("commissioningStatus") || "").trim();
+        if (status) {
+          throw new Error(`Service-stand werd niet gereed: ${status}.`);
         }
-        if (!ready) {
-          throw new Error("Service-stand CM100 werd niet op tijd actief.");
-        }
+        throw new Error("Service-stand CM100 werd niet op tijd gereed.");
       }
 
       await setQuickStartSwitch("quickFlowTest", true);
