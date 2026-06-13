@@ -26,8 +26,32 @@ const LOGO_MARKUP = `
       ],
     },
     {
-      id: "boiler",
+      id: "flow-source",
       kicker: "Stap 2",
+      title: "Flowmeting configureren",
+      copy: "Controleer en activeer de flowbron die bij jouw Quatt-versie en controller hoort.",
+      fields: [
+        {
+          title: "Flowbron",
+          copy: "De Quatt-versie en het hardwareprofiel bepalen automatisch welke flowbron OpenQuatt moet gebruiken.",
+        },
+      ],
+    },
+    {
+      id: "thermostat-source",
+      kicker: "Stap 3",
+      title: "Thermostaatgegevens configureren",
+      copy: "Leg vast waar OpenQuatt de kamertemperatuur en het kamer-setpoint samen vandaan haalt.",
+      fields: [
+        {
+          title: "Thermostaatbron",
+          copy: "Q-edition gebruikt OpenTherm. Listener en Waveshare gebruiken CiC of Home Assistant.",
+        },
+      ],
+    },
+    {
+      id: "boiler",
+      kicker: "Stap 4",
       title: "CV-ketel of boiler",
       copy: "Geef aan of OpenQuatt ondersteuning via een CV-ketel of boiler mag gebruiken.",
       optionalEntity: "boilerCvAssistEnabled",
@@ -40,7 +64,7 @@ const LOGO_MARKUP = `
     },
     {
       id: "strategy",
-      kicker: "Stap 3",
+      kicker: "Stap 5",
       title: "Kies de verwarmingsstrategie",
       copy: "Kies hier hoe OpenQuatt je verwarming regelt. Daarna lopen we samen de belangrijkste instellingen langs.",
       fields: [
@@ -52,7 +76,7 @@ const LOGO_MARKUP = `
     },
     {
       id: "heating",
-      kicker: "Stap 4",
+      kicker: "Stap 6",
       title: "Werk de regeling uit",
       copy: "Stel nu de gekozen regeling verder in. De inhoud hieronder past zich aan aan je keuze.",
       fields: [
@@ -64,7 +88,7 @@ const LOGO_MARKUP = `
     },
     {
       id: "flow",
-      kicker: "Stap 5",
+      kicker: "Stap 7",
       title: "Flowregeling en afstelling",
       copy: "Leg daarna vast hoe de pomp geregeld moet worden en welke waarden daarbij horen. De autotune staat later onder Instellingen → Installatie → Service & commissioning.",
       fields: [
@@ -76,7 +100,7 @@ const LOGO_MARKUP = `
     },
     {
       id: "water",
-      kicker: "Stap 6",
+      kicker: "Stap 8",
       title: "Watertemperatuur beveiligen",
       copy: "Controleer de normale bovengrens en de tripgrens voor het watercircuit.",
       fields: [
@@ -88,7 +112,7 @@ const LOGO_MARKUP = `
     },
     {
       id: "silent",
-      kicker: "Stap 7",
+      kicker: "Stap 9",
       title: "Stille uren en niveaus",
       copy: "Stel daarna het stille venster en de compressorlimieten voor dag en nacht in.",
       fields: [
@@ -100,7 +124,7 @@ const LOGO_MARKUP = `
     },
     {
       id: "confirm",
-      kicker: "Stap 8",
+      kicker: "Stap 10",
       title: "Bevestigen en afronden",
       copy: "Controleer nog één keer je keuzes. Met afronden markeer je Quick Start als voltooid.",
       fields: [
@@ -271,6 +295,7 @@ const LOGO_MARKUP = `
     manualFlowStatus: { domain: "text_sensor", name: "Manual flow status", optional: true },
     manualFlowSetpoint: { domain: "number", name: "Manual flow service setpoint", optional: true },
     manualFlowTargetIpwm: { domain: "sensor", name: "Manual flow target iPWM", optional: true },
+    quickFlowTest: { domain: "switch", name: "Quick flow test", optional: true },
     manualHpStart: { domain: "button", name: "Manual HP Start", optional: true },
     manualHpAbort: { domain: "button", name: "Manual HP Abort", optional: true },
     manualHpActive: { domain: "binary_sensor", name: "Manual HP active", optional: true },
@@ -788,6 +813,50 @@ const LOGO_MARKUP = `
     "coolingEnableHa",
     "coolingEnableHaValid",
   ];
+  const QUICK_START_FLOW_SOURCE_KEYS = [
+    "hardwareProfileText",
+    "hpGeneration",
+    "flowSource",
+    "qFlowSource",
+    "cicPollingEnabled",
+    "cicFeedUrl",
+    "cicJsonFeedOk",
+    "cicDataStale",
+    "cicFlowrate",
+    "controllerFlow",
+    "flowSelected",
+    "flowLocal",
+    "hp1Flow",
+    "hp2Flow",
+    "commissioningCm100Start",
+    "commissioningCm100Stop",
+    "commissioningStatus",
+    "cm100Active",
+    "quickFlowTest",
+  ];
+  const QUICK_START_THERMOSTAT_SOURCE_KEYS = [
+    "hardwareProfileText",
+    "roomTempSource",
+    "roomSetpointSource",
+    "roomTemp",
+    "roomSetpoint",
+    "roomTempEffectiveSource",
+    "roomSetpointEffectiveSource",
+    "otEnabled",
+    "otLinkProblem",
+    "otRoomTemp",
+    "otRoomSetpoint",
+    "cicPollingEnabled",
+    "cicFeedUrl",
+    "cicJsonFeedOk",
+    "cicDataStale",
+    "cicRoomTemp",
+    "cicRoomSetpoint",
+    "roomTempHa",
+    "roomTempHaValid",
+    "roomSetpointHa",
+    "roomSetpointHaValid",
+  ];
   const COOLING_SETTING_KEYS = [
     "coolingMinimumSupplyTemp",
     "coolingDemandMax",
@@ -1155,6 +1224,8 @@ const LOGO_MARKUP = `
     ...FLOW_SETTING_KEYS,
     "maxWater",
     ...SILENT_SETTING_KEYS,
+    ...QUICK_START_FLOW_SOURCE_KEYS,
+    ...QUICK_START_THERMOSTAT_SOURCE_KEYS,
     "coolingDewPointSelected",
     "coolingMinimumSafeSupplyTemp",
     "coolingEffectiveMinSupplyTemp",

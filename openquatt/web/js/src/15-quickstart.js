@@ -22,6 +22,426 @@
     `;
   }
 
+  function normalizeQuickStartCicFeedUrl(rawValue) {
+    const value = String(rawValue || "").trim();
+    if (!value) {
+      return "";
+    }
+
+    try {
+      const parsed = new URL(/^[a-z][a-z0-9+.-]*:\/\//i.test(value) ? value : `http://${value}`);
+      if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+        return "";
+      }
+      if (!parsed.port) {
+        parsed.port = "8080";
+      }
+      if (!parsed.pathname || parsed.pathname === "/") {
+        parsed.pathname = "/beta/feed/data.json";
+      }
+      return parsed.toString();
+    } catch (_error) {
+      return "";
+    }
+  }
+
+  function getQuickStartCicFeedUrlModel() {
+    const configuredUrl = String(getEntityValue("cicFeedUrl") || "").trim();
+    const draftUrl = state.quickStartCicFeedUrlDraft === null
+      ? configuredUrl
+      : String(state.quickStartCicFeedUrlDraft || "");
+    return {
+      configuredUrl,
+      draftUrl,
+      normalizedDraftUrl: normalizeQuickStartCicFeedUrl(draftUrl),
+    };
+  }
+
+  function renderQuickStartCicFeedUrlField(model, busy) {
+    return `
+      <article class="oq-settings-field oq-settings-field--span-2" data-oq-settings-field="quickStartCicFeedUrl">
+        <div class="oq-settings-field-head">
+          <h3>CiC JSON-feed</h3>
+          ${renderSettingsInfoToggle("quickStartCicFeedUrl", "CiC JSON-feed", "Vul een IP-adres, hostname of volledige URL in. Bij alleen een adres gebruikt OpenQuatt automatisch poort 8080 en /beta/feed/data.json.")}
+        </div>
+        <div class="oq-settings-field-control">
+          <label class="oq-settings-control oq-settings-control--text">
+            <input
+              class="oq-helper-input oq-settings-integration-url-input"
+              type="text"
+              data-oq-quickstart-cic-url
+              value="${escapeHtml(model.draftUrl)}"
+              placeholder="192.168.2.117"
+              autocomplete="off"
+              spellcheck="false"
+              ${busy ? "disabled" : ""}
+            >
+          </label>
+          ${model.draftUrl && !model.normalizedDraftUrl ? `<p class="oq-settings-source-warning">Vul een geldig IP-adres, hostname of een geldige HTTP(S)-URL in.</p>` : ""}
+          ${model.normalizedDraftUrl ? `<p class="oq-settings-action-note">Wordt ingesteld als ${escapeHtml(model.normalizedDraftUrl)}</p>` : ""}
+        </div>
+      </article>
+    `;
+  }
+
+  function normalizeQuickStartHardwareProfile(value) {
+    const normalized = String(value || "").trim().toLowerCase();
+    if (normalized === "heatpump_controller_q" || normalized.includes("q-edition") || normalized.includes("controller q")) {
+      return "heatpump_controller_q";
+    }
+    if (normalized === "heatpump_listener" || normalized.includes("listener")) {
+      return "heatpump_listener";
+    }
+    if (normalized === "waveshare" || normalized.includes("waveshare")) {
+      return "waveshare";
+    }
+    return "";
+  }
+
+  function getQuickStartHardwareProfileModel() {
+    let profile = normalizeQuickStartHardwareProfile(getEntityValue("hardwareProfileText"));
+    let inferred = false;
+    if (!profile) {
+      profile = normalizeQuickStartHardwareProfile(getDeviceMeta().hardwareProfile);
+    }
+    if (!profile && hasEntity("qFlowSource")) {
+      profile = "heatpump_controller_q";
+      inferred = true;
+    } else if (!profile && hasEntity("flowSource") && hasEntity("cicPollingEnabled")) {
+      profile = "remote";
+      inferred = true;
+    }
+
+    return {
+      profile,
+      inferred,
+      isQEdition: profile === "heatpump_controller_q",
+      isRemoteProfile: profile === "heatpump_listener" || profile === "waveshare" || profile === "remote",
+      hardwareKnown: Boolean(profile),
+      hardwareLabel: profile === "heatpump_controller_q"
+        ? "Heatpump Controller Q-edition"
+        : profile === "heatpump_listener"
+          ? "Heatpump Listener"
+          : profile === "waveshare"
+            ? "Waveshare"
+            : profile === "remote"
+              ? "Heatpump Listener / Waveshare"
+              : "Onbekend hardwareprofiel",
+    };
+  }
+
+  function getQuickStartFlowSourceModel() {
+    const generation = String(getEntityValue("hpGeneration") || "").trim();
+    const hardware = getQuickStartHardwareProfileModel();
+    const isV1 = generation === "V1";
+    const { isQEdition, isRemoteProfile, hardwareKnown } = hardware;
+    const requiresCic = isV1 && isRemoteProfile;
+    const qFlowTarget = isQEdition ? (isV1 ? "Local" : "Outdoor unit") : "";
+    const flowSourceTarget = requiresCic ? "CIC" : "Outdoor unit";
+    const currentFlowSource = String(getEntityValue("flowSource") || "").trim();
+    const currentQFlowSource = String(getEntityValue("qFlowSource") || "").trim();
+    const cicEnabled = isEntityActive("cicPollingEnabled");
+    const cicFeedOk = isEntityActive("cicJsonFeedOk");
+    const cicStale = isEntityActive("cicDataStale");
+    const cicUrl = getQuickStartCicFeedUrlModel();
+    const sourceApplied = currentFlowSource === flowSourceTarget
+      && (!qFlowTarget || currentQFlowSource === qFlowTarget);
+    const configurationApplied = requiresCic
+      ? sourceApplied && cicEnabled && Boolean(cicUrl.configuredUrl)
+      : sourceApplied;
+    const sensorKey = requiresCic
+      ? "cicFlowrate"
+      : isQEdition && isV1
+        ? "controllerFlow"
+        : getInstallationTopology() === "duo"
+          ? "flowLocal"
+          : "hp1Flow";
+    const flowValue = getEntityNumericValue(sensorKey);
+    const flowAvailable = Number.isFinite(flowValue);
+    const flowTestActive = isEntityActive("quickFlowTest");
+
+    let status = hardwareKnown ? requiresCic ? "Nog configureren" : "Nog activeren" : "Hardwareprofiel niet herkend";
+    if (requiresCic && configurationApplied) {
+      status = cicFeedOk && flowAvailable
+        ? flowValue > 0 ? "Geldig" : "Bron actief, geen circulatie"
+        : cicStale
+          ? "Geen actuele CiC-data"
+          : cicFeedOk
+            ? "Verbonden, wacht op flow"
+            : "Verbinding controleren";
+    } else if (!requiresCic && configurationApplied) {
+      status = flowAvailable
+        ? flowValue > 0 ? "Geldig" : "Bron actief, geen circulatie"
+        : "Wacht op actuele flow";
+    }
+
+    const sourceLabel = requiresCic
+      ? "CiC JSON-feed"
+      : isQEdition && isV1
+        ? "Lokale flowmeter op de controller"
+        : "Flowmeter in de buitenunit via Modbus";
+    const explanation = requiresCic
+      ? "Een Quatt V1 heeft op dit hardwareprofiel geen lokaal aangesloten flowmeter. Configureer daarom de lokale CiC JSON-feed."
+      : isQEdition && isV1
+        ? "Bij Quatt V1 is de centrale flowmeter lokaal aangesloten op de Q-edition controller."
+        : `Bij Quatt ${generation || "V1.5/V2"} zit de flowmeter in de buitenunit en leest OpenQuatt deze via Modbus.`;
+
+    return {
+      generation,
+      hardwareLabel: hardware.hardwareLabel,
+      requiresCic,
+      qFlowTarget,
+      flowSourceTarget,
+      configurationApplied,
+      sourceLabel,
+      explanation,
+      status,
+      flowValue,
+      flowAvailable,
+      flowTestActive,
+      canRunFlowTest: configurationApplied,
+      ...cicUrl,
+      canApply: hardwareKnown
+        && hasEntity("flowSource")
+        && (!qFlowTarget || hasEntity("qFlowSource"))
+        && (!requiresCic || (hasEntity("cicPollingEnabled") && hasEntity("cicFeedUrl") && Boolean(cicUrl.normalizedDraftUrl))),
+    };
+  }
+
+  function getQuickStartThermostatSourceModel() {
+    const hardware = getQuickStartHardwareProfileModel();
+    const { isQEdition, isRemoteProfile } = hardware;
+    const currentRoomTempSource = String(getEntityValue("roomTempSource") || "").trim();
+    const currentRoomSetpointSource = String(getEntityValue("roomSetpointSource") || "").trim();
+    const pairedCurrentSource = currentRoomTempSource === currentRoomSetpointSource
+      && ["CIC", "OT thermostat", "HA input"].includes(currentRoomTempSource)
+      ? currentRoomTempSource
+      : "";
+    const selectedSource = isQEdition
+      ? "OT thermostat"
+      : state.quickStartThermostatSourceDraft || (pairedCurrentSource === "CIC" || pairedCurrentSource === "HA input" ? pairedCurrentSource : "CIC");
+    const cicUrl = getQuickStartCicFeedUrlModel();
+    const sourceApplied = currentRoomTempSource === selectedSource && currentRoomSetpointSource === selectedSource;
+    const configurationApplied = sourceApplied
+      && (selectedSource !== "OT thermostat" || isEntityActive("otEnabled"))
+      && (selectedSource !== "CIC" || (isEntityActive("cicPollingEnabled") && Boolean(cicUrl.configuredUrl)));
+    const sourceValueKeys = selectedSource === "OT thermostat"
+      ? ["otRoomTemp", "otRoomSetpoint"]
+      : selectedSource === "CIC"
+        ? ["cicRoomTemp", "cicRoomSetpoint"]
+        : ["roomTempHa", "roomSetpointHa"];
+    const roomTempValue = getEntityNumericValue(sourceValueKeys[0]);
+    const roomSetpointValue = getEntityNumericValue(sourceValueKeys[1]);
+    const valuesAvailable = Number.isFinite(roomTempValue) && Number.isFinite(roomSetpointValue);
+    const sourceHealthy = selectedSource === "OT thermostat"
+      ? isEntityActive("otEnabled") && !isEntityActive("otLinkProblem") && valuesAvailable
+      : selectedSource === "CIC"
+        ? isEntityActive("cicJsonFeedOk") && !isEntityActive("cicDataStale") && valuesAvailable
+        : isEntityActive("roomTempHaValid") && isEntityActive("roomSetpointHaValid") && valuesAvailable;
+
+    let status = isQEdition || isRemoteProfile ? "Nog activeren" : "Hardwareprofiel niet herkend";
+    if (configurationApplied) {
+      status = sourceHealthy ? "Geldig" : selectedSource === "OT thermostat"
+        ? "OpenTherm-verbinding controleren"
+        : selectedSource === "CIC"
+          ? "CiC-feed controleren"
+          : "HA-proxy's controleren";
+    }
+
+    const sourceLabel = selectedSource === "OT thermostat"
+      ? "OpenTherm-thermostaat"
+      : selectedSource === "CIC"
+        ? "CiC JSON-feed"
+        : "Home Assistant-proxy's";
+    const explanation = isQEdition
+      ? "De Q-edition leest kamertemperatuur en kamer-setpoint rechtstreeks uit via OpenTherm."
+      : selectedSource === "CIC"
+        ? "OpenQuatt leest beide thermostaatwaarden samen uit de lokale CiC JSON-feed."
+        : "OpenQuatt gebruikt de vaste HA-proxy's voor kamertemperatuur en kamer-setpoint.";
+
+    return {
+      hardwareLabel: hardware.hardwareLabel,
+      isQEdition,
+      isRemoteProfile,
+      selectedSource,
+      sourceLabel,
+      explanation,
+      configurationApplied,
+      status,
+      roomTempValue,
+      roomSetpointValue,
+      valuesAvailable,
+      ...cicUrl,
+      canApply: (isQEdition || isRemoteProfile)
+        && hasEntity("roomTempSource")
+        && hasEntity("roomSetpointSource")
+        && (selectedSource !== "OT thermostat" || hasEntity("otEnabled"))
+        && (selectedSource !== "CIC" || (hasEntity("cicPollingEnabled") && hasEntity("cicFeedUrl") && Boolean(cicUrl.normalizedDraftUrl))),
+    };
+  }
+
+  function renderFlowSourceWorkspace() {
+    const model = getQuickStartFlowSourceModel();
+    const busy = state.busyAction === "quickstart-flow-source" || state.busyAction === "quickstart-flow-refresh";
+    const flowTestBusy = state.busyAction === "quickstart-flow-test-start" || state.busyAction === "quickstart-flow-test-abort";
+    const controlsBusy = busy || flowTestBusy || model.flowTestActive;
+    const statusClass = model.status === "Geldig" || model.status === "Bron actief, geen circulatie" ? " is-active" : "";
+    const flowLabel = model.flowAvailable ? `${Math.round(model.flowValue)} L/h` : "Nog geen actuele waarde";
+    const cicField = model.requiresCic ? renderQuickStartCicFeedUrlField(model, controlsBusy) : "";
+
+    return `
+      <section class="oq-helper-panel">
+        <p class="oq-helper-label">${escapeHtml(getQuickStepKicker("flow-source"))}</p>
+        <h2 class="oq-helper-section-title">Flowmeting configureren</h2>
+        <p class="oq-helper-section-copy">Je Quatt-versie en het hardwareprofiel bepalen automatisch welke flowbron nodig is. Controleer de uitkomst en activeer de configuratie.</p>
+        <div class="oq-settings-grid oq-settings-grid--quickstart">
+          ${renderSettingsFieldCard(
+            "quickStartFlowSource",
+            "Vastgestelde flowbron",
+            model.explanation,
+            `
+              <div class="oq-settings-quickstart-status">
+                <div class="oq-settings-quickstart-status-row">
+                  <div>
+                    <p class="oq-settings-quickstart-status-label">${escapeHtml(model.hardwareLabel)} · Quatt ${escapeHtml(model.generation || "onbekend")}</p>
+                    <strong class="oq-settings-quickstart-status-value">${escapeHtml(model.sourceLabel)}</strong>
+                    <p class="oq-settings-quickstart-status-copy">${escapeHtml(model.explanation)}</p>
+                  </div>
+                </div>
+                <div class="oq-settings-source-rows">
+                  <div class="oq-settings-source-row${statusClass}"><span>Status</span><strong>${escapeHtml(model.status)}</strong></div>
+                  <div class="oq-settings-source-row"><span>Actuele flow</span><strong>${escapeHtml(flowLabel)}</strong></div>
+                </div>
+              </div>
+            `,
+            "oq-settings-field--span-2",
+          )}
+          ${cicField}
+        </div>
+        <div class="oq-helper-actions">
+          <button
+            class="oq-helper-button oq-helper-button--primary"
+            type="button"
+            data-oq-action="apply-quickstart-flow-source"
+            ${controlsBusy || !model.canApply ? "disabled" : ""}
+          >
+            ${state.busyAction === "quickstart-flow-source" ? "Flowconfiguratie opslaan..." : model.configurationApplied ? "Flowconfiguratie opnieuw opslaan" : model.requiresCic ? "CiC-flowconfiguratie opslaan" : "Flowconfiguratie activeren"}
+          </button>
+          <button
+            class="oq-helper-button oq-helper-button--ghost"
+            type="button"
+            data-oq-action="refresh-quickstart-flow-signal"
+            ${controlsBusy || !model.configurationApplied ? "disabled" : ""}
+          >
+            ${state.busyAction === "quickstart-flow-refresh" ? "Signaal controleren..." : "Signaal opnieuw controleren"}
+          </button>
+          ${model.canRunFlowTest ? `
+            <button
+              class="oq-helper-button ${model.flowTestActive ? "" : "oq-helper-button--ghost"}"
+              type="button"
+              data-oq-action="${model.flowTestActive ? "abort-quickstart-flow-test" : "start-quickstart-flow-test"}"
+              ${busy || flowTestBusy ? "disabled" : ""}
+            >
+              ${flowTestBusy
+                ? model.flowTestActive ? "Waterpomptest stoppen..." : "Waterpomptest starten..."
+                : model.flowTestActive
+                  ? "Waterpomptest stoppen"
+                  : "Waterpomptest starten (30 sec)"}
+            </button>
+          ` : ""}
+        </div>
+        <p class="oq-settings-action-note">${model.flowTestActive
+          ? "Alleen de waterpomp draait op 400 iPWM. Het kan enkele seconden duren voordat de circulatie op gang komt en de flowmeter een waarde toont. De firmware stopt de test automatisch na maximaal 30 seconden."
+          : "0 L/h kan normaal zijn als de circulatiepomp stilstaat. De waterpomptest gebruikt 400 iPWM, start geen compressor en stopt automatisch na 30 seconden."}</p>
+        ${renderQuickStartStepNav({
+          nextDisabled: !model.configurationApplied || model.flowTestActive || flowTestBusy,
+          nextDisabledLabel: flowTestBusy
+            ? "Even wachten"
+            : model.flowTestActive
+              ? "Test loopt"
+              : model.requiresCic ? "Sla eerst op" : "Activeer eerst",
+        })}
+      </section>
+    `;
+  }
+
+  function renderThermostatSourceWorkspace() {
+    const model = getQuickStartThermostatSourceModel();
+    const busy = state.busyAction === "quickstart-thermostat-source";
+    const statusClass = model.status === "Geldig" ? " is-active" : "";
+    const sourceSelector = model.isRemoteProfile ? `
+      <article class="oq-settings-field oq-settings-field--span-2" data-oq-settings-field="quickStartThermostatSource">
+        <div class="oq-settings-field-head">
+          <h3>Gegevensbron</h3>
+          ${renderSettingsInfoToggle("quickStartThermostatSource", "Gegevensbron", "Kamertemperatuur en kamer-setpoint worden bewust als gekoppeld paar ingesteld.")}
+        </div>
+        <div class="oq-settings-field-control">
+          <label class="oq-settings-control oq-settings-control--select">
+            <select data-oq-quickstart-thermostat-source ${busy ? "disabled" : ""}>
+              <option value="CIC" ${model.selectedSource === "CIC" ? "selected" : ""}>CiC JSON-feed</option>
+              <option value="HA input" ${model.selectedSource === "HA input" ? "selected" : ""}>Home Assistant</option>
+            </select>
+          </label>
+          <p class="oq-settings-action-note">Deze keuze geldt altijd voor zowel kamertemperatuur als kamer-setpoint.</p>
+        </div>
+      </article>
+    ` : "";
+    const cicField = model.selectedSource === "CIC" ? renderQuickStartCicFeedUrlField(model, busy) : "";
+    const haNote = model.selectedSource === "HA input" ? `
+      <article class="oq-settings-field oq-settings-field--span-2">
+        <div class="oq-settings-field-head"><h3>Home Assistant-contract</h3></div>
+        <div class="oq-settings-field-control">
+          <p class="oq-settings-action-note">Verwacht <strong>sensor.openquatt_ext_room_temperature</strong> en <strong>sensor.openquatt_ext_room_setpoint</strong>, plus de bijbehorende <strong>_valid</strong> binary sensors.</p>
+          <p class="oq-settings-action-note"><a href="https://github.com/jeroen85/OpenQuatt/tree/main/docs/dashboard#optioneel-dynamische-bronselectie-via-home-assistant" target="_blank" rel="noreferrer">Bekijk de Home Assistant-configuratie en het dynamische bronnenpakket</a>.</p>
+        </div>
+      </article>
+    ` : "";
+
+    return `
+      <section class="oq-helper-panel">
+        <p class="oq-helper-label">${escapeHtml(getQuickStepKicker("thermostat-source"))}</p>
+        <h2 class="oq-helper-section-title">Thermostaatgegevens configureren</h2>
+        <p class="oq-helper-section-copy">Kamertemperatuur en kamer-setpoint horen bij dezelfde thermostaatbron en worden daarom samen ingesteld.</p>
+        <div class="oq-settings-grid oq-settings-grid--quickstart">
+          ${renderSettingsFieldCard(
+            "quickStartThermostatSourceStatus",
+            model.isQEdition ? "Vastgestelde thermostaatbron" : "Gekozen thermostaatbron",
+            model.explanation,
+            `
+              <div class="oq-settings-quickstart-status">
+                <div class="oq-settings-quickstart-status-row">
+                  <div>
+                    <p class="oq-settings-quickstart-status-label">${escapeHtml(model.hardwareLabel)}</p>
+                    <strong class="oq-settings-quickstart-status-value">${escapeHtml(model.sourceLabel)}</strong>
+                    <p class="oq-settings-quickstart-status-copy">${escapeHtml(model.explanation)}</p>
+                  </div>
+                </div>
+                <div class="oq-settings-source-rows">
+                  <div class="oq-settings-source-row${statusClass}"><span>Status</span><strong>${escapeHtml(model.status)}</strong></div>
+                  <div class="oq-settings-source-row"><span>Kamertemperatuur</span><strong>${Number.isFinite(model.roomTempValue) ? `${model.roomTempValue.toFixed(1)} °C` : "Nog geen actuele waarde"}</strong></div>
+                  <div class="oq-settings-source-row"><span>Kamer-setpoint</span><strong>${Number.isFinite(model.roomSetpointValue) ? `${model.roomSetpointValue.toFixed(1)} °C` : "Nog geen actuele waarde"}</strong></div>
+                </div>
+              </div>
+            `,
+            "oq-settings-field--span-2",
+          )}
+          ${sourceSelector}
+          ${cicField}
+          ${haNote}
+        </div>
+        <div class="oq-helper-actions">
+          <button class="oq-helper-button oq-helper-button--primary" type="button" data-oq-action="apply-quickstart-thermostat-source" ${busy || !model.canApply ? "disabled" : ""}>
+            ${busy ? "Thermostaatconfiguratie opslaan..." : model.configurationApplied ? "Thermostaatconfiguratie opnieuw opslaan" : model.selectedSource === "OT thermostat" ? "OpenTherm-configuratie activeren" : "Thermostaatconfiguratie opslaan"}
+          </button>
+        </div>
+        ${renderQuickStartStepNav({
+          nextDisabled: !model.configurationApplied,
+          nextDisabledLabel: model.isQEdition ? "Activeer eerst" : "Sla eerst op",
+        })}
+      </section>
+    `;
+  }
+
   function renderQuickStartModal() {
     if (!state.quickStartModalOpen || state.loadingEntities || state.complete === null || (state.complete && state.quickStartModalMode !== "generation")) {
       return "";
@@ -250,6 +670,12 @@
     if (state.currentStep === "boiler") {
       return hasEntity("boilerCvAssistEnabled") ? renderBoilerWorkspace() : renderStrategyWorkspace();
     }
+    if (state.currentStep === "flow-source") {
+      return renderFlowSourceWorkspace();
+    }
+    if (state.currentStep === "thermostat-source") {
+      return renderThermostatSourceWorkspace();
+    }
     if (state.currentStep === "flow") {
       return renderFlowWorkspace();
     }
@@ -300,7 +726,7 @@
           aria-current="${stepStatus.current ? "step" : "false"}"
         >
           <div class="oq-helper-field-step-head">
-            <h3>0${index + 1}. ${escapeHtml(step.title)}</h3>
+            <h3>${String(index + 1).padStart(2, "0")}. ${escapeHtml(step.title)}</h3>
             <span class="oq-helper-field-step-state">${stepStatus.label}</span>
           </div>
           <p>${escapeHtml(step.copy)}</p>
@@ -324,7 +750,7 @@
     state.currentStep = steps[nextIndex]?.id || QUICK_STEPS[0].id;
   }
 
-  function renderQuickStartStepNav() {
+  function renderQuickStartStepNav(options = {}) {
     const index = getCurrentQuickStepIndex();
     const steps = getQuickSteps();
     const previousStep = index > 0 ? steps[index - 1] : null;
@@ -340,8 +766,8 @@
           <button class="oq-helper-button oq-helper-button--ghost" type="button" data-oq-action="previous-step" ${previousStep ? "" : "disabled"}>
             Vorige
           </button>
-          <button class="oq-helper-button oq-helper-button--primary" type="button" data-oq-action="next-step" ${nextStep ? "" : "disabled"}>
-            ${nextStep ? "Volgende" : "Laatste stap"}
+          <button class="oq-helper-button oq-helper-button--primary" type="button" data-oq-action="next-step" ${nextStep && !options.nextDisabled ? "" : "disabled"}>
+            ${nextStep ? options.nextDisabled ? options.nextDisabledLabel || "Configureer eerst" : "Volgende" : "Laatste stap"}
           </button>
         </div>
       </div>
@@ -370,9 +796,7 @@
     const generationTitle = formatSettingsOptionLabel(getEntityStateText("hpGeneration"));
     const strategyTitle = isCurveMode() ? "Stooklijn" : "Power House";
     const formatReviewOption = (key) => formatSettingsOptionLabel(getEntityStateText(key));
-    const generationLines = [
-      ["Quatt Hybrid-versie", formatReviewOption("hpGeneration")],
-    ];
+    const generationLines = [];
     const strategyLines = isCurveMode()
       ? [
           ["Regelprofiel", formatReviewOption("curveControlProfile")],
@@ -394,6 +818,17 @@
         ];
 
     const flowMode = String(getEntityValue("flowControlMode") || "");
+    const flowSourceModel = getQuickStartFlowSourceModel();
+    const flowSourceLines = [
+      ["Status", flowSourceModel.status],
+      ["Actuele flow", flowSourceModel.flowAvailable ? `${Math.round(flowSourceModel.flowValue)} L/h` : "Nog geen actuele waarde"],
+    ];
+    const thermostatSourceModel = getQuickStartThermostatSourceModel();
+    const thermostatSourceLines = [
+      ["Status", thermostatSourceModel.status],
+      ["Kamertemperatuur", Number.isFinite(thermostatSourceModel.roomTempValue) ? `${thermostatSourceModel.roomTempValue.toFixed(1)} °C` : "Nog geen actuele waarde"],
+      ["Kamer-setpoint", Number.isFinite(thermostatSourceModel.roomSetpointValue) ? `${thermostatSourceModel.roomSetpointValue.toFixed(1)} °C` : "Nog geen actuele waarde"],
+    ];
     const flowLines = [
       ["Flowregeling", flowMode === "Manual PWM" ? "Vaste pompstand" : "Gewenste flow"],
       flowMode === "Manual PWM"
@@ -446,16 +881,14 @@
 
     return `
       <div class="oq-helper-fields oq-helper-fields--review">
-        <div class="oq-helper-review-column">
-          ${renderReviewCard("Quatt Hybrid-versie", generationLines, generationTitle)}
-          ${renderReviewCard("Verwarmingsstrategie", strategyLines, strategyTitle)}
-          ${renderReviewCard("Watertemperatuur", waterLines)}
-        </div>
-        <div class="oq-helper-review-column">
-          ${renderReviewCard("Flowregeling", flowLines)}
-          ${boilerLines.length ? renderReviewCard("CV-ketel / boiler", boilerLines) : ""}
-          ${renderReviewCard("Stille uren", silentLines)}
-        </div>
+        ${renderReviewCard("Quatt Hybrid-versie", generationLines, generationTitle)}
+        ${renderReviewCard("Flowmeting", flowSourceLines, flowSourceModel.sourceLabel)}
+        ${renderReviewCard("Verwarmingsstrategie", strategyLines, strategyTitle)}
+        ${renderReviewCard("Watertemperatuur", waterLines)}
+        ${renderReviewCard("Thermostaatgegevens", thermostatSourceLines, thermostatSourceModel.sourceLabel)}
+        ${renderReviewCard("Flowregeling", flowLines)}
+        ${boilerLines.length ? renderReviewCard("CV-ketel / boiler", boilerLines) : ""}
+        ${renderReviewCard("Stille uren", silentLines)}
       </div>
     `;
   }
