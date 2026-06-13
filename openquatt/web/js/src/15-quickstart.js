@@ -351,7 +351,7 @@
           ` : ""}
         </div>
         <p class="oq-settings-action-note">${model.flowTestActive
-          ? "Alleen de waterpomp draait op 400 iPWM. De firmware stopt de test automatisch na maximaal 30 seconden."
+          ? "Alleen de waterpomp draait op 400 iPWM. Het kan enkele seconden duren voordat de circulatie op gang komt en de flowmeter een waarde toont. De firmware stopt de test automatisch na maximaal 30 seconden."
           : "0 L/h kan normaal zijn als de circulatiepomp stilstaat. De waterpomptest gebruikt 400 iPWM, start geen compressor en stopt automatisch na 30 seconden."}</p>
         ${renderQuickStartStepNav({
           nextDisabled: !model.configurationApplied || model.flowTestActive || flowTestBusy,
