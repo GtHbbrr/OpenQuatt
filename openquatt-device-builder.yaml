@@ -5,7 +5,6 @@ substitutions:
   friendly_name: OpenQuatt
   openquatt_root: openquatt
   components_root: components
-  scripts_root: ../../../scripts
 
 packages:
   openquatt: !include configs/heatpump_listener/single_wifi.yaml
