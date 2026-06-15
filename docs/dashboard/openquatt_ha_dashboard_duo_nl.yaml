@@ -2291,7 +2291,7 @@ views:
 
                   De status `Valid` hoort voor alle zes signalen op `on` te staan.
 
-                  Als `Valid` op `off` staat, is de huidige bron niet numeriek.
+                  Als `Valid` op `off` staat, is de huidige bron ongeldig of niet beschikbaar.
 
                   Dan wordt de proxywaarde `Unavailable` totdat de bron weer geldig
 
