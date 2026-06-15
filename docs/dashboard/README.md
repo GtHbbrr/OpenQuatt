@@ -15,6 +15,9 @@ Gebruik `duo` voor Duo en `single` voor Single. Kies daarna `nl` of `en`.
 
 ## Importeren in Home Assistant
 
+> [!IMPORTANT]
+> Selecteer bij het toevoegen van OpenQuatt nog geen Home Assistant-area. Sinds Home Assistant 2026.6 kan de area tijdens de eerste aanmaak onderdeel worden van de `entity_id`, bijvoorbeeld `sensor.zolder_openquatt_flow`. Deze dashboards gebruiken de vaste vorm `sensor.openquatt_...`. Laat de area daarom eerst leeg, wacht tot alle OpenQuatt-entiteiten zijn aangemaakt en ken daarna pas de area toe. Home Assistant wijzigt de bestaande entity-ID's dan niet meer.
+
 1. Open Home Assistant.
 2. Ga naar **Instellingen -> Dashboards**.
 3. Maak een nieuw dashboard aan of open een bestaand dashboard.
@@ -28,6 +31,16 @@ Gebruik `duo` voor Duo en `single` voor Single. Kies daarna `nl` of `en`.
 - Controleer of je echt het juiste `single`- of `duo`-bestand hebt.
 - Controleer of je de volledige YAML hebt geplakt.
 - Controleer of de OpenQuatt-entiteiten al in Home Assistant bestaan.
+- Controleer of de entity-ID's beginnen met `openquatt_` en niet met een area-prefix zoals `zolder_openquatt_`.
+
+### Area was al geselecteerd
+
+Als Home Assistant de area al in de entity-ID's heeft verwerkt, zijn er twee herstelroutes:
+
+1. Hernoem de betrokken entity-ID's in Home Assistant en verwijder alleen de area-prefix. Wijzig bijvoorbeeld `sensor.zolder_openquatt_flow` in `sensor.openquatt_flow`. De area zelf mag daarna toegewezen blijven.
+2. Is dit nog een verse installatie zonder gebruikte historie of automatiseringen, verwijder OpenQuatt dan uit Home Assistant en voeg het opnieuw toe zonder area. Wacht tot de entiteiten bestaan en wijs daarna de area toe.
+
+Pas niet de dashboard-YAML aan naar een specifieke area. Zo'n dashboard werkt dan alleen voor die ene Home Assistant-installatie.
 
 ## Optioneel: dynamische bronselectie via Home Assistant
 
@@ -116,6 +129,7 @@ OpenQuatt gebruikt het hoogste geldige dauwpunt als veilige grens. Als er geen g
 ## Belangrijk om te onthouden
 
 - De dashboards gaan uit van de entiteitsnamen uit deze repository.
+- Ken de Home Assistant-area pas toe nadat de OpenQuatt-entiteiten zijn aangemaakt.
 - Als je zelf entiteitsnamen wijzigt, moet je ook het dashboard aanpassen.
 - Het Nederlandstalige dashboard is voor de meeste gebruikers de beste start.
 - De dynamische bronpakketten zijn optioneel. Zonder package werken de normale OpenQuatt-entiteiten en dashboards nog steeds.
