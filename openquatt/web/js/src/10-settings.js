@@ -3400,7 +3400,7 @@
       const allOptions = getSelectEntityOptions(entity);
       const availableOptions = allOptions.filter((option) => isSourceAvailable(option, config));
       const currentUnavailable = current && !isSourceAvailable(current, config);
-      const hideUnavailableCurrent = current === "HA input";
+      const hideUnavailableCurrent = current === "HA input" && config.keepUnavailableCurrent !== true;
       const renderOptions = currentUnavailable && !hideUnavailableCurrent && !availableOptions.includes(current)
         ? [current, ...availableOptions]
         : availableOptions;
@@ -3555,6 +3555,29 @@
           renderSourceRow({ label: "Gebruikte bron", value: getOutsideTempUsedSource() }),
           renderSourceRow({ label: "Buitenunit", key: "outsideTempLocalAggregated" }),
           ...renderHaSourceRows({ valueKey: "outsideTempHa", validKey: "outsideTempHaValid" }),
+        ],
+      }),
+      renderSourceCard({
+        key: "heating-enable",
+        title: "Warmtetoestemming",
+        select: {
+          key: "heatingEnableSource",
+          label: "Warmtetoestemming bron",
+          optionLabels: { Disabled: "Niet gebruiken" },
+          haKeys: ["heatingEnableHa", "heatingEnableHaValid"],
+          keepUnavailableCurrent: true,
+        },
+        rows: [
+          renderSourceRow({ label: "Actieve waarde", value: sourceStateText("heatingEnableSelected", "Toegestaan", "Geblokkeerd") }),
+          renderSourceRow({ label: "Gebruikte bron", value: formattedTextSourceValue("heatingEnableEffectiveSource") }),
+          renderSourceRow({ label: "Bronstatus", value: sourceStateText("heatingEnableValid", "Geldig", "Ongeldig") }),
+          otAvailable ? renderSourceRow({ label: "OpenTherm", value: sourceStateText("otThermostatChEnable", "Actief", "Normaal") }) : "",
+          cicAvailable ? renderSourceRow({ label: "CIC", value: sourceStateText("cicChEnabled", "Actief", "Normaal") }) : "",
+          ...renderHaSourceRows({
+            valueKey: "heatingEnableHa",
+            validKey: "heatingEnableHaValid",
+            value: sourceStateText("heatingEnableHa", "Actief", "Normaal"),
+          }),
         ],
       }),
       renderSourceCard({

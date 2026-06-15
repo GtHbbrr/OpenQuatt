@@ -39,6 +39,7 @@ Dat pakket maakt extra helper-entiteiten aan, zoals:
 - `input_text.openquatt_source_water_supply_temperature`
 - `input_text.openquatt_source_room_setpoint`
 - `input_text.openquatt_source_room_temperature`
+- `input_text.openquatt_source_heating_enable`
 - `input_text.openquatt_source_cooling_enable`
 
 Installatie in Home Assistant:
@@ -59,7 +60,7 @@ Als de waarde in een attribuut van een entiteit zit, gebruik je:
 climate.woonkamer|current_temperature
 ```
 
-De algemene dynamische bronnen publiceren stabiele proxy-entiteiten, bijvoorbeeld `sensor.openquatt_ext_outdoor_temperature` en `binary_sensor.openquatt_ext_cooling_enable`. OpenQuatt kan die vervolgens als Home Assistant-bron gebruiken.
+De algemene dynamische bronnen publiceren stabiele proxy-entiteiten, bijvoorbeeld `sensor.openquatt_ext_outdoor_temperature`, `binary_sensor.openquatt_ext_heating_enable` en `binary_sensor.openquatt_ext_cooling_enable`. OpenQuatt kan die vervolgens als Home Assistant-bron gebruiken.
 
 ## Optioneel: dynamische koelbronnen via Home Assistant
 
