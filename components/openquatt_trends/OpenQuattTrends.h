@@ -44,6 +44,27 @@ class OpenQuattTrends : public Component {
   float get_flash_storage_kib() const;
   uint32_t get_flash_write_count() const;
 
+  // --- Peak Hold Trackers (Used for zero-to-non-zero edge cases) ---
+  float max_flow_observed_ = 0.0f;
+  float max_input_w_observed_ = 0.0f;
+  float max_output_w_observed_ = 0.0f;
+
+  // --- Historical States for Cycle Checks ---
+  float last_saved_flow_ = 0.0f;
+  float last_saved_input_w_ = 0.0f;
+  float last_saved_output_w_ = 0.0f;
+
+  // --- Running Totals for 5-Minute Interval Averages ---
+  float interval_flow_sum_ = 0.0f;
+  float interval_input_w_sum_ = 0.0f;
+  float interval_output_w_sum_ = 0.0f;
+  uint32_t interval_sample_count_ = 0;
+
+  // --- Maximum Deviation Sample Trackers (Catches both Peaks and Drops) ---
+  float max_dev_flow_val_ = 0.0f;
+  float max_dev_input_val_ = 0.0f;
+  float max_dev_output_val_ = 0.0f;
+
  protected:
   static constexpr uint32_t TAG_MAGIC = 0x4F545247;  // "OTRG"
   static constexpr uint16_t TAG_VERSION = 1;
@@ -193,4 +214,3 @@ class OpenQuattTrends : public Component {
 
 }  // namespace openquatt_trends
 }  // namespace esphome
-// OpenQuatt Workspace Target Lock

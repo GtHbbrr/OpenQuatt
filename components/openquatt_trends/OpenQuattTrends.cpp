@@ -756,14 +756,79 @@ void OpenQuattTrends::capture_sample(float outside_c, float supply_c, float room
     return;
   }
 
+  // 1. INTERVAL TRACKING: Accumulate totals and track peaks/drops (absolute deviations)
+  // Always update absolute peak-hold trackers for zero-to-non-zero edge cases
+  if (flow_lph > this->max_flow_observed_) this->max_flow_observed_ = flow_lph;
+  if (input_w > this->max_input_w_observed_) this->max_input_w_observed_ = input_w;
+  if (output_w > this->max_output_w_observed_) this->max_output_w_observed_ = output_w;
+
+  // Accumulate running totals to calculate the 5-minute interval averages
+  this->interval_flow_sum_ += flow_lph;
+  this->interval_input_w_sum_ += input_w;
+  this->interval_output_w_sum_ += output_w;
+  this->interval_sample_count_++;
+
+  // Calculate current running averages to isolate the sample with the largest variance
+  float current_avg_flow = this->interval_flow_sum_ / this->interval_sample_count_;
+  float current_avg_input = this->interval_input_w_sum_ / this->interval_sample_count_;
+  float current_avg_output = this->interval_output_w_sum_ / this->interval_sample_count_;
+
+  // Track the raw sample value that caused the largest deviation (peaks or drops) from the running average
+  if (this->interval_sample_count_ == 1 || std::abs(flow_lph - current_avg_flow) > std::abs(this->max_dev_flow_val_ - current_avg_flow)) {
+    this->max_dev_flow_val_ = flow_lph;
+  }
+  if (this->interval_sample_count_ == 1 || std::abs(input_w - current_avg_input) > std::abs(this->max_dev_input_val_ - current_avg_input)) {
+    this->max_dev_input_val_ = input_w;
+  }
+  if (this->interval_sample_count_ == 1 || std::abs(output_w - current_avg_output) > std::abs(this->max_dev_output_val_ - current_avg_output)) {
+    this->max_dev_output_val_ = output_w;
+  }
+
+
+  // 2. GATEKEEPER: Check if 5 minutes (SAMPLE_INTERVAL_MS) have already passed
   const uint32_t now_monotonic_ms = static_cast<uint32_t>(millis());
   if (this->last_capture_ms_ != 0 &&
       static_cast<uint32_t>(now_monotonic_ms - static_cast<uint32_t>(this->last_capture_ms_)) < SAMPLE_INTERVAL_MS) {
     return;
   }
 
+
+  // 3. TIME IS UP (5 minutes passed): Filter and evaluate values to save
+  float flow_to_save = flow_lph;
+  float input_w_to_save = input_w;
+  float output_w_to_save = output_w;
+
+  // Protect against division by zero if no updates occurred
+  if (this->interval_sample_count_ > 0) {
+    float avg_flow = this->interval_flow_sum_ / this->interval_sample_count_;
+    float avg_input = this->interval_input_w_sum_ / this->interval_sample_count_;
+    float avg_output = this->interval_output_w_sum_ / this->interval_sample_count_;
+
+    // --- FLOW FILTERING ---
+    if (this->last_saved_flow_ == 0.0f) {
+      if (this->max_flow_observed_ > 0.0f) flow_to_save = this->max_flow_observed_;
+    } else {
+      // Dead-band filter: if the largest deviation (peak or drop) exceeds 5% of the average, save that extreme value
+      flow_to_save = (std::abs(this->max_dev_flow_val_ - avg_flow) > (0.05f * avg_flow)) ? this->max_dev_flow_val_ : avg_flow;
+    }
+
+    // --- INPUT POWER FILTERING ---
+    if (this->last_saved_input_w_ == 0.0f) {
+      if (this->max_input_w_observed_ > 0.0f) input_w_to_save = this->max_input_w_observed_;
+    } else {
+      input_w_to_save = (std::abs(this->max_dev_input_val_ - avg_input) > (0.05f * avg_input)) ? this->max_dev_input_val_ : avg_input;
+    }
+
+    // --- HEAT OUTPUT FILTERING ---
+    if (this->last_saved_output_w_ == 0.0f) {
+      if (this->max_output_w_observed_ > 0.0f) output_w_to_save = this->max_output_w_observed_;
+    } else {
+      output_w_to_save = (std::abs(this->max_dev_output_val_ - avg_output) > (0.05f * avg_output)) ? this->max_dev_output_val_ : avg_output;
+    }
+  }
+
   const uint64_t now_ms = this->current_time_ms_();
-  const TrendValues values = this->pack_values_(outside_c, supply_c, room_c, room_setpoint_c, flow_lph, input_w, output_w);
+  const TrendValues values = this->pack_values_(outside_c, supply_c, room_c, room_setpoint_c, flow_to_save, input_w_to_save, output_w_to_save);
   const bool any_valid = values.outside_c_x10 != INT16_MIN || values.supply_c_x10 != INT16_MIN ||
                          values.room_c_x10 != INT16_MIN || values.room_setpoint_c_x10 != INT16_MIN ||
                          values.flow_lph != UINT16_MAX || values.input_w != UINT16_MAX || values.output_w != UINT16_MAX;
@@ -771,6 +836,8 @@ void OpenQuattTrends::capture_sample(float outside_c, float supply_c, float room
     return;
   }
 
+
+  // 4. SAVE DATA & UPDATE TRACKERS
   const TrendSample sample = this->make_sample_(now_ms, values);
   this->push_ram_sample_(sample);
   this->last_capture_ms_ = now_monotonic_ms;
@@ -778,6 +845,25 @@ void OpenQuattTrends::capture_sample(float outside_c, float supply_c, float room
   if (this->flash_switch_enabled_()) {
     this->append_sample_to_flash_(sample);
   }
+
+  // Keep these filtered values for the next 5-minute cycle comparison
+  this->last_saved_flow_ = flow_to_save;
+  this->last_saved_input_w_ = input_w_to_save;
+  this->last_saved_output_w_ = output_w_to_save;
+
+  // RESET all temporary interval states for the next 5 minutes
+  this->max_flow_observed_ = 0.0f;
+  this->max_input_w_observed_ = 0.0f;
+  this->max_output_w_observed_ = 0.0f;
+  
+  this->interval_flow_sum_ = 0.0f;
+  this->interval_input_w_sum_ = 0.0f;
+  this->interval_output_w_sum_ = 0.0f;
+  this->interval_sample_count_ = 0;
+
+  this->max_dev_flow_val_ = 0.0f;
+  this->max_dev_input_val_ = 0.0f;
+  this->max_dev_output_val_ = 0.0f;
 }
 
 void OpenQuattTrends::set_flash_enabled(bool enabled) {
@@ -1092,4 +1178,3 @@ uint32_t OpenQuattTrends::get_flash_write_count() const {
 
 }  // namespace openquatt_trends
 }  // namespace esphome
-// OpenQuatt Workspace Target Lock
