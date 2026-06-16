@@ -1,0 +1,108 @@
+name: Bug/probleem
+description: Meld iets dat niet werkt zoals verwacht
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Gebruik dit formulier voor bugs of problemen in OpenQuatt.
+
+        Deel geen secrets, tokens, wifi-wachtwoorden of andere lokale gevoelige data.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Probleem
+      description: Wat gaat er mis? Beschrijf wat je probeerde te doen en wat er gebeurde.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Verwacht gedrag
+      description: Wat had je verwacht dat er zou gebeuren?
+    validations:
+      required: false
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Stappen om te reproduceren
+      description: Beschrijf de kleinste set stappen waarmee het probleem zichtbaar wordt.
+      placeholder: |
+        1.
+        2.
+        3.
+    validations:
+      required: false
+
+  - type: dropdown
+    id: hardware
+    attributes:
+      label: Hardware
+      options:
+        - Heatpump Controller Q
+        - Waveshare
+        - Heatpump Listener
+        - Anders/onbekend
+    validations:
+      required: true
+
+  - type: dropdown
+    id: topology
+    attributes:
+      label: Topology
+      options:
+        - Single
+        - Duo
+        - Niet van toepassing/onbekend
+    validations:
+      required: false
+
+  - type: dropdown
+    id: connection
+    attributes:
+      label: Verbinding
+      options:
+        - WiFi
+        - Ethernet
+        - Niet van toepassing/onbekend
+    validations:
+      required: false
+
+  - type: input
+    id: firmware
+    attributes:
+      label: Firmware/build
+      description: Versie, release, commit hash, of "onbekend".
+      placeholder: "v0.0.0 / commit / onbekend"
+    validations:
+      required: false
+
+  - type: textarea
+    id: config
+    attributes:
+      label: Relevante YAML/configuratie
+      description: Plak alleen wat nodig is om het probleem te begrijpen. Verwijder secrets en lokale gevoelige data.
+      render: yaml
+    validations:
+      required: false
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs of foutmelding
+      description: Plak alleen relevante regels of sleep een logbestand in dit veld.
+      render: text
+    validations:
+      required: false
+
+  - type: textarea
+    id: extra_context
+    attributes:
+      label: Extra context
+      description: Screenshots, dashboardgedrag, timing, installatiesituatie, of wat je al geprobeerd hebt.
+    validations:
+      required: false
