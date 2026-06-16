@@ -783,12 +783,14 @@ void OpenQuattTrends::capture_sample(float outside_c, float supply_c, float room
 void OpenQuattTrends::set_flash_enabled(bool enabled) {
   if (enabled) {
     this->flash_enabled_ = true;
+    this->flash_archive_scanned_ = false;
     this->load_archive_if_needed_();
     return;
   }
 
+  this->reset_flash_builder_();
+  this->flash_dirty_ = false;
   this->flash_enabled_ = false;
-  this->clear_flash_archive_();
 }
 
 bool OpenQuattTrends::force_flush() {
@@ -805,7 +807,6 @@ void OpenQuattTrends::clear_history() {
   this->flash_dirty_ = false;
   this->flash_archive_seeded_ = false;
   this->reset_flash_builder_();
-  this->clear_flash_archive_();
 }
 
 uint64_t OpenQuattTrends::get_window_cutoff_ms_(uint32_t window_hours) const {
@@ -965,8 +966,7 @@ bool OpenQuattTrends::write_sample_line_(ChunkedTextWriter *writer, const TrendS
 void OpenQuattTrends::write_samples_for_history_(ChunkedTextWriter *writer, uint32_t window_hours) {
   const uint64_t cutoff_ms = this->get_window_cutoff_ms_(window_hours);
   const uint32_t stride = this->get_window_stride_(window_hours);
-  const bool flash_enabled = this->flash_switch_enabled_();
-  if (flash_enabled && this->flash_partition_ != nullptr && !this->flash_archive_scanned_) {
+  if (this->flash_partition_ != nullptr && !this->flash_archive_scanned_) {
     this->scan_flash_archive_();
   }
   const uint64_t oldest_ram_timestamp_ms = this->get_ram_oldest_timestamp_ms_();
@@ -994,8 +994,8 @@ void OpenQuattTrends::write_samples_for_history_(ChunkedTextWriter *writer, uint
   };
 
   const bool ram_covers_window = oldest_ram_timestamp_ms != 0 && oldest_ram_timestamp_ms <= cutoff_ms;
-  const bool should_read_flash_archive = flash_enabled && this->flash_archive_scanned_ &&
-                                         this->flash_index_count_ > 0 && !ram_covers_window;
+  const bool should_read_flash_archive =
+      this->flash_archive_scanned_ && this->flash_index_count_ > 0 && !ram_covers_window;
   if (should_read_flash_archive) {
     for (size_t block_index = 0; block_index < this->flash_index_count_; ++block_index) {
       const FlashBlockInfo &indexed = this->flash_index_[block_index];
