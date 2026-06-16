@@ -1,0 +1,87 @@
+name: Feature request
+description: Stel een verbetering of nieuwe mogelijkheid voor
+title: "[Feature] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Gebruik dit formulier voor verbeteringen of nieuwe mogelijkheden in OpenQuatt.
+
+  - type: textarea
+    id: idea
+    attributes:
+      label: Idee
+      description: Wat wil je toevoegen of verbeteren?
+    validations:
+      required: true
+
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Waarom is dit nuttig?
+      description: Welk probleem lost dit op, of welke workflow wordt beter?
+    validations:
+      required: true
+
+  - type: textarea
+    id: desired_behavior
+    attributes:
+      label: Gewenst gedrag
+      description: Beschrijf hoe het idealiter werkt voor de gebruiker.
+    validations:
+      required: false
+
+  - type: dropdown
+    id: category
+    attributes:
+      label: Categorie
+      options:
+        - Config/YAML
+        - Control/platform logic
+        - Web UI
+        - Docs
+        - Tooling/generated
+        - Hardware/platform
+        - Anders/onbekend
+    validations:
+      required: true
+
+  - type: dropdown
+    id: hardware
+    attributes:
+      label: Hardware
+      options:
+        - Heatpump Controller Q
+        - Waveshare
+        - Heatpump Listener
+        - Niet hardware-specifiek
+        - Anders/onbekend
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: impact
+    attributes:
+      label: Impact
+      options:
+        - label: User-facing entities/configuratie veranderen
+        - label: Runtime/control gedrag verandert mogelijk
+        - label: Hardware, Modbus IO, actuator, safety, thermal, boiler, of flow gedrag wordt geraakt
+        - label: Ik weet het niet zeker
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatieven
+      description: Zijn er workarounds of andere oplossingen overwogen?
+    validations:
+      required: false
+
+  - type: textarea
+    id: extra_context
+    attributes:
+      label: Extra context
+      description: Links, voorbeelden, screenshots, of vergelijkbare implementaties.
+    validations:
+      required: false
