@@ -256,8 +256,11 @@
       Custom: "Aangepast",
       [STRATEGY_OPTION_CURVE]: "Stooklijn",
       [STRATEGY_OPTION_POWER_HOUSE]: "Power House",
-      "Dew point required": "Dauwpunt verplicht",
-      "Allow without dew point": "Toestaan zonder dauwpunt",
+      "Dew point required": "Dauwpuntmeting vereist",
+      "Allow without dew point": "Dauwpuntsbenadering",
+      "Allow without dew point, use fallback": "Dauwpuntsbenadering",
+      "Allow without dew point, use dew point approximation": "Dauwpuntsbenadering",
+      "Allow without dew point, user responsibility": "Expliciet toestaan",
       Local: "Lokaal",
       CIC: "CIC",
       "HA input": "HA-invoer",
@@ -286,10 +289,16 @@
       "No dew point source": "Geen dauwpuntbron",
       "OpenQuatt paused": "OpenQuatt gepauzeerd",
       "Cooling disabled": "Koeling uitgeschakeld",
+      "Cooling minimum unavailable": "Minimale koel-aanvoer onbekend",
       "Flow too low": "Flow te laag",
-      "Fallback cooling active": "Fallback-koeling actief",
-      "Fallback corrected by warm night": "Fallback gecorrigeerd door warme nacht",
-      "Fallback blocked by tropical night": "Fallback geblokkeerd door tropische nacht",
+      "Fallback active": "Dauwpuntsbenadering actief",
+      "Fallback active (+0.5°C warm night)": "Dauwpuntsbenadering actief (+0,5°C warme nacht)",
+      "Fallback active (+1.0°C very warm night)": "Dauwpuntsbenadering actief (+1,0°C zeer warme nacht)",
+      "Fallback active (+1.5°C tropical night)": "Dauwpuntsbenadering actief (+1,5°C tropische nacht)",
+      "User responsibility (no dew point or fallback)": "Expliciet toegestaan (geen dauwpunt of benadering)",
+      "Fallback cooling active": "Dauwpuntsbenadering actief",
+      "Fallback corrected by warm night": "Dauwpuntsbenadering gecorrigeerd door warme nacht",
+      "Fallback blocked by tropical night": "Dauwpuntsbenadering geblokkeerd door tropische nacht",
     };
 
     return labels[value] || value;
@@ -4093,10 +4102,10 @@
     ].filter(Boolean);
     const hasFallbackSettings = hasEntity("coolingWithoutDewPointMode");
     const fallbackStatusFields = [
-      hasEntity("coolingGuardMode") ? renderSettingsStaticField("coolingGuardMode", "Actieve beveiligingsroute", "Laat zien of koeling nu via dauwpunt of via de fallback wordt begrensd.", getEntityStateText("coolingGuardMode", "Onbekend")) : "",
-      hasEntity("coolingFallbackNightMinOutdoorTemp") ? renderSettingsStaticField("coolingFallbackNightMinOutdoorTemp", "Nachtminimum buitentemperatuur", "Minimum buitentemperatuur van de afgelopen nacht. Warme nachten maken fallback-cooling conservatiever of blokkeren die helemaal.", getEntityStateText("coolingFallbackNightMinOutdoorTemp", "—")) : "",
-      hasEntity("coolingFallbackMinSupplyTemp") ? renderSettingsStaticField("coolingFallbackMinSupplyTemp", "Fallback minimum watertemperatuur", "De conservatieve ondergrens die OpenQuatt gebruikt als er geen dauwpuntbron beschikbaar is en fallback is toegestaan.", getEntityStateText("coolingFallbackMinSupplyTemp", "—")) : "",
-      hasEntity("coolingEffectiveMinSupplyTemp") ? renderSettingsStaticField("coolingEffectiveMinSupplyTemp", "Actieve minimum ondergrens", "De ondergrens die de koeling nu daadwerkelijk gebruikt: dauwpunt plus marge, of de fallback-ondergrens.", getEntityStateText("coolingEffectiveMinSupplyTemp", "—")) : "",
+      hasEntity("coolingGuardMode") ? renderSettingsStaticField("coolingGuardMode", "Actieve beveiligingsroute", "Laat zien of koeling nu via dauwpuntmeting, dauwpuntsbenadering of expliciet toestaan wordt begrensd.", getEntityStateText("coolingGuardMode", "Onbekend")) : "",
+      hasEntity("coolingFallbackNightMinOutdoorTemp") ? renderSettingsStaticField("coolingFallbackNightMinOutdoorTemp", "Nachtminimum buitentemperatuur", "Minimum buitentemperatuur van de afgelopen nacht. Warme nachten maken de dauwpuntsbenadering conservatiever.", getEntityStateText("coolingFallbackNightMinOutdoorTemp", "—")) : "",
+      hasEntity("coolingFallbackMinSupplyTemp") ? renderSettingsStaticField("coolingFallbackMinSupplyTemp", "Berekende minimum watertemperatuur", "De conservatieve ondergrens die OpenQuatt gebruikt bij de dauwpuntsbenadering. Als die grens door warm weer hoger wordt dan zinvol is, houdt OpenQuatt rekening met de kamertemperatuur.", getEntityStateText("coolingFallbackMinSupplyTemp", "—")) : "",
+      hasEntity("coolingEffectiveMinSupplyTemp") ? renderSettingsStaticField("coolingEffectiveMinSupplyTemp", "Actieve minimum ondergrens", "De ondergrens die de koeling nu daadwerkelijk gebruikt: dauwpunt plus marge, dauwpuntsbenadering, of de ingestelde minimumgrens bij expliciet toestaan.", getEntityStateText("coolingEffectiveMinSupplyTemp", "—")) : "",
     ].filter(Boolean);
 
     if (!tuningFields.length && !hasFallbackSettings && !fallbackStatusFields.length) {
@@ -4104,8 +4113,11 @@
     }
 
     const fallbackModeCopy = {
-      "Dew point required": "Blokkeer koeling zodra er geen dauwpuntbron beschikbaar is.",
-      "Allow without dew point": "Sta een conservatieve fallback toe op basis van buitentemperatuur en de minimum buitentemperatuur van de afgelopen nacht.",
+      "Dew point required": "Koel alleen als er een betrouwbare dauwpuntmeting beschikbaar is. Zonder dauwpuntmeting blijft koeling geblokkeerd.",
+      "Allow without dew point": "Gebruik een echte dauwpuntmeting als die beschikbaar is. Ontbreekt die, koel dan alleen via een conservatieve dauwpuntsbenadering.",
+      "Allow without dew point, use fallback": "Gebruik een echte dauwpuntmeting als die beschikbaar is. Ontbreekt die, koel dan alleen via een conservatieve dauwpuntsbenadering.",
+      "Allow without dew point, use dew point approximation": "Gebruik een echte dauwpuntmeting als die beschikbaar is. Ontbreekt die, koel dan alleen via een conservatieve dauwpuntsbenadering.",
+      "Allow without dew point, user responsibility": "Sta koeling expliciet toe zonder dauwpuntgrens. Ook een beschikbare dauwpuntmeting wordt dan genegeerd; alleen de ingestelde minimale koel-aanvoer geldt.",
     };
 
     return renderSettingsSection(
@@ -4120,12 +4132,15 @@
         ` : ""}
         ${(hasFallbackSettings || fallbackStatusFields.length) ? `
           <div class="oq-settings-grid">
-            ${hasFallbackSettings ? renderSettingsOptionCardsField("coolingWithoutDewPointMode", "Koeling zonder dauwpuntbeveiliging", "Kies of OpenQuatt zonder dauwpuntbron volledig moet blokkeren, of een conservatieve fallback mag gebruiken.", fallbackModeCopy, "oq-settings-field--span-2") : ""}
+            ${hasFallbackSettings ? renderSettingsOptionCardsField("coolingWithoutDewPointMode", "Keuze koelbeveiliging", "Kies welke veiligheidsgrens OpenQuatt gebruikt: dauwpuntmeting, dauwpuntsbenadering bij ontbrekende meting, of expliciet toestaan zonder dauwpuntgrens.", fallbackModeCopy, "oq-settings-field--span-2") : ""}
             ${hasFallbackSettings ? `
               <details class="oq-settings-callout oq-settings-callout--cooling oq-settings-callout--inline">
-              <summary>Fallback-regel bekijken</summary>
+              <summary>Dauwpuntsbenadering bekijken</summary>
               <div class="oq-settings-callout-body">
-                <p>Onder de 20°C buiten blijft fallback-cooling uit. Daarboven gebruikt OpenQuatt 19/20/21/22°C als minimum water, met extra correctie voor warme nachten.</p>
+                <p>Zonder dauwpuntmeting weet OpenQuatt niet zeker hoe koud het water mag worden zonder condensrisico. De dauwpuntsbenadering gebruikt daarom een voorzichtige minimum watertemperatuur.</p>
+                <p>Onder de 20°C buiten blijft koeling via deze benadering uit. Daarboven loopt de ondergrens geleidelijk op van 19°C bij 20°C buiten naar 22°C bij 32°C buiten. Warme nachten verhogen die grens nog iets.</p>
+                <p>Wordt die grens hoger dan zinvol is voor de kamer, dan verlaagt OpenQuatt hem beperkt: ongeveer 1°C onder de kamertemperatuur, maar nooit lager dan 20°C. Voorbeeld: bij 22°C kamer en een berekende grens van 23,5°C wordt de grens ongeveer 21°C. Zo kan OpenQuatt nog voorzichtig koelen. Een echte dauwpuntmeting blijft veiliger.</p>
+                <p>Kies je expliciet toestaan, dan gebruikt OpenQuatt geen dauwpuntgrens: ook een beschikbare dauwpuntmeting wordt genegeerd. Koeling mag dan doorgaan op basis van de ingestelde minimale koel-aanvoer. Dat kan nuttig zijn bij een installatie die je zelf goed bewaakt, maar het condensrisico ligt dan volledig bij jou.</p>
                 <div class="oq-settings-rule-groups">
                   <section class="oq-settings-rule-group">
                     <h4>Buitentemperatuur</h4>
@@ -4135,19 +4150,11 @@
                         <span class="oq-settings-rule-value">Uit</span>
                       </div>
                       <div class="oq-settings-rule-row">
-                        <span class="oq-settings-rule-key">20-24°C</span>
-                        <span class="oq-settings-rule-value">Min. water 19°C</span>
+                        <span class="oq-settings-rule-key">20-32°C</span>
+                        <span class="oq-settings-rule-value">19°C → 22°C</span>
                       </div>
                       <div class="oq-settings-rule-row">
-                        <span class="oq-settings-rule-key">24-28°C</span>
-                        <span class="oq-settings-rule-value">Min. water 20°C</span>
-                      </div>
-                      <div class="oq-settings-rule-row">
-                        <span class="oq-settings-rule-key">28-32°C</span>
-                        <span class="oq-settings-rule-value">Min. water 21°C</span>
-                      </div>
-                      <div class="oq-settings-rule-row">
-                        <span class="oq-settings-rule-key">Boven 32°C</span>
+                        <span class="oq-settings-rule-key">Vanaf 32°C</span>
                         <span class="oq-settings-rule-value">Min. water 22°C</span>
                       </div>
                     </div>
@@ -4161,15 +4168,15 @@
                       </div>
                       <div class="oq-settings-rule-row">
                         <span class="oq-settings-rule-key">18-19°C</span>
-                        <span class="oq-settings-rule-value">+1°C</span>
+                        <span class="oq-settings-rule-value">+0,5°C</span>
                       </div>
                       <div class="oq-settings-rule-row">
                         <span class="oq-settings-rule-key">19-20°C</span>
-                        <span class="oq-settings-rule-value">+2°C</span>
+                        <span class="oq-settings-rule-value">+1,0°C</span>
                       </div>
                       <div class="oq-settings-rule-row">
                         <span class="oq-settings-rule-key">Vanaf 20°C</span>
-                        <span class="oq-settings-rule-value">Fallback uit</span>
+                        <span class="oq-settings-rule-value">+1,5°C</span>
                       </div>
                     </div>
                   </section>

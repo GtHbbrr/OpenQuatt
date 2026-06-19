@@ -373,15 +373,26 @@
     if (isCoolingOverviewActive()) {
       const model = getCoolingOverviewModel();
       const guardMode = model.guardMode.toLowerCase();
+      const unguardedMode = guardMode.includes("user responsibility");
+      const fallbackMode = guardMode.includes("fallback");
       return {
         title: "Koelregeling",
-        copy: "Koeling laat zien op welke aanvoertemperatuur de regeling nu mikt en hoe dicht die bij de veilige grens zit.",
+        copy: unguardedMode
+          ? "Koeling draait expliciet zonder dauwpuntmeting of dauwpuntsbenadering. De ingestelde minimale koel-aanvoer blijft gelden."
+          : "Koeling laat zien op welke aanvoertemperatuur de regeling nu mikt en hoe dicht die bij de veilige grens zit.",
         focusLabel: "Koeldoel",
         focusValue: model.targetText,
         focusCopy: model.statusCopy,
         metrics: [
           { label: "Actuele aanvoertemperatuur", value: model.supplyText, tone: "orange", note: "Wat nu door het systeem loopt." },
-          { label: guardMode.includes("fallback") ? "Fallback ondergrens" : "Veilige aanvoergrens", value: model.safeFloorText, tone: "blue", note: guardMode.includes("fallback") ? `Conservatieve ondergrens zonder dauwpuntmeting. Nachtminimum: ${model.fallbackNightMin}.` : "Dauwpunt plus veiligheidsmarge." },
+          {
+            label: unguardedMode ? "Ingestelde grens" : (fallbackMode ? "Berekende grens" : "Veilige aanvoergrens"),
+            value: model.safeFloorText,
+            tone: "blue",
+            note: unguardedMode
+              ? "Geen dauwpuntmeting of benadering; dit is de ingestelde minimale koel-aanvoer."
+              : (fallbackMode ? `Conservatieve dauwpuntsbenadering. Nachtminimum: ${model.fallbackNightMin}.` : "Dauwpunt plus veiligheidsmarge."),
+          },
           { label: "Koelvraag", value: model.demandText, tone: "sky", note: "De huidige koelvraag van de regelaar." },
         ],
       };
