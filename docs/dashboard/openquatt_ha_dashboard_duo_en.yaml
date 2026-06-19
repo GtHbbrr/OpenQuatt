@@ -3154,8 +3154,6 @@ views:
           - type: entities
             show_header_toggle: false
             entities:
-              - entity: climate.openquatt_heating_curve_pid
-                name: Heating Curve PID
               - entity: sensor.openquatt_outside_temperature_selected
                 name: Outside temp (selected)
               - entity: sensor.openquatt_heating_curve_supply_target

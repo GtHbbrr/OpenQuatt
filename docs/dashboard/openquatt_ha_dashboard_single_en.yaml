@@ -2609,7 +2609,7 @@ views:
           - type: entities
             show_header_toggle: false
             entities:
-              - entity: button.openquatt_reset_runtime_counters_hp1_hp2
+              - entity: button.openquatt_reset_runtime_counters_hp1
                 name: Reset runtime counters
               - entity: button.openquatt_reset_cumulative_energy_counters
                 name: Reset cumulative energy counters
@@ -2785,8 +2785,6 @@ views:
           - type: entities
             show_header_toggle: false
             entities:
-              - entity: climate.openquatt_heating_curve_pid
-                name: Heating Curve PID
               - entity: sensor.openquatt_outside_temperature_selected
                 name: Outside temp (selected)
               - entity: sensor.openquatt_heating_curve_supply_target

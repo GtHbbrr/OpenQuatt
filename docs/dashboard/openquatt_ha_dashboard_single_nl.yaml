@@ -2677,7 +2677,7 @@ views:
           - type: entities
             show_header_toggle: false
             entities:
-              - entity: button.openquatt_reset_runtime_counters_hp1_hp2
+              - entity: button.openquatt_reset_runtime_counters_hp1
                 name: Reset draaitellers
               - entity: button.openquatt_reset_cumulative_energy_counters
                 name: Reset cumulatieve energietellers
@@ -2852,8 +2852,6 @@ views:
           - type: entities
             show_header_toggle: false
             entities:
-              - entity: climate.openquatt_heating_curve_pid
-                name: Stooklijn-PID
               - entity: sensor.openquatt_outside_temperature_selected
                 name: Buitentemp (gekozen)
               - entity: sensor.openquatt_heating_curve_supply_target
