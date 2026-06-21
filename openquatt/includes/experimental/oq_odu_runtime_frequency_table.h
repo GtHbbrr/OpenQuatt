@@ -212,13 +212,9 @@ inline bool read_desired_values(const std::array<esphome::number::Number *, 11> 
   return validate_monotonic_table(values);
 }
 
-inline void apply_runtime_table(RuntimeFrequencyTableRefs refs, bool enabled, bool hp_online) {
+inline void apply_runtime_table(RuntimeFrequencyTableRefs refs, bool enabled) {
   if (!enabled) {
     publish_status(refs, "BLOCKED: enable switch is off");
-    return;
-  }
-  if (!hp_online) {
-    publish_status(refs, "BLOCKED: ODU offline");
     return;
   }
 

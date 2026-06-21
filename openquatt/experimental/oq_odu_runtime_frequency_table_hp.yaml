@@ -481,8 +481,7 @@ button:
           };
           oq_odu_runtime_frequency::apply_runtime_table(
               refs,
-              id(${hp_id}_odu_runtime_frequency_table_enable)->state,
-              id(${hp_id}_is_online));
+              id(${hp_id}_odu_runtime_frequency_table_enable)->state);
 
 text_sensor:
   - platform: template
