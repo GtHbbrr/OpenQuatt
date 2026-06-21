@@ -2957,6 +2957,14 @@
       return;
     }
 
+    if (action === "toggle-odu-runtime-frequency-details") {
+      event.preventDefault();
+      const details = button.closest(".oq-settings-odu-runtime-details");
+      state.oduRuntimeFrequencyDetailsOpen = !(details && details.hasAttribute("open"));
+      render();
+      return;
+    }
+
     if (action === "select-view") {
       if ((button.dataset.viewId || "") === "trends" && !isTrendHistoryEnabled()) {
         return;

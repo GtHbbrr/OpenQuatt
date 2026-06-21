@@ -1462,8 +1462,8 @@
     }
 
     return `
-      <details class="oq-settings-section oq-settings-section--collapsible oq-settings-odu-runtime-details">
-        <summary class="oq-settings-section-summary">
+      <details class="oq-settings-section oq-settings-section--collapsible oq-settings-odu-runtime-details"${state.oduRuntimeFrequencyDetailsOpen ? " open" : ""}>
+        <summary class="oq-settings-section-summary" data-oq-action="toggle-odu-runtime-frequency-details">
           <div class="oq-settings-section-head">
             <div class="oq-settings-section-head-meta">
               <p class="oq-helper-label">Experimenteel</p>
