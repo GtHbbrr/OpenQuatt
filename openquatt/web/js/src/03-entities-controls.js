@@ -300,6 +300,7 @@
       ...SENSOR_CALIBRATION_KEYS,
       ...SENSOR_CALIBRATION_STATE_KEYS,
       "maxWater",
+      ...ODU_RUNTIME_FREQUENCY_KEYS,
     ],
     service: [
       ...INSTALLATION_MONITORING_STATE_KEYS,
@@ -311,7 +312,6 @@
       "flowSelected",
       "flowKp",
       "flowKi",
-      ...ODU_RUNTIME_FREQUENCY_KEYS,
     ],
     heating: [
       "strategy",

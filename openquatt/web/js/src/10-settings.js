@@ -668,12 +668,12 @@
           renderSettingsSilentSection(),
           renderSettingsWaterSection(),
           renderSettingsCompressorSection(),
+          renderSettingsOduRuntimeFrequencySection(),
         ]
       : activeGroup === "service"
         ? [
             renderSettingsInstallationMonitoringSection(),
             renderSettingsServiceSection(),
-            renderSettingsOduRuntimeFrequencySection(),
           ]
       : activeGroup === "heating"
         ? [renderSettingsHeatingSection()]
@@ -1461,12 +1461,22 @@
       return "";
     }
 
-    return renderSettingsSection(
-      "Experimenteel",
-      "ODU runtime frequentietabel",
-      "Lees en schrijf de ODU frequentietabel alleen runtime; waarden worden niet opgeslagen in EEPROM.",
-      `
-        <div class="oq-settings-odu-runtime">
+    return `
+      <details class="oq-settings-section oq-settings-section--collapsible oq-settings-odu-runtime-details">
+        <summary class="oq-settings-section-summary">
+          <div class="oq-settings-section-head">
+            <div class="oq-settings-section-head-meta">
+              <p class="oq-helper-label">Experimenteel</p>
+              <div class="oq-settings-section-head-meta-badge">
+                <span class="oq-settings-section-badge oq-settings-section-badge--experimental">Runtime only</span>
+              </div>
+            </div>
+            <h3>ODU runtime frequentietabel</h3>
+            <p>Lees en schrijf de ODU frequentietabel alleen runtime; waarden worden niet opgeslagen in EEPROM.</p>
+          </div>
+          <span class="oq-settings-section-summary-toggle" aria-hidden="true"></span>
+        </summary>
+        <div class="oq-settings-section-collapsible-body oq-settings-odu-runtime">
           <div class="oq-settings-odu-runtime-warning" role="alert">
             <strong>Schrijft direct naar ODU runtime registers.</strong>
             <p>Gebruik dit alleen voor gecontroleerde tests. Apply werkt alleen wanneer de HP in standby staat, de compressor uit is en de enable-schakelaar bewust aan staat.</p>
@@ -1475,9 +1485,8 @@
             ${hpIndexes.map((hpIndex) => renderOduRuntimeFrequencyHpPanel(hpIndex)).join("")}
           </div>
         </div>
-      `,
-      '<span class="oq-settings-section-badge oq-settings-section-badge--experimental">Runtime only</span>',
-    );
+      </details>
+    `;
   }
 
   function renderPowerHouseBaseFields(className = "oq-settings-grid") {

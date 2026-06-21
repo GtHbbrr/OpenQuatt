@@ -9,6 +9,71 @@
   background: linear-gradient(180deg, rgba(28, 39, 56, 0.98), rgba(23, 34, 49, 0.98));
 }
 
+.oq-settings-section--collapsible {
+  padding: 0;
+  overflow: hidden;
+}
+
+.oq-settings-section-summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  padding: 22px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.oq-settings-section-summary::-webkit-details-marker {
+  display: none;
+}
+
+.oq-settings-section-summary .oq-settings-section-head {
+  margin-bottom: 0;
+}
+
+.oq-settings-section-summary-toggle {
+  position: relative;
+  width: 38px;
+  height: 38px;
+  border-radius: 999px;
+  border: 1px solid var(--oq-helper-line);
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.02);
+}
+
+.oq-settings-section-summary-toggle::before {
+  content: "";
+  position: absolute;
+  top: 12px;
+  left: 14px;
+  width: 9px;
+  height: 9px;
+  border-right: 2px solid var(--oq-helper-soft);
+  border-bottom: 2px solid var(--oq-helper-soft);
+  transform: rotate(45deg);
+  transition: transform 0.16s ease, top 0.16s ease;
+}
+
+.oq-settings-section--collapsible[open] .oq-settings-section-summary-toggle::before {
+  top: 16px;
+  transform: rotate(225deg);
+}
+
+.oq-settings-section-summary:hover .oq-settings-section-summary-toggle,
+.oq-settings-section-summary:focus-visible .oq-settings-section-summary-toggle {
+  border-color: rgba(249, 115, 22, 0.35);
+  color: var(--oq-helper-accent-deep);
+}
+
+.oq-helper-shell--dark .oq-settings-section-summary-toggle {
+  background: rgba(15, 23, 42, 0.46);
+}
+
+.oq-settings-section-collapsible-body {
+  padding: 0 22px 22px;
+}
+
 .oq-settings-section-head {
   display: grid;
   gap: 8px;
