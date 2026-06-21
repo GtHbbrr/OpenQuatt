@@ -764,17 +764,17 @@
         }
       });
 
-      const input = card.querySelector('input[data-oq-field]');
-      if (input) {
+      card.querySelectorAll('input[data-oq-field]').forEach((input) => {
         const fieldKey = String(input.dataset.oqField || key);
         const value = String(getInputDraftValue(fieldKey) || "");
         if (input.value !== value) {
           input.value = value;
         }
-      }
+      });
 
       const sliderValue = card.querySelector(".oq-helper-slider-meta strong");
-      if (sliderValue && input && input.type === "range") {
+      const rangeInput = card.querySelector('input[type="range"][data-oq-field]');
+      if (sliderValue && rangeInput) {
         const text = formatValue(key, normalizeNumber(key, getEntityValue(key)));
         if (sliderValue.textContent !== text) {
           sliderValue.textContent = text;
@@ -1350,7 +1350,7 @@
     return "Laatste status van de experimentele runtime tabel.";
   }
 
-  function renderOduRuntimeFrequencyNumberInput(key) {
+  function renderOduRuntimeFrequencyNumberInput(key, tabIndex) {
     if (!hasEntity(key)) {
       return `<span class="oq-settings-odu-runtime-missing">-</span>`;
     }
@@ -1360,11 +1360,13 @@
       meta: getNumberMeta(key),
       controlClass: "oq-helper-control oq-helper-control--suffix oq-settings-odu-runtime-control",
       inputClass: "oq-helper-input oq-helper-input--compact-number oq-settings-odu-runtime-input",
+      inputAttributes: `data-oq-odu-runtime-tab-index="${tabIndex}"`,
       unitMarkup: '<span class="oq-helper-unit-chip">Hz</span>',
     });
   }
 
   function renderOduRuntimeFrequencyTable(hpIndex) {
+    const levelCount = ODU_RUNTIME_FREQUENCY_LEVELS.length;
     return `
       <div class="oq-settings-odu-runtime-table" role="table" aria-label="${escapeHtml(`HP${hpIndex} ODU runtime frequentietabel`)}">
         <div class="oq-settings-odu-runtime-row oq-settings-odu-runtime-row--head" role="row">
@@ -1375,12 +1377,40 @@
         ${ODU_RUNTIME_FREQUENCY_LEVELS.map((level) => `
           <div class="oq-settings-odu-runtime-row" role="row">
             <span class="oq-settings-odu-runtime-level" role="cell">F${level}</span>
-            <div role="cell">${renderOduRuntimeFrequencyNumberInput(getOduRuntimeFrequencyValueKey(hpIndex, "cooling", level))}</div>
-            <div role="cell">${renderOduRuntimeFrequencyNumberInput(getOduRuntimeFrequencyValueKey(hpIndex, "heating", level))}</div>
+            <div role="cell">${renderOduRuntimeFrequencyNumberInput(getOduRuntimeFrequencyValueKey(hpIndex, "cooling", level), level)}</div>
+            <div role="cell">${renderOduRuntimeFrequencyNumberInput(getOduRuntimeFrequencyValueKey(hpIndex, "heating", level), levelCount + level)}</div>
           </div>
         `).join("")}
       </div>
     `;
+  }
+
+  function handleOduRuntimeFrequencyInputKeyDown(event) {
+    if (event.key !== "Tab" || event.altKey || event.ctrlKey || event.metaKey) {
+      return;
+    }
+
+    const input = event.target && event.target.closest
+      ? event.target.closest("input[data-oq-odu-runtime-tab-index]")
+      : null;
+    const table = input ? input.closest(".oq-settings-odu-runtime-table") : null;
+    if (!input || !table) {
+      return;
+    }
+
+    const inputs = Array.from(table.querySelectorAll("input[data-oq-odu-runtime-tab-index]:not(:disabled)"))
+      .sort((left, right) => Number(left.dataset.oqOduRuntimeTabIndex || 0) - Number(right.dataset.oqOduRuntimeTabIndex || 0));
+    const currentIndex = inputs.indexOf(input);
+    const nextInput = inputs[currentIndex + (event.shiftKey ? -1 : 1)];
+    if (currentIndex < 0 || !nextInput) {
+      return;
+    }
+
+    event.preventDefault();
+    nextInput.focus();
+    if (typeof nextInput.select === "function") {
+      nextInput.select();
+    }
   }
 
   function renderOduRuntimeFrequencyHpPanel(hpIndex) {

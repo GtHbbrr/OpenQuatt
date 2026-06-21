@@ -2699,6 +2699,10 @@
     }
   }
 
+  function handleKeyDown(event) {
+    handleOduRuntimeFrequencyInputKeyDown(event);
+  }
+
   function handleChange(event) {
     if (event.target.dataset.oqDevControl === "boiler" && typeof window.__OQ_SET_MOCK_BOILER__ === "function") {
       window.__OQ_SET_MOCK_BOILER__(event.target.value);
@@ -4980,7 +4984,7 @@
     }
   }
 
-  function renderNumberInputControl({ key, value, meta, controlClass, inputClass = "oq-helper-input", unitMarkup = "" }) {
+  function renderNumberInputControl({ key, value, meta, controlClass, inputClass = "oq-helper-input", inputAttributes = "", unitMarkup = "" }) {
     return `
       <label class="${controlClass}">
         <input
@@ -4991,6 +4995,7 @@
           max="${meta.max}"
           step="${meta.step}"
           value="${escapeHtml(value)}"
+          ${inputAttributes}
           ${state.loadingEntities ? "disabled" : ""}
         >
         ${unitMarkup}

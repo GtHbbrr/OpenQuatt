@@ -657,6 +657,7 @@
     root.addEventListener("click", handleClick);
     root.addEventListener("change", handleChange);
     root.addEventListener("input", handleInput);
+    root.addEventListener("keydown", handleKeyDown);
     root.addEventListener("focusin", handleFocusChange);
     root.addEventListener("focusout", handleFocusChange);
     root.addEventListener("mouseover", handleSettingsInteractionStart);
