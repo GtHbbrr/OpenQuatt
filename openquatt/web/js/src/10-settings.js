@@ -1329,6 +1329,9 @@
     if (normalized.includes("APPLIED")) {
       return "Runtime registers zijn geschreven en via readback bevestigd. Een ODU powercycle zet de originele tabel terug.";
     }
+    if (normalized.includes("GUARD_READ_REQUESTED")) {
+      return "Firmware leest actuele ODU mode en compressorfrequentie voordat er geschreven wordt.";
+    }
     if (normalized.includes("WRITE_QUEUED") || normalized.includes("WRITE_CONFIRMED")) {
       return "Runtime write loopt; wacht op bevestigde readback voordat je de waarden vertrouwt.";
     }

@@ -2362,6 +2362,7 @@
       return;
     }
 
+    setOduRuntimeStatus(hp, "GUARD_READ_REQUESTED: checking ODU state");
     const mode = String(getEntity("text_sensor", `${hp} - Working Mode Label`)?.value || "").trim();
     const compressorHz = Number(getEntity("sensor", `${hp} - Compressor frequency`)?.value);
     if (!mode || /unknown|onbekend/i.test(mode)) {
