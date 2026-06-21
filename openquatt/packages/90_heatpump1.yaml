@@ -9,3 +9,4 @@ packages:
       hp_index: "1"
       prefix: "HP1 - "
       device_address: 0x01
+  hp1_odu_runtime_frequency_table: !include ../experimental/oq_odu_runtime_frequency_table_hp1.yaml

@@ -1301,13 +1301,23 @@
     const mode = String(getEntityValue(`hp${hpIndex}Mode`) || "").trim();
     const freq = parseLooseNumber(getEntityValue(`hp${hpIndex}Freq`));
     const modeKnown = mode && mode !== "Onbekend" && mode !== "Unknown";
-    const standby = !modeKnown || /standby|stand-by/i.test(mode);
-    const stopped = !Number.isFinite(freq) || freq <= 0.5;
+    const freqKnown = Number.isFinite(freq);
+    const standby = modeKnown && /standby|stand-by/i.test(mode);
+    const stopped = freqKnown && freq <= 0.5;
+    const reason = !modeKnown
+      ? "ODU status is onbekend."
+      : !standby
+        ? `ODU staat in ${mode}.`
+        : !freqKnown
+          ? "Compressorfrequentie is onbekend."
+          : !stopped
+            ? `Compressor draait op ${freq.toFixed(0)} Hz.`
+            : "Standby en compressor uit.";
     return {
       mode: modeKnown ? mode : "Onbekend",
       freq: Number.isFinite(freq) ? `${freq.toFixed(0)} Hz` : "Onbekend",
       safe: standby && stopped,
-      reason: !standby ? `ODU staat in ${mode}.` : (!stopped ? `Compressor draait op ${freq.toFixed(0)} Hz.` : "Standby en compressor uit."),
+      reason,
     };
   }
 
@@ -1317,7 +1327,13 @@
       return "Nog geen readback of apply-status ontvangen.";
     }
     if (normalized.includes("APPLIED")) {
-      return "Runtime registers zijn geschreven. Een ODU powercycle zet de originele tabel terug.";
+      return "Runtime registers zijn geschreven en via readback bevestigd. Een ODU powercycle zet de originele tabel terug.";
+    }
+    if (normalized.includes("WRITE_QUEUED") || normalized.includes("WRITE_CONFIRMED")) {
+      return "Runtime write loopt; wacht op bevestigde readback voordat je de waarden vertrouwt.";
+    }
+    if (normalized.includes("FAILED")) {
+      return "Firmware kon de runtime tabel niet volledig bevestigen. Laad opnieuw voordat je verder test.";
     }
     if (normalized.includes("LOADED")) {
       return "Readback is in de velden geladen. Controleer de waarden voordat je schrijft.";

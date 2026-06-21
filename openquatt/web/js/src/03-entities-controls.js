@@ -3360,10 +3360,10 @@
           const hpIndex = getOduRuntimeFrequencyButtonHp(buttonKey);
           if (hpIndex) {
             refreshKeys.push(...getOduRuntimeFrequencyHpKeys(hpIndex));
-            refreshDelayMs = buttonKey.endsWith("Load") ? 1200 : 350;
+            refreshDelayMs = buttonKey.endsWith("Load") ? 1200 : 2200;
             successNotice = buttonKey.endsWith("Load")
               ? `HP${hpIndex} ODU runtime tabel lezen aangevraagd.`
-              : `HP${hpIndex} ODU runtime tabel geschreven; niet opgeslagen in EEPROM.`;
+              : `HP${hpIndex} ODU runtime write aangevraagd; controleer status/readback.`;
             errorPrefix = `ODU runtime actie mislukt voor HP${hpIndex}`;
           }
         }

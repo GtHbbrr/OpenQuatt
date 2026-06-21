@@ -2363,12 +2363,20 @@
     }
 
     const mode = String(getEntity("text_sensor", `${hp} - Working Mode Label`)?.value || "").trim();
-    const compressorHz = Number(getEntity("sensor", `${hp} - Compressor frequency`)?.value || 0);
-    if (mode && !/standby|stand-by/i.test(mode)) {
+    const compressorHz = Number(getEntity("sensor", `${hp} - Compressor frequency`)?.value);
+    if (!mode || /unknown|onbekend/i.test(mode)) {
+      setOduRuntimeStatus(hp, "BLOCKED: ODU mode unknown");
+      return;
+    }
+    if (!/standby|stand-by/i.test(mode)) {
       setOduRuntimeStatus(hp, "BLOCKED: ODU is not in standby");
       return;
     }
-    if (Number.isFinite(compressorHz) && compressorHz > 0.5) {
+    if (!Number.isFinite(compressorHz)) {
+      setOduRuntimeStatus(hp, "BLOCKED: compressor frequency unknown");
+      return;
+    }
+    if (compressorHz > 0.5) {
       setOduRuntimeStatus(hp, "BLOCKED: compressor is running");
       return;
     }
@@ -2388,7 +2396,15 @@
     state.oduRuntimeFrequency[hp].heating = heating;
     enable.value = false;
     enable.state = false;
-    setOduRuntimeStatus(hp, "APPLIED: runtime table written, not persisted");
+    setOduRuntimeStatus(hp, "WRITE_QUEUED: runtime table write requested");
+    window.setTimeout(() => {
+      setOduRuntimeStatus(hp, "WRITE_CONFIRMED: runtime write acknowledged");
+      window.setTimeout(() => {
+        setOduRuntimeStatus(hp, "APPLIED: runtime table written and read back");
+        notifyMockUpdated();
+      }, 320);
+      notifyMockUpdated();
+    }, 320);
   }
 
   function handleButtonPress(name) {

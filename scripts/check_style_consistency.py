@@ -140,6 +140,7 @@ STRICT_TOP_LEVEL_ORDER_RULES = {
     ),
     "openquatt/topology/duo_packages.yaml": (
         "heatpump2",
+        "hp2_odu_runtime_frequency_table",
     ),
     "openquatt/topology/single.yaml": (
         "secondary_hp_id",
@@ -241,6 +242,7 @@ NESTED_KEY_ORDER_RULES = {
     ),
     ("openquatt/packages/90_heatpump1.yaml", "packages"): (
         "heatpump1",
+        "hp1_odu_runtime_frequency_table",
     ),
     ("openquatt/profiles/heatpump_controller_q.yaml", "packages"): (
         "oq_cic_compatibility",

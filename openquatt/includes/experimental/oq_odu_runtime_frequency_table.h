@@ -3,6 +3,7 @@
 #include <array>
 #include <cmath>
 #include <cstdio>
+#include <cstdint>
 #include <vector>
 
 #include "esphome/components/modbus_controller/modbus_controller.h"
@@ -26,8 +27,6 @@ struct RuntimeFrequencyTableRefs {
   const char *prefix;
   std::array<esphome::number::Number *, 11> cooling_desired;
   std::array<esphome::number::Number *, 11> heating_desired;
-  std::array<esphome::number::Number *, 11> cooling_writers;
-  std::array<esphome::number::Number *, 11> heating_writers;
 };
 
 inline void publish_status(const RuntimeFrequencyTableRefs &refs, const char *message) {
@@ -56,10 +55,71 @@ inline bool read_word_as_frequency(const std::vector<uint8_t> &data, size_t inde
 
 inline void publish_loaded_value(esphome::number::Number *target, float value) { target->publish_state(value); }
 
-inline void write_runtime_value(esphome::number::Number *writer, float value) {
-  auto call = writer->make_call();
-  call.set_value(value);
-  call.perform();
+inline bool parse_runtime_table(const std::vector<uint8_t> &data, std::array<float, 11> &cooling,
+                                std::array<float, 11> &heating, int &loaded) {
+  loaded = 0;
+  float value = NAN;
+  for (size_t i = 0; i < cooling.size(); i++) {
+    if (!read_word_as_frequency(data, i, value)) return false;
+    cooling[i] = value;
+    loaded++;
+  }
+  for (size_t i = 0; i < heating.size(); i++) {
+    if (!read_word_as_frequency(data, i + cooling.size(), value)) return false;
+    heating[i] = value;
+    loaded++;
+  }
+  return true;
+}
+
+inline void publish_runtime_table(const RuntimeFrequencyTableRefs &refs, const std::array<float, 11> &cooling,
+                                  const std::array<float, 11> &heating) {
+  for (size_t i = 0; i < cooling.size(); i++) publish_loaded_value(refs.cooling_desired[i], cooling[i]);
+  for (size_t i = 0; i < heating.size(); i++) publish_loaded_value(refs.heating_desired[i], heating[i]);
+}
+
+inline bool tables_match(const std::array<float, 11> &actual, const std::array<float, 11> &expected) {
+  for (size_t i = 0; i < actual.size(); i++) {
+    if (lroundf(actual[i]) != lroundf(expected[i])) return false;
+  }
+  return true;
+}
+
+inline uint16_t frequency_to_register(float value) { return static_cast<uint16_t>(lroundf(value)); }
+
+inline std::vector<uint16_t> build_runtime_write_values(const std::array<float, 11> &cooling,
+                                                        const std::array<float, 11> &heating) {
+  std::vector<uint16_t> values;
+  values.reserve(RUNTIME_TABLE_REGISTER_COUNT);
+  for (float value : cooling) values.push_back(frequency_to_register(value));
+  for (float value : heating) values.push_back(frequency_to_register(value));
+  return values;
+}
+
+inline void queue_apply_readback(RuntimeFrequencyTableRefs refs, std::array<float, 11> expected_cooling,
+                                 std::array<float, 11> expected_heating) {
+  auto cmd = esphome::modbus_controller::ModbusCommandItem::create_read_command(
+      refs.controller, esphome::modbus::ModbusRegisterType::HOLDING, RUNTIME_TABLE_START_ADDRESS,
+      RUNTIME_TABLE_REGISTER_COUNT,
+      [refs, expected_cooling, expected_heating](esphome::modbus::ModbusRegisterType register_type,
+                                                 uint16_t start_address, const std::vector<uint8_t> &data) {
+        std::array<float, 11> cooling{};
+        std::array<float, 11> heating{};
+        int loaded = 0;
+        if (!parse_runtime_table(data, cooling, heating, loaded)) {
+          char status[56];
+          snprintf(status, sizeof(status), "VERIFY_FAILED: %d/22 runtime registers", loaded);
+          publish_status(refs, status);
+          return;
+        }
+        publish_runtime_table(refs, cooling, heating);
+        if (!tables_match(cooling, expected_cooling) || !tables_match(heating, expected_heating)) {
+          publish_status(refs, "VERIFY_FAILED: readback mismatch");
+          return;
+        }
+        publish_status(refs, "APPLIED: runtime table written and read back");
+      });
+  refs.controller->queue_command(cmd);
 }
 
 inline void load_runtime_table(RuntimeFrequencyTableRefs refs) {
@@ -69,20 +129,16 @@ inline void load_runtime_table(RuntimeFrequencyTableRefs refs) {
       RUNTIME_TABLE_REGISTER_COUNT,
       [refs](esphome::modbus::ModbusRegisterType register_type, uint16_t start_address,
              const std::vector<uint8_t> &data) {
+        std::array<float, 11> cooling{};
+        std::array<float, 11> heating{};
         int loaded = 0;
-        float value = NAN;
-        for (size_t i = 0; i < refs.cooling_desired.size(); i++) {
-          if (read_word_as_frequency(data, i, value)) {
-            publish_loaded_value(refs.cooling_desired[i], value);
-            loaded++;
-          }
+        if (!parse_runtime_table(data, cooling, heating, loaded)) {
+          char status[52];
+          snprintf(status, sizeof(status), "LOAD_FAILED: %d/22 runtime registers", loaded);
+          publish_status(refs, status);
+          return;
         }
-        for (size_t i = 0; i < refs.heating_desired.size(); i++) {
-          if (read_word_as_frequency(data, i + refs.cooling_desired.size(), value)) {
-            publish_loaded_value(refs.heating_desired[i], value);
-            loaded++;
-          }
-        }
+        publish_runtime_table(refs, cooling, heating);
 
         char status[48];
         snprintf(status, sizeof(status), "LOADED: %d/22 runtime registers", loaded);
@@ -107,11 +163,19 @@ inline void apply_runtime_table(RuntimeFrequencyTableRefs refs, bool enabled, bo
     publish_status(refs, "BLOCKED: ODU offline");
     return;
   }
-  if (!std::isnan(working_mode) && lroundf(working_mode) != 0) {
+  if (std::isnan(working_mode)) {
+    publish_status(refs, "BLOCKED: ODU mode unknown");
+    return;
+  }
+  if (lroundf(working_mode) != 0) {
     publish_status(refs, "BLOCKED: ODU is not in standby");
     return;
   }
-  if (!std::isnan(compressor_hz) && compressor_hz > 0.5f) {
+  if (std::isnan(compressor_hz)) {
+    publish_status(refs, "BLOCKED: compressor frequency unknown");
+    return;
+  }
+  if (compressor_hz > 0.5f) {
     publish_status(refs, "BLOCKED: compressor is running");
     return;
   }
@@ -127,11 +191,17 @@ inline void apply_runtime_table(RuntimeFrequencyTableRefs refs, bool enabled, bo
     return;
   }
 
-  for (size_t i = 0; i < refs.cooling_writers.size(); i++) write_runtime_value(refs.cooling_writers[i], cooling[i]);
-  for (size_t i = 0; i < refs.heating_writers.size(); i++) write_runtime_value(refs.heating_writers[i], heating[i]);
-
   refs.enable_switch->turn_off();
-  publish_status(refs, "APPLIED: runtime table written, not persisted");
+  publish_status(refs, "WRITE_QUEUED: runtime table write requested");
+  auto cmd = esphome::modbus_controller::ModbusCommandItem::create_write_multiple_command(
+      refs.controller, RUNTIME_TABLE_START_ADDRESS, RUNTIME_TABLE_REGISTER_COUNT,
+      build_runtime_write_values(cooling, heating));
+  cmd.on_data_func = [refs, cooling, heating](esphome::modbus::ModbusRegisterType register_type,
+                                              uint16_t start_address, const std::vector<uint8_t> &data) {
+    publish_status(refs, "WRITE_CONFIRMED: runtime write acknowledged");
+    queue_apply_readback(refs, cooling, heating);
+  };
+  refs.controller->queue_command(cmd);
 }
 
 }  // namespace oq_odu_runtime_frequency
