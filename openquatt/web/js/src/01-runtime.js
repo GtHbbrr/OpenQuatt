@@ -97,6 +97,7 @@
     settingsInfoOpen: "",
     installationMonitoringDetailsOpen: false,
     integrationDiagnosticsOpen: false,
+    oduRuntimeFrequencyDetailsOpen: false,
     installationMonitoringProblemSignature: "",
     settingsInteractionLock: false,
     settingsRenderSignature: "",
