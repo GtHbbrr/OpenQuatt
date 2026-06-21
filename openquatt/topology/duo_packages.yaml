@@ -9,3 +9,4 @@ heatpump2: !include
     prefix: "HP2 - "
     device_address: 0x02
     oq_modbus_startup_delay_ms: "2500"
+hp2_odu_runtime_frequency_table: !include ../experimental/oq_odu_runtime_frequency_table_hp2.yaml

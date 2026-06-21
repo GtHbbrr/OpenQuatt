@@ -300,6 +300,7 @@
       ...SENSOR_CALIBRATION_KEYS,
       ...SENSOR_CALIBRATION_STATE_KEYS,
       "maxWater",
+      ...ODU_RUNTIME_FREQUENCY_KEYS,
     ],
     service: [
       ...INSTALLATION_MONITORING_STATE_KEYS,
@@ -2698,6 +2699,55 @@
     }
   }
 
+  function handleKeyDown(event) {
+    handleOduRuntimeFrequencyInputKeyDown(event);
+  }
+
+  function getWheelDeltaPixels(event, value) {
+    if (event.deltaMode === 1) {
+      return value * 16;
+    }
+    if (event.deltaMode === 2) {
+      return value * window.innerHeight;
+    }
+    return value;
+  }
+
+  function getWheelScrollContainer(element) {
+    let node = element ? element.parentElement : null;
+    while (node && node !== document.body && node !== document.documentElement) {
+      const style = window.getComputedStyle(node);
+      const canScrollY = /(auto|scroll)/.test(style.overflowY) && node.scrollHeight > node.clientHeight;
+      const canScrollX = /(auto|scroll)/.test(style.overflowX) && node.scrollWidth > node.clientWidth;
+      if (canScrollY || canScrollX) {
+        return node;
+      }
+      node = node.parentElement;
+    }
+    return document.scrollingElement || document.documentElement;
+  }
+
+  function handleWheel(event) {
+    const input = event.target && event.target.closest
+      ? event.target.closest('input[type="number"]')
+      : null;
+    if (!input || !state.root || !state.root.contains(input) || document.activeElement !== input) {
+      return;
+    }
+
+    event.preventDefault();
+    input.blur();
+
+    const scroller = getWheelScrollContainer(input);
+    if (scroller && typeof scroller.scrollBy === "function") {
+      scroller.scrollBy({
+        left: getWheelDeltaPixels(event, event.deltaX || 0),
+        top: getWheelDeltaPixels(event, event.deltaY || 0),
+        behavior: "auto",
+      });
+    }
+  }
+
   function handleChange(event) {
     if (event.target.dataset.oqDevControl === "boiler" && typeof window.__OQ_SET_MOCK_BOILER__ === "function") {
       window.__OQ_SET_MOCK_BOILER__(event.target.value);
@@ -3237,6 +3287,9 @@
           state.commissioningTaskLock = "manual-hp";
         }
         const refreshKeys = [];
+        let refreshDelayMs = 0;
+        let successNotice = "";
+        let errorPrefix = "";
         if (buttonKey === "acknowledgeCompressorCyclingAlert") {
           refreshKeys.push(...INSTALLATION_MONITORING_STATE_KEYS);
         } else if (buttonKey === "commissioningCm100Start" || buttonKey === "commissioningCm100Stop") {
@@ -3352,8 +3405,23 @@
             "hp1Mode",
             "hp2Mode",
           );
+        } else if (ODU_RUNTIME_FREQUENCY_BUTTON_KEYS.has(buttonKey)) {
+          const hpIndex = getOduRuntimeFrequencyButtonHp(buttonKey);
+          if (hpIndex) {
+            refreshKeys.push(...getOduRuntimeFrequencyHpKeys(hpIndex));
+            refreshDelayMs = buttonKey.endsWith("Load") ? 1200 : 3200;
+            successNotice = buttonKey.endsWith("Load")
+              ? `HP${hpIndex} ODU runtime tabel lezen aangevraagd.`
+              : `HP${hpIndex} ODU runtime write aangevraagd; controleer status/readback.`;
+            errorPrefix = `ODU runtime actie mislukt voor HP${hpIndex}`;
+          }
         }
-        void triggerNamedButton(buttonKey, refreshKeys.length ? { refreshKeys } : {});
+        void triggerNamedButton(buttonKey, {
+          ...(refreshKeys.length ? { refreshKeys } : {}),
+          ...(refreshDelayMs ? { refreshDelayMs } : {}),
+          ...(successNotice ? { successNotice } : {}),
+          ...(errorPrefix ? { errorPrefix } : {}),
+        });
       }
       return;
     }
@@ -4892,7 +4960,7 @@
         "manualFlowApplyCooling",
         "manualHpStart",
         "manualHpAbort",
-      ].includes(key);
+      ].includes(key) || ODU_RUNTIME_FREQUENCY_BUTTON_KEYS.has(key);
       if (!keepCommissioningModalOpen) {
         stopLoginAuthStatusPolling();
         state.systemModal = "";
@@ -4902,6 +4970,10 @@
         beginDeviceReconnect(options.reconnectMode);
       }
       if (Array.isArray(options.refreshKeys) && options.refreshKeys.length) {
+        const refreshDelayMs = Number(options.refreshDelayMs || 0);
+        if (Number.isFinite(refreshDelayMs) && refreshDelayMs > 0) {
+          await new Promise((resolve) => window.setTimeout(resolve, refreshDelayMs));
+        }
         await refreshEntities(options.refreshKeys, "state");
       }
     } catch (error) {
@@ -4957,7 +5029,7 @@
     }
   }
 
-  function renderNumberInputControl({ key, value, meta, controlClass, inputClass = "oq-helper-input", unitMarkup = "" }) {
+  function renderNumberInputControl({ key, value, meta, controlClass, inputClass = "oq-helper-input", inputAttributes = "", unitMarkup = "" }) {
     return `
       <label class="${controlClass}">
         <input
@@ -4968,6 +5040,7 @@
           max="${meta.max}"
           step="${meta.step}"
           value="${escapeHtml(value)}"
+          ${inputAttributes}
           ${state.loadingEntities ? "disabled" : ""}
         >
         ${unitMarkup}

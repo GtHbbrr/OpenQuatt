@@ -2881,6 +2881,7 @@ body.oq-surface-native {
   line-height: 1;
   white-space: nowrap;
   pointer-events: none;
+  user-select: none;
 }
 
 .oq-helper-slider-meta {

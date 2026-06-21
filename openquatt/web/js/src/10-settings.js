@@ -668,6 +668,7 @@
           renderSettingsSilentSection(),
           renderSettingsWaterSection(),
           renderSettingsCompressorSection(),
+          renderSettingsOduRuntimeFrequencySection(),
         ]
       : activeGroup === "service"
         ? [
@@ -763,17 +764,17 @@
         }
       });
 
-      const input = card.querySelector('input[data-oq-field]');
-      if (input) {
+      card.querySelectorAll('input[data-oq-field]').forEach((input) => {
         const fieldKey = String(input.dataset.oqField || key);
         const value = String(getInputDraftValue(fieldKey) || "");
         if (input.value !== value) {
           input.value = value;
         }
-      }
+      });
 
       const sliderValue = card.querySelector(".oq-helper-slider-meta strong");
-      if (sliderValue && input && input.type === "range") {
+      const rangeInput = card.querySelector('input[type="range"][data-oq-field]');
+      if (sliderValue && rangeInput) {
         const text = formatValue(key, normalizeNumber(key, getEntityValue(key)));
         if (sliderValue.textContent !== text) {
           sliderValue.textContent = text;
@@ -1260,6 +1261,231 @@
         </div>
         ${metrics ? `<div class="oq-settings-grid oq-settings-commissioning-metrics">${metrics}</div>` : ""}
       </article>
+    `;
+  }
+
+  function getOduRuntimeFrequencyHpIndexes() {
+    return ODU_RUNTIME_FREQUENCY_HP_IDS.filter((hpIndex) => (
+      hasEntity(getOduRuntimeFrequencyControlKey(hpIndex, "Status"))
+      || hasEntity(getOduRuntimeFrequencyControlKey(hpIndex, "Load"))
+      || hasEntity(getOduRuntimeFrequencyValueKey(hpIndex, "cooling", 0))
+    ));
+  }
+
+  function getOduRuntimeFrequencyNumberValue(key) {
+    return parseLooseNumber(getInputDraftValue(key));
+  }
+
+  function getOduRuntimeFrequencyTableValidation(hpIndex) {
+    const invalid = [];
+    ODU_RUNTIME_FREQUENCY_MODES.forEach((mode) => {
+      let previous = -Infinity;
+      ODU_RUNTIME_FREQUENCY_LEVELS.forEach((level) => {
+        const key = getOduRuntimeFrequencyValueKey(hpIndex, mode, level);
+        const value = getOduRuntimeFrequencyNumberValue(key);
+        if (!Number.isFinite(value) || value < 0 || value > 120 || value < previous) {
+          invalid.push(`${mode === "cooling" ? "C" : "H"}F${level}`);
+        }
+        if (Number.isFinite(value)) {
+          previous = value;
+        }
+      });
+    });
+    return {
+      valid: invalid.length === 0,
+      invalid,
+    };
+  }
+
+  function getOduRuntimeFrequencyOperationState(hpIndex) {
+    const mode = String(getEntityValue(`hp${hpIndex}Mode`) || "").trim();
+    const freq = parseLooseNumber(getEntityValue(`hp${hpIndex}Freq`));
+    const modeKnown = mode && mode !== "Onbekend" && mode !== "Unknown";
+    const freqKnown = Number.isFinite(freq);
+    const standby = modeKnown && /standby|stand-by/i.test(mode);
+    const stopped = freqKnown && freq <= 0.5;
+    const reason = !modeKnown
+      ? "ODU status is onbekend."
+      : !standby
+        ? `ODU staat in ${mode}.`
+        : !freqKnown
+          ? "Compressorfrequentie is onbekend."
+          : !stopped
+            ? `Compressor draait op ${freq.toFixed(0)} Hz.`
+            : "Standby en compressor uit.";
+    return {
+      mode: modeKnown ? mode : "Onbekend",
+      freq: Number.isFinite(freq) ? `${freq.toFixed(0)} Hz` : "Onbekend",
+      safe: standby && stopped,
+      reason,
+    };
+  }
+
+  function getOduRuntimeFrequencyStatusCopy(status) {
+    const normalized = String(status || "").toUpperCase();
+    if (!status || normalized === "UNKNOWN" || normalized === "UNAVAILABLE") {
+      return "Nog geen readback of apply-status ontvangen.";
+    }
+    if (normalized.includes("APPLIED")) {
+      return "Runtime registers zijn geschreven en via readback bevestigd. Een ODU powercycle zet de originele tabel terug.";
+    }
+    if (normalized.includes("GUARD_READ_REQUESTED")) {
+      return "Firmware leest actuele ODU mode en compressorfrequentie voordat er geschreven wordt.";
+    }
+    if (normalized.includes("WRITE_QUEUED") || normalized.includes("WRITE_CONFIRMED")) {
+      return "Runtime write loopt; wacht op bevestigde readback voordat je de waarden vertrouwt.";
+    }
+    if (normalized.includes("FAILED")) {
+      return "Firmware kon de runtime tabel niet volledig bevestigen. Laad opnieuw voordat je verder test.";
+    }
+    if (normalized.includes("LOADED")) {
+      return "Readback is in de velden geladen. Controleer de waarden voordat je schrijft.";
+    }
+    if (normalized.includes("BLOCKED")) {
+      return "Firmware heeft de actie geblokkeerd; controleer enable, standby en compressorstatus.";
+    }
+    if (normalized.includes("LOAD_REQUESTED")) {
+      return "Readback is aangevraagd bij de ODU.";
+    }
+    return "Laatste status van de experimentele runtime tabel.";
+  }
+
+  function renderOduRuntimeFrequencyNumberInput(key, tabIndex) {
+    if (!hasEntity(key)) {
+      return `<span class="oq-settings-odu-runtime-missing">-</span>`;
+    }
+    return renderNumberInputControl({
+      key,
+      value: getInputDraftValue(key),
+      meta: getNumberMeta(key),
+      controlClass: "oq-helper-control oq-helper-control--suffix oq-settings-odu-runtime-control",
+      inputClass: "oq-helper-input oq-helper-input--compact-number oq-settings-odu-runtime-input",
+      inputAttributes: `data-oq-odu-runtime-tab-index="${tabIndex}"`,
+      unitMarkup: '<span class="oq-helper-unit-chip">Hz</span>',
+    });
+  }
+
+  function renderOduRuntimeFrequencyTable(hpIndex) {
+    const levelCount = ODU_RUNTIME_FREQUENCY_LEVELS.length;
+    return `
+      <div class="oq-settings-odu-runtime-table" role="table" aria-label="${escapeHtml(`HP${hpIndex} ODU runtime frequentietabel`)}">
+        <div class="oq-settings-odu-runtime-row oq-settings-odu-runtime-row--head" role="row">
+          <span role="columnheader">Level</span>
+          <span role="columnheader">Cooling</span>
+          <span role="columnheader">Heating</span>
+        </div>
+        ${ODU_RUNTIME_FREQUENCY_LEVELS.map((level) => `
+          <div class="oq-settings-odu-runtime-row" role="row">
+            <span class="oq-settings-odu-runtime-level" role="cell">F${level}</span>
+            <div role="cell">${renderOduRuntimeFrequencyNumberInput(getOduRuntimeFrequencyValueKey(hpIndex, "cooling", level), level)}</div>
+            <div role="cell">${renderOduRuntimeFrequencyNumberInput(getOduRuntimeFrequencyValueKey(hpIndex, "heating", level), levelCount + level)}</div>
+          </div>
+        `).join("")}
+      </div>
+    `;
+  }
+
+  function handleOduRuntimeFrequencyInputKeyDown(event) {
+    if (event.key !== "Tab" || event.altKey || event.ctrlKey || event.metaKey) {
+      return;
+    }
+
+    const input = event.target && event.target.closest
+      ? event.target.closest("input[data-oq-odu-runtime-tab-index]")
+      : null;
+    const table = input ? input.closest(".oq-settings-odu-runtime-table") : null;
+    if (!input || !table) {
+      return;
+    }
+
+    const inputs = Array.from(table.querySelectorAll("input[data-oq-odu-runtime-tab-index]:not(:disabled)"))
+      .sort((left, right) => Number(left.dataset.oqOduRuntimeTabIndex || 0) - Number(right.dataset.oqOduRuntimeTabIndex || 0));
+    const currentIndex = inputs.indexOf(input);
+    const nextInput = inputs[currentIndex + (event.shiftKey ? -1 : 1)];
+    if (currentIndex < 0 || !nextInput) {
+      return;
+    }
+
+    event.preventDefault();
+    nextInput.focus();
+    if (typeof nextInput.select === "function") {
+      nextInput.select();
+    }
+  }
+
+  function renderOduRuntimeFrequencyHpPanel(hpIndex) {
+    const enableKey = getOduRuntimeFrequencyControlKey(hpIndex, "Enable");
+    const loadKey = getOduRuntimeFrequencyControlKey(hpIndex, "Load");
+    const applyKey = getOduRuntimeFrequencyControlKey(hpIndex, "Apply");
+    const statusKey = getOduRuntimeFrequencyControlKey(hpIndex, "Status");
+    const status = String(getEntityValue(statusKey) || "").trim() || "Nog niet geladen";
+    const validation = getOduRuntimeFrequencyTableValidation(hpIndex);
+    const operation = getOduRuntimeFrequencyOperationState(hpIndex);
+    const enabled = Boolean(getEntityValue(enableKey));
+    const busy = state.loadingEntities || state.busyAction === loadKey || state.busyAction === applyKey;
+    const applyDisabled = busy || !enabled || !validation.valid || !operation.safe || !hasEntity(applyKey);
+    const validationText = validation.valid
+      ? "Waarden zijn 0-120 Hz en per tabel oplopend."
+      : `Controleer ${validation.invalid.slice(0, 5).join(", ")}${validation.invalid.length > 5 ? "..." : ""}.`;
+
+    return `
+      <article class="oq-settings-odu-runtime-panel">
+        <div class="oq-settings-odu-runtime-panel-head">
+          <div>
+            <p class="oq-helper-label">HP${hpIndex}</p>
+            <h4>Runtime frequentietabel</h4>
+            <p>${escapeHtml(operation.reason)} Laatste compressorfrequentie: ${escapeHtml(operation.freq)}.</p>
+          </div>
+          <div class="oq-settings-odu-runtime-actions">
+            ${hasEntity(loadKey) ? renderNamedActionButton(loadKey, state.busyAction === loadKey ? "Lezen..." : "Uit ODU laden", "oq-helper-button oq-helper-button--ghost", busy) : ""}
+            ${hasEntity(enableKey) ? renderSettingsCompactSwitchControl(enableKey, `HP${hpIndex} writes vrijgeven`, enabled, busy, "Enable", "Locked", false) : ""}
+            ${hasEntity(applyKey) ? renderNamedActionButton(applyKey, state.busyAction === applyKey ? "Schrijven..." : "Runtime toepassen", "oq-helper-button oq-helper-button--warning", applyDisabled) : ""}
+          </div>
+        </div>
+        <div class="oq-settings-odu-runtime-status${status.toUpperCase().includes("BLOCKED") ? " is-warning" : status.toUpperCase().includes("APPLIED") || status.toUpperCase().includes("LOADED") ? " is-success" : ""}">
+          <div>
+            <span>Status</span>
+            <strong>${escapeHtml(status)}</strong>
+          </div>
+          <p>${escapeHtml(getOduRuntimeFrequencyStatusCopy(status))}</p>
+        </div>
+        ${renderOduRuntimeFrequencyTable(hpIndex)}
+        <p class="oq-settings-odu-runtime-validation${validation.valid && operation.safe ? " is-ok" : " is-warning"}">${escapeHtml(validationText)} ${escapeHtml(operation.safe ? "" : operation.reason)}</p>
+      </article>
+    `;
+  }
+
+  function renderSettingsOduRuntimeFrequencySection() {
+    const hpIndexes = getOduRuntimeFrequencyHpIndexes();
+    if (!hpIndexes.length) {
+      return "";
+    }
+
+    return `
+      <details class="oq-settings-section oq-settings-section--collapsible oq-settings-odu-runtime-details">
+        <summary class="oq-settings-section-summary">
+          <div class="oq-settings-section-head">
+            <div class="oq-settings-section-head-meta">
+              <p class="oq-helper-label">Experimenteel</p>
+              <div class="oq-settings-section-head-meta-badge">
+                <span class="oq-settings-section-badge oq-settings-section-badge--experimental">Runtime only</span>
+              </div>
+            </div>
+            <h3>ODU runtime frequentietabel</h3>
+            <p>Lees en schrijf de ODU frequentietabel alleen runtime; waarden worden niet opgeslagen in EEPROM.</p>
+          </div>
+          <span class="oq-settings-section-summary-toggle" aria-hidden="true"></span>
+        </summary>
+        <div class="oq-settings-section-collapsible-body oq-settings-odu-runtime">
+          <div class="oq-settings-odu-runtime-warning" role="alert">
+            <strong>Schrijft direct naar ODU runtime registers.</strong>
+            <p>Gebruik dit alleen voor gecontroleerde tests. Apply werkt alleen wanneer de HP in standby staat, de compressor uit is en de enable-schakelaar bewust aan staat.</p>
+          </div>
+          <div class="oq-settings-odu-runtime-panels">
+            ${hpIndexes.map((hpIndex) => renderOduRuntimeFrequencyHpPanel(hpIndex)).join("")}
+          </div>
+        </div>
+      </details>
     `;
   }
 
