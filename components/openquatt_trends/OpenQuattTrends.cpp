@@ -302,6 +302,57 @@ uint32_t OpenQuattTrends::fnv1a_hash_(const uint8_t *data, size_t len) {
   return hash;
 }
 
+bool OpenQuattTrends::valid_unsigned_metric_(float value) {
+  return std::isfinite(value) && value >= 0.0f;
+}
+
+void OpenQuattTrends::reset_interval_metric_samples_(IntervalMetricState &state) {
+  state.sum = 0.0f;
+  state.count = 0;
+  state.min = 0.0f;
+  state.max = 0.0f;
+}
+
+void OpenQuattTrends::update_interval_metric_(IntervalMetricState &state, float value) {
+  if (!valid_unsigned_metric_(value)) {
+    return;
+  }
+  if (state.count == 0) {
+    state.min = value;
+    state.max = value;
+  } else {
+    state.min = std::min(state.min, value);
+    state.max = std::max(state.max, value);
+  }
+  state.sum += value;
+  state.count++;
+}
+
+float OpenQuattTrends::select_interval_metric_value_(const IntervalMetricState &state, float fallback) {
+  if (state.count == 0) {
+    return fallback;
+  }
+
+  const float average = state.sum / static_cast<float>(state.count);
+  if (state.last_saved == 0.0f && state.max > 0.0f) {
+    return state.max;
+  }
+
+  const float min_deviation = std::abs(state.min - average);
+  const float max_deviation = std::abs(state.max - average);
+  const bool max_is_furthest = max_deviation > min_deviation;
+  const float furthest_value = max_is_furthest ? state.max : state.min;
+  const float furthest_deviation = max_is_furthest ? max_deviation : min_deviation;
+
+  return furthest_deviation > (INTERVAL_DEVIATION_RATIO * average) ? furthest_value : average;
+}
+
+void OpenQuattTrends::update_last_saved_metric_(IntervalMetricState &state, float value) {
+  if (valid_unsigned_metric_(value)) {
+    state.last_saved = value;
+  }
+}
+
 OpenQuattTrends::TrendValues OpenQuattTrends::pack_values_(float outside_c, float supply_c, float room_c,
                                                             float room_setpoint_c, float flow_lph, float input_w,
                                                             float output_w) const {
@@ -750,94 +801,51 @@ bool OpenQuattTrends::read_flash_block_(uint32_t slot_index, uint32_t expected_s
   return true;
 }
 
+void OpenQuattTrends::reset_interval_samples_() {
+  reset_interval_metric_samples_(this->flow_interval_);
+  reset_interval_metric_samples_(this->input_w_interval_);
+  reset_interval_metric_samples_(this->output_w_interval_);
+}
+
+void OpenQuattTrends::reset_interval_filters_() {
+  this->reset_interval_samples_();
+  this->flow_interval_.last_saved = 0.0f;
+  this->input_w_interval_.last_saved = 0.0f;
+  this->output_w_interval_.last_saved = 0.0f;
+}
+
 void OpenQuattTrends::capture_sample(float outside_c, float supply_c, float room_c, float room_setpoint_c, float flow_lph,
                                      float input_w, float output_w) {
   if (!this->capture_enabled_()) {
     return;
   }
 
-  // 1. INTERVAL TRACKING: Accumulate totals and track peaks/drops (absolute deviations)
-  // Always update absolute peak-hold trackers for zero-to-non-zero edge cases
-  if (flow_lph > this->max_flow_observed_) this->max_flow_observed_ = flow_lph;
-  if (input_w > this->max_input_w_observed_) this->max_input_w_observed_ = input_w;
-  if (output_w > this->max_output_w_observed_) this->max_output_w_observed_ = output_w;
+  this->update_interval_metric_(this->flow_interval_, flow_lph);
+  this->update_interval_metric_(this->input_w_interval_, input_w);
+  this->update_interval_metric_(this->output_w_interval_, output_w);
 
-  // Accumulate running totals to calculate the 5-minute interval averages
-  this->interval_flow_sum_ += flow_lph;
-  this->interval_input_w_sum_ += input_w;
-  this->interval_output_w_sum_ += output_w;
-  this->interval_sample_count_++;
-
-  // Calculate current running averages to isolate the sample with the largest variance
-  float current_avg_flow = this->interval_flow_sum_ / this->interval_sample_count_;
-  float current_avg_input = this->interval_input_w_sum_ / this->interval_sample_count_;
-  float current_avg_output = this->interval_output_w_sum_ / this->interval_sample_count_;
-
-  // Track the raw sample value that caused the largest deviation (peaks or drops) from the running average
-  if (this->interval_sample_count_ == 1 || std::abs(flow_lph - current_avg_flow) > std::abs(this->max_dev_flow_val_ - current_avg_flow)) {
-    this->max_dev_flow_val_ = flow_lph;
-  }
-  if (this->interval_sample_count_ == 1 || std::abs(input_w - current_avg_input) > std::abs(this->max_dev_input_val_ - current_avg_input)) {
-    this->max_dev_input_val_ = input_w;
-  }
-  if (this->interval_sample_count_ == 1 || std::abs(output_w - current_avg_output) > std::abs(this->max_dev_output_val_ - current_avg_output)) {
-    this->max_dev_output_val_ = output_w;
-  }
-
-
-  // 2. GATEKEEPER: Check if 5 minutes (SAMPLE_INTERVAL_MS) have already passed
   const uint32_t now_monotonic_ms = static_cast<uint32_t>(millis());
   if (this->last_capture_ms_ != 0 &&
       static_cast<uint32_t>(now_monotonic_ms - static_cast<uint32_t>(this->last_capture_ms_)) < SAMPLE_INTERVAL_MS) {
     return;
   }
 
-
-  // 3. TIME IS UP (5 minutes passed): Filter and evaluate values to save
-  float flow_to_save = flow_lph;
-  float input_w_to_save = input_w;
-  float output_w_to_save = output_w;
-
-  // Protect against division by zero if no updates occurred
-  if (this->interval_sample_count_ > 0) {
-    float avg_flow = this->interval_flow_sum_ / this->interval_sample_count_;
-    float avg_input = this->interval_input_w_sum_ / this->interval_sample_count_;
-    float avg_output = this->interval_output_w_sum_ / this->interval_sample_count_;
-
-    // --- FLOW FILTERING ---
-    if (this->last_saved_flow_ == 0.0f) {
-      if (this->max_flow_observed_ > 0.0f) flow_to_save = this->max_flow_observed_;
-    } else {
-      // Dead-band filter: if the largest deviation (peak or drop) exceeds 5% of the average, save that extreme value
-      flow_to_save = (std::abs(this->max_dev_flow_val_ - avg_flow) > (0.05f * avg_flow)) ? this->max_dev_flow_val_ : avg_flow;
-    }
-
-    // --- INPUT POWER FILTERING ---
-    if (this->last_saved_input_w_ == 0.0f) {
-      if (this->max_input_w_observed_ > 0.0f) input_w_to_save = this->max_input_w_observed_;
-    } else {
-      input_w_to_save = (std::abs(this->max_dev_input_val_ - avg_input) > (0.05f * avg_input)) ? this->max_dev_input_val_ : avg_input;
-    }
-
-    // --- HEAT OUTPUT FILTERING ---
-    if (this->last_saved_output_w_ == 0.0f) {
-      if (this->max_output_w_observed_ > 0.0f) output_w_to_save = this->max_output_w_observed_;
-    } else {
-      output_w_to_save = (std::abs(this->max_dev_output_val_ - avg_output) > (0.05f * avg_output)) ? this->max_dev_output_val_ : avg_output;
-    }
-  }
+  const float flow_to_save = select_interval_metric_value_(this->flow_interval_, flow_lph);
+  const float input_w_to_save = select_interval_metric_value_(this->input_w_interval_, input_w);
+  const float output_w_to_save = select_interval_metric_value_(this->output_w_interval_, output_w);
 
   const uint64_t now_ms = this->current_time_ms_();
-  const TrendValues values = this->pack_values_(outside_c, supply_c, room_c, room_setpoint_c, flow_to_save, input_w_to_save, output_w_to_save);
+  const TrendValues values = this->pack_values_(outside_c, supply_c, room_c, room_setpoint_c, flow_to_save,
+                                                input_w_to_save, output_w_to_save);
   const bool any_valid = values.outside_c_x10 != INT16_MIN || values.supply_c_x10 != INT16_MIN ||
                          values.room_c_x10 != INT16_MIN || values.room_setpoint_c_x10 != INT16_MIN ||
                          values.flow_lph != UINT16_MAX || values.input_w != UINT16_MAX || values.output_w != UINT16_MAX;
   if (!any_valid) {
+    this->last_capture_ms_ = now_monotonic_ms;
+    this->reset_interval_samples_();
     return;
   }
 
-
-  // 4. SAVE DATA & UPDATE TRACKERS
   const TrendSample sample = this->make_sample_(now_ms, values);
   this->push_ram_sample_(sample);
   this->last_capture_ms_ = now_monotonic_ms;
@@ -846,24 +854,10 @@ void OpenQuattTrends::capture_sample(float outside_c, float supply_c, float room
     this->append_sample_to_flash_(sample);
   }
 
-  // Keep these filtered values for the next 5-minute cycle comparison
-  this->last_saved_flow_ = flow_to_save;
-  this->last_saved_input_w_ = input_w_to_save;
-  this->last_saved_output_w_ = output_w_to_save;
-
-  // RESET all temporary interval states for the next 5 minutes
-  this->max_flow_observed_ = 0.0f;
-  this->max_input_w_observed_ = 0.0f;
-  this->max_output_w_observed_ = 0.0f;
-  
-  this->interval_flow_sum_ = 0.0f;
-  this->interval_input_w_sum_ = 0.0f;
-  this->interval_output_w_sum_ = 0.0f;
-  this->interval_sample_count_ = 0;
-
-  this->max_dev_flow_val_ = 0.0f;
-  this->max_dev_input_val_ = 0.0f;
-  this->max_dev_output_val_ = 0.0f;
+  update_last_saved_metric_(this->flow_interval_, flow_to_save);
+  update_last_saved_metric_(this->input_w_interval_, input_w_to_save);
+  update_last_saved_metric_(this->output_w_interval_, output_w_to_save);
+  this->reset_interval_samples_();
 }
 
 void OpenQuattTrends::set_flash_enabled(bool enabled) {
@@ -890,6 +884,7 @@ void OpenQuattTrends::clear_history() {
   this->last_capture_ms_ = 0;
   this->flash_dirty_ = false;
   this->flash_archive_seeded_ = false;
+  this->reset_interval_filters_();
   this->reset_flash_builder_();
   this->clear_flash_archive_();
 }
