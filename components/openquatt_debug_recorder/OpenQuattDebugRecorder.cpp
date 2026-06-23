@@ -403,7 +403,85 @@ void OpenQuattDebugRecorder::clear_() {
   this->count_ = 0;
   this->write_index_ = 0;
   this->last_sample_ms_ = 0;
+  this->capture_in_progress_ = false;
+  this->capture_index_ = 0;
   this->clear_strings_();
+}
+
+bool OpenQuattDebugRecorder::compact_strings_() {
+  if (!this->string_entries_ || !this->string_data_) {
+    return false;
+  }
+
+  constexpr uint16_t MISSING_STRING_INDEX = UINT16_MAX;
+  uint16_t remap[STRING_ENTRY_CAPACITY];
+  std::fill(std::begin(remap), std::end(remap), MISSING_STRING_INDEX);
+
+  // Rolling captures outlive stale text values; keep only strings still referenced by retained samples.
+  auto uses_string = [](FieldType type) { return type == FieldType::TEXT_SENSOR || type == FieldType::SELECT; };
+  auto mark_sample = [&](DebugSample &sample) {
+    for (size_t field_index = 0; field_index < this->field_count_; ++field_index) {
+      if (!uses_string(this->fields_[field_index].type)) continue;
+      const uint32_t value = sample.values[field_index];
+      if (value < this->string_count_) {
+        remap[value] = 0;
+      }
+    }
+  };
+
+  for (size_t sample_index = 0; sample_index < this->count_; ++sample_index) {
+    mark_sample(this->samples_[sample_index]);
+  }
+  if (this->capture_in_progress_ && this->capture_index_ < SAMPLE_CAPACITY && this->capture_index_ >= this->count_) {
+    mark_sample(this->samples_[this->capture_index_]);
+  }
+
+  size_t new_count = 0;
+  size_t new_data_used = 0;
+  for (size_t old_index = 0; old_index < this->string_count_; ++old_index) {
+    if (remap[old_index] == MISSING_STRING_INDEX) continue;
+    const StringEntry old_entry = this->string_entries_[old_index];
+    if (old_entry.length == 0 || old_entry.offset + old_entry.length > this->string_data_used_) {
+      remap[old_index] = MISSING_STRING_INDEX;
+      continue;
+    }
+    if (new_count >= STRING_ENTRY_CAPACITY || new_data_used + old_entry.length > STRING_DATA_BYTES) {
+      return false;
+    }
+    if (old_entry.offset != new_data_used) {
+      std::memmove(this->string_data_.data() + new_data_used, this->string_data_.data() + old_entry.offset,
+                   old_entry.length);
+    }
+    StringEntry &new_entry = this->string_entries_[new_count];
+    new_entry.hash = old_entry.hash;
+    new_entry.offset = static_cast<uint32_t>(new_data_used);
+    new_entry.length = old_entry.length;
+    remap[old_index] = static_cast<uint16_t>(new_count);
+    new_data_used += old_entry.length;
+    new_count++;
+  }
+
+  auto remap_sample = [&](DebugSample &sample) {
+    for (size_t field_index = 0; field_index < this->field_count_; ++field_index) {
+      if (!uses_string(this->fields_[field_index].type)) continue;
+      const uint32_t value = sample.values[field_index];
+      if (value == MISSING_VALUE) continue;
+      sample.values[field_index] =
+          value < this->string_count_ && remap[value] != MISSING_STRING_INDEX ? remap[value] : MISSING_VALUE;
+    }
+  };
+
+  for (size_t sample_index = 0; sample_index < this->count_; ++sample_index) {
+    remap_sample(this->samples_[sample_index]);
+  }
+  if (this->capture_in_progress_ && this->capture_index_ < SAMPLE_CAPACITY && this->capture_index_ >= this->count_) {
+    remap_sample(this->samples_[this->capture_index_]);
+  }
+
+  this->string_count_ = new_count;
+  this->string_data_used_ = new_data_used;
+  this->string_overflow_ = false;
+  return true;
 }
 
 const OpenQuattDebugRecorder::DebugSample *OpenQuattDebugRecorder::sample_at_(size_t index) const {
@@ -425,11 +503,28 @@ uint32_t OpenQuattDebugRecorder::intern_string_(const char *value, size_t length
     return MISSING_VALUE;
   }
   const uint32_t hash = hash_string(value, length);
-  for (size_t index = 0; index < this->string_count_; ++index) {
-    const StringEntry &entry = this->string_entries_[index];
-    if (entry.hash == hash && entry.length == length &&
-        std::memcmp(this->string_data_.data() + entry.offset, value, length) == 0) {
-      return static_cast<uint32_t>(index);
+  auto find_existing = [&]() -> uint32_t {
+    for (size_t index = 0; index < this->string_count_; ++index) {
+      const StringEntry &entry = this->string_entries_[index];
+      if (entry.hash == hash && entry.length == length &&
+          std::memcmp(this->string_data_.data() + entry.offset, value, length) == 0) {
+        return static_cast<uint32_t>(index);
+      }
+    }
+    return MISSING_VALUE;
+  };
+
+  uint32_t existing = find_existing();
+  if (existing != MISSING_VALUE) {
+    return existing;
+  }
+  if (this->string_count_ >= STRING_ENTRY_CAPACITY || length > UINT16_MAX ||
+      this->string_data_used_ + length > STRING_DATA_BYTES) {
+    if (this->rolling_ && this->compact_strings_()) {
+      existing = find_existing();
+      if (existing != MISSING_VALUE) {
+        return existing;
+      }
     }
   }
   if (this->string_count_ >= STRING_ENTRY_CAPACITY || length > UINT16_MAX ||
@@ -617,11 +712,14 @@ void OpenQuattDebugRecorder::capture_sample_() {
   }
 
   DebugSample &sample = this->samples_[this->write_index_];
+  this->capture_in_progress_ = true;
+  this->capture_index_ = this->write_index_;
   sample.offset_s = (now_ms - this->started_ms_) / 1000U;
   std::fill(std::begin(sample.values), std::end(sample.values), MISSING_VALUE);
   for (size_t index = 0; index < this->field_count_; ++index) {
     sample.values[index] = this->capture_value_(this->fields_[index]);
   }
+  this->capture_in_progress_ = false;
 
   this->write_index_ = (this->write_index_ + 1) % SAMPLE_CAPACITY;
   if (this->count_ < SAMPLE_CAPACITY) {

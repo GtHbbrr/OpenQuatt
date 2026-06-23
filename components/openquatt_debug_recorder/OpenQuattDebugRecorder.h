@@ -101,6 +101,8 @@ class OpenQuattDebugRecorder : public Component {
   size_t missing_field_count_{0};
   size_t string_count_{0};
   size_t string_data_used_{0};
+  bool capture_in_progress_{false};
+  size_t capture_index_{0};
   bool string_overflow_{false};
 
   bool available_() const {
@@ -120,6 +122,7 @@ class OpenQuattDebugRecorder : public Component {
   uint32_t sanitize_duration_s_(uint32_t duration_s) const;
   void clear_();
   void clear_strings_();
+  bool compact_strings_();
   void capture_sample_();
   uint32_t capture_value_(const DebugField &field);
   uint32_t intern_string_(const char *value, size_t length);
