@@ -101,6 +101,8 @@
     logHistoryEntries: [],
     debugRecording: {
       active: false,
+      mode: "manual",
+      frozen: false,
       startedAt: 0,
       stoppedAt: 0,
       durationS: 15 * 60,
@@ -3141,7 +3143,8 @@
     if (!recording.startedAt) {
       return;
     }
-    const elapsedS = Math.min(getDebugRecordingElapsedS(recording), Number(recording.durationS || 0));
+    const rolling = recording.mode === "rolling";
+    const elapsedS = rolling ? getDebugRecordingElapsedS(recording) : Math.min(getDebugRecordingElapsedS(recording), Number(recording.durationS || 0));
     if (!Number.isFinite(Number(recording.nextOffsetS))) {
       recording.nextOffsetS = 0;
     }
@@ -3152,7 +3155,7 @@
         recording.samples.shift();
       }
     }
-    if (recording.active && elapsedS >= Number(recording.durationS || 0)) {
+    if (!rolling && recording.active && elapsedS >= Number(recording.durationS || 0)) {
       recording.active = false;
       recording.stoppedAt = recording.startedAt + Number(recording.durationS || 0) * 1000;
     }
@@ -3161,8 +3164,9 @@
   function getDebugRecordingStatusPayload() {
     syncDebugRecordingSamples();
     const recording = state.debugRecording;
-    const elapsedS = Math.min(getDebugRecordingElapsedS(recording), Number(recording.durationS || 0));
-    const remainingS = recording.active ? Math.max(0, Number(recording.durationS || 0) - elapsedS) : 0;
+    const rolling = recording.mode === "rolling";
+    const elapsedS = rolling ? getDebugRecordingElapsedS(recording) : Math.min(getDebugRecordingElapsedS(recording), Number(recording.durationS || 0));
+    const remainingS = recording.active && !rolling ? Math.max(0, Number(recording.durationS || 0) - elapsedS) : 0;
     const firstSample = recording.samples[0] || null;
     const lastSample = recording.samples[recording.samples.length - 1] || null;
     const retainedDurationS = firstSample && lastSample ? Math.max(0, lastSample.offset_s - firstSample.offset_s) : 0;
@@ -3170,6 +3174,9 @@
       ok: true,
       available: true,
       active: Boolean(recording.active),
+      mode: rolling ? "rolling" : "manual",
+      rolling,
+      frozen: Boolean(recording.frozen),
       recording_id: Number(recording.startedAt || 0),
       storage: "psram",
       interval_s: 10,
@@ -3177,6 +3184,7 @@
       elapsed_s: elapsedS,
       remaining_s: remainingS,
       retained_duration_s: retainedDurationS,
+      retention_capacity_s: (DEBUG_RECORDING_SAMPLE_CAPACITY - 1) * 10,
       sample_count: recording.samples.length,
       sample_capacity: DEBUG_RECORDING_SAMPLE_CAPACITY,
       field_count: recording.fields.length,
@@ -3208,9 +3216,12 @@
   }
 
   function handleDebugRecordingStart(url) {
-    const durationS = Math.max(60, Math.min(3600, Number(url.searchParams.get("duration_s") || 15 * 60)));
+    const rolling = url.searchParams.get("rolling") === "1";
+    const durationS = rolling ? 0 : Math.max(60, Math.min(3600, Number(url.searchParams.get("duration_s") || 15 * 60)));
     state.debugRecording = {
       active: true,
+      mode: rolling ? "rolling" : "manual",
+      frozen: false,
       startedAt: Date.now(),
       stoppedAt: 0,
       durationS,
@@ -3222,11 +3233,23 @@
     return mockResponse(200, getDebugRecordingStatusPayload());
   }
 
+  function handleDebugRecordingFreeze() {
+    const recording = state.debugRecording;
+    syncDebugRecordingSamples();
+    if (recording.active) {
+      recording.active = false;
+      recording.frozen = recording.mode === "rolling";
+      recording.stoppedAt = Date.now();
+    }
+    return mockResponse(200, getDebugRecordingStatusPayload());
+  }
+
   function handleDebugRecordingStop() {
     const recording = state.debugRecording;
     syncDebugRecordingSamples();
     if (recording.active) {
       recording.active = false;
+      recording.frozen = recording.mode === "rolling";
       recording.stoppedAt = Date.now();
     }
     return mockResponse(200, getDebugRecordingStatusPayload());
@@ -3263,10 +3286,14 @@
         recording_id: Number(recording.startedAt || 0),
         ended_at_ms: endedAtMs,
         active: Boolean(recording.active),
+        mode: recording.mode === "rolling" ? "rolling" : "manual",
+        rolling: recording.mode === "rolling",
+        frozen: Boolean(recording.frozen),
         duration_s: Math.max(0, Math.floor((endedAtMs - startedAtMs) / 1000)),
         retained_duration_s: initial && recording.samples.length
           ? Math.max(0, recording.samples[recording.samples.length - 1].offset_s - initial.offset_s)
           : 0,
+        retention_capacity_s: (DEBUG_RECORDING_SAMPLE_CAPACITY - 1) * 10,
         interval_s: 10,
         sample_count: recording.samples.length,
         sample_capacity: DEBUG_RECORDING_SAMPLE_CAPACITY,
@@ -3348,6 +3375,9 @@
       }
       if (url.pathname.endsWith("/openquatt/debug-recording/start") && method === "POST") {
         return handleDebugRecordingStart(url);
+      }
+      if (url.pathname.endsWith("/openquatt/debug-recording/freeze") && method === "POST") {
+        return handleDebugRecordingFreeze();
       }
       if (url.pathname.endsWith("/openquatt/debug-recording/stop") && method === "POST") {
         return handleDebugRecordingStop();
