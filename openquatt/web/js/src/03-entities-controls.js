@@ -3468,6 +3468,11 @@
       return;
     }
 
+    if (action === "start-rolling-debug-recording") {
+      void startRollingDebugRecording();
+      return;
+    }
+
     if (action === "select-debug-recording-duration") {
       setDebugRecordingSelectedMinutes(button.dataset.debugMinutes || 15);
       return;
@@ -3475,6 +3480,11 @@
 
     if (action === "stop-debug-recording") {
       void stopDebugRecording();
+      return;
+    }
+
+    if (action === "freeze-debug-recording") {
+      void freezeDebugRecording();
       return;
     }
 

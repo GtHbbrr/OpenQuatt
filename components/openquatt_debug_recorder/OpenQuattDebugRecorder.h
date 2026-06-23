@@ -27,6 +27,8 @@ class OpenQuattDebugRecorder : public Component {
 
   bool configure(const std::string &entities, bool reset);
   bool start(uint32_t duration_s);
+  bool start_rolling();
+  void freeze();
   void stop();
   void write_status(httpd_req_t *req) const;
   void write_recording(httpd_req_t *req) const;
@@ -86,6 +88,8 @@ class OpenQuattDebugRecorder : public Component {
   PsramBuffer<StringEntry> string_entries_{};
   PsramBuffer<char> string_data_{};
   bool active_{false};
+  bool rolling_{false};
+  bool frozen_{false};
   uint64_t recording_id_{0};
   uint32_t started_ms_{0};
   uint32_t stopped_ms_{0};
@@ -112,6 +116,7 @@ class OpenQuattDebugRecorder : public Component {
   uint32_t elapsed_s_() const;
   uint32_t remaining_s_() const;
   uint32_t retained_duration_s_() const;
+  uint32_t retention_capacity_s_() const;
   uint32_t sanitize_duration_s_(uint32_t duration_s) const;
   void clear_();
   void clear_strings_();
