@@ -57,6 +57,16 @@ function getDebugRecordingStatusCopy() {
   return "Neem tijdelijk supportgegevens op voor analyse. De opname wordt lokaal in het apparaatgeheugen opgeslagen. Er wordt niets automatisch verzonden.";
 }
 
+function getDebugRecordingHubStatusLabel() {
+  if (state.debugRecordingActive) {
+    return `Loopt · ${formatDebugRecordingDuration(getDebugRecordingRemainingMs())}`;
+  }
+  if (getDebugRecordingSampleCount() > 0) {
+    return "Klaar";
+  }
+  return getDebugRecordingStatusLabel();
+}
+
 function getDebugRecordingSelectedMinutes() {
   const selected = Number(state.debugRecordingSelectedMinutes || 15);
   const allowed = DEBUG_RECORDING_DURATION_OPTIONS.map((option) => Number(option.minutes));

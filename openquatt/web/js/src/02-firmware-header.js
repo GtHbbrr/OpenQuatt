@@ -1663,6 +1663,9 @@
     if (key === "connectivity") {
       return "open-connectivity-modal";
     }
+    if (key === "debugRecording") {
+      return "open-debug-recording-modal";
+    }
     if (key === "login") {
       return "open-login-modal";
     }
@@ -1676,6 +1679,7 @@
       ["connectivity", "Connectiviteit", getConnectivityStatus()],
       ["time", "Tijd", formatDeviceClock()],
       ["version", "Versie", getFirmwareVersionChipValue(), Boolean(getFirmwareUpdateEntity())],
+      ["debugRecording", "Debugopname", getDebugRecordingHubStatusLabel(), true],
     ];
   }
 
@@ -1821,8 +1825,8 @@
   function renderHeaderStatus() {
     const surface = state.nativeOpen ? "native" : "app";
     const hasUpdateAttention = hasFirmwareUpdateAttention();
-    const debugRecordingStatus = renderDebugRecordingHeaderStatus();
     if (!state.interfacePanelOpen) {
+      const debugRecordingStatus = renderDebugRecordingHeaderStatus();
       return `
         <aside class="oq-helper-hub oq-helper-hub--collapsed" aria-label="Weergave en systeem">
           <div class="oq-helper-hub-head-actions">
@@ -1845,7 +1849,6 @@
         <div class="oq-helper-hub-head">
           <h2 class="oq-helper-hub-title">Weergave en systeem</h2>
           <div class="oq-helper-hub-head-actions">
-            ${debugRecordingStatus}
             <button
               class="oq-helper-hub-toggle oq-helper-hub-toggle--close"
               type="button"
@@ -1888,7 +1891,12 @@
     if (!state.root) {
       return;
     }
-    const actions = state.root.querySelector(".oq-helper-hub .oq-helper-hub-head-actions");
+    if (state.interfacePanelOpen) {
+      state.root.querySelector(".oq-debug-recording-header-status")?.remove();
+      patchHeaderDom();
+      return;
+    }
+    const actions = state.root.querySelector(".oq-helper-hub--collapsed .oq-helper-hub-head-actions");
     if (!actions) {
       return;
     }
