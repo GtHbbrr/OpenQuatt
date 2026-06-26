@@ -578,7 +578,7 @@ uint32_t OpenQuattDebugRecorder::capture_value_(const DebugField &field) {
 #ifdef USE_SWITCH
     case FieldType::SWITCH: {
       auto *entity = static_cast<switch_::Switch *>(field.source);
-      return entity != nullptr && entity->has_state() ? static_cast<uint32_t>(entity->state) : MISSING_VALUE;
+      return entity != nullptr ? static_cast<uint32_t>(entity->state) : MISSING_VALUE;
     }
 #endif
 #ifdef USE_TEXT_SENSOR
