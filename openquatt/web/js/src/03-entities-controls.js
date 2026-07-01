@@ -4470,7 +4470,7 @@
     render();
 
     try {
-      await setFirmwareUpdateTarget("current build", { poll: false });
+      await setFirmwareUpdateTarget("current build", { poll: false, force: true });
       primeFirmwareUpdateState();
       const response = await fetch(buildEntityPath(entity.domain, entity.name, "press"), {
         method: "POST",
@@ -4510,7 +4510,7 @@
       return false;
     }
 
-    if (String(getEntityValue("firmwareUpdateTarget") || "").trim() === value) {
+    if (!options.force && String(getEntityValue("firmwareUpdateTarget") || "").trim() === value) {
       return true;
     }
 
@@ -4564,7 +4564,7 @@
     render();
 
     try {
-      await setFirmwareUpdateTarget("current build", { poll: false });
+      await setFirmwareUpdateTarget("current build", { poll: false, force: true });
       state.updateInstallTargetVersion = getFirmwareLatestVersion(getFirmwareUpdateEntity() || {}) || state.updateInstallTargetVersion;
       beginFirmwareOtaQuietWindow();
       const response = await fetch(buildEntityPath("update", "Firmware Update", "install"), {
@@ -4622,7 +4622,7 @@
     render();
 
     try {
-      await setFirmwareUpdateTarget("alternate connection");
+      await setFirmwareUpdateTarget("alternate connection", { force: true });
       state.updateInstallTargetVersion = getFirmwareLatestVersion(getFirmwareUpdateEntity() || {}) || getFirmwareCurrentVersion() || "";
       state.updateInstallPhaseHint = "starting";
       state.updateInstallProgressHint = 0;
@@ -4689,7 +4689,7 @@
     render();
 
     try {
-      await setFirmwareUpdateTarget("alternate topology");
+      await setFirmwareUpdateTarget("alternate topology", { force: true });
       state.updateInstallTargetVersion = getFirmwareLatestVersion(getFirmwareUpdateEntity() || {}) || getFirmwareCurrentVersion() || "";
       state.updateInstallPhaseHint = "starting";
       state.updateInstallProgressHint = 0;

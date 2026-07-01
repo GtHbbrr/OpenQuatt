@@ -193,6 +193,32 @@ globals:
 # OVERVIEW TRENDS
 # ==============================================================================
 script:
+  - id: oq_apply_firmware_update_source
+    mode: queued
+    then:
+      - lambda: |-
+          // Re-apply the manifest URL immediately before check/install so the selected target wins.
+          const std::string channel = id(oq_firmware_update_channel).current_option();
+          const std::string target = id(oq_firmware_update_target).current_option();
+          const bool alternate_connection_update_target = target == "alternate connection";
+          const bool alternate_topology_update_target = target == "alternate topology";
+          const bool dev_channel = channel == "dev";
+
+          const char *source_url = dev_channel ? "${dev_release_manifest_url}" : "${main_release_manifest_url}";
+          const char *alternate_connection_url =
+            dev_channel ? "${alternate_dev_release_manifest_url}" : "${alternate_main_release_manifest_url}";
+          const char *alternate_topology_url =
+            dev_channel ? "${alternate_topology_dev_release_manifest_url}" : "${alternate_topology_main_release_manifest_url}";
+          if (alternate_connection_update_target && alternate_connection_url[0] != '\0') {
+            source_url = alternate_connection_url;
+          } else if (alternate_topology_update_target && alternate_topology_url[0] != '\0') {
+            source_url = alternate_topology_url;
+          }
+
+          ESP_LOGI("oq_fw", "Firmware update target '%s' on channel '%s' uses manifest: %s",
+                   target.c_str(), channel.c_str(), source_url);
+          id(oq_firmware_update).set_source_url(source_url);
+
   - id: oq_capture_overview_trend_sample
     mode: single
     then:
@@ -630,6 +656,8 @@ button:
     web_server:
       sorting_group_id: oq_system_diagnostics
     on_press:
+      - script.execute: oq_apply_firmware_update_source
+      - script.wait: oq_apply_firmware_update_source
       - if:
           condition:
             lambda: |-
@@ -656,6 +684,8 @@ button:
     web_server:
       sorting_group_id: oq_system_diagnostics
     on_press:
+      - script.execute: oq_apply_firmware_update_source
+      - script.wait: oq_apply_firmware_update_source
       - update.perform:
           id: oq_firmware_update
           force_update: true
