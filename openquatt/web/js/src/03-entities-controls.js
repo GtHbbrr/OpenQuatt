@@ -3206,11 +3206,7 @@
     if (action === "open-update-modal") {
       state.updateModalOpen = true;
       render();
-      void hydrateFirmwareUpdateModal().then(() => {
-        if (state.updateModalOpen && !hasKnownFirmwareTargetVersion() && !state.updateCheckBusy && !state.updateInstallBusy) {
-          void triggerFirmwareUpdateCheck();
-        }
-      });
+      void hydrateFirmwareUpdateModal();
       return;
     }
 
@@ -4530,7 +4526,7 @@
 
     if (options.poll !== false) {
       primeFirmwareUpdateState();
-      await pollFirmwareUpdateState();
+      return await pollFirmwareUpdateState({ expectedBuildLabel: options.expectedBuildLabel || "" });
     }
     return true;
   }
@@ -4622,7 +4618,13 @@
     render();
 
     try {
-      await setFirmwareUpdateTarget("alternate connection", { force: true });
+      const targetReady = await setFirmwareUpdateTarget("alternate connection", {
+        force: true,
+        expectedBuildLabel: model.targetBuildLabel,
+      });
+      if (!targetReady) {
+        throw new Error("Doelmanifest is nog niet geladen. Probeer het over enkele seconden opnieuw.");
+      }
       state.updateInstallTargetVersion = getFirmwareLatestVersion(getFirmwareUpdateEntity() || {}) || getFirmwareCurrentVersion() || "";
       state.updateInstallPhaseHint = "starting";
       state.updateInstallProgressHint = 0;
@@ -4689,7 +4691,13 @@
     render();
 
     try {
-      await setFirmwareUpdateTarget("alternate topology", { force: true });
+      const targetReady = await setFirmwareUpdateTarget("alternate topology", {
+        force: true,
+        expectedBuildLabel: model.targetBuildLabel,
+      });
+      if (!targetReady) {
+        throw new Error("Doelmanifest is nog niet geladen. Probeer het over enkele seconden opnieuw.");
+      }
       state.updateInstallTargetVersion = getFirmwareLatestVersion(getFirmwareUpdateEntity() || {}) || getFirmwareCurrentVersion() || "";
       state.updateInstallPhaseHint = "starting";
       state.updateInstallProgressHint = 0;

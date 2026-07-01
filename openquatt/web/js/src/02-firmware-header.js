@@ -885,6 +885,22 @@
     return getFirmwareUpdateVersions().latest !== "—";
   }
 
+  function getFirmwareBuildSignature(label) {
+    return String(label || "")
+      .toLowerCase()
+      .replace(/wi[\s-]?fi/g, "wifi")
+      .replace(/[^a-z0-9]+/g, "");
+  }
+
+  function isFirmwareUpdateEntityForBuild(buildLabel, entity = getFirmwareUpdateEntity() || {}) {
+    const expected = getFirmwareBuildSignature(buildLabel);
+    if (!expected) {
+      return true;
+    }
+    const text = getFirmwareBuildSignature(`${entity.title || ""} ${entity.summary || ""}`);
+    return text.includes(expected);
+  }
+
   function wait(ms) {
     return new Promise((resolve) => window.setTimeout(resolve, ms));
   }
@@ -1075,18 +1091,21 @@
     };
   }
 
-  async function pollFirmwareUpdateState() {
+  async function pollFirmwareUpdateState(options = {}) {
+    const expectedBuildLabel = String(options.expectedBuildLabel || "").trim();
     for (let attempt = 0; attempt < 6; attempt += 1) {
       await wait(attempt === 0 ? 900 : 1200);
       await refreshEntities(FIRMWARE_MODAL_KEYS, "all", { forceMissing: true });
       const entityAligned = isFirmwareEntityAlignedWithChannel();
+      const targetAligned = !expectedBuildLabel || isFirmwareUpdateEntityForBuild(expectedBuildLabel);
       const knownTarget = hasKnownFirmwareTargetVersion();
       const checking = isFirmwareUpdateChecking();
       const status = getUpdateStatus();
-      if (entityAligned && (knownTarget || (!checking && status !== "Nog niet gecontroleerd"))) {
-        return;
+      if (entityAligned && targetAligned && (knownTarget || (!checking && status !== "Nog niet gecontroleerd"))) {
+        return true;
       }
     }
+    return false;
   }
 
   async function pollFirmwareInstallState(options = {}) {
