@@ -58,6 +58,7 @@ class OpenQuattLogHistory : public Component {
   uint32_t pending_crash_report_since_ms_{0};
   uint32_t pending_crash_epoch_s_{0};
   uint32_t pending_crash_uptime_s_{0};
+  uint32_t pending_crash_breadcrumb_sequence_{0};
   uint32_t last_crash_breadcrumb_update_ms_{0};
 #endif
 

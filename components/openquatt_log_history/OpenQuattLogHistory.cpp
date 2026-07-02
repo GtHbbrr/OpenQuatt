@@ -8,6 +8,7 @@
 #include "esphome/core/defines.h"
 #ifdef USE_ESP32_CRASH_HANDLER
 #include <esp_attr.h>
+#include <esp_system.h>
 
 #include "esphome/components/esp32/crash_handler.h"
 #endif
@@ -65,6 +66,35 @@ static bool crash_time_breadcrumb_is_valid(const CrashTimeBreadcrumb &breadcrumb
   return breadcrumb.magic == CRASH_TIME_BREADCRUMB_MAGIC &&
          breadcrumb.version == CRASH_TIME_BREADCRUMB_VERSION && epoch_is_sane(breadcrumb.epoch_s) &&
          breadcrumb.crc == crash_time_breadcrumb_crc(breadcrumb);
+}
+
+static const char *reset_reason_to_string(esp_reset_reason_t reason) {
+  switch (reason) {
+    case ESP_RST_UNKNOWN:
+      return "UNKNOWN";
+    case ESP_RST_POWERON:
+      return "POWERON";
+    case ESP_RST_EXT:
+      return "EXT";
+    case ESP_RST_SW:
+      return "SW";
+    case ESP_RST_PANIC:
+      return "PANIC";
+    case ESP_RST_INT_WDT:
+      return "INT_WDT";
+    case ESP_RST_TASK_WDT:
+      return "TASK_WDT";
+    case ESP_RST_WDT:
+      return "WDT";
+    case ESP_RST_DEEPSLEEP:
+      return "DEEPSLEEP";
+    case ESP_RST_BROWNOUT:
+      return "BROWNOUT";
+    case ESP_RST_SDIO:
+      return "SDIO";
+    default:
+      return "OTHER";
+  }
 }
 #endif
 
@@ -436,6 +466,7 @@ void OpenQuattLogHistory::load_crash_time_breadcrumb_() {
   this->pending_crash_breadcrumb_valid_ = false;
   this->pending_crash_epoch_s_ = 0;
   this->pending_crash_uptime_s_ = 0;
+  this->pending_crash_breadcrumb_sequence_ = 0;
 
   if (!crash_time_breadcrumb_is_valid(crash_time_breadcrumb)) {
     return;
@@ -444,6 +475,7 @@ void OpenQuattLogHistory::load_crash_time_breadcrumb_() {
   this->pending_crash_breadcrumb_valid_ = true;
   this->pending_crash_epoch_s_ = crash_time_breadcrumb.epoch_s;
   this->pending_crash_uptime_s_ = crash_time_breadcrumb.uptime_s;
+  this->pending_crash_breadcrumb_sequence_ = crash_time_breadcrumb.sequence;
 }
 
 void OpenQuattLogHistory::update_crash_time_breadcrumb_() {
@@ -501,11 +533,15 @@ void OpenQuattLogHistory::maybe_log_pending_crash_report_() {
   if (this->pending_crash_breadcrumb_valid_) {
     char timestamp[32];
     format_epoch_(this->pending_crash_epoch_s_, timestamp, sizeof(timestamp));
-    ESP_LOGE(TAG, "Previous boot crashed; last known controller time before reset: %s (uptime %" PRIu32 "s)",
-             timestamp, this->pending_crash_uptime_s_);
+    ESP_LOGE(TAG, "Previous boot crashed; last known controller time before reset: %s (uptime %" PRIu32
+                  "s, breadcrumb seq %" PRIu32 ")",
+             timestamp, this->pending_crash_uptime_s_, this->pending_crash_breadcrumb_sequence_);
   } else {
     ESP_LOGE(TAG, "Previous boot crashed; no retained pre-crash timestamp was available");
   }
+  const esp_reset_reason_t reset_reason = esp_reset_reason();
+  ESP_LOGE(TAG, "Current boot reset reason: %s (%d)", reset_reason_to_string(reset_reason),
+           static_cast<int>(reset_reason));
 
   if (!time_ready) {
     ESP_LOGW(TAG, "Replaying crash report after waiting without a sane controller clock");
