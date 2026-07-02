@@ -28,7 +28,7 @@ Je hoeft voor de eerste installatie niet eerst alle technische achtergronddocume
 
 OpenQuatt ondersteunt momenteel Quatt Hybrid `Single` en `Duo` (V1, V1.5 en V2).
 
-Voor nieuwe installaties is de [`Electropaultje Heatpump Controller Q-edition`](https://electropaultje.nl/product/heatpump-controller-quatt-edition/) de aanbevolen en volledig ondersteunde module. Deze hardware is speciaal voor OpenQuatt gemaakt en is de primaire focus voor support en nieuwe ontwikkeling.
+Voor nieuwe installaties is de [`Electropaultje Heatpump Controller Q-edition`](https://electropaultje.nl/product/heatpump-controller-q-edition/) de aanbevolen en volledig ondersteunde module. Deze hardware is speciaal voor OpenQuatt gemaakt en is de primaire focus voor support en nieuwe ontwikkeling.
 
 `Waveshare ESP32-S3-Relay-1CH` en `Electropaultje Heatpump Listener` blijven beschikbaar met limited/best-effort support. Ze blijven waarschijnlijk gewoon functioneren, maar actieve ontwikkeling en support richten zich op Q-edition.
 
@@ -70,7 +70,7 @@ OpenQuatt biedt:
 
 OpenQuatt richt zich nu bewust op drie hardwareprofielen:
 
-- [Electropaultje Heatpump Controller Q-edition](https://electropaultje.nl/product/heatpump-controller-quatt-edition/)
+- [Electropaultje Heatpump Controller Q-edition](https://electropaultje.nl/product/heatpump-controller-q-edition/)
 - [Waveshare ESP32-S3-Relay-1CH](https://www.waveshare.com/esp32-s3-relay-1ch.htm)
 - [Electropaultje Heatpump Listener](https://electropaultje.nl/product/heatpump-listener/)
 
