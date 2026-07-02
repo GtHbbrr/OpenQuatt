@@ -1,12 +1,15 @@
 #include "OpenQuattEnergyHistory.h"
 
 #include <algorithm>
+#include <array>
+#include <cctype>
 #include <cstdarg>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 
+#include "esp_random.h"
 #include "esphome/core/log.h"
 
 namespace esphome {
@@ -15,6 +18,54 @@ namespace openquatt_energy_history {
 static const char *const TAG = "openquatt.energy_history";
 
 namespace {
+
+static std::string base64_encode_bytes_(const uint8_t *data, size_t length) {
+  static constexpr char TABLE[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+  std::string out;
+  out.reserve(((length + 2U) / 3U) * 4U);
+
+  for (size_t i = 0; i < length; i += 3U) {
+    const uint32_t byte_a = data[i];
+    const uint32_t byte_b = i + 1U < length ? data[i + 1U] : 0U;
+    const uint32_t byte_c = i + 2U < length ? data[i + 2U] : 0U;
+    const uint32_t triple = (byte_a << 16U) | (byte_b << 8U) | byte_c;
+
+    out.push_back(TABLE[(triple >> 18U) & 0x3FU]);
+    out.push_back(TABLE[(triple >> 12U) & 0x3FU]);
+    out.push_back(i + 1U < length ? TABLE[(triple >> 6U) & 0x3FU] : '=');
+    out.push_back(i + 2U < length ? TABLE[triple & 0x3FU] : '=');
+  }
+
+  return out;
+}
+
+static void fill_random_token_(std::array<uint8_t, 32> *key) {
+  if (key == nullptr) {
+    return;
+  }
+  for (size_t i = 0; i < key->size(); i += sizeof(uint32_t)) {
+    const uint32_t rnd = esp_random();
+    for (size_t byte_index = 0; byte_index < sizeof(uint32_t) && i + byte_index < key->size(); ++byte_index) {
+      (*key)[i + byte_index] = static_cast<uint8_t>(rnd >> (byte_index * 8U));
+    }
+  }
+}
+
+static bool header_matches_host_(const std::string &header_value, const std::string &host) {
+  if (host.empty() || header_value.empty()) {
+    return false;
+  }
+
+  size_t authority_start = 0;
+  const size_t scheme_pos = header_value.find("://");
+  if (scheme_pos != std::string::npos) {
+    authority_start = scheme_pos + 3U;
+  }
+  const size_t authority_end = header_value.find_first_of("/?#", authority_start);
+  const std::string authority = header_value.substr(
+      authority_start, authority_end == std::string::npos ? std::string::npos : authority_end - authority_start);
+  return authority == host;
+}
 
 static bool url_path_matches(const char *url, const char *path) {
   if (url == nullptr || path == nullptr) {
@@ -60,6 +111,18 @@ static bool read_query_flag(httpd_req_t *req, const char *key, bool default_valu
   return std::strcmp(value, "1") == 0 || std::strcmp(value, "true") == 0 || std::strcmp(value, "yes") == 0;
 }
 
+static std::string trim_copy(const std::string &value) {
+  size_t first = 0;
+  while (first < value.size() && std::isspace(static_cast<unsigned char>(value[first]))) {
+    ++first;
+  }
+  size_t last = value.size();
+  while (last > first && std::isspace(static_cast<unsigned char>(value[last - 1U]))) {
+    --last;
+  }
+  return value.substr(first, last - first);
+}
+
 }  // namespace
 
 class ChunkedTextWriter {
@@ -87,13 +150,52 @@ class OpenQuattEnergyHistoryRequestHandler : public AsyncWebHandler {
  public:
   explicit OpenQuattEnergyHistoryRequestHandler(OpenQuattEnergyHistory *parent) : parent_(parent) {}
 
+  bool passes_same_origin_(AsyncWebServerRequest *request) const {
+    const auto host = request->get_header("Host");
+    if (!host.has_value() || host->empty()) {
+      return false;
+    }
+
+    const auto origin = request->get_header("Origin");
+    if (origin.has_value() && !header_matches_host_(origin.value(), host.value())) {
+      return false;
+    }
+
+    const auto referer = request->get_header("Referer");
+    if (referer.has_value() && !header_matches_host_(referer.value(), host.value())) {
+      return false;
+    }
+
+    return true;
+  }
+
+  bool passes_csrf_(AsyncWebServerRequest *request) const {
+    const std::string csrf_token = request->arg("csrf_token");
+    return !csrf_token.empty() && csrf_token == this->parent_->get_csrf_token();
+  }
+
   bool canHandle(AsyncWebServerRequest *request) const override {
     char url_buf[AsyncWebServerRequest::URL_BUF_SIZE];
     request->url_to(url_buf);
+    if (url_path_matches(url_buf, "/energy/history/import")) {
+      return request->method() == HTTP_POST;
+    }
     return url_path_matches(url_buf, "/energy/history") && request->method() == HTTP_GET;
   }
 
   void handleRequest(AsyncWebServerRequest *request) override {
+    char url_buf[AsyncWebServerRequest::URL_BUF_SIZE];
+    request->url_to(url_buf);
+    if (url_path_matches(url_buf, "/energy/history/import")) {
+      if (!this->passes_same_origin_(request) || !this->passes_csrf_(request)) {
+        request->send(409, "application/json", R"({"ok":false,"error":"forbidden"})");
+        return;
+      }
+      const std::string response = this->parent_->import_history_records(request->arg("records"));
+      request->send(200, "application/json", response.c_str());
+      return;
+    }
+
     httpd_req_t *req = *request;
     httpd_resp_set_status(req, HTTPD_200);
     httpd_resp_set_type(req, "text/plain; charset=utf-8");
@@ -106,6 +208,8 @@ class OpenQuattEnergyHistoryRequestHandler : public AsyncWebHandler {
 };
 
 void OpenQuattEnergyHistory::setup() {
+  this->rotate_csrf_token_();
+
   if (web_server_base::global_web_server_base == nullptr) {
     ESP_LOGE(TAG, "global_web_server_base is unavailable");
     return;
@@ -136,6 +240,12 @@ void OpenQuattEnergyHistory::setup() {
 }
 
 void OpenQuattEnergyHistory::loop() {}
+
+void OpenQuattEnergyHistory::rotate_csrf_token_() {
+  std::array<uint8_t, 32> token_bytes{};
+  fill_random_token_(&token_bytes);
+  this->csrf_token_ = base64_encode_bytes_(token_bytes.data(), token_bytes.size());
+}
 
 void OpenQuattEnergyHistory::on_shutdown() {
   if (this->enabled_() && this->has_current_day_ && record_has_values_(this->current_values_)) {
@@ -255,6 +365,90 @@ bool OpenQuattEnergyHistory::record_has_values_(const EnergyHistoryValues &value
          values.system_heat_output_wh != UNKNOWN_WH;
 }
 
+bool OpenQuattEnergyHistory::date_key_valid_(uint32_t date_key) {
+  const uint16_t year = static_cast<uint16_t>(date_key / 10000U);
+  const uint8_t month = static_cast<uint8_t>((date_key / 100U) % 100U);
+  const uint8_t day = static_cast<uint8_t>(date_key % 100U);
+  if (year < MIN_DATE_YEAR || year > MAX_DATE_YEAR || month < 1U || month > 12U || day < 1U) {
+    return false;
+  }
+
+  static constexpr uint8_t days_per_month[] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+  uint8_t max_day = days_per_month[month - 1U];
+  const bool leap_year = (year % 4U == 0U && year % 100U != 0U) || (year % 400U == 0U);
+  if (month == 2U && leap_year) {
+    max_day = 29U;
+  }
+  return day <= max_day;
+}
+
+bool OpenQuattEnergyHistory::date_bitmap_index_(uint32_t date_key, size_t *byte_index, uint8_t *bit_mask) {
+  if (byte_index == nullptr || bit_mask == nullptr || !date_key_valid_(date_key)) {
+    return false;
+  }
+  const uint16_t year = static_cast<uint16_t>(date_key / 10000U);
+  const uint8_t month = static_cast<uint8_t>((date_key / 100U) % 100U);
+  const uint8_t day = static_cast<uint8_t>(date_key % 100U);
+  const size_t date_index =
+      ((static_cast<size_t>(year - MIN_DATE_YEAR) * 12U) + static_cast<size_t>(month - 1U)) * 31U +
+      static_cast<size_t>(day - 1U);
+  *byte_index = date_index / 8U;
+  *bit_mask = static_cast<uint8_t>(1U << (date_index % 8U));
+  return *byte_index < DATE_BITMAP_BYTES;
+}
+
+bool OpenQuattEnergyHistory::date_bitmap_get_(const uint8_t *bitmap, uint32_t date_key) {
+  if (bitmap == nullptr) {
+    return false;
+  }
+  size_t byte_index = 0;
+  uint8_t bit_mask = 0;
+  return date_bitmap_index_(date_key, &byte_index, &bit_mask) && (bitmap[byte_index] & bit_mask) != 0U;
+}
+
+void OpenQuattEnergyHistory::date_bitmap_set_(uint8_t *bitmap, uint32_t date_key) {
+  if (bitmap == nullptr) {
+    return;
+  }
+  size_t byte_index = 0;
+  uint8_t bit_mask = 0;
+  if (date_bitmap_index_(date_key, &byte_index, &bit_mask)) {
+    bitmap[byte_index] |= bit_mask;
+  }
+}
+
+bool OpenQuattEnergyHistory::parse_import_uint32_(const std::string &value, uint32_t *out) {
+  if (out == nullptr) {
+    return false;
+  }
+  const std::string trimmed = trim_copy(value);
+  if (trimmed.empty() || trimmed[0] == '-') {
+    return false;
+  }
+  char *end = nullptr;
+  const unsigned long parsed = std::strtoul(trimmed.c_str(), &end, 10);
+  if (end == trimmed.c_str() || *end != '\0' || parsed >= UNKNOWN_WH) {
+    return false;
+  }
+  *out = static_cast<uint32_t>(parsed);
+  return true;
+}
+
+std::vector<std::string> OpenQuattEnergyHistory::split_import_fields_(const std::string &line) {
+  std::vector<std::string> fields;
+  size_t start = 0;
+  while (start <= line.size()) {
+    const size_t separator = line.find('|', start);
+    const size_t end = separator == std::string::npos ? line.size() : separator;
+    fields.push_back(trim_copy(line.substr(start, end - start)));
+    if (separator == std::string::npos) {
+      break;
+    }
+    start = separator + 1U;
+  }
+  return fields;
+}
+
 uint32_t OpenQuattEnergyHistory::add_wh_(uint32_t base, uint32_t delta) {
   if (delta == UNKNOWN_WH) {
     return base;
@@ -330,8 +524,8 @@ bool OpenQuattEnergyHistory::read_record_(uint32_t slot_index, EnergyHistoryReco
 }
 
 bool OpenQuattEnergyHistory::record_valid_(const EnergyHistoryRecord &record) const {
-  return record.magic == RECORD_MAGIC && record.version == RECORD_VERSION && record.date_key >= 20200101U &&
-         record.date_key <= 20991231U && record.crc32 == record_crc_(record);
+  return record.magic == RECORD_MAGIC && record.version == RECORD_VERSION && date_key_valid_(record.date_key) &&
+         record.crc32 == record_crc_(record);
 }
 
 uint16_t OpenQuattEnergyHistory::requested_flash_hourly_retention_days_() const {
@@ -399,11 +593,11 @@ bool OpenQuattEnergyHistory::read_hour_day_record_(uint32_t slot_index, EnergyHi
 
 bool OpenQuattEnergyHistory::hour_day_record_valid_(const EnergyHistoryHourDayRecord &record) const {
   return record.magic == HOUR_DAY_RECORD_MAGIC && record.version == HOUR_DAY_RECORD_VERSION &&
-         record.date_key >= 20200101U && record.date_key <= 20991231U &&
-         record.hour_mask != 0U && record.crc32 == hour_day_record_crc_(record);
+         date_key_valid_(record.date_key) && record.hour_mask != 0U && record.crc32 == hour_day_record_crc_(record);
 }
 
 bool OpenQuattEnergyHistory::scan_archive_() {
+  std::memset(this->stored_day_bitmap_, 0, sizeof(this->stored_day_bitmap_));
   if (!this->is_partition_ready_()) {
     this->record_count_ = 0;
     this->stored_day_count_ = 0;
@@ -422,27 +616,15 @@ bool OpenQuattEnergyHistory::scan_archive_() {
   uint32_t oldest_date = 0;
   uint32_t newest_date = 0;
   uint32_t newest_write_ts = 0;
-  uint8_t seen_dates[DATE_BITMAP_BYTES];
-  std::memset(seen_dates, 0, sizeof(seen_dates));
 
   for (uint32_t slot_index = 0; slot_index < this->flash_slot_count_; ++slot_index) {
     EnergyHistoryRecord record{};
     if (!this->read_record_(slot_index, &record) || !this->record_valid_(record)) {
       continue;
     }
-    const uint16_t year = static_cast<uint16_t>(record.date_key / 10000U);
-    const uint8_t month = static_cast<uint8_t>((record.date_key / 100U) % 100U);
-    const uint8_t day = static_cast<uint8_t>(record.date_key % 100U);
-    if (year >= MIN_DATE_YEAR && year <= MAX_DATE_YEAR && month >= 1U && month <= 12U && day >= 1U && day <= 31U) {
-      const size_t date_index =
-          ((static_cast<size_t>(year - MIN_DATE_YEAR) * 12U) + static_cast<size_t>(month - 1U)) * 31U +
-          static_cast<size_t>(day - 1U);
-      const size_t byte_index = date_index / 8U;
-      const uint8_t bit_mask = static_cast<uint8_t>(1U << (date_index % 8U));
-      if ((seen_dates[byte_index] & bit_mask) == 0U) {
-        seen_dates[byte_index] |= bit_mask;
-        ++stored_day_count;
-      }
+    if (!date_bitmap_get_(this->stored_day_bitmap_, record.date_key)) {
+      date_bitmap_set_(this->stored_day_bitmap_, record.date_key);
+      ++stored_day_count;
     }
     if (!found || record.sequence < min_sequence) {
       min_sequence = record.sequence;
@@ -471,6 +653,7 @@ bool OpenQuattEnergyHistory::scan_archive_() {
 }
 
 bool OpenQuattEnergyHistory::scan_hour_archive_() {
+  std::memset(this->stored_hour_day_bitmap_, 0, sizeof(this->stored_hour_day_bitmap_));
   if (!this->is_hour_partition_ready_()) {
     this->hour_flash_record_count_ = 0;
     this->hour_flash_stored_day_count_ = 0;
@@ -488,27 +671,15 @@ bool OpenQuattEnergyHistory::scan_hour_archive_() {
   uint32_t oldest_date = 0;
   uint32_t newest_date = 0;
   uint32_t newest_write_ts = 0;
-  uint8_t seen_dates[DATE_BITMAP_BYTES];
-  std::memset(seen_dates, 0, sizeof(seen_dates));
 
   for (uint32_t slot_index = 0; slot_index < this->hour_flash_slot_count_; ++slot_index) {
     auto &record = this->hour_flash_record_buffer_;
     if (!this->read_hour_day_record_(slot_index, &record) || !this->hour_day_record_valid_(record)) {
       continue;
     }
-    const uint16_t year = static_cast<uint16_t>(record.date_key / 10000U);
-    const uint8_t month = static_cast<uint8_t>((record.date_key / 100U) % 100U);
-    const uint8_t day = static_cast<uint8_t>(record.date_key % 100U);
-    if (year >= MIN_DATE_YEAR && year <= MAX_DATE_YEAR && month >= 1U && month <= 12U && day >= 1U && day <= 31U) {
-      const size_t date_index =
-          ((static_cast<size_t>(year - MIN_DATE_YEAR) * 12U) + static_cast<size_t>(month - 1U)) * 31U +
-          static_cast<size_t>(day - 1U);
-      const size_t byte_index = date_index / 8U;
-      const uint8_t bit_mask = static_cast<uint8_t>(1U << (date_index % 8U));
-      if ((seen_dates[byte_index] & bit_mask) == 0U) {
-        seen_dates[byte_index] |= bit_mask;
-        ++stored_day_count;
-      }
+    if (!date_bitmap_get_(this->stored_hour_day_bitmap_, record.date_key)) {
+      date_bitmap_set_(this->stored_hour_day_bitmap_, record.date_key);
+      ++stored_day_count;
     }
     if (!found || record.sequence > max_sequence) {
       max_sequence = record.sequence;
@@ -533,15 +704,17 @@ bool OpenQuattEnergyHistory::scan_hour_archive_() {
   return true;
 }
 
-bool OpenQuattEnergyHistory::write_record_(uint32_t date_key, const EnergyHistoryValues &values, bool partial) {
-  if (!this->enabled_() || !this->is_partition_ready_() || this->flash_slot_count_ == 0U ||
-      !this->time_is_valid_() || date_key == 0 || !record_has_values_(values)) {
+bool OpenQuattEnergyHistory::write_record_(uint32_t date_key, const EnergyHistoryValues &values, bool partial,
+                                           bool rescan, bool require_enabled) {
+  if ((require_enabled && !this->enabled_()) || !this->is_partition_ready_() || this->flash_slot_count_ == 0U ||
+      !this->time_is_valid_() || !date_key_valid_(date_key) || !record_has_values_(values)) {
     return false;
   }
 
   const uint32_t sequence = this->next_sequence_;
   const uint32_t slot_index = sequence % static_cast<uint32_t>(this->flash_slot_count_);
   const uint32_t slot_offset = BASE_OFFSET + (slot_index * FLASH_SLOT_SIZE);
+  bool sector_erased = false;
   if ((slot_offset - BASE_OFFSET) % FLASH_SECTOR_SIZE == 0) {
     const esp_err_t erase_result = esp_partition_erase_range(this->flash_partition_, slot_offset, FLASH_SECTOR_SIZE);
     if (erase_result != ESP_OK) {
@@ -549,6 +722,7 @@ bool OpenQuattEnergyHistory::write_record_(uint32_t date_key, const EnergyHistor
                static_cast<unsigned>((slot_offset - BASE_OFFSET) / FLASH_SECTOR_SIZE), esp_err_to_name(erase_result));
       return false;
     }
+    sector_erased = true;
   }
 
   EnergyHistoryRecord record{};
@@ -568,10 +742,18 @@ bool OpenQuattEnergyHistory::write_record_(uint32_t date_key, const EnergyHistor
   if (write_result != ESP_OK) {
     ESP_LOGW(TAG, "Could not write energy history slot %u: %s", static_cast<unsigned>(slot_index),
              esp_err_to_name(write_result));
+    if (sector_erased && !rescan) {
+      this->scan_archive_();
+    }
     return false;
   }
 
-  this->scan_archive_();
+  if (rescan || sector_erased) {
+    this->scan_archive_();
+  } else {
+    ++this->next_sequence_;
+    date_bitmap_set_(this->stored_day_bitmap_, date_key);
+  }
   return true;
 }
 
@@ -646,6 +828,74 @@ bool OpenQuattEnergyHistory::write_hour_day_record_(uint32_t date_key, bool part
   }
 
   this->scan_hour_archive_();
+  return true;
+}
+
+bool OpenQuattEnergyHistory::write_hour_day_import_record_(uint32_t date_key, uint32_t hour_mask,
+                                                           const EnergyHistoryValues hours[24], bool rescan) {
+  if (!this->is_hour_partition_ready_() || !this->time_is_valid_() || !date_key_valid_(date_key) ||
+      hour_mask == 0U || hours == nullptr) {
+    return false;
+  }
+
+  bool has_values = false;
+  for (uint8_t hour = 0; hour < 24U; ++hour) {
+    if ((hour_mask & (1UL << hour)) != 0U && record_has_values_(hours[hour])) {
+      has_values = true;
+      break;
+    }
+  }
+  if (!has_values) {
+    return false;
+  }
+
+  const uint32_t sequence = this->next_hour_flash_sequence_;
+  const uint32_t slot_index = sequence % static_cast<uint32_t>(this->hour_flash_slot_count_);
+  const uint32_t slot_offset = HOUR_FLASH_BASE_OFFSET + (slot_index * HOUR_FLASH_SLOT_SIZE);
+  bool sector_erased = false;
+  if ((slot_offset - HOUR_FLASH_BASE_OFFSET) % FLASH_SECTOR_SIZE == 0) {
+    const esp_err_t erase_result = esp_partition_erase_range(this->flash_partition_, slot_offset, FLASH_SECTOR_SIZE);
+    if (erase_result != ESP_OK) {
+      ESP_LOGW(TAG, "Could not erase imported energy hour history sector %u: %s",
+               static_cast<unsigned>((slot_offset - HOUR_FLASH_BASE_OFFSET) / FLASH_SECTOR_SIZE),
+               esp_err_to_name(erase_result));
+      return false;
+    }
+    sector_erased = true;
+  }
+
+  auto &record = this->hour_flash_record_buffer_;
+  record = EnergyHistoryHourDayRecord{};
+  record.magic = HOUR_DAY_RECORD_MAGIC;
+  record.version = HOUR_DAY_RECORD_VERSION;
+  record.flags = 0U;
+  record.sequence = sequence;
+  record.date_key = date_key;
+  record.write_timestamp_s = static_cast<uint32_t>(this->current_time_ms_() / 1000ULL);
+  record.hour_mask = hour_mask;
+  std::memcpy(record.hours, hours, sizeof(record.hours));
+  record.crc32 = hour_day_record_crc_(record);
+
+  auto *slot_buffer = this->hour_flash_slot_buffer_;
+  std::memset(slot_buffer, 0xFF, HOUR_FLASH_SLOT_SIZE);
+  std::memcpy(slot_buffer, &record, sizeof(record));
+  const esp_err_t write_result =
+      esp_partition_write(this->flash_partition_, slot_offset, slot_buffer, HOUR_FLASH_SLOT_SIZE);
+  if (write_result != ESP_OK) {
+    ESP_LOGW(TAG, "Could not write imported energy hour history slot %u: %s", static_cast<unsigned>(slot_index),
+             esp_err_to_name(write_result));
+    if (sector_erased && !rescan) {
+      this->scan_hour_archive_();
+    }
+    return false;
+  }
+
+  if (rescan || sector_erased) {
+    this->scan_hour_archive_();
+  } else {
+    ++this->next_hour_flash_sequence_;
+    date_bitmap_set_(this->stored_hour_day_bitmap_, date_key);
+  }
   return true;
 }
 
@@ -779,6 +1029,223 @@ void OpenQuattEnergyHistory::clear_history() {
   this->scan_hour_archive_();
 }
 
+std::string OpenQuattEnergyHistory::import_history_records(const std::string &records) {
+  if (!this->is_partition_ready_()) {
+    return R"({"ok":false,"error":"partition_unavailable"})";
+  }
+  if (!this->time_is_valid_()) {
+    return R"({"ok":false,"error":"time_unavailable"})";
+  }
+  if (records.empty()) {
+    return R"({"ok":false,"error":"empty_records"})";
+  }
+  if (records.size() > 24576U) {
+    return R"({"ok":false,"error":"payload_too_large"})";
+  }
+
+  uint32_t written = 0;
+  uint32_t hour_written = 0;
+  uint32_t duplicates = 0;
+  uint32_t skipped = 0;
+  uint32_t invalid = 0;
+  uint32_t unsupported = 0;
+
+  size_t line_start = 0;
+  while (line_start <= records.size()) {
+    size_t line_end = records.find('\n', line_start);
+    if (line_end == std::string::npos) {
+      line_end = records.size();
+    }
+
+    std::string line = trim_copy(records.substr(line_start, line_end - line_start));
+    if (!line.empty() && line.back() == '\r') {
+      line.pop_back();
+      line = trim_copy(line);
+    }
+    line_start = line_end + 1U;
+
+    if (line.empty()) {
+      continue;
+    }
+    if (line[0] == '@') {
+      if (line == "@schema|openquatt.energy_history_import.v1") {
+        continue;
+      }
+      ++unsupported;
+      continue;
+    }
+
+    const auto fields = split_import_fields_(line);
+    if (fields.empty()) {
+      continue;
+    }
+
+    if (fields[0] == "day") {
+      const bool compact_quatt_day = fields.size() == 5U;
+      const bool compact_day = fields.size() == 6U;
+      if (!compact_quatt_day && !compact_day && fields.size() != 9U) {
+        ++invalid;
+        continue;
+      }
+
+      uint32_t date_key = 0;
+      uint32_t parsed_values[7]{};
+      EnergyHistoryValues values{};
+      bool parsed = parse_import_uint32_(fields[1], &date_key) && date_key_valid_(date_key);
+      if (parsed && compact_quatt_day) {
+        parsed = parse_import_uint32_(fields[2], &parsed_values[0]) &&
+                 parse_import_uint32_(fields[3], &parsed_values[3]) &&
+                 parse_import_uint32_(fields[4], &parsed_values[5]);
+        parsed_values[1] = parsed_values[0];
+        parsed_values[2] = 0U;
+        parsed_values[4] = 0U;
+        const uint64_t system_heat = static_cast<uint64_t>(parsed_values[3]) + parsed_values[5];
+        parsed_values[6] = system_heat > UINT32_MAX ? UINT32_MAX : static_cast<uint32_t>(system_heat);
+      } else if (parsed && compact_day) {
+        parsed = parse_import_uint32_(fields[2], &parsed_values[0]) &&
+                 parse_import_uint32_(fields[3], &parsed_values[3]) &&
+                 parse_import_uint32_(fields[4], &parsed_values[5]) &&
+                 parse_import_uint32_(fields[5], &parsed_values[6]);
+        parsed_values[1] = parsed_values[0];
+        parsed_values[2] = 0U;
+        parsed_values[4] = 0U;
+      } else if (parsed) {
+        parsed = parse_import_uint32_(fields[2], &parsed_values[0]) &&
+                 parse_import_uint32_(fields[3], &parsed_values[1]) &&
+                 parse_import_uint32_(fields[4], &parsed_values[2]) &&
+                 parse_import_uint32_(fields[5], &parsed_values[3]) &&
+                 parse_import_uint32_(fields[6], &parsed_values[4]) &&
+                 parse_import_uint32_(fields[7], &parsed_values[5]) &&
+                 parse_import_uint32_(fields[8], &parsed_values[6]);
+      }
+      if (!parsed) {
+        ++invalid;
+        continue;
+      }
+      values = EnergyHistoryValues{parsed_values[0], parsed_values[1], parsed_values[2], parsed_values[3],
+                                   parsed_values[4], parsed_values[5], parsed_values[6]};
+      if (!record_has_values_(values)) {
+        ++invalid;
+        continue;
+      }
+
+      if (date_bitmap_get_(this->stored_day_bitmap_, date_key)) {
+        ++duplicates;
+        continue;
+      }
+
+      if (this->write_record_(date_key, values, false, false, false)) {
+        ++written;
+      } else {
+        ++skipped;
+      }
+      continue;
+    }
+
+    if (fields[0] == "hourday") {
+      const bool compact_quatt_hour_day = fields.size() == 75U;
+      const bool compact_hour_day = fields.size() == 99U;
+      if (!compact_quatt_hour_day && !compact_hour_day && fields.size() != 171U) {
+        ++invalid;
+        continue;
+      }
+      if (!this->is_hour_partition_ready_()) {
+        ++skipped;
+        continue;
+      }
+
+      uint32_t date_key = 0;
+      uint32_t hour_mask = 0;
+      if (!parse_import_uint32_(fields[1], &date_key) || !date_key_valid_(date_key) ||
+          !parse_import_uint32_(fields[2], &hour_mask) || (hour_mask & 0xFF000000UL) != 0U ||
+          hour_mask == 0U) {
+        ++invalid;
+        continue;
+      }
+
+      for (uint8_t hour = 0; hour < 24U; ++hour) {
+        this->hour_import_values_[hour] = EnergyHistoryValues{UNKNOWN_WH, UNKNOWN_WH, UNKNOWN_WH, UNKNOWN_WH,
+                                                              UNKNOWN_WH, UNKNOWN_WH, UNKNOWN_WH};
+      }
+
+      bool valid = true;
+      for (uint8_t hour = 0; hour < 24U && valid; ++hour) {
+        if ((hour_mask & (1UL << hour)) == 0U) {
+          continue;
+        }
+        const size_t fields_per_hour = compact_quatt_hour_day ? 3U : (compact_hour_day ? 4U : 7U);
+        const size_t offset = 3U + (static_cast<size_t>(hour) * fields_per_hour);
+        uint32_t parsed_values[7]{};
+        auto &values = this->hour_import_values_[hour];
+        if (compact_quatt_hour_day) {
+          valid = parse_import_uint32_(fields[offset], &parsed_values[0]) &&
+                  parse_import_uint32_(fields[offset + 1U], &parsed_values[3]) &&
+                  parse_import_uint32_(fields[offset + 2U], &parsed_values[5]);
+          parsed_values[1] = parsed_values[0];
+          parsed_values[2] = 0U;
+          parsed_values[4] = 0U;
+          const uint64_t system_heat = static_cast<uint64_t>(parsed_values[3]) + parsed_values[5];
+          parsed_values[6] = system_heat > UINT32_MAX ? UINT32_MAX : static_cast<uint32_t>(system_heat);
+        } else if (compact_hour_day) {
+          valid = parse_import_uint32_(fields[offset], &parsed_values[0]) &&
+                  parse_import_uint32_(fields[offset + 1U], &parsed_values[3]) &&
+                  parse_import_uint32_(fields[offset + 2U], &parsed_values[5]) &&
+                  parse_import_uint32_(fields[offset + 3U], &parsed_values[6]);
+          parsed_values[1] = parsed_values[0];
+          parsed_values[2] = 0U;
+          parsed_values[4] = 0U;
+        } else {
+          valid = parse_import_uint32_(fields[offset], &parsed_values[0]) &&
+                  parse_import_uint32_(fields[offset + 1U], &parsed_values[1]) &&
+                  parse_import_uint32_(fields[offset + 2U], &parsed_values[2]) &&
+                  parse_import_uint32_(fields[offset + 3U], &parsed_values[3]) &&
+                  parse_import_uint32_(fields[offset + 4U], &parsed_values[4]) &&
+                  parse_import_uint32_(fields[offset + 5U], &parsed_values[5]) &&
+                  parse_import_uint32_(fields[offset + 6U], &parsed_values[6]);
+        }
+        if (valid) {
+          values = EnergyHistoryValues{parsed_values[0], parsed_values[1], parsed_values[2], parsed_values[3],
+                                       parsed_values[4], parsed_values[5], parsed_values[6]};
+          valid = record_has_values_(values);
+        }
+      }
+      if (!valid) {
+        ++invalid;
+        continue;
+      }
+
+      if (date_bitmap_get_(this->stored_hour_day_bitmap_, date_key)) {
+        ++duplicates;
+        continue;
+      }
+
+      if (this->write_hour_day_import_record_(date_key, hour_mask, this->hour_import_values_, false)) {
+        ++hour_written;
+      } else {
+        ++skipped;
+      }
+      continue;
+    }
+
+    ++unsupported;
+  }
+
+  if (written > 0U) {
+    this->scan_archive_();
+  }
+  if (hour_written > 0U) {
+    this->scan_hour_archive_();
+  }
+
+  char response[192];
+  std::snprintf(response, sizeof(response),
+                "{\"ok\":true,\"written\":%u,\"hour_written\":%u,\"duplicates\":%u,\"skipped\":%u,\"invalid\":%u,\"unsupported\":%u}",
+                static_cast<unsigned>(written), static_cast<unsigned>(hour_written),
+                static_cast<unsigned>(duplicates), static_cast<unsigned>(skipped), static_cast<unsigned>(invalid),
+                static_cast<unsigned>(unsupported));
+  return response;
+}
+
 void OpenQuattEnergyHistory::write_history(httpd_req_t *req) {
   if (req == nullptr) {
     return;
@@ -796,6 +1263,7 @@ void OpenQuattEnergyHistory::write_history(httpd_req_t *req) {
   ChunkedTextWriter writer(req);
   const uint32_t hour_count = this->get_hour_record_count_();
   if (!writer.printf("@schema|3\n") || !writer.printf("@enabled|%u\n", this->enabled_() ? 1U : 0U) ||
+      !writer.printf("@csrf|%s\n", this->csrf_token_.c_str()) ||
       !writer.printf("@now|%llu\n", static_cast<unsigned long long>(this->current_time_ms_())) ||
       !writer.printf("@records|%u\n", static_cast<unsigned>(this->record_count_)) ||
       !writer.printf("@hours|%u|%u\n", static_cast<unsigned>(hour_count), static_cast<unsigned>(HOURLY_RETENTION_DAYS)) ||
