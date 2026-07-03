@@ -17,6 +17,7 @@ uart:
   - id: cic_compat_uart_bus
     tx_pin: ${cic_compat_uart_tx_pin}
     rx_pin: ${cic_compat_uart_rx_pin}
+    flow_control_pin: ${cic_compat_uart_rts_pin}
     baud_rate: 19200
     data_bits: 8
     stop_bits: 1
@@ -28,7 +29,6 @@ modbus:
   - uart_id: cic_compat_uart_bus
     id: cic_compat_modbus
     role: server
-    flow_control_pin: ${cic_compat_uart_rts_pin}
     send_wait_time: 50ms
 
 packages:
