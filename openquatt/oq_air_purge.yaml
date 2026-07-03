@@ -47,6 +47,11 @@ globals:
     restore_value: false
     initial_value: '0'
 
+  - id: oq_air_purge_status_value
+    type: std::string
+    restore_value: false
+    initial_value: '"IDLE"'
+
 # ----------------------------
 # CONTROL INPUTS
 # ----------------------------
@@ -86,73 +91,6 @@ switch:
     entity_category: config
     optimistic: true
     restore_mode: RESTORE_DEFAULT_ON
-    web_server:
-      sorting_group_id: oq_hydraulics
-
-# ----------------------------
-# STATUS
-# ----------------------------
-binary_sensor:
-  - platform: template
-    id: oq_air_purge_active_sensor
-    name: "Air purge active"
-    internal: true
-    icon: mdi:water-pump
-    entity_category: diagnostic
-    web_server:
-      sorting_group_id: oq_hydraulics
-    lambda: |-
-      return id(oq_air_purge_active);
-
-sensor:
-  - platform: template
-    id: oq_air_purge_remaining_sensor
-    name: "Air purge remaining"
-    internal: true
-    icon: mdi:timer-outline
-    unit_of_measurement: "s"
-    state_class: measurement
-    accuracy_decimals: 0
-    update_interval: 1s
-    web_server:
-      sorting_group_id: oq_hydraulics
-    lambda: |-
-      return (float) id(oq_air_purge_remaining_s);
-
-  - platform: template
-    id: oq_air_purge_phase_sensor
-    name: "Air purge phase"
-    internal: true
-    icon: mdi:timeline-clock-outline
-    state_class: measurement
-    accuracy_decimals: 0
-    update_interval: 1s
-    web_server:
-      sorting_group_id: oq_hydraulics
-    lambda: |-
-      return (float) id(oq_air_purge_phase);
-
-  - platform: template
-    id: oq_air_purge_target_ipwm_sensor
-    name: "Air purge target iPWM"
-    internal: true
-    icon: mdi:fan-speed-3
-    unit_of_measurement: "iPWM"
-    state_class: measurement
-    accuracy_decimals: 0
-    update_interval: 1s
-    web_server:
-      sorting_group_id: oq_hydraulics
-    lambda: |-
-      return (float) id(oq_air_purge_target_ipwm);
-
-text_sensor:
-  - platform: template
-    id: oq_air_purge_status
-    name: "Air purge status"
-    internal: true
-    icon: mdi:information-outline
-    update_interval: never
     web_server:
       sorting_group_id: oq_hydraulics
 

@@ -50,7 +50,8 @@
     }
 
     const text = String(entity.state ?? entity.value ?? "").trim();
-    return text || "—";
+    const normalizedText = text.toLowerCase();
+    return !text || normalizedText === "nan" || normalizedText === "unknown" || normalizedText === "unavailable" ? "—" : text;
   }
 
   function getSettingsTextStatValue(key, fallback = "—") {

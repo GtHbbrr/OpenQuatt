@@ -34,6 +34,16 @@ globals:
     restore_value: false
     initial_value: '0'
 
+  - id: oq_manual_hp_status_value
+    type: std::string
+    restore_value: false
+    initial_value: '"IDLE"'
+
+  - id: oq_manual_hp_guard_status_value
+    type: std::string
+    restore_value: false
+    initial_value: '"Vrijgegeven"'
+
 select:
   - platform: template
     id: oq_manual_hp1_mode
@@ -130,38 +140,6 @@ button:
     on_press:
       - lambda: |-
           oq_manual_hp::runtime().abort_or_clear();
-
-binary_sensor:
-  - platform: template
-    id: oq_manual_hp_active_sensor
-    name: "Manual HP active"
-    internal: true
-    icon: mdi:heat-pump
-    entity_category: diagnostic
-    web_server:
-      sorting_group_id: oq_hydraulics
-    lambda: |-
-      // Expose service-task ownership to the dashboard.
-      return id(oq_manual_hp_active);
-
-text_sensor:
-  - platform: template
-    id: oq_manual_hp_status
-    name: "Manual HP status"
-    internal: true
-    icon: mdi:information-outline
-    update_interval: never
-    web_server:
-      sorting_group_id: oq_hydraulics
-
-  - platform: template
-    id: oq_manual_hp_guard_status
-    name: "Manual HP guard status"
-    internal: true
-    icon: mdi:shield-check-outline
-    update_interval: never
-    web_server:
-      sorting_group_id: oq_hydraulics
 
 interval:
   - interval: 1s

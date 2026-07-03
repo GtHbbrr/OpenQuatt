@@ -130,7 +130,7 @@ class AirPurgeRuntime {
     id(oq_air_purge_started_ms) = now_ms;
     id(oq_air_purge_remaining_s) = cfg.duration_s;
 
-    id(oq_commissioning_status).publish_state("AIR PURGE STARTED");
+    oq_service_status::set_commissioning("AIR PURGE STARTED");
     publish("PHASE1_STEADY");
   }
 
@@ -141,7 +141,7 @@ class AirPurgeRuntime {
       id(oq_air_purge_abort) = true;
       id(oq_commissioning_abort_requested) = true;
       publish("ABORT REQUESTED");
-      id(oq_commissioning_status).publish_state("ABORT REQUESTED");
+      oq_service_status::set_commissioning("ABORT REQUESTED");
       return;
     }
     reset();
@@ -243,7 +243,7 @@ class AirPurgeRuntime {
   void publish(const char *status) {
     const std::string s(status ? status : "");
     if (s != last_status_) {
-      id(oq_air_purge_status).publish_state(s.c_str());
+      oq_service_status::set_air_purge(s);
       ESP_LOGI("quatt.cm100.purge", "status=%s phase=%d target_iPWM=%d remaining=%ds flow=%.0fL/h",
                s.c_str(),
                id(oq_air_purge_phase),
@@ -304,7 +304,7 @@ class AirPurgeRuntime {
         call.set_option("Auto");
         call.perform();
       }
-      id(oq_commissioning_status).publish_state("IDLE");
+      oq_service_status::set_commissioning("IDLE");
     } else {
       const bool still_cm100 = oq_commissioning::is_cm100(id(oq_control_mode_code));
       oq_commissioning::clear_container(still_cm100, next_state);

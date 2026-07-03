@@ -120,11 +120,11 @@ class FlowAutotuneRuntime {
         id(oq_commissioning_active), id(oq_commissioning_task_code));
     if (busy() || id(oq_flow_autotune_active) ||
         id(oq_flow_autotune_req) || task_running) {
-      id(oq_flow_autotune_status).publish_state("REFUSED: BUSY");
+      oq_service_status::set_flow_autotune("REFUSED: BUSY");
       return;
     }
     if (!cm100_ready) {
-      id(oq_flow_autotune_status).publish_state("REFUSED: not CM100");
+      oq_service_status::set_flow_autotune("REFUSED: not CM100");
       return;
     }
 
@@ -150,8 +150,8 @@ class FlowAutotuneRuntime {
     id(oq_flow_autotune_abort) = false;
     id(oq_flow_autotune_active) = false;
     id(oq_flow_autotune_pwm) = cfg.baseline_pwm;
-    id(oq_commissioning_status).publish_state("FLOW AUTOTUNE STARTED");
-    id(oq_flow_autotune_status).publish_state("REQUESTED");
+    oq_service_status::set_commissioning("FLOW AUTOTUNE STARTED");
+    oq_service_status::set_flow_autotune("REQUESTED");
   }
 
   void tick(const RuntimeConfig &cfg, uint32_t now_ms) {
@@ -165,7 +165,7 @@ class FlowAutotuneRuntime {
     const bool flow_valid = !(isnan(pv) || pv <= 0.0f);
     if (state_ != STATE_IDLE && id(oq_flow_autotune_req)) {
       id(oq_flow_autotune_req) = false;
-      id(oq_flow_autotune_status).publish_state("REFUSED: BUSY");
+      oq_service_status::set_flow_autotune("REFUSED: BUSY");
     }
 
     switch (state_) {
@@ -298,9 +298,7 @@ class FlowAutotuneRuntime {
            window_mean() > 0.0f;
   }
 
-  void publish(const char *status) {
-    if (status != nullptr) id(oq_flow_autotune_status).publish_state(status);
-  }
+  void publish(const char *status) { oq_service_status::set_flow_autotune(status); }
 
   void abort_with(const char *status) {
     publish(status);
@@ -775,8 +773,8 @@ class FlowAutotuneRuntime {
     const char *prefix = limited_validation ? "DONE (LIMITED)" :
                          clamped ? "DONE (CLAMPED)" : "DONE (CLOSED-LOOP)";
 
-    set_number_value(id(oq_flow_kp_suggested), kp);
-    set_number_value(id(oq_flow_ki_suggested), ki);
+    id(oq_flow_kp_suggested_value) = kp;
+    id(oq_flow_ki_suggested_value) = ki;
     const float peak_pv = validate_peak_pv_;
     restore_live_settings();
     clear_window();

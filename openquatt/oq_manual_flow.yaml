@@ -34,6 +34,11 @@ globals:
     restore_value: false
     initial_value: '400'
 
+  - id: oq_manual_flow_status_value
+    type: std::string
+    restore_value: false
+    initial_value: '"IDLE"'
+
 number:
   - platform: template
     id: oq_manual_flow_setpoint_lph
@@ -116,43 +121,6 @@ switch:
     turn_off_action:
       - lambda: |-
           oq_manual_flow::runtime().abort_quick_test();
-    web_server:
-      sorting_group_id: oq_hydraulics
-
-binary_sensor:
-  - platform: template
-    id: oq_manual_flow_active_sensor
-    name: "Manual flow active"
-    internal: true
-    icon: mdi:water-pump
-    entity_category: diagnostic
-    web_server:
-      sorting_group_id: oq_hydraulics
-    lambda: |-
-      return id(oq_manual_flow_active);
-
-sensor:
-  - platform: template
-    id: oq_manual_flow_target_ipwm_sensor
-    name: "Manual flow target iPWM"
-    internal: true
-    icon: mdi:fan-speed-3
-    unit_of_measurement: "iPWM"
-    state_class: measurement
-    accuracy_decimals: 0
-    update_interval: 1s
-    web_server:
-      sorting_group_id: oq_hydraulics
-    lambda: |-
-      return (float) id(oq_flow_last_pwm);
-
-text_sensor:
-  - platform: template
-    id: oq_manual_flow_status
-    name: "Manual flow status"
-    internal: true
-    icon: mdi:information-outline
-    update_interval: never
     web_server:
       sorting_group_id: oq_hydraulics
 

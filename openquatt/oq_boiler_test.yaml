@@ -27,6 +27,11 @@ globals:
     restore_value: false
     initial_value: '0.0'
 
+  - id: oq_boiler_power_test_status_value
+    type: std::string
+    restore_value: false
+    initial_value: '"IDLE"'
+
 # ----------------------------
 # CONTROL INPUTS
 # ----------------------------
@@ -74,9 +79,9 @@ button:
             call.perform();
             char msg[64];
             snprintf(msg, sizeof(msg), "APPLIED: %dW", rounded_result);
-            id(oq_boiler_power_test_status).publish_state(msg);
+            id(oq_boiler_power_test_status_value) = msg;
           } else {
-            id(oq_boiler_power_test_status).publish_state("APPLY_FAILED");
+            id(oq_boiler_power_test_status_value) = "APPLY_FAILED";
           }
 
 number:
@@ -93,58 +98,6 @@ number:
     optimistic: true
     initial_value: 6000
     entity_category: config
-    web_server:
-      sorting_group_id: oq_boiler
-
-sensor:
-  - platform: template
-    id: oq_boiler_power_test_result
-    name: "Boiler power test result"
-    internal: true
-    icon: mdi:chart-line
-    unit_of_measurement: "W"
-    device_class: power
-    state_class: measurement
-    accuracy_decimals: 0
-    update_interval: 5s
-    web_server:
-      sorting_group_id: oq_boiler
-    lambda: |-
-      return id(oq_commissioning_result_w);
-
-  - platform: template
-    id: oq_boiler_power_test_confidence
-    name: "Boiler power test confidence"
-    internal: true
-    icon: mdi:percent-outline
-    unit_of_measurement: "%"
-    state_class: measurement
-    accuracy_decimals: 0
-    update_interval: 5s
-    web_server:
-      sorting_group_id: oq_boiler
-    lambda: |-
-      return id(oq_commissioning_result_confidence);
-
-binary_sensor:
-  - platform: template
-    id: oq_boiler_power_test_active
-    name: "Boiler power test active"
-    internal: true
-    icon: mdi:test-tube
-    entity_category: diagnostic
-    web_server:
-      sorting_group_id: oq_boiler
-    lambda: |-
-      return id(oq_commissioning_active) && id(oq_commissioning_task_code) == oq_commissioning::TASK_BOILER_POWER_TEST;
-
-text_sensor:
-  - platform: template
-    id: oq_boiler_power_test_status
-    name: "Boiler power test status"
-    internal: true
-    icon: mdi:information-outline
-    update_interval: never
     web_server:
       sorting_group_id: oq_boiler
 

@@ -9,7 +9,7 @@ external_components:
   - source:
       type: local
       path: ${external_components_path}
-    components: [openquatt_web_auth, openquatt_trends, openquatt_energy_history, openquatt_log_history, openquatt_debug_recorder, openquatt_entities]
+    components: [openquatt_web_auth, openquatt_trends, openquatt_energy_history, openquatt_log_history, openquatt_debug_recorder, openquatt_entities, openquatt_service_status]
 
 openquatt_web_auth:
   id: oq_web_auth_store
@@ -28,6 +28,45 @@ openquatt_debug_recorder:
 
 openquatt_entities:
   id: oq_entities
+
+openquatt_service_status:
+  id: oq_service_status_endpoint
+  control_mode_code: oq_control_mode_code
+  commissioning_active: oq_commissioning_active
+  commissioning_task_code: oq_commissioning_task_code
+  commissioning_status: oq_commissioning_status_value
+  boiler_result_w: oq_commissioning_result_w
+  boiler_confidence: oq_commissioning_result_confidence
+  boiler_status: oq_boiler_power_test_status_value
+  flow_autotune_status: oq_flow_autotune_status_value
+  flow_kp_suggested: oq_flow_kp_suggested_value
+  flow_ki_suggested: oq_flow_ki_suggested_value
+  air_purge_active: oq_air_purge_active
+  air_purge_status: oq_air_purge_status_value
+  air_purge_remaining: oq_air_purge_remaining_s
+  air_purge_phase: oq_air_purge_phase
+  air_purge_target_ipwm: oq_air_purge_target_ipwm
+  manual_flow_active: oq_manual_flow_active
+  manual_flow_status: oq_manual_flow_status_value
+  manual_flow_target_ipwm: oq_flow_last_pwm
+  manual_hp_active: oq_manual_hp_active
+  manual_hp_status: oq_manual_hp_status_value
+  manual_hp_guard_status: oq_manual_hp_guard_status_value
+  hp_water_calibration_active: oq_hp_water_calibration_active
+  hp_water_calibration_status: oq_hp_water_calibration_status_value
+  hp_water_calibration_remaining: oq_hp_water_calibration_remaining_s
+  hp_water_calibration_phase: oq_hp_water_calibration_phase
+  hp_water_calibration_spread: oq_hp_water_calibration_spread_c
+  hp_water_calibration_supply_delta: oq_hp_water_calibration_supply_delta_c
+  hp_water_calibration_stable_progress: oq_hp_water_calibration_stable_progress_s
+  hp_water_calibration_stable_required: oq_hp_water_calibration_stable_required_s
+  hp_water_calibration_result_reference: oq_hp_water_calibration_result_reference_c
+  hp_water_calibration_result_spread_before: oq_hp_water_calibration_result_spread_before_c
+  hp_water_calibration_result_expected_spread: oq_hp_water_calibration_result_expected_spread_c
+  hp_water_calibration_result_hp1_in_raw_avg: oq_hp_water_calibration_result_hp1_in_raw_avg_c
+  hp_water_calibration_result_hp1_out_raw_avg: oq_hp_water_calibration_result_hp1_out_raw_avg_c
+  hp_water_calibration_result_hp2_in_raw_avg: oq_hp_water_calibration_result_hp2_in_raw_avg_c
+  hp_water_calibration_result_hp2_out_raw_avg: oq_hp_water_calibration_result_hp2_out_raw_avg_c
 
 switch:
   - platform: template

@@ -577,6 +577,58 @@
     return parseAuthFormBody(init);
   }
 
+  const SERVICE_STATUS_ENTITY_MAP = {
+    commissioningStatus: ["text_sensor", "Commissioning status"],
+    cm100Active: ["binary_sensor", "CM100 active"],
+    boilerPowerTestResult: ["sensor", "Boiler power test result"],
+    boilerPowerTestConfidence: ["sensor", "Boiler power test confidence"],
+    boilerPowerTestActive: ["binary_sensor", "Boiler power test active"],
+    boilerPowerTestStatus: ["text_sensor", "Boiler power test status"],
+    flowAutotuneStatus: ["text_sensor", "Flow Autotune status"],
+    flowKpSuggested: ["number", "Flow Autotune Kp suggested"],
+    flowKiSuggested: ["number", "Flow Autotune Ki suggested"],
+    airPurgeActive: ["binary_sensor", "Air purge active"],
+    airPurgeStatus: ["text_sensor", "Air purge status"],
+    airPurgeRemaining: ["sensor", "Air purge remaining"],
+    airPurgePhase: ["sensor", "Air purge phase"],
+    airPurgeTargetIpwm: ["sensor", "Air purge target iPWM"],
+    manualFlowActive: ["binary_sensor", "Manual flow active"],
+    manualFlowStatus: ["text_sensor", "Manual flow status"],
+    manualFlowTargetIpwm: ["sensor", "Manual flow target iPWM"],
+    manualHpActive: ["binary_sensor", "Manual HP active"],
+    manualHpStatus: ["text_sensor", "Manual HP status"],
+    manualHpGuardStatus: ["text_sensor", "Manual HP guard status"],
+    hpWaterCalibrationActive: ["binary_sensor", "HP water calibration active"],
+    hpWaterCalibrationStatus: ["text_sensor", "HP water calibration status"],
+    hpWaterCalibrationRemaining: ["sensor", "HP water calibration remaining"],
+    hpWaterCalibrationPhase: ["sensor", "HP water calibration phase"],
+    hpWaterCalibrationSpread: ["sensor", "HP water calibration spread"],
+    hpWaterCalibrationSupplyDelta: ["sensor", "HP water calibration supply delta"],
+    hpWaterCalibrationStableProgress: ["sensor", "HP water calibration stable window progress"],
+    hpWaterCalibrationStableRequired: ["sensor", "HP water calibration stable window required"],
+    hpWaterCalibrationResultReference: ["sensor", "HP water calibration result reference"],
+    hpWaterCalibrationResultSpreadBefore: ["sensor", "HP water calibration result spread before"],
+    hpWaterCalibrationResultExpectedSpread: ["sensor", "HP water calibration result expected spread"],
+    hpWaterCalibrationResultHp1InRawAvg: ["sensor", "HP water calibration result HP1 water in raw average"],
+    hpWaterCalibrationResultHp1OutRawAvg: ["sensor", "HP water calibration result HP1 water out raw average"],
+    hpWaterCalibrationResultHp2InRawAvg: ["sensor", "HP water calibration result HP2 water in raw average"],
+    hpWaterCalibrationResultHp2OutRawAvg: ["sensor", "HP water calibration result HP2 water out raw average"],
+  };
+
+  function handleServiceStatus() {
+    const responseEntities = {};
+    Object.entries(SERVICE_STATUS_ENTITY_MAP).forEach(([key, [domain, name]]) => {
+      const entity = getEntity(domain, name);
+      if (entity) {
+        responseEntities[key] = clone(entity);
+      }
+    });
+    return mockResponse(200, {
+      ok: true,
+      entities: responseEntities,
+    });
+  }
+
   function handleBulkEntities(init) {
     const params = parseBulkEntityFormBody(init || {});
     const lines = String(params.get("entities") || "").split(/\r?\n/);
@@ -3677,6 +3729,9 @@
       }
       if (url.pathname.endsWith("/openquatt/debug-recording/download") && method === "GET") {
         return handleDebugRecordingDownload();
+      }
+      if (url.pathname.endsWith("/openquatt/service/status") && method === "GET") {
+        return handleServiceStatus();
       }
       if (url.pathname.endsWith("/openquatt/entities") && String(init?.method || "GET").toUpperCase() === "POST") {
         return handleBulkEntities(init || {});

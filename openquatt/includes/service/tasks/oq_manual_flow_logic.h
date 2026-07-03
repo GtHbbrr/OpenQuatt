@@ -23,7 +23,7 @@ class ManualFlowRuntime {
     id(oq_quick_flow_test_active) = false;
     id(oq_quick_flow_test_switch).publish_state(false);
     publish("ACTIVE");
-    id(oq_commissioning_status).publish_state("MANUAL FLOW ACTIVE");
+    oq_service_status::set_commissioning("MANUAL FLOW ACTIVE");
   }
 
   void abort_or_clear() {
@@ -34,34 +34,34 @@ class ManualFlowRuntime {
     id(oq_manual_flow_active) = false;
     oq_commissioning::clear_container(true);
     publish("STOPPED");
-    id(oq_commissioning_status).publish_state("CM100 READY");
+    oq_service_status::set_commissioning("CM100 READY");
   }
 
   void start_quick_test(uint32_t now_ms) {
     if (id(oq_control_mode_code) != 100) {
       id(oq_quick_flow_test_switch).publish_state(false);
-      id(oq_commissioning_status).publish_state("REFUSED: CM100 required");
+      oq_service_status::set_commissioning("REFUSED: CM100 required");
       return;
     }
     if (id(oq_commissioning_task_code) != oq_commissioning::TASK_NONE ||
         id(oq_commissioning_request_pending)) {
       id(oq_quick_flow_test_switch).publish_state(false);
-      id(oq_commissioning_status).publish_state("REFUSED: BUSY");
+      oq_service_status::set_commissioning("REFUSED: BUSY");
       return;
     }
     if (id(oq_water_temp_hard_trip_active)) {
       id(oq_quick_flow_test_switch).publish_state(false);
-      id(oq_commissioning_status).publish_state("REFUSED: water temperature hard trip");
+      oq_service_status::set_commissioning("REFUSED: water temperature hard trip");
       return;
     }
     if (id(boiler_active).state) {
       id(oq_quick_flow_test_switch).publish_state(false);
-      id(oq_commissioning_status).publish_state("REFUSED: boiler active");
+      oq_service_status::set_commissioning("REFUSED: boiler active");
       return;
     }
     if (!heat_pumps_idle()) {
       id(oq_quick_flow_test_switch).publish_state(false);
-      id(oq_commissioning_status).publish_state("REFUSED: heat pump active");
+      oq_service_status::set_commissioning("REFUSED: heat pump active");
       return;
     }
 
@@ -78,7 +78,7 @@ class ManualFlowRuntime {
     id(oq_quick_flow_test_target_ipwm) = 400;
     id(oq_quick_flow_test_switch).publish_state(true);
     publish("QUICK TEST ACTIVE");
-    id(oq_commissioning_status).publish_state("QUICK FLOW TEST ACTIVE");
+    oq_service_status::set_commissioning("QUICK FLOW TEST ACTIVE");
   }
 
   void abort_quick_test() {
@@ -137,11 +137,11 @@ class ManualFlowRuntime {
     if (cm100_exited) {
       oq_commissioning::clear_container(false);
       publish("ABORTED: CM100 exited");
-      id(oq_commissioning_status).publish_state("IDLE");
+      oq_service_status::set_commissioning("IDLE");
     } else {
       oq_commissioning::clear_container(true);
       publish("ABORTED");
-      id(oq_commissioning_status).publish_state("CM100 READY");
+      oq_service_status::set_commissioning("CM100 READY");
     }
   }
 
@@ -197,7 +197,7 @@ class ManualFlowRuntime {
   }
 
   void publish(const char *status) {
-    id(oq_manual_flow_status).publish_state(status);
+    oq_service_status::set_manual_flow(status);
   }
 
 };

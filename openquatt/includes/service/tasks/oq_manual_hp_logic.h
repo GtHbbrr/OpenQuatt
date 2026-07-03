@@ -81,7 +81,7 @@ class ManualHpRuntime {
     id(oq_manual_hp_active) = true;
     publish_status("ACTIVE: select mode and compressor level");
     publish_guard("Vrijgegeven");
-    id(oq_commissioning_status).publish_state("MANUAL HP ACTIVE");
+    oq_service_status::set_commissioning("MANUAL HP ACTIVE");
   }
 
   void abort_or_clear() {
@@ -110,7 +110,7 @@ class ManualHpRuntime {
       oq_commissioning::clear_container(false);
       publish_status("ABORTED: CM100 exited");
       publish_guard("Vrijgegeven");
-      id(oq_commissioning_status).publish_state("IDLE");
+      oq_service_status::set_commissioning("IDLE");
       return;
     }
 
@@ -149,7 +149,7 @@ class ManualHpRuntime {
     oq_commissioning::clear_container(true);
     publish_status("STOPPED");
     publish_guard("Vrijgegeven");
-    id(oq_commissioning_status).publish_state("CM100 READY");
+    oq_service_status::set_commissioning("CM100 READY");
   }
 
  private:
@@ -252,11 +252,11 @@ class ManualHpRuntime {
   }
 
   void publish_status(const char *status) {
-    id(oq_manual_hp_status).publish_state(status);
+    oq_service_status::set_manual_hp(status);
   }
 
   void publish_guard(const char *status) {
-    id(oq_manual_hp_guard_status).publish_state(status);
+    oq_service_status::set_manual_hp_guard(status);
   }
 };
 

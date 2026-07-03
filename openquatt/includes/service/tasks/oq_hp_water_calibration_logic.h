@@ -154,7 +154,7 @@ class HpWaterCalibrationRuntime {
     id(oq_hp_water_calibration_stable_required_s) = cfg.stable_window_s;
 
     phase_ = PHASE_MIXING;
-    id(oq_commissioning_status).publish_state("HP WATER CALIBRATION STARTED");
+    oq_service_status::set_commissioning("HP WATER CALIBRATION STARTED");
     publish("MIXING");
   }
 
@@ -165,7 +165,7 @@ class HpWaterCalibrationRuntime {
       id(oq_hp_water_calibration_abort) = true;
       id(oq_commissioning_abort_requested) = true;
       publish("ABORT REQUESTED");
-      id(oq_commissioning_status).publish_state("ABORT REQUESTED");
+      oq_service_status::set_commissioning("ABORT REQUESTED");
       return;
     }
     reset();
@@ -537,7 +537,7 @@ class HpWaterCalibrationRuntime {
   void publish(const char *status) {
     const std::string s(status ? status : "");
     if (s != last_status_) {
-      id(oq_hp_water_calibration_status).publish_state(s.c_str());
+      oq_service_status::set_hp_water_calibration(s);
       ESP_LOGI("quatt.cm100.hpcal",
                "status=%s phase=%d remaining=%ds flow=%.0fL/h spread=%.2fC stable=%ds/%ds",
                s.c_str(),

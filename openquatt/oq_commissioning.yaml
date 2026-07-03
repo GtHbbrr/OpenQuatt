@@ -58,6 +58,11 @@ globals:
     restore_value: false
     initial_value: '0'
 
+  - id: oq_commissioning_status_value
+    type: std::string
+    restore_value: false
+    initial_value: '"IDLE"'
+
 # ----------------------------
 # CONTROL INPUTS
 # ----------------------------
@@ -76,7 +81,7 @@ button:
           if (id(oq_cm_override).has_state()) {
             const std::string override_mode = id(oq_cm_override).current_option();
             if (override_mode != "Auto") {
-              id(oq_commissioning_status).publish_state("REFUSED: CM Override must be Auto");
+              id(oq_commissioning_status_value) = "REFUSED: CM Override must be Auto";
               return;
             }
           }
@@ -87,7 +92,7 @@ button:
                    (int) id(oq_commissioning_request_pending));
           if (id(oq_commissioning_active) &&
               id(oq_commissioning_task_code) != oq_commissioning::TASK_NONE) {
-            id(oq_commissioning_status).publish_state("REFUSED: BUSY");
+            id(oq_commissioning_status_value) = "REFUSED: BUSY";
             return;
           }
 
@@ -105,26 +110,3 @@ button:
           // Stop CM100 immediately when no task is active; otherwise abort the running task.
           if (oq_commissioning::request_running_task_abort()) return;
           oq_commissioning::stop_neutral_cm100();
-
-binary_sensor:
-  - platform: template
-    id: oq_commissioning_cm100_active
-    name: "CM100 active"
-    internal: true
-    icon: mdi:state-machine
-    entity_category: diagnostic
-    web_server:
-      sorting_group_id: oq_boiler
-    lambda: |-
-      // This is the mode indicator: true whenever Control Mode is CM100.
-      return id(oq_control_mode_code) == 100;
-
-text_sensor:
-  - platform: template
-    id: oq_commissioning_status
-    name: "Commissioning status"
-    internal: true
-    icon: mdi:state-machine
-    update_interval: never
-    web_server:
-      sorting_group_id: oq_boiler

@@ -3,6 +3,7 @@
 #include <math.h>
 
 #include "oq_service_logic.h"
+#include "oq_service_status.h"
 
 namespace oq_commissioning {
 
@@ -15,7 +16,7 @@ inline void clear_container(bool keep_cm100,
   id(oq_commissioning_state_code) = next_state;
   id(oq_commissioning_started_ms) = 0;
   id(oq_commissioning_state_since_ms) = 0;
-  id(oq_commissioning_status).publish_state(keep_cm100 ? "CM100 READY" : "IDLE");
+  oq_service_status::set_commissioning(keep_cm100 ? "CM100 READY" : "IDLE");
 }
 
 inline void reset_task_runtime_state() {
@@ -63,7 +64,7 @@ inline void request_neutral_cm100() {
   clear_container(false);
   reset_task_runtime_state();
   id(oq_commissioning_request_pending) = true;
-  id(oq_commissioning_status).publish_state("CM100 REQUESTED");
+  oq_service_status::set_commissioning("CM100 REQUESTED");
 }
 
 inline bool request_running_task_abort() {
@@ -81,7 +82,7 @@ inline bool request_running_task_abort() {
   } else {
     return false;
   }
-  id(oq_commissioning_status).publish_state("ABORT REQUESTED");
+  oq_service_status::set_commissioning("ABORT REQUESTED");
   return true;
 }
 

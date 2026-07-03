@@ -1612,6 +1612,7 @@
   const RECONNECT_ENTITY_REQUEST_TIMEOUT_MS = 3000;
   const BULK_ENTITY_ENDPOINT = "/openquatt/entities";
   const BULK_ENTITY_REQUEST_BODY_MAX_CHARS = 900;
+  const SERVICE_STATUS_ENDPOINT = "/openquatt/service/status";
 
   function getEntityRequestTimeoutMs() {
     return state.deviceReconnectMode || state.busyAction === "restartAction" || state.updateInstallBusy || state.updateInstallPhaseHint
@@ -1886,11 +1887,85 @@
     return response.json();
   }
 
+  async function fetchServiceStatusPayload() {
+    const timeoutMs = getEntityRequestTimeoutMs();
+    const fetchOptions = { cache: "no-store", headers: { "Cache-Control": "no-store" } };
+
+    if (typeof AbortController === "function") {
+      const controller = new AbortController();
+      const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        const response = await fetch(SERVICE_STATUS_ENDPOINT, { ...fetchOptions, signal: controller.signal });
+        if (!response.ok) {
+          throw new Error(`service status HTTP ${response.status}`);
+        }
+        return response.json();
+      } catch (error) {
+        if (controller.signal.aborted) {
+          throw new Error(`service status request timed out after ${timeoutMs}ms`);
+        }
+        throw error;
+      } finally {
+        window.clearTimeout(timeoutId);
+      }
+    }
+
+    const response = await fetch(SERVICE_STATUS_ENDPOINT, fetchOptions);
+    if (!response.ok) {
+      throw new Error(`service status HTTP ${response.status}`);
+    }
+    return response.json();
+  }
+
+  function mergeServiceStatusPayload(payload = {}) {
+    const entities = payload?.entities && typeof payload.entities === "object" ? payload.entities : {};
+    Object.entries(entities).forEach(([key, entity]) => {
+      if (!SERVICE_STATUS_ENTITY_KEYS.has(key)) {
+        return;
+      }
+      if (state.optionalMissingEntities) {
+        delete state.optionalMissingEntities[key];
+      }
+      state.entities[key] = mergeEntityPayload(key, state.entities[key], entity);
+    });
+  }
+
+  async function refreshServiceStatusEntities(keys) {
+    if (!keys.length) {
+      return { ok: true, message: "" };
+    }
+    try {
+      const payload = await fetchServiceStatusPayload();
+      mergeServiceStatusPayload(payload);
+      state.lastEntityResponseAt = Date.now();
+      return { ok: true, message: "" };
+    } catch (error) {
+      return { ok: false, message: error.message || String(error) };
+    }
+  }
+
   async function refreshEntities(keys, detail = "state", options = {}) {
     const now = Date.now();
     const forceMissing = options.forceMissing === true;
-    const refreshKeys = keys.filter((key) => forceMissing || !isKnownOptionalMissingEntity(key, now));
+    const refreshKeys = keys.filter((key) =>
+      forceMissing || SERVICE_STATUS_ENTITY_KEYS.has(key) || !isKnownOptionalMissingEntity(key, now)
+    );
     if (!refreshKeys.length) {
+      return;
+    }
+    const serviceStatusKeys = refreshKeys.filter((key) => SERVICE_STATUS_ENTITY_KEYS.has(key));
+    const regularKeys = refreshKeys.filter((key) => !SERVICE_STATUS_ENTITY_KEYS.has(key));
+    const serviceStatusResult = await refreshServiceStatusEntities(serviceStatusKeys);
+    const entityRefreshKeys = serviceStatusResult.ok
+      ? regularKeys
+      : [...regularKeys, ...serviceStatusKeys];
+    if (!entityRefreshKeys.length) {
+      applyDerivedState();
+      syncInstallationMonitoringDetailsState(getInstallationMonitoringModel());
+      if (!state.busyAction) {
+        noteEntityRefreshSuccess();
+        state.controlError = "";
+      }
       return;
     }
 
@@ -1898,7 +1973,7 @@
     const concurrency = Number.isFinite(requestedConcurrency) && requestedConcurrency > 0
       ? Math.floor(requestedConcurrency)
       : ENTITY_REFRESH_CONCURRENCY;
-    const chunks = buildBulkEntityChunks(refreshKeys, detail);
+    const chunks = buildBulkEntityChunks(entityRefreshKeys, detail);
     const chunkConcurrency = Math.max(1, Math.min(concurrency, ENTITY_REFRESH_CONCURRENCY));
     const results = [];
     for (let index = 0; index < chunks.length; index += chunkConcurrency) {

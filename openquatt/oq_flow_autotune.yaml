@@ -47,6 +47,21 @@ globals:
     restore_value: false
     initial_value: 'false'
 
+  - id: oq_flow_autotune_status_value
+    type: std::string
+    restore_value: false
+    initial_value: '"IDLE"'
+
+  - id: oq_flow_kp_suggested_value
+    type: float
+    restore_value: false
+    initial_value: '0.03'
+
+  - id: oq_flow_ki_suggested_value
+    type: float
+    restore_value: false
+    initial_value: '0.0008'
+
 # ----------------------------
 # CONTROL INPUTS
 # ----------------------------
@@ -92,8 +107,8 @@ button:
     on_press:
       - lambda: |-
           // Read the suggested gains and apply them only when both are valid.
-          const float kp = id(oq_flow_kp_suggested).state;
-          const float ki = id(oq_flow_ki_suggested).state;
+          const float kp = id(oq_flow_kp_suggested_value);
+          const float ki = id(oq_flow_ki_suggested_value);
           if (!isnan(kp) && !isnan(ki) && kp > 0.0f && ki >= 0.0f) {
             auto ckp = id(oq_flow_kp).make_call();
             ckp.set_value(kp);
@@ -101,54 +116,11 @@ button:
             auto cki = id(oq_flow_ki).make_call();
             cki.set_value(ki);
             cki.perform();
-            id(oq_flow_autotune_status).publish_state("APPLIED");
+            id(oq_flow_autotune_status_value) = "APPLIED";
           } else {
             // Leave the live tuning untouched when the suggestion is invalid.
-            id(oq_flow_autotune_status).publish_state("APPLY_FAILED");
+            id(oq_flow_autotune_status_value) = "APPLY_FAILED";
           }
-
-number:
-  - platform: template
-    id: oq_flow_kp_suggested
-    name: "Flow Autotune Kp suggested"
-    internal: true
-    icon: mdi:alpha-k-circle-outline
-    mode: slider
-    min_value: ${oq_flow_kp_min}
-    max_value: ${oq_flow_kp_max}
-    step: 0.001
-    restore_value: false
-    optimistic: true
-    initial_value: 0.03
-    entity_category: diagnostic
-    web_server:
-      sorting_group_id: oq_tuning_flow
-
-  - platform: template
-    id: oq_flow_ki_suggested
-    name: "Flow Autotune Ki suggested"
-    internal: true
-    icon: mdi:alpha-i-circle-outline
-    mode: slider
-    min_value: ${oq_flow_ki_min}
-    max_value: ${oq_flow_ki_max}
-    step: 0.0001
-    restore_value: false
-    optimistic: true
-    initial_value: 0.0008
-    entity_category: diagnostic
-    web_server:
-      sorting_group_id: oq_tuning_flow
-
-text_sensor:
-  - platform: template
-    id: oq_flow_autotune_status
-    name: "Flow Autotune status"
-    internal: true
-    icon: mdi:information-outline
-    web_server:
-      sorting_group_id: oq_tuning_flow
-    update_interval: never
 
 # ----------------------------
 # MAIN LOOP

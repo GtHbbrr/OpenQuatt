@@ -461,7 +461,7 @@ interval:
             #endif
             static std::string last_manual_guard_status = "";
             if (manual_guard_status != last_manual_guard_status) {
-              id(oq_manual_hp_guard_status).publish_state(manual_guard_status.c_str());
+              oq_service_status::set_manual_hp_guard(manual_guard_status);
               last_manual_guard_status = manual_guard_status;
             }
           }

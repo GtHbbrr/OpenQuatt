@@ -59,23 +59,23 @@ class BoilerPowerTestRuntime {
     const int cm_code = id(oq_control_mode_code);
     const bool task_running = id(oq_commissioning_active) && id(oq_commissioning_task_code) != TASK_NONE;
     if (!id(oq_boiler_assist_enabled).state) {
-      id(oq_boiler_power_test_status).publish_state("REFUSED: boiler/CV assist disabled");
+      oq_service_status::set_boiler_power_test("REFUSED: boiler/CV assist disabled");
       return;
     }
     if (task_running || id(oq_commissioning_request_pending)) {
-      id(oq_boiler_power_test_status).publish_state("REFUSED: BUSY");
+      oq_service_status::set_boiler_power_test("REFUSED: BUSY");
       return;
     }
     if (!id(oq_flow_control_mode).has_state() || id(oq_flow_control_mode).current_option() != "Flow Setpoint") {
-      id(oq_boiler_power_test_status).publish_state("REFUSED: Flow mode must be Flow Setpoint");
+      oq_service_status::set_boiler_power_test("REFUSED: Flow mode must be Flow Setpoint");
       return;
     }
     if (!id(oq_flow_setpoint_lph).has_state()) {
-      id(oq_boiler_power_test_status).publish_state("REFUSED: flow setpoint unavailable");
+      oq_service_status::set_boiler_power_test("REFUSED: flow setpoint unavailable");
       return;
     }
     if (cm_code != 100) {
-      id(oq_boiler_power_test_status).publish_state("REFUSED: not CM100");
+      oq_service_status::set_boiler_power_test("REFUSED: not CM100");
       return;
     }
 
@@ -108,7 +108,7 @@ class BoilerPowerTestRuntime {
              id(oq_commissioning_state_code));
     set_number_value(id(oq_flow_setpoint_lph), cfg.target_flow_lph);
 
-    id(oq_commissioning_status).publish_state("BOILER TEST STARTED");
+    oq_service_status::set_commissioning("BOILER TEST STARTED");
     publish_status("FLOW_SETTLING");
   }
 
@@ -121,13 +121,13 @@ class BoilerPowerTestRuntime {
       } else {
         id(oq_commissioning_abort_requested) = true;
       }
-      id(oq_commissioning_status).publish_state("ABORT REQUESTED");
+      oq_service_status::set_commissioning("ABORT REQUESTED");
       return;
     }
     if (task_code == TASK_FLOW_AUTOTUNE || id(oq_flow_autotune_req)) {
       id(oq_flow_autotune_abort) = true;
       id(oq_commissioning_abort_requested) = true;
-      id(oq_commissioning_status).publish_state("ABORT REQUESTED");
+      oq_service_status::set_commissioning("ABORT REQUESTED");
       return;
     }
     clear_container();
@@ -246,7 +246,7 @@ class BoilerPowerTestRuntime {
 
   void publish_status(const char *status) {
     if (last_status_ != status) {
-      id(oq_boiler_power_test_status).publish_state(status);
+      oq_service_status::set_boiler_power_test(status);
       last_status_ = status;
     }
   }
@@ -276,7 +276,7 @@ class BoilerPowerTestRuntime {
     id(oq_flow_autotune_abort) = false;
     id(oq_flow_autotune_active) = false;
     id(oq_flow_autotune_state) = 0;
-    id(oq_commissioning_status).publish_state("IDLE");
+    oq_service_status::set_commissioning("IDLE");
   }
 
   void finish_task(const char *status, int next_state, bool keep_result, bool keep_cm100) {
@@ -295,7 +295,7 @@ class BoilerPowerTestRuntime {
     if (!id(oq_commissioning_request_pending)) return;
     if (!in_cm100) {
       publish_status("WAITING_FOR_CM100");
-      id(oq_commissioning_status).publish_state("WAITING_FOR_CM100");
+      oq_service_status::set_commissioning("WAITING_FOR_CM100");
       ESP_LOGI("quatt.cm100", "CM100 request pending while not in CM100; waiting");
       return;
     }
@@ -305,7 +305,7 @@ class BoilerPowerTestRuntime {
     id(oq_commissioning_started_ms) = now_ms;
     id(oq_commissioning_state_since_ms) = now_ms;
     publish_status("CM100 READY");
-    id(oq_commissioning_status).publish_state("CM100 READY");
+    oq_service_status::set_commissioning("CM100 READY");
   }
 
   void accept_boiler_if_ready(bool in_cm100, uint32_t now_ms) {
