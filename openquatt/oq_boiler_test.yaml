@@ -87,7 +87,7 @@ number:
     unit_of_measurement: "W"
     mode: slider
     min_value: 1000
-    max_value: 20000
+    max_value: 50000
     step: 10
     restore_value: true
     optimistic: true
