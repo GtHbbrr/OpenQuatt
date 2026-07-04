@@ -2019,7 +2019,7 @@ views:
         cards:
           - type: heading
             icon: mdi:source-branch
-            heading: Sensorselectie
+            heading: Sensorbronnen
             heading_style: title
           - type: markdown
             content: |-
@@ -2028,28 +2028,22 @@ views:
               <summary><strong>Uitleg</strong></summary>
 
 
-              Kies per signaal de bron die OpenQuatt gebruikt.
+              Deze tab toont per signaal de waarde die OpenQuatt gebruikt en de beschikbare ruwe bronnen.
 
-              De `Geselecteerde` waarde hoort de gekozen bron direct te volgen.
+              Sensorselectie wijzig je in de OpenQuatt web-app via `http://openquatt.local`, zodat hardwareprofiel, CIC-status en geldige opties daar samen worden bewaakt.
 
               Zo zie je snel of de effectieve regelinput overeenkomt met wat je verwacht.
 
 
               Gebruik dit blok voor:
 
-              - bronkeuze tijdens tuning
-
               - snelle vergelijking tussen CIC, lokaal en HA input
 
               - validatie van de effectieve regelinput
-              - bij `Flow bron = Outdoor unit` in een Duo-opstelling verschijnt een extra
-                keuze voor `Flowmeter HP1`, `Flowmeter HP2` of de bestaande lokale aggregatie van HP1/HP2
 
-              De lokale aggregatie van `HP1/HP2` is in principe het gemiddelde van beide
+              - diagnose van ontbrekende of afwijkende bronwaarden
 
-              flowmeters.
-
-              Voor `Buitentemperatuur bron` is `Auto` de aanbevolen stand. OpenQuatt kiest dan de laagste geldige bron tussen de lokale Duo-aggregatie en de HA-buitentemperatuur, als die bron is geconfigureerd en geldig is. Dat houdt de regeling robuust als een bron tijdelijk te warm uitvalt door zon of lokale opwarming.
+              Voor HA-invoer blijft de HA bronconfiguratie verderop op deze tab staan.
 
 
               </details>
@@ -2068,8 +2062,6 @@ views:
               - type: entities
                 show_header_toggle: false
                 entities:
-                  - entity: select.openquatt_room_temperature_source
-                    name: Ruimtetemperatuur bron
                   - entity: sensor.openquatt_room_temperature_effective_source
                     name: Effectieve kamertemperatuurbron
                   - entity: sensor.openquatt_room_temperature_selected
@@ -2092,8 +2084,6 @@ views:
               - type: entities
                 show_header_toggle: false
                 entities:
-                  - entity: select.openquatt_water_supply_source
-                    name: Aanvoertemperatuur bron
                   - entity: sensor.openquatt_water_supply_temp_selected
                     name: Geselecteerde aanvoertemperatuur
                   - entity: sensor.openquatt_water_supply_temp
@@ -2114,16 +2104,6 @@ views:
               - type: entities
                 show_header_toggle: false
                 entities:
-                  - entity: select.openquatt_flow_source
-                    name: Flow bron
-                  - type: conditional
-                    row:
-                      entity: select.openquatt_outdoor_unit_flow_mode
-                      name: Buitenunit flowmodus
-                    conditions:
-                      - condition: state
-                        entity: select.openquatt_flow_source
-                        state: Outdoor unit
                   - entity: sensor.openquatt_flow_average_selected
                     name: Geselecteerde flow
                   - entity: sensor.openquatt_flow_average_local
@@ -2142,8 +2122,6 @@ views:
               - type: entities
                 show_header_toggle: false
                 entities:
-                  - entity: select.openquatt_outside_temperature_source
-                    name: Buitentemperatuur bron
                   - entity: sensor.openquatt_outside_temperature_selected
                     name: Geselecteerde buitentemperatuur
                   - entity: sensor.openquatt_outside_temperature_local_aggregated
@@ -2162,8 +2140,6 @@ views:
               - type: entities
                 show_header_toggle: false
                 entities:
-                  - entity: select.openquatt_room_setpoint_source
-                    name: Kamer setpoint bron
                   - entity: sensor.openquatt_room_setpoint_effective_source
                     name: Effectieve setpointbron
                   - entity: sensor.openquatt_room_setpoint_selected
@@ -2186,8 +2162,6 @@ views:
               - type: entities
                 show_header_toggle: false
                 entities:
-                  - entity: select.openquatt_heating_enable_source
-                    name: Warmtetoestemming bron
                   - entity: sensor.openquatt_heating_enable_effective_source
                     name: Gebruikte externe bron
                   - entity: binary_sensor.openquatt_heating_enable_selected
@@ -2214,8 +2188,6 @@ views:
               - type: entities
                 show_header_toggle: false
                 entities:
-                  - entity: select.openquatt_cooling_enable_source
-                    name: Koeltoestemming bron
                   - entity: switch.openquatt_manual_cooling_enable
                     name: Handmatige koeltoestemming (OpenQuatt)
                   - entity: sensor.openquatt_cooling_enable_effective_source
@@ -2231,20 +2203,20 @@ views:
         cards:
           - type: heading
             icon: mdi:home-assistant
-            heading: Home Assistant input configuration
+            heading: Home Assistant bronkoppeling
             heading_style: title
           - type: vertical-stack
             cards:
               - type: heading
                 icon: mdi:form-textbox
-                heading: Dynamische bronselectors
+                heading: HA-bronentities
                 heading_style: subtitle
               - type: markdown
                 content: |-
                   <details>
                   <summary><strong>Uitleg</strong></summary>
 
-                  Vul hier de entity IDs in van de bronnen die de OpenQuatt HA proxy-sensoren moeten voeden.
+                  Vul hier de HA entity IDs in die de OpenQuatt proxywaarden moeten voeden. Dit is alleen de koppeling vanuit Home Assistant; of OpenQuatt een HA-invoer gebruikt kies je in de OpenQuatt web-app via `http://openquatt.local`.
 
                   Voorbeelden:
                   - `sensor.outdoor_temperature`
@@ -2311,11 +2283,11 @@ views:
                   - entity: sensor.openquatt_ext_outdoor_temperature
                     name: Proxy buitentemperatuur
                   - entity: binary_sensor.openquatt_ext_outdoor_temperature_valid
-                    name: Buitentemperatuur bron valid
+                    name: Buitentemperatuurbron geldig
                   - entity: sensor.openquatt_ext_water_supply_temperature
                     name: Proxy aanvoertemperatuur
                   - entity: binary_sensor.openquatt_ext_water_supply_temperature_valid
-                    name: Aanvoertemperatuur bron valid
+                    name: Aanvoertemperatuurbron geldig
                   - entity: sensor.openquatt_ext_room_setpoint
                     name: Proxy kamer setpoint
                   - entity: binary_sensor.openquatt_ext_room_setpoint_valid
@@ -2323,15 +2295,15 @@ views:
                   - entity: sensor.openquatt_ext_room_temperature
                     name: Proxy ruimtetemperatuur
                   - entity: binary_sensor.openquatt_ext_room_temperature_valid
-                    name: Ruimtetemperatuur bron valid
+                    name: Ruimtetemperatuurbron geldig
                   - entity: binary_sensor.openquatt_ext_heating_enable
                     name: Proxy warmtetoestemming
                   - entity: binary_sensor.openquatt_ext_heating_enable_valid
-                    name: Warmtetoestemming bron valid
+                    name: Warmtetoestemmingsbron geldig
                   - entity: binary_sensor.openquatt_ext_cooling_enable
                     name: Proxy koeltoestemming
                   - entity: binary_sensor.openquatt_ext_cooling_enable_valid
-                    name: Koeltoestemming bron valid
+                    name: Koeltoestemmingsbron geldig
           - type: vertical-stack
             cards:
               - type: heading
@@ -2345,7 +2317,7 @@ views:
 
                   Dit zijn de zes HA-invoerwaarden zoals OpenQuatt ze ontvangt. Deze horen de proxywaarden uit het middelste blok te volgen.
 
-                  Blijft een waarde op `Unknown`, controleer dan eerst of de bijbehorende `... bron valid` op `on` staat.
+                  Blijft een waarde op `Unknown`, controleer dan eerst of de bijbehorende `...bron geldig` op `on` staat.
 
                   </details>
                 text_only: true
@@ -2357,7 +2329,7 @@ views:
                   - entity: sensor.openquatt_ha_water_supply_temperature
                     name: HA - Aanvoertemperatuur
                   - entity: sensor.openquatt_ha_thermostat_setpoint
-                    name: HA - Thermostat Doeltemperatuur
+                    name: HA - Thermostaat doeltemperatuur
                   - entity: sensor.openquatt_ha_thermostat_room_temperature
                     name: HA - Thermostaat kamertemperatuur
                   - entity: binary_sensor.openquatt_ha_heating_enable
@@ -2373,22 +2345,24 @@ views:
         cards:
           - type: heading
             icon: mdi:home-assistant
-            heading: Home Assistant input configuration
+            heading: Home Assistant bronkoppeling
             heading_style: title
           - type: markdown
             content: >
-              **Optionele HA-bronselectie niet actief**
+              **Optionele HA-bronkoppeling niet actief**
 
 
               `openquatt_ha_dynamic_sources_package.yaml` is niet geladen.  
 
               Met dit optionele package kun je in Home Assistant zelf de
               bron-entities voor buiten-, aanvoer-, kamer-, setpointtemperatuur
-              en koeltoestemming kiezen, zonder OpenQuatt opnieuw te flashen.
+              en koeltoestemming koppelen, zonder OpenQuatt opnieuw te flashen.
+              Sensorselectie zelf doe je daarna in de OpenQuatt web-app via
+              `http://openquatt.local`.
 
 
               Na installatie verschijnen hier extra configuratieblokken voor
-              dynamische bronselectie.
+              dynamische HA-bronkoppeling.
 
 
               Installatiehandleiding:
@@ -2689,9 +2663,7 @@ views:
           # <ha-icon icon="mdi:source-branch"></ha-icon> Sensorconfiguratie
 
 
-          Configureer bronkeuze en bronkoppeling, en verifieer daarna per signaal
-
-          de geselecteerde waarde en bronstatus.
+          Bekijk hier per signaal welke waarde OpenQuatt gebruikt en of de bronstatus klopt. Sensorselectie doe je in de OpenQuatt web-app: `http://openquatt.local`.
     top_margin: false
     dense_section_placement: false
   - title: Instellingen

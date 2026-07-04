@@ -1928,25 +1928,21 @@ views:
         cards:
           - type: heading
             icon: mdi:source-branch
-            heading: Sensor selection
+            heading: Sensor sources
             heading_style: title
           - type: markdown
             content: |-
               <details>
               <summary><strong>Explanation</strong></summary>
 
-              Select which source OpenQuatt should use per signal. The `Selected` value should directly follow the chosen source. This makes it easy to verify that the effective control input matches your expectation.
+              This tab shows the value OpenQuatt uses per signal and the available raw sources. Configure sensor selection in the OpenQuatt web app at `http://openquatt.local`, where hardware profile, CIC status, and valid options are evaluated together.
 
               Use this block for:
-              - source selection during tuning
               - quick comparison between CIC, local, and HA Input
               - validation of the effective control input
-              - in Duo, `Flow source = Outdoor unit` reveals an extra choice for
-                `Flowmeter HP1`, `Flowmeter HP2`, or the existing local HP1/HP2 aggregate
+              - diagnosis of missing or unexpected source values
 
-              The local `HP1/HP2` aggregate is, in principle, the average of both flowmeters.
-
-              For `Outside temperature source`, `Auto` is the recommended mode. OpenQuatt then picks the lowest valid source between the local Duo aggregate and HA outside temperature, when HA is configured and valid. This keeps control robust when one source is temporarily biased warm by sun or local heat.
+              HA input source mapping remains further down on this tab.
 
               </details>
             text_only: true
@@ -1962,8 +1958,6 @@ views:
               - type: entities
                 show_header_toggle: false
                 entities:
-                  - entity: select.openquatt_room_temperature_source
-                    name: Room temperature source
                   - entity: sensor.openquatt_room_temperature_effective_source
                     name: Effective room temperature source
                   - entity: sensor.openquatt_room_temperature_selected
@@ -1986,8 +1980,6 @@ views:
               - type: entities
                 show_header_toggle: false
                 entities:
-                  - entity: select.openquatt_water_supply_source
-                    name: Water supply temperature source
                   - entity: sensor.openquatt_water_supply_temp_selected
                     name: Selected water supply temperature
                   - entity: sensor.openquatt_water_supply_temp
@@ -2008,16 +2000,6 @@ views:
               - type: entities
                 show_header_toggle: false
                 entities:
-                  - entity: select.openquatt_flow_source
-                    name: Flow source
-                  - type: conditional
-                    row:
-                      entity: select.openquatt_outdoor_unit_flow_mode
-                      name: Outdoor unit flow mode
-                    conditions:
-                      - condition: state
-                        entity: select.openquatt_flow_source
-                        state: Outdoor unit
                   - entity: sensor.openquatt_flow_average_selected
                     name: Selected flow rate
                   - entity: sensor.openquatt_flow_average_local
@@ -2036,8 +2018,6 @@ views:
               - type: entities
                 show_header_toggle: false
                 entities:
-                  - entity: select.openquatt_outside_temperature_source
-                    name: Outside temperature source
                   - entity: sensor.openquatt_outside_temperature_selected
                     name: Selected outside temperature
                   - entity: sensor.openquatt_outside_temperature_local_aggregated
@@ -2056,8 +2036,6 @@ views:
               - type: entities
                 show_header_toggle: false
                 entities:
-                  - entity: select.openquatt_room_setpoint_source
-                    name: Room setpoint source
                   - entity: sensor.openquatt_room_setpoint_effective_source
                     name: Effective room setpoint source
                   - entity: sensor.openquatt_room_setpoint_selected
@@ -2080,8 +2058,6 @@ views:
               - type: entities
                 show_header_toggle: false
                 entities:
-                  - entity: select.openquatt_heating_enable_source
-                    name: Heating enable source
                   - entity: sensor.openquatt_heating_enable_effective_source
                     name: External source in use
                   - entity: binary_sensor.openquatt_heating_enable_selected
@@ -2108,8 +2084,6 @@ views:
               - type: entities
                 show_header_toggle: false
                 entities:
-                  - entity: select.openquatt_cooling_enable_source
-                    name: Cooling enable source
                   - entity: switch.openquatt_manual_cooling_enable
                     name: Manual cooling enable (OpenQuatt)
                   - entity: sensor.openquatt_cooling_enable_effective_source
@@ -2131,14 +2105,14 @@ views:
             cards:
               - type: heading
                 icon: mdi:form-textbox
-                heading: Dynamic source selectors
+                heading: HA source entities
                 heading_style: subtitle
               - type: markdown
                 content: |-
                   <details>
                   <summary><strong>Explanation</strong></summary>
 
-                  Enter the entity IDs for the sources that must feed the OpenQuatt HA proxy sensors.
+                  Enter the HA entity IDs that must feed the OpenQuatt proxy values. This only maps Home Assistant entities into the proxy layer; choose whether OpenQuatt uses HA input in the OpenQuatt web app at `http://openquatt.local`.
 
                   Example values:
                   - `sensor.outdoor_temperature`
@@ -2259,18 +2233,20 @@ views:
             heading_style: title
           - type: markdown
             content: >
-              **Optional HA source selection not active**
+              **Optional HA source mapping not active**
 
 
               `openquatt_ha_dynamic_sources_package.yaml` is not loaded.  
 
-              With this optional package you can choose the Home Assistant source
+              With this optional package you can map the Home Assistant source
               entities for outside, water supply, room, setpoint, and cooling
-              enable at runtime, without reflashing OpenQuatt.
+              enable at runtime, without reflashing OpenQuatt. Configure sensor
+              selection itself in the OpenQuatt web app at
+              `http://openquatt.local`.
 
 
-              After installation, extra configuration blocks for dynamic source
-              selection will appear here.
+              After installation, extra configuration blocks for dynamic HA
+              source mapping will appear here.
 
 
               Installation guide:
@@ -2570,7 +2546,7 @@ views:
         content: |-
           # <ha-icon icon="mdi:source-branch"></ha-icon> Sensor configuration
 
-          Configure source selection and source mapping, then verify per signal the selected value and source status.
+          Review which value OpenQuatt uses per signal and whether the source status looks healthy. Configure sensor selection in the OpenQuatt web app: `http://openquatt.local`.
     top_margin: false
     dense_section_placement: false
   - title: Tuning

@@ -54,6 +54,7 @@
 ## GitHub And PRs
 
 - Do not prefix PR titles with `[codex]`; use a concise human-readable title instead.
+- Use `.github/pull_request_template.md` for PR bodies and fill every relevant section.
 
 ## Concise Mode
 
