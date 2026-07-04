@@ -1462,10 +1462,7 @@ interval:
                 }
               }
 
-              const bool cur_st = id(oq_sticky_active).state;
-              if (cur_st != sticky_active_local) {
-                id(oq_sticky_active).publish_state(sticky_active_local);
-              }
+              publish_binary_if_changed(id(oq_sticky_active), sticky_active_local);
             }
 
             const bool sticky_active = in_cm0 && ms_window_active(id(oq_sticky_until_ms));
@@ -1492,7 +1489,7 @@ interval:
               set_number_value(id(${secondary_pump_speed_id}), target_pwm, 1.0f);
               #endif
             } else {
-              if (id(oq_sticky_active).state) id(oq_sticky_active).publish_state(false);
+              publish_binary_if_changed(id(oq_sticky_active), false);
             }
           };
 
