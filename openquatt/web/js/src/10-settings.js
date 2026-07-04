@@ -4308,26 +4308,56 @@
       }
       return "Auto";
     };
-    const renderSourceRow = ({ label, value = "", key = "", active = false }) => {
+    const renderSourceRow = ({ label, value = "", key = "", active = false, status = "", statusTone = "", statusTitle = "" }) => {
       const text = value || (key ? getSettingsStatValue(key) : "");
-      if (!text) {
+      if (!text && !status) {
         return "";
       }
+      const safeStatusTone = String(statusTone || "").replace(/[^a-z0-9_-]/gi, "");
+      const safeStatusTitle = statusTitle || status;
+      const statusMarkup = status
+        ? `<em class="oq-settings-source-status${safeStatusTone ? ` oq-settings-source-status--${escapeHtml(safeStatusTone)}` : ""}" title="${escapeHtml(safeStatusTitle)}" aria-label="${escapeHtml(`${status}: ${safeStatusTitle}`)}">${escapeHtml(status)}</em>`
+        : "";
       return `
-        <div class="oq-settings-source-row${active ? " is-warning" : ""}">
-          <span>${escapeHtml(label)}</span>
+        <div class="oq-settings-source-row${active ? " is-warning" : ""}${status ? " has-status" : ""}">
+          <span>${escapeHtml(label)}${statusMarkup}</span>
           <strong>${escapeHtml(text)}</strong>
         </div>
       `;
     };
-    const renderHaSourceRows = ({ label = "HA input", valueKey = "", validKey = "", value = "" }) => {
-      if (!hasValidHaSource(valueKey, validKey)) {
+    const renderHaSourceRows = ({ label = "HA-invoer", valueKey = "", validKey = "", value = "" }) => {
+      if (!valueKey || !validKey || !hasEntity(valueKey) || !hasEntity(validKey)) {
         return [];
       }
-      return [
-        renderSourceRow({ label, key: valueKey, value }),
-        renderSourceRow({ label: "HA status", value: "Geldig" }),
-      ];
+      const valid = isInstallationMonitoringBinaryActive(validKey);
+      const statusTitle = valid
+        ? "Home Assistant geeft dit signaal geldig door. OpenQuatt mag deze HA-invoer gebruiken."
+        : "Home Assistant geeft dit signaal niet geldig door. OpenQuatt gebruikt deze HA-invoer dan niet als bron.";
+      return [renderSourceRow({
+        label,
+        key: valueKey,
+        value,
+        status: valid ? "Geldig" : "Ongeldig",
+        statusTone: valid ? "valid" : "invalid",
+        statusTitle,
+      })];
+    };
+    const renderSourceGroup = ({ title, icon = "", content = "", rows = [], copy = "", className = "" }) => {
+      const rowMarkup = rows.filter(Boolean).join("");
+      if (!content && !rowMarkup && !copy) {
+        return "";
+      }
+      return `
+        <section class="oq-settings-source-group${className ? ` ${escapeHtml(className)}` : ""}">
+          <h5>
+            ${icon ? `<span class="oq-settings-source-group-icon">${renderOqIcon(icon, "oq-settings-source-group-icon-svg")}</span>` : ""}
+            <span>${escapeHtml(title)}</span>
+          </h5>
+          ${content ? `<div class="oq-settings-source-group-content">${content}</div>` : ""}
+          ${rowMarkup ? `<div class="oq-settings-source-rows">${rowMarkup}</div>` : ""}
+          ${copy ? `<p class="oq-settings-source-group-copy">${escapeHtml(copy)}</p>` : ""}
+        </section>
+      `;
     };
     const renderSourceSelect = (key, config = {}) => {
       if (!hasEntity(key)) {
@@ -4343,12 +4373,8 @@
         ? [current, ...availableOptions]
         : availableOptions;
       const optionMarkup = renderOptions.map((option) => {
-        const unavailable = !isSourceAvailable(option, config);
         const displayLabel = formatSourceOptionLabel(option, config);
-        const label = unavailable
-          ? `${displayLabel} (${getUnavailableSourceReason(option, config) || "niet beschikbaar"})`
-          : displayLabel;
-        return `<option value="${escapeHtml(option)}" ${option === current ? "selected" : ""}>${escapeHtml(label)}</option>`;
+        return `<option value="${escapeHtml(option)}" ${option === current ? "selected" : ""}>${escapeHtml(displayLabel)}</option>`;
       }).join("");
       return {
         markup: `
@@ -4365,7 +4391,18 @@
         warning: currentUnavailable ? `Huidige bron niet beschikbaar: ${getUnavailableSourceReason(current, config)}` : "",
       };
     };
-    const renderSourceCard = ({ key, title, select, secondarySelect = null, secondarySelects = null, rows = [] }) => {
+    const renderSourceCard = ({
+      key,
+      title,
+      icon = "",
+      select,
+      secondarySelect = null,
+      secondarySelects = null,
+      activeRows = [],
+      measurementRows = [],
+      activeCopy = "",
+      rows = [],
+    }) => {
       const mainSelect = select && select.when !== false
         ? renderSourceSelect(select.key, select)
         : { markup: "", warning: "" };
@@ -4380,23 +4417,40 @@
       const secondaryWarning = secondaries.map((item) => item.warning).find(Boolean) || "";
       const bodyRows = rows.filter(Boolean).join("");
       const controlsMarkup = `${mainSelect.markup}${secondaryMarkup}`;
-      if (!controlsMarkup && !bodyRows) {
+      const warning = mainSelect.warning || secondaryWarning;
+      const groupedMarkup = [
+        renderSourceGroup({
+          title: "Configuratie",
+          icon: "settings",
+          className: "oq-settings-source-group--config",
+          content: controlsMarkup ? `
+            <div class="oq-settings-source-controls">
+              ${controlsMarkup}
+            </div>
+            ${warning ? `<p class="oq-settings-source-warning">${escapeHtml(warning)}</p>` : ""}
+          ` : "",
+        }),
+        renderSourceGroup({ title: "Actief", icon: "target", rows: activeRows, copy: activeCopy, className: "oq-settings-source-group--active" }),
+        renderSourceGroup({ title: "Metingen", icon: "activity", rows: measurementRows, className: "oq-settings-source-group--measurements" }),
+      ].filter(Boolean).join("");
+      if (!groupedMarkup && !controlsMarkup && !bodyRows) {
         return "";
       }
       return `
         <article class="oq-settings-source-card" data-oq-settings-field="${escapeHtml(key || select.key)}">
           <div class="oq-settings-source-card-head">
+            ${icon ? `<span class="oq-settings-source-card-icon">${renderOqIcon(icon, "oq-settings-source-card-icon-svg")}</span>` : ""}
             <h4>${escapeHtml(title)}</h4>
           </div>
-          ${controlsMarkup ? `
-            <div class="oq-settings-source-controls">
-              ${controlsMarkup}
-            </div>
-          ` : ""}
-          ${mainSelect.warning || secondaryWarning ? `
-            <p class="oq-settings-source-warning">${escapeHtml(mainSelect.warning || secondaryWarning)}</p>
-          ` : ""}
-          ${bodyRows ? `<div class="oq-settings-source-rows">${bodyRows}</div>` : ""}
+          ${groupedMarkup || `
+            ${controlsMarkup ? `
+              <div class="oq-settings-source-controls">
+                ${controlsMarkup}
+              </div>
+            ` : ""}
+            ${warning ? `<p class="oq-settings-source-warning">${escapeHtml(warning)}</p>` : ""}
+            ${bodyRows ? `<div class="oq-settings-source-rows">${bodyRows}</div>` : ""}
+          `}
         </article>
       `;
     };
@@ -4407,10 +4461,13 @@
       renderSourceCard({
         key: "room-temperature",
         title: "Kamertemperatuur",
-        select: { key: "roomTempSource", label: "Kamertemperatuur bron", haKeys: ["roomTempHa", "roomTempHaValid"] },
-        rows: [
-          renderSourceRow({ label: "Actieve waarde", key: "roomTemp" }),
-          renderSourceRow({ label: "Gebruikte bron", value: formattedTextSourceValue("roomTempEffectiveSource") }),
+        icon: "thermometer",
+        select: { key: "roomTempSource", label: "Bron", haKeys: ["roomTempHa", "roomTempHaValid"] },
+        activeRows: [
+          renderSourceRow({ label: "Waarde", key: "roomTemp" }),
+          renderSourceRow({ label: "Bron", value: formattedTextSourceValue("roomTempEffectiveSource") }),
+        ],
+        measurementRows: [
           cicAvailable ? renderSourceRow({ label: "CIC", key: "cicRoomTemp" }) : "",
           otAvailable ? renderSourceRow({ label: "OpenTherm", key: "otRoomTemp" }) : "",
           ...renderHaSourceRows({ valueKey: "roomTempHa", validKey: "roomTempHaValid" }),
@@ -4419,10 +4476,13 @@
       renderSourceCard({
         key: "room-setpoint",
         title: "Kamer setpoint",
-        select: { key: "roomSetpointSource", label: "Setpoint bron", haKeys: ["roomSetpointHa", "roomSetpointHaValid"] },
-        rows: [
-          renderSourceRow({ label: "Actieve waarde", key: "roomSetpoint" }),
-          renderSourceRow({ label: "Gebruikte bron", value: formattedTextSourceValue("roomSetpointEffectiveSource") }),
+        icon: "target",
+        select: { key: "roomSetpointSource", label: "Bron", haKeys: ["roomSetpointHa", "roomSetpointHaValid"] },
+        activeRows: [
+          renderSourceRow({ label: "Waarde", key: "roomSetpoint" }),
+          renderSourceRow({ label: "Bron", value: formattedTextSourceValue("roomSetpointEffectiveSource") }),
+        ],
+        measurementRows: [
           cicAvailable ? renderSourceRow({ label: "CIC", key: "cicRoomSetpoint" }) : "",
           otAvailable ? renderSourceRow({ label: "OpenTherm", key: "otRoomSetpoint" }) : "",
           ...renderHaSourceRows({ valueKey: "roomSetpointHa", validKey: "roomSetpointHaValid" }),
@@ -4431,15 +4491,18 @@
       renderSourceCard({
         key: "water-supply",
         title: "Aanvoertemperatuur",
-        select: { key: "waterSupplySource", label: "Aanvoer bron", haKeys: ["waterSupplyTempHa", "waterSupplyTempHaValid"] },
+        icon: "droplet",
+        select: { key: "waterSupplySource", label: "Bron", haKeys: ["waterSupplyTempHa", "waterSupplyTempHaValid"] },
         secondarySelect: {
           key: "localWaterSupplyTempSource",
           label: "Lokale sensor",
           when: currentWaterSupplySource === "Local" && hasEntity("localWaterSupplyTempSource"),
         },
-        rows: [
-          renderSourceRow({ label: "Actieve waarde", key: "supplyTemp" }),
-          renderSourceRow({ label: "Gebruikte bron", value: getWaterSupplyUsedSource() }),
+        activeRows: [
+          renderSourceRow({ label: "Waarde", key: "supplyTemp" }),
+          renderSourceRow({ label: "Bron", value: getWaterSupplyUsedSource() }),
+        ],
+        measurementRows: [
           renderSourceRow({ label: "Lokale selectie", key: "waterSupplyTempEsp" }),
           renderSourceRow({ label: "PT1000", key: "waterSupplyTempPt1000" }),
           renderSourceRow({ label: "DS18B20", key: "waterSupplyTempDs18b20" }),
@@ -4450,36 +4513,40 @@
       renderSourceCard({
         key: "flow-source",
         title: "Flow",
-        select: { key: "flowSource", label: "Flow bron", optionLabels: { "Outdoor unit": "Quatt-flow" }, when: cicAvailable || currentFlowSource === "CIC" },
+        icon: "waves",
+        select: { key: "flowSource", label: "Bron", optionLabels: { "Outdoor unit": "Quatt-flow" }, when: cicAvailable || currentFlowSource === "CIC" },
         secondarySelects: [
           {
             key: "qFlowSource",
-            label: "Quatt-flow bron",
+            label: "Flowpad",
             infoId: "qFlowSource-info",
             infoCopy: "Auto behoudt het bestaande gedrag: V1 gebruikt de lokale controller-flowmeter, V1.5 gebruikt de flow uit de buitenunit via Modbus. Kies Lokaal of Buitenunit om dit expliciet vast te zetten.",
             when: currentFlowSource === "Outdoor unit" && hasEntity("qFlowSource"),
           },
           {
             key: "outdoorUnitFlowMode",
-            label: "Flowmeterkeuze",
+            label: "Meterkeuze",
             infoId: "outdoorUnitFlowMode-info",
             infoCopy: "Kies welke buitenunit-flowmeting wordt gebruikt. Flowmeter HP1 en HP2 gebruiken direct die meter. Gecombineerde flow HP1/HP2 gebruikt normaal het gemiddelde, met een guard die bij sterk afwijkende meters de meest aannemelijke waarde kiest.",
             when: currentFlowSource === "Outdoor unit" && hasEntity("outdoorUnitFlowMode") && (!hasEntity("qFlowSource") || currentQFlowSource !== "Local"),
           },
         ],
-        rows: [
-          renderSourceRow({ label: "Actieve waarde", key: "flowSelected" }),
-          renderSourceRow({ label: "Gebruikte bron", value: getFlowUsedSource() }),
-          renderSourceRow({ label: "Lokaal", key: "controllerFlow" }),
-          renderSourceRow({ label: "Gecombineerd", key: "flowLocal" }),
-          renderSourceRow({ label: "HP1", key: "hp1Flow" }),
-          renderSourceRow({ label: "HP2", key: "hp2Flow" }),
+        activeRows: [
+          renderSourceRow({ label: "OpenQuatt-flow", key: "flowSelected" }),
+          renderSourceRow({ label: "Bron", value: getFlowUsedSource() }),
+        ],
+        measurementRows: [
+          renderSourceRow({ label: "Controller-flowmeter", key: "controllerFlow" }),
+          renderSourceRow({ label: "Gecombineerd HP1/HP2", key: "flowLocal" }),
+          renderSourceRow({ label: "Flowmeter HP1", key: "hp1Flow" }),
+          renderSourceRow({ label: "Flowmeter HP2", key: "hp2Flow" }),
           cicAvailable ? renderSourceRow({ label: "CIC", key: "cicFlowrate" }) : "",
         ],
       }),
       renderSourceCard({
         key: "outside-temperature",
         title: "Buitentemperatuur",
+        icon: "sun",
         select: {
           key: "outsideTempSource",
           label: "Buiten bron",
@@ -4489,9 +4556,11 @@
             ? "Auto gebruikt de laagste geldige buitentemperatuurbron. Zijn zowel buitenunit als HA-invoer geldig, dan kiest OpenQuatt de laagste waarde. Is er maar een van beide geldig, dan wordt die gebruikt."
             : "Auto gebruikt de geldige buitentemperatuur van de buitenunit.",
         },
-        rows: [
-          renderSourceRow({ label: "Actieve waarde", key: "outsideTempSelected" }),
-          renderSourceRow({ label: "Gebruikte bron", value: getOutsideTempUsedSource() }),
+        activeRows: [
+          renderSourceRow({ label: "Waarde", key: "outsideTempSelected" }),
+          renderSourceRow({ label: "Bron", value: getOutsideTempUsedSource() }),
+        ],
+        measurementRows: [
           renderSourceRow({ label: "Buitenunit", key: "outsideTempLocalAggregated" }),
           ...renderHaSourceRows({ valueKey: "outsideTempHa", validKey: "outsideTempHaValid" }),
         ],
@@ -4499,16 +4568,19 @@
       renderSourceCard({
         key: "heating-enable",
         title: "Warmtetoestemming",
+        icon: "flame",
         select: {
           key: "heatingEnableSource",
-          label: "Warmtetoestemming bron",
+          label: "Bron",
           optionLabels: { Disabled: "Niet gebruiken" },
           haKeys: ["heatingEnableHa", "heatingEnableHaValid"],
           keepUnavailableCurrent: true,
         },
-        rows: [
-          renderSourceRow({ label: "Verwarming toegestaan", value: sourceStateText("heatingEnableSelected", "Ja", "Nee") }),
-          renderSourceRow({ label: "Gebruikte externe bron", value: formattedTextSourceValue("heatingEnableEffectiveSource") }),
+        activeRows: [
+          renderSourceRow({ label: "Toegestaan", value: sourceStateText("heatingEnableSelected", "Ja", "Nee") }),
+          renderSourceRow({ label: "Externe bron", value: formattedTextSourceValue("heatingEnableEffectiveSource") }),
+        ],
+        measurementRows: [
           renderSourceRow({ label: "Bronselectie", value: sourceStateText("heatingEnableValid", "Geldig", "Ongeldig") }),
           otAvailable ? renderSourceRow({ label: "OpenTherm", value: sourceStateText("otThermostatChEnable", "Toestemming", "Geen toestemming") }) : "",
           cicAvailable ? renderSourceRow({ label: "CIC", value: sourceStateText("cicChEnabled", "Toestemming", "Geen toestemming") }) : "",
@@ -4522,14 +4594,17 @@
       renderSourceCard({
         key: "cooling-enable",
         title: "Koeltoestemming",
+        icon: "snowflake",
         select: {
           key: "coolingEnableSource",
-          label: "Koeltoestemming bron",
+          label: "Bron",
           haKeys: ["coolingEnableHa", "coolingEnableHaValid"],
         },
-        rows: [
-          renderSourceRow({ label: "Actieve waarde", value: sourceStateText("coolingEnableSelected", "Actief", "Niet actief") }),
-          renderSourceRow({ label: "Gebruikte bron", value: formattedTextSourceValue("coolingEnableEffectiveSource") }),
+        activeRows: [
+          renderSourceRow({ label: "Waarde", value: sourceStateText("coolingEnableSelected", "Actief", "Niet actief") }),
+          renderSourceRow({ label: "Bron", value: formattedTextSourceValue("coolingEnableEffectiveSource") }),
+        ],
+        measurementRows: [
           renderSourceRow({ label: "Handmatig", value: sourceStateText("manualCoolingEnable", "Aan", "Uit") }),
           cicAvailable ? renderSourceRow({ label: "CIC", value: sourceStateText("cicCoolingEnabled", "Actief", "Normaal") }) : "",
           ...renderHaSourceRows({

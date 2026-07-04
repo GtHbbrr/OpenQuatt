@@ -4291,42 +4291,179 @@
 }
 
 .oq-settings-source-grid {
+  container-type: inline-size;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px;
 }
 
 .oq-settings-source-card {
   display: grid;
-  gap: 9px;
   align-content: start;
   min-width: 0;
-  padding: 12px;
+  overflow: hidden;
+  padding: 0;
   border: 1px solid var(--oq-helper-line);
   border-radius: var(--oq-helper-radius-md);
   background: var(--oq-helper-card);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
 }
 
 .oq-settings-source-card-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   min-width: 0;
+  padding: 14px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.16);
+  background: linear-gradient(180deg, rgba(248, 250, 252, 0.84), rgba(255, 255, 255, 0.96));
+}
+
+.oq-settings-source-card-icon {
+  display: grid;
+  flex: 0 0 34px;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 1px solid rgba(37, 99, 235, 0.14);
+  border-radius: 50%;
+  background: rgba(37, 99, 235, 0.08);
+  color: #1d4ed8;
+}
+
+.oq-settings-source-card-icon-svg {
+  width: 19px;
+  height: 19px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.05;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .oq-settings-source-card-head h4 {
   margin: 0;
+  min-width: 0;
   color: var(--oq-helper-ink);
-  font-size: 0.95rem;
+  font-size: 1.06rem;
   line-height: 1.2;
   letter-spacing: 0;
 }
 
+.oq-settings-source-group {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  min-width: 0;
+  padding: 12px 14px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.16);
+}
+
+.oq-settings-source-group--config {
+  box-sizing: border-box;
+}
+
+.oq-settings-source-group--active {
+  min-height: 104px;
+  box-sizing: border-box;
+  background: rgba(248, 250, 252, 0.56);
+}
+
+@container (min-width: 1156px) {
+  .oq-settings-source-card:nth-child(-n + 4) .oq-settings-source-group--config {
+    min-height: 192px;
+  }
+
+  .oq-settings-source-card:nth-child(n + 5) .oq-settings-source-group--config {
+    min-height: 118px;
+  }
+}
+
+@container (min-width: 864px) and (max-width: 1155px) {
+  .oq-settings-source-card:nth-child(-n + 6) .oq-settings-source-group--config {
+    min-height: 192px;
+  }
+}
+
+@container (min-width: 572px) and (max-width: 863px) {
+  .oq-settings-source-card:nth-child(-n + 2) .oq-settings-source-group--config {
+    min-height: 170px;
+  }
+
+  .oq-settings-source-card:nth-child(3),
+  .oq-settings-source-card:nth-child(4) {
+    --oq-settings-source-config-height: 192px;
+  }
+
+  .oq-settings-source-card:nth-child(5),
+  .oq-settings-source-card:nth-child(6) {
+    --oq-settings-source-config-height: 118px;
+  }
+
+  .oq-settings-source-card .oq-settings-source-group--config {
+    min-height: var(--oq-settings-source-config-height, 0);
+  }
+}
+
+.oq-settings-source-group:last-child {
+  border-bottom: 0;
+}
+
+.oq-settings-source-group h5 {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0;
+  color: var(--oq-helper-ink);
+  font-size: 0.86rem;
+  font-weight: 850;
+  line-height: 1.2;
+  letter-spacing: 0;
+}
+
+.oq-settings-source-group-icon {
+  display: grid;
+  flex: 0 0 20px;
+  width: 20px;
+  height: 20px;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(37, 99, 235, 0.08);
+  color: #2563eb;
+}
+
+.oq-settings-source-group-icon-svg {
+  width: 13px;
+  height: 13px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.1;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.oq-settings-source-group-content {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.oq-settings-source-group-copy {
+  margin: -1px 0 0;
+  color: var(--oq-helper-faint);
+  font-size: 0.76rem;
+  font-weight: 550;
+  line-height: 1.35;
+}
+
 .oq-settings-source-controls {
   display: grid;
-  gap: 7px;
+  gap: 8px;
 }
 
 .oq-settings-source-select {
   display: grid;
-  gap: 4px;
+  gap: 5px;
   min-width: 0;
 }
 
@@ -4341,9 +4478,9 @@
 .oq-settings-source-select-head > span:first-child {
   min-width: 0;
   color: var(--oq-helper-faint);
-  font-size: 0.7rem;
+  font-size: 0.76rem;
   font-weight: 750;
-  letter-spacing: 0.02em;
+  letter-spacing: 0;
 }
 
 .oq-settings-source-select-head .oq-settings-info-button {
@@ -4358,9 +4495,9 @@
 }
 
 .oq-settings-source-select .oq-helper-select {
-  min-height: 38px;
-  padding: 0 34px 0 10px;
-  font-size: 0.86rem;
+  min-height: 40px;
+  padding: 0 34px 0 11px;
+  font-size: 0.9rem;
   font-weight: 750;
 }
 
@@ -4379,7 +4516,7 @@
 .oq-settings-source-rows {
   display: grid;
   gap: 0;
-  margin-top: 1px;
+  min-width: 0;
 }
 
 .oq-settings-source-row {
@@ -4401,14 +4538,18 @@
   padding-bottom: 0;
 }
 
-.oq-settings-source-row span,
+.oq-settings-source-row > span,
 .oq-settings-source-row strong {
   min-width: 0;
-  font-size: 0.79rem;
+  font-size: 0.82rem;
   line-height: 1.25;
 }
 
-.oq-settings-source-row span {
+.oq-settings-source-row > span {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
   color: var(--oq-helper-soft);
   font-weight: 650;
 }
@@ -4418,6 +4559,32 @@
   font-weight: 800;
   text-align: right;
   word-break: break-word;
+}
+
+.oq-settings-source-status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 18px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: rgba(100, 116, 139, 0.1);
+  color: var(--oq-helper-soft);
+  font-size: 0.68rem;
+  font-style: normal;
+  font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: help;
+}
+
+.oq-settings-source-status--valid {
+  background: rgba(22, 101, 52, 0.11);
+  color: #15803d;
+}
+
+.oq-settings-source-status--invalid {
+  background: rgba(234, 88, 12, 0.12);
+  color: var(--oq-helper-accent-deep);
 }
 
 .oq-settings-source-row.is-warning strong {
@@ -4431,6 +4598,31 @@
 .oq-helper-shell--dark .oq-settings-source-card,
 .oq-helper-modal-backdrop--dark .oq-settings-source-card {
   background: rgba(15, 23, 42, 0.28);
+}
+
+.oq-helper-shell--dark .oq-settings-source-card-head,
+.oq-helper-modal-backdrop--dark .oq-settings-source-card-head {
+  background: linear-gradient(180deg, rgba(30, 41, 59, 0.62), rgba(15, 23, 42, 0.2));
+}
+
+.oq-helper-shell--dark .oq-settings-source-card-icon,
+.oq-helper-modal-backdrop--dark .oq-settings-source-card-icon,
+.oq-helper-shell--dark .oq-settings-source-group-icon,
+.oq-helper-modal-backdrop--dark .oq-settings-source-group-icon {
+  border-color: rgba(96, 165, 250, 0.22);
+  background: rgba(37, 99, 235, 0.18);
+  color: #93c5fd;
+}
+
+.oq-helper-shell--dark .oq-settings-source-group--active,
+.oq-helper-modal-backdrop--dark .oq-settings-source-group--active {
+  background: rgba(15, 23, 42, 0.22);
+}
+
+@media (max-width: 720px) {
+  .oq-settings-source-group--active {
+    min-height: 0;
+  }
 }
 
 .oq-settings-checkbox-switch {
