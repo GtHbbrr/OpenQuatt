@@ -21,7 +21,6 @@ TEXT_PATTERNS = (
     "openquatt/topology/*.yaml",
     "scripts/*.py",
     "scripts/*.sh",
-    "scripts/*.ps1",
 )
 
 YAML_BANNER_PATTERNS = (

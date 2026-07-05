@@ -84,4 +84,3 @@ Use a consistent order per package where applicable:
    - `boiler_relay`
    - `hp1_set_working_mode`, `hp2_set_working_mode`
 5. Verify dashboard entity references are still valid.
-6. On Windows, run `powershell -ExecutionPolicy Bypass -File .\scripts\validate_local.ps1` for the same matrix-driven validation.

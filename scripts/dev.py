@@ -3,10 +3,8 @@ from __future__ import annotations
 
 import argparse
 import concurrent.futures
-import fnmatch
 import json
 import os
-import re
 import shutil
 import subprocess
 import sys
@@ -17,29 +15,8 @@ from typing import Iterable, Sequence
 
 from build_targets import filter_targets, load_targets
 
-STAGE_EXCLUDE_DIRS = {
-    ".git",
-    ".venv",
-    ".cache",
-    ".tmp",
-    "build",
-    ".esphome",
-    "__pycache__",
-}
-
-STAGE_EXCLUDE_FILES = ("*.pyc", "*.pyo")
-
-EFUSE_DUPLICATE_SOURCE = '"src/esp_efuse_fields.c"'
-EFUSE_DUPLICATE_UTILITY_SOURCE = '"src/esp_efuse_utility.c"'
 EFUSE_SOC_UTILITY_SOURCE = '"esp_efuse_utility.c"'
 EFUSE_SOC_UTILITY_RENAMED = '"esp_efuse_utility_esp32s3.c"'
-EFUSE_PATCH_MARKER_PREFIX = (
-    "# OpenQuatt validate patch: target-specific sources.cmake already provides "
-)
-EFUSE_PATCH_MARKER = (
-    EFUSE_PATCH_MARKER_PREFIX
-    + "esp_efuse_fields.c; esp_efuse_utility.c stays in the main efuse CMakeLists.\n"
-)
 SYSTEM_TIME_SOURCE = '"src/system_time.c"'
 SYSTEM_TIME_RENAMED = '"src/esp_timer_system_time.c"'
 PHY_LIB_PRINTF_SOURCE = '"src/lib_printf.c"'
@@ -73,10 +50,6 @@ def config_log_stem(config: str) -> str:
     return "_".join((*path.parent.parts, path.stem)) if path.parent.parts else path.stem
 
 
-def is_windows() -> bool:
-    return os.name == "nt"
-
-
 def resolve_path(path_value: str) -> Path:
     path = Path(path_value)
     if path.is_absolute():
@@ -85,7 +58,7 @@ def resolve_path(path_value: str) -> Path:
 
 
 def venv_bin_dir(venv_dir: Path) -> Path:
-    return venv_dir / ("Scripts" if is_windows() else "bin")
+    return venv_dir / "bin"
 
 
 def _existing_path(paths: Iterable[Path]) -> Path | None:
@@ -98,7 +71,6 @@ def _existing_path(paths: Iterable[Path]) -> Path | None:
 def venv_python_path(venv_dir: Path) -> Path | None:
     return _existing_path(
         (
-            venv_bin_dir(venv_dir) / "python.exe",
             venv_bin_dir(venv_dir) / "python",
             venv_bin_dir(venv_dir) / "python3",
         )
@@ -115,7 +87,6 @@ def resolve_helper_python(venv_dir: Path) -> list[str]:
 def resolve_esphome_command(venv_dir: Path) -> list[str]:
     candidate = _existing_path(
         (
-            venv_bin_dir(venv_dir) / "esphome.exe",
             venv_bin_dir(venv_dir) / "esphome",
         )
     )
@@ -505,75 +476,10 @@ def run_logged(
     print(f"[ok] {label}")
 
 
-def stage_ignore(directory: str, entries: list[str]) -> set[str]:
-    ignored: set[str] = set()
-    current_dir = Path(directory)
-    for entry in entries:
-        candidate = current_dir / entry
-        if candidate.is_dir() and entry in STAGE_EXCLUDE_DIRS:
-            ignored.add(entry)
-            continue
-        if any(fnmatch.fnmatch(entry, pattern) for pattern in STAGE_EXCLUDE_FILES):
-            ignored.add(entry)
-    return ignored
-
-
-def sync_staged_workspace(source_dir: Path, stage_dir: Path) -> None:
-    if is_windows():
-        stage_dir.parent.mkdir(parents=True, exist_ok=True)
-        log_path = stage_dir.parent / "workspace-sync.log"
-        arguments = [
-            str(source_dir),
-            str(stage_dir),
-            "/MIR",
-            "/R:1",
-            "/W:1",
-            "/XD",
-            *sorted(STAGE_EXCLUDE_DIRS),
-            "/XF",
-            *STAGE_EXCLUDE_FILES,
-            f"/LOG:{log_path}",
-        ]
-        completed = subprocess.run(
-            ["robocopy.exe", *arguments],
-            cwd=source_dir,
-            check=False,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.STDOUT,
-        )
-        if completed.returncode > 7:
-            tail = tail_lines(log_path)
-            if tail:
-                print(tail, file=sys.stderr, end="" if tail.endswith("\n") else "\n")
-            raise SystemExit(f"workspace sync failed. Full log: {log_path}")
-        return
-
-    if stage_dir.exists():
-        shutil.rmtree(stage_dir)
-    stage_dir.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copytree(source_dir, stage_dir, ignore=stage_ignore)
-
-
-def resolve_command_root(root_dir: Path) -> tuple[Path, Path, Path | None]:
-    command_root = root_dir
+def resolve_command_root(root_dir: Path) -> tuple[Path, Path]:
     pio_core_dir = root_dir / ".cache" / "platformio"
-    cleanup_dir: Path | None = None
-
-    if is_windows() and " " in str(root_dir):
-        local_app_data = Path(os.environ.get("LOCALAPPDATA", tempfile.gettempdir()))
-        stage_base_dir = local_app_data / "OpenQuattBuild"
-        sessions_dir = stage_base_dir / "sessions"
-        sessions_dir.mkdir(parents=True, exist_ok=True)
-
-        cleanup_dir = Path(tempfile.mkdtemp(prefix="workspace-", dir=sessions_dir))
-        command_root = cleanup_dir / "workspace"
-        pio_core_dir = stage_base_dir / "platformio"
-        print(f"Workspace path contains spaces; mirroring into {command_root}")
-        sync_staged_workspace(root_dir, command_root)
-        print("[ok] workspace sync")
-
     pio_core_dir.mkdir(parents=True, exist_ok=True)
-    return command_root, pio_core_dir, cleanup_dir
+    return root_dir, pio_core_dir
 
 
 def build_pages_site(site_dir: Path, factory_dir: Path, helper_python: Sequence[str]) -> None:
@@ -645,15 +551,6 @@ def default_jobs() -> int:
     return value
 
 
-def ensure_supported_parallelism(args: argparse.Namespace) -> None:
-    if is_windows() and args.jobs > 1:
-        raise SystemExit(
-            "Parallel compile jobs are not supported on native Windows in this repo yet. "
-            "Use '--jobs 1' on native Windows, or run the same command in WSL/macOS/Linux "
-            "for reliable parallel builds."
-        )
-
-
 def bootstrap_command(args: argparse.Namespace) -> int:
     root_dir = repo_root()
     venv_dir = resolve_path(args.venv_dir)
@@ -684,10 +581,9 @@ def bootstrap_command(args: argparse.Namespace) -> int:
 
 
 def validate_command(args: argparse.Namespace) -> int:
-    ensure_supported_parallelism(args)
     root_dir = repo_root()
     venv_dir = resolve_path(args.venv_dir)
-    command_root, pio_core_dir, cleanup_dir = resolve_command_root(root_dir)
+    command_root, pio_core_dir = resolve_command_root(root_dir)
     log_dir = root_dir / ".tmp" / "validate_local_logs"
     helper_python = resolve_helper_python(venv_dir)
     esphome_command = resolve_esphome_command(venv_dir)
@@ -700,119 +596,101 @@ def validate_command(args: argparse.Namespace) -> int:
     env["PLATFORMIO_HOME_DIR"] = str(pio_core_dir)
 
     print(f"Workspace root: {root_dir}")
-    if command_root != root_dir:
-        print(f"Command root: {command_root}")
     print(f"PlatformIO core dir: {pio_core_dir}")
     print(f"Log dir: {log_dir}")
     print(f"Parallel compile jobs: {args.jobs}")
 
-    try:
-        command_scripts_dir = command_root / "scripts"
+    command_scripts_dir = command_root / "scripts"
+    run_logged(
+        [*helper_python, str(command_scripts_dir / "check_style_consistency.py")],
+        cwd=command_root,
+        env=env,
+        log_path=log_dir / "style-consistency.log",
+        label="style consistency",
+    )
+    run_logged(
+        [*helper_python, str(command_scripts_dir / "check_docs_consistency.py")],
+        cwd=command_root,
+        env=env,
+        log_path=log_dir / "docs-consistency.log",
+        label="docs consistency",
+    )
+
+    for config in args.configs:
+        stem = config_log_stem(config)
         run_logged(
-            [*helper_python, str(command_scripts_dir / "check_style_consistency.py")],
+            [*esphome_command, "config", config],
             cwd=command_root,
             env=env,
-            log_path=log_dir / "style-consistency.log",
-            label="style consistency",
+            log_path=log_dir / f"{stem}.config.log",
+            label=f"config {config}",
         )
-        run_logged(
-            [*helper_python, str(command_scripts_dir / "check_docs_consistency.py")],
+
+    if args.config_only:
+        print()
+        print("Validation complete.")
+        return 0
+
+    patched_packages = apply_framework_espidf_source_workarounds(pio_core_dir)
+    for package_dir in patched_packages:
+        print(f"[fix] patched framework-espidf duplicate sources in {package_dir}")
+    if patched_packages:
+        shutil.rmtree(command_root / ".esphome" / "build", ignore_errors=True)
+
+    compile_queue = list(args.configs)
+    packages_dir = pio_core_dir / "packages"
+    espressif_cache_dir = command_root / ".esphome" / ".espressif"
+    cold_platformio_cache = not packages_dir.exists() or not any(packages_dir.iterdir())
+    # ESPHome 2026.5 keeps managed components per build path. Only treat the
+    # legacy shared cache as cold when it is actually present.
+    cold_espressif_cache = espressif_cache_dir.exists() and not any(espressif_cache_dir.iterdir())
+    force_serial_compile = args.jobs > 1 and (cold_platformio_cache or cold_espressif_cache)
+    if force_serial_compile:
+        print(
+            "Cold compile cache detected; running this validation sequentially once "
+            "to avoid ESP-IDF component-cache races."
+        )
+        shutil.rmtree(espressif_cache_dir, ignore_errors=True)
+
+    def compile_one(config: str) -> tuple[str, int, Path]:
+        log_path = log_dir / f"{config_log_stem(config)}.compile.log"
+        label = f"compile {config}"
+        print(f"[run] {label}", flush=True)
+        exit_code = run_command(
+            [*esphome_command, "compile", config],
             cwd=command_root,
             env=env,
-            log_path=log_dir / "docs-consistency.log",
-            label="docs consistency",
+            log_path=log_path,
+            check=False,
+            heartbeat_label=label,
         )
-
-        for config in args.configs:
-            stem = config_log_stem(config)
-            run_logged(
-                [*esphome_command, "config", config],
-                cwd=command_root,
-                env=env,
-                log_path=log_dir / f"{stem}.config.log",
-                label=f"config {config}",
+        if exit_code != 0:
+            tail = tail_lines(log_path, limit=160)
+            duplicate_object = next(
+                (
+                    object_name
+                    for object_name in ("esp_efuse_fields.c.o", "efuse_hal.c.o", "system_time.c.o", "lib_printf.c.o")
+                    if object_name in tail
+                ),
+                "",
             )
-
-        if args.config_only:
-            print()
-            print("Validation complete.")
-            return 0
-
-        patched_packages = apply_framework_espidf_source_workarounds(pio_core_dir)
-        for package_dir in patched_packages:
-            print(f"[fix] patched framework-espidf duplicate sources in {package_dir}")
-        if patched_packages:
-            shutil.rmtree(command_root / ".esphome" / "build", ignore_errors=True)
-
-        compile_queue = list(args.configs)
-        packages_dir = pio_core_dir / "packages"
-        espressif_cache_dir = command_root / ".esphome" / ".espressif"
-        cold_platformio_cache = not packages_dir.exists() or not any(packages_dir.iterdir())
-        # ESPHome 2026.5 keeps managed components per build path. Only treat the
-        # legacy shared cache as cold when it is actually present.
-        cold_espressif_cache = espressif_cache_dir.exists() and not any(espressif_cache_dir.iterdir())
-        force_serial_compile = args.jobs > 1 and (cold_platformio_cache or cold_espressif_cache)
-        if force_serial_compile:
-            print(
-                "Cold compile cache detected; running this validation sequentially once "
-                "to avoid ESP-IDF component-cache races."
+            source_duplicate = (
+                "Multiple ways to build the same target were specified for:" in tail
+                and bool(duplicate_object)
             )
-            shutil.rmtree(espressif_cache_dir, ignore_errors=True)
-
-        def compile_one(config: str) -> tuple[str, int, Path]:
-            log_path = log_dir / f"{config_log_stem(config)}.compile.log"
-            label = f"compile {config}"
-            print(f"[run] {label}", flush=True)
-            exit_code = run_command(
-                [*esphome_command, "compile", config],
-                cwd=command_root,
-                env=env,
-                log_path=log_path,
-                check=False,
-                heartbeat_label=label,
+            cache_race = (
+                ".esphome/.espressif/service_" in tail
+                and ("ArduinoJson" in tail or "idf_component_manager" in tail)
             )
-            if exit_code != 0:
-                tail = tail_lines(log_path, limit=160)
-                duplicate_object = next(
-                    (
-                        object_name
-                        for object_name in ("esp_efuse_fields.c.o", "efuse_hal.c.o", "system_time.c.o", "lib_printf.c.o")
-                        if object_name in tail
-                    ),
-                    "",
-                )
-                source_duplicate = (
-                    "Multiple ways to build the same target were specified for:" in tail
-                    and bool(duplicate_object)
-                )
-                cache_race = (
-                    ".esphome/.espressif/service_" in tail
-                    and ("ArduinoJson" in tail or "idf_component_manager" in tail)
-                )
-                if source_duplicate:
-                    patched = apply_framework_espidf_source_workarounds(pio_core_dir)
-                    if patched or has_framework_espidf_source_workaround(pio_core_dir, duplicate_object):
-                        print(
-                            f"[retry] compile {config}: resetting build cache after framework-espidf "
-                            "duplicate-target failure."
-                        )
-                        build_root = command_root / target_build_paths.get(config, f".esphome/build/{Path(config).stem}")
-                        shutil.rmtree(build_root, ignore_errors=True)
-                        exit_code = run_command(
-                            [*esphome_command, "compile", config],
-                            cwd=command_root,
-                            env=env,
-                            log_path=log_path,
-                            check=False,
-                            heartbeat_label=label,
-                        )
-                        tail = tail_lines(log_path, limit=160)
-
-                if cache_race:
+            if source_duplicate:
+                patched = apply_framework_espidf_source_workarounds(pio_core_dir)
+                if patched or has_framework_espidf_source_workaround(pio_core_dir, duplicate_object):
                     print(
-                        f"[retry] compile {config}: resetting ESP-IDF component cache after a generated-cache race."
+                        f"[retry] compile {config}: resetting build cache after framework-espidf "
+                        "duplicate-target failure."
                     )
-                    shutil.rmtree(espressif_cache_dir, ignore_errors=True)
+                    build_root = command_root / target_build_paths.get(config, f".esphome/build/{Path(config).stem}")
+                    shutil.rmtree(build_root, ignore_errors=True)
                     exit_code = run_command(
                         [*esphome_command, "compile", config],
                         cwd=command_root,
@@ -821,51 +699,63 @@ def validate_command(args: argparse.Namespace) -> int:
                         check=False,
                         heartbeat_label=label,
                     )
-            if exit_code == 0:
-                build_dir = command_root / target_build_paths.get(config, f".esphome/build/{Path(config).stem}") / ".pioenvs" / "openquatt"
+                    tail = tail_lines(log_path, limit=160)
+
+            if cache_race:
+                print(
+                    f"[retry] compile {config}: resetting ESP-IDF component cache after a generated-cache race."
+                )
+                shutil.rmtree(espressif_cache_dir, ignore_errors=True)
                 exit_code = run_command(
-                    [*helper_python, str(command_scripts_dir / "repair_factory_bin.py"), str(build_dir)],
+                    [*esphome_command, "compile", config],
                     cwd=command_root,
                     env=env,
                     log_path=log_path,
                     check=False,
-                    heartbeat_label=f"repair factory {config}",
+                    heartbeat_label=label,
                 )
-            return config, exit_code, log_path
+        if exit_code == 0:
+            build_dir = command_root / target_build_paths.get(config, f".esphome/build/{Path(config).stem}") / ".pioenvs" / "openquatt"
+            exit_code = run_command(
+                [*helper_python, str(command_scripts_dir / "repair_factory_bin.py"), str(build_dir)],
+                cwd=command_root,
+                env=env,
+                log_path=log_path,
+                check=False,
+                heartbeat_label=f"repair factory {config}",
+            )
+        return config, exit_code, log_path
 
-        results: list[tuple[str, int, Path]] = []
-        if compile_queue:
-            if args.jobs == 1 or force_serial_compile:
-                results = [compile_one(config) for config in compile_queue]
-            else:
-                with concurrent.futures.ThreadPoolExecutor(max_workers=args.jobs) as executor:
-                    futures = [executor.submit(compile_one, config) for config in compile_queue]
-                    for future in concurrent.futures.as_completed(futures):
-                        results.append(future.result())
+    results: list[tuple[str, int, Path]] = []
+    if compile_queue:
+        if args.jobs == 1 or force_serial_compile:
+            results = [compile_one(config) for config in compile_queue]
+        else:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=args.jobs) as executor:
+                futures = [executor.submit(compile_one, config) for config in compile_queue]
+                for future in concurrent.futures.as_completed(futures):
+                    results.append(future.result())
 
-                order = {config: index for index, config in enumerate(compile_queue)}
-                results.sort(key=lambda item: order[item[0]])
+            order = {config: index for index, config in enumerate(compile_queue)}
+            results.sort(key=lambda item: order[item[0]])
 
-        failures = 0
-        for config, exit_code, log_path in results:
-            if exit_code != 0:
-                failures += 1
-                print(f"[FAIL] compile {config}", file=sys.stderr)
-                tail = tail_lines(log_path)
-                if tail:
-                    print(tail, file=sys.stderr, end="" if tail.endswith("\n") else "\n")
-                continue
-            print(f"[ok] compile {config}")
+    failures = 0
+    for config, exit_code, log_path in results:
+        if exit_code != 0:
+            failures += 1
+            print(f"[FAIL] compile {config}", file=sys.stderr)
+            tail = tail_lines(log_path)
+            if tail:
+                print(tail, file=sys.stderr, end="" if tail.endswith("\n") else "\n")
+            continue
+        print(f"[ok] compile {config}")
 
-        if failures:
-            raise SystemExit(f"Validation finished with {failures} compile failure(s).")
+    if failures:
+        raise SystemExit(f"Validation finished with {failures} compile failure(s).")
 
-        print()
-        print("Validation complete.")
-        return 0
-    finally:
-        if cleanup_dir is not None:
-            shutil.rmtree(cleanup_dir, ignore_errors=True)
+    print()
+    print("Validation complete.")
+    return 0
 
 
 def prepare_pages_site_command(args: argparse.Namespace) -> int:
