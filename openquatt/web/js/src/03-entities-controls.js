@@ -2091,6 +2091,72 @@
     ].join(":");
   }
 
+  function getMqttStatusSignature(status = state.mqttStatus || {}) {
+    const inputTopics = status.input_topics && typeof status.input_topics === "object"
+      ? status.input_topics
+      : {};
+    return [
+      status.enabled ? "on" : "off",
+      status.connected ? "connected" : "idle",
+      String(status.broker || ""),
+      String(status.port || ""),
+      String(status.username || ""),
+      status.password_set ? "password" : "nopassword",
+      String(status.dew_point_topic || ""),
+      JSON.stringify(inputTopics),
+      String(status.source || ""),
+      String(status.csrf_token || ""),
+    ].join(":");
+  }
+
+  function syncMqttDraftsFromStatus() {
+    const status = state.mqttStatus || {};
+    state.mqttDraftEnabled = status.enabled === true;
+    state.mqttDraftBroker = String(status.broker || "");
+    state.mqttDraftPort = String(status.port || 1883);
+    state.mqttDraftUsername = String(status.username || "");
+    state.mqttDraftPassword = "";
+    state.mqttDraftClearPassword = false;
+    state.mqttDraftDirty = false;
+  }
+
+  function syncMqttDraftFromInput(input) {
+    const mqttField = input?.dataset?.oqMqttField;
+    if (!mqttField) {
+      return false;
+    }
+
+    state.mqttNotice = "";
+    state.mqttError = "";
+    state.mqttDraftDirty = true;
+    if (mqttField === "enabled") {
+      state.mqttDraftEnabled = Boolean(input.checked);
+    } else if (mqttField === "broker") {
+      state.mqttDraftBroker = String(input.value || "");
+    } else if (mqttField === "port") {
+      state.mqttDraftPort = String(input.value || "");
+    } else if (mqttField === "username") {
+      state.mqttDraftUsername = String(input.value || "");
+    } else if (mqttField === "password") {
+      state.mqttDraftPassword = String(input.value || "");
+    } else if (mqttField === "clear-password") {
+      state.mqttDraftClearPassword = Boolean(input.checked);
+      if (state.mqttDraftClearPassword) {
+        state.mqttDraftPassword = "";
+      }
+      const passwordInput = input.closest(".oq-helper-modal")?.querySelector('[data-oq-mqtt-field="password"]');
+      if (passwordInput) {
+        passwordInput.value = state.mqttDraftPassword;
+        passwordInput.disabled = state.mqttBusy || state.mqttDraftClearPassword;
+      }
+    }
+
+    input.closest(".oq-helper-modal")?.querySelectorAll(".oq-helper-modal-success, .oq-helper-modal-note--error").forEach((node) => {
+      node.remove();
+    });
+    return true;
+  }
+
   function shouldRefreshSupplementaryStatus(lastRefreshAt, options = {}, intervalMs = SUPPLEMENTARY_STATUS_REFRESH_INTERVAL_MS) {
     if (options.force === true) {
       return true;
@@ -2105,6 +2171,10 @@
 
   function shouldRefreshApiSecurityStatusForCurrentSurface() {
     return state.systemModal === "api-security" || isSystemSettingsGroupActive();
+  }
+
+  function shouldRefreshMqttStatusForCurrentSurface() {
+    return state.systemModal === "mqtt" || state.systemModal === "mqtt-sensors" || isIntegrationsSettingsGroupActive();
   }
 
   async function refreshAuthStatus(options = {}) {
@@ -2228,6 +2298,55 @@
     }
   }
 
+  async function refreshMqttStatus(options = {}) {
+    if (!shouldRefreshSupplementaryStatus(state.lastMqttStatusRefreshAt, options)) {
+      return false;
+    }
+    state.lastMqttStatusRefreshAt = Date.now();
+    try {
+      const response = await fetch("/mqtt/status", { cache: "no-store" });
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      const payload = await response.json();
+      const rawInputTopics = payload.input_topics && typeof payload.input_topics === "object"
+        ? payload.input_topics
+        : {};
+      const inputTopics = {};
+      Object.entries(rawInputTopics).forEach(([key, value]) => {
+        inputTopics[String(key)] = String(value || "");
+      });
+      const coolingDewPointTopic = String(inputTopics.cooling_dew_point || payload.dew_point_topic || "");
+      inputTopics.cooling_dew_point = coolingDewPointTopic;
+      const nextStatus = {
+        enabled: Boolean(payload.enabled),
+        connected: Boolean(payload.connected),
+        broker: String(payload.broker || ""),
+        port: Number(payload.port || 1883),
+        username: String(payload.username || ""),
+        password_set: Boolean(payload.password_set),
+        dew_point_topic: coolingDewPointTopic,
+        input_topics: inputTopics,
+        source: String(payload.source || ""),
+        csrf_token: String(payload.csrf_token || ""),
+      };
+      const previousSignature = getMqttStatusSignature();
+      const nextSignature = getMqttStatusSignature(nextStatus);
+      state.mqttStatus = nextStatus;
+      if (previousSignature !== nextSignature) {
+        if (!(state.systemModal === "mqtt" && state.mqttDraftDirty)) {
+          syncMqttDraftsFromStatus();
+        }
+        state.mqttNotice = "";
+      }
+      state.mqttError = "";
+      return previousSignature !== nextSignature;
+    } catch (error) {
+      state.mqttError = `MQTT-status kon niet worden geladen. ${error.message}`;
+      return false;
+    }
+  }
+
   async function copyTextToClipboard(text) {
     if (!text) {
       return false;
@@ -2254,6 +2373,23 @@
       document.body.removeChild(textarea);
     }
     return success;
+  }
+
+  async function copyMqttDewPointTopic() {
+    const topic = getMqttInputTopic("cooling_dew_point");
+    if (!topic) {
+      state.mqttError = "MQTT-topic is nog niet geladen.";
+      render();
+      return;
+    }
+    try {
+      const copied = await copyTextToClipboard(topic);
+      state.mqttNotice = copied ? "MQTT-topic gekopieerd." : "Kopiëren is niet gelukt.";
+      state.mqttError = "";
+    } catch (error) {
+      state.mqttError = `Kopiëren is mislukt. ${error.message}`;
+    }
+    render();
   }
 
   async function restartForApiSecurityChange() {
@@ -3390,6 +3526,7 @@
           : false;
       const authChanged = shouldDeferSupplementary || !shouldRefreshAuthStatusForCurrentSurface() ? false : await refreshAuthStatus();
       const apiSecurityChanged = shouldDeferSupplementary || !shouldRefreshApiSecurityStatusForCurrentSurface() ? false : await refreshApiSecurityStatus();
+      const mqttChanged = shouldDeferSupplementary || !shouldRefreshMqttStatusForCurrentSurface() ? false : await refreshMqttStatus();
       const nextHeaderSignature = getHeaderRenderSignature();
       if (shouldDeferSupplementary && !state.nativeOpen) {
         schedulePrimeSupplementaryData(getSupplementaryPrimeDelayMs(syncView));
@@ -3415,6 +3552,14 @@
         return;
       }
       if (apiSecurityChanged && state.appView === "settings") {
+        render();
+        return;
+      }
+      if (mqttChanged && state.appView === "settings") {
+        render();
+        return;
+      }
+      if (state.systemModal === "mqtt-sensors") {
         render();
         return;
       }
@@ -3643,6 +3788,12 @@
       return;
     }
 
+    const mqttField = event.target.dataset.oqMqttField;
+    if (mqttField) {
+      syncMqttDraftFromInput(event.target);
+      return;
+    }
+
     const field = event.target.dataset.oqField;
     if (!field) {
       if (event.target.dataset.oqQuickstartCicUrl !== undefined) {
@@ -3655,21 +3806,21 @@
         return;
       }
       const authField = event.target.dataset.oqAuthField;
-      if (!authField) {
+      if (authField) {
+        state.authNotice = "";
+        state.authError = "";
+        if (authField === "username") {
+          state.authDraftUsername = String(event.target.value || "");
+        } else if (authField === "currentPassword") {
+          state.authDraftCurrentPassword = String(event.target.value || "");
+        } else if (authField === "newPassword") {
+          state.authDraftNewPassword = String(event.target.value || "");
+        } else if (authField === "confirmPassword") {
+          state.authDraftConfirmPassword = String(event.target.value || "");
+        }
         return;
       }
 
-      state.authNotice = "";
-      state.authError = "";
-      if (authField === "username") {
-        state.authDraftUsername = String(event.target.value || "");
-      } else if (authField === "currentPassword") {
-        state.authDraftCurrentPassword = String(event.target.value || "");
-      } else if (authField === "newPassword") {
-        state.authDraftNewPassword = String(event.target.value || "");
-      } else if (authField === "confirmPassword") {
-        state.authDraftConfirmPassword = String(event.target.value || "");
-      }
       return;
     }
 
@@ -4056,6 +4207,36 @@
       state.apiSecurityError = "";
       render();
       void refreshApiSecurityStatus({ force: true });
+      return;
+    }
+
+    if (action === "open-mqtt-modal") {
+      state.systemModal = "mqtt";
+      syncMqttDraftsFromStatus();
+      state.mqttDraftDirty = false;
+      state.mqttNotice = "";
+      state.mqttError = "";
+      render();
+      void refreshMqttStatus({ force: true });
+      return;
+    }
+
+    if (action === "open-mqtt-sensors-modal") {
+      state.systemModal = "mqtt-sensors";
+      state.mqttNotice = "";
+      state.mqttError = "";
+      render();
+      void refreshMqttStatus({ force: true });
+      return;
+    }
+
+    if (action === "copy-mqtt-dew-topic") {
+      void copyMqttDewPointTopic();
+      return;
+    }
+
+    if (action === "save-mqtt-config") {
+      void commitMqttConfig();
       return;
     }
 
@@ -6052,6 +6233,71 @@
       render();
     } finally {
       state.authBusy = false;
+      render();
+    }
+  }
+
+  async function commitMqttConfig() {
+    const status = state.mqttStatus || {};
+    const enabled = Boolean(state.mqttDraftEnabled);
+    const broker = String(state.mqttDraftBroker || "").trim();
+    const port = Number(String(state.mqttDraftPort || "").trim());
+    const username = String(state.mqttDraftUsername || "").trim();
+    const clearPassword = Boolean(state.mqttDraftClearPassword);
+    const password = clearPassword ? "" : String(state.mqttDraftPassword || "");
+
+    if (!status.csrf_token) {
+      state.mqttError = "MQTT-configuratie laadt nog. Probeer het zo opnieuw.";
+      render();
+      return;
+    }
+    if (!Number.isInteger(port) || port < 1 || port > 65535) {
+      state.mqttError = "Vul een geldige poort in.";
+      render();
+      return;
+    }
+    if (enabled && !broker) {
+      state.mqttError = "Vul een broker in als je MQTT inschakelt.";
+      render();
+      return;
+    }
+
+    state.mqttBusy = true;
+    state.mqttNotice = "";
+    state.mqttError = "";
+    render();
+
+    try {
+      const params = new URLSearchParams();
+      params.set("csrf_token", status.csrf_token);
+      params.set("enabled", enabled ? "true" : "false");
+      params.set("broker", broker);
+      params.set("port", String(port));
+      params.set("username", username);
+      params.set("password", password);
+      params.set("clear_password", clearPassword ? "true" : "false");
+
+      const response = await fetch("/mqtt/save", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8" },
+        body: params.toString(),
+      });
+      const payload = await response.json().catch(() => ({ ok: false, error: "invalid_response" }));
+      if (!response.ok || !payload.ok) {
+        throw new Error(payload.error || `HTTP ${response.status}`);
+      }
+      state.mqttDraftDirty = false;
+      await refreshMqttStatus({ force: true });
+      state.mqttDraftPassword = "";
+      state.mqttDraftClearPassword = false;
+      state.mqttNotice = enabled ? "MQTT inputbronnen staan aan." : "MQTT-configuratie opgeslagen.";
+      state.mqttError = "";
+      render();
+    } catch (error) {
+      state.mqttError = `Opslaan is mislukt. ${error.message}`;
+      render();
+    } finally {
+      state.mqttBusy = false;
       render();
     }
   }

@@ -140,6 +140,10 @@ Daarom kijkt OpenQuatt bij koeling niet alleen naar comfort, maar ook naar veili
 - wat is dan de veilige ondergrens voor de watertemperatuur;
 - mag cooling op dit moment dus wel of niet vrijgegeven worden.
 
+Een dauwpunt kan uit Home Assistant komen of via MQTT worden aangeleverd. In de web-app kies je bij `Cooling Dew Point Source` tussen `Auto`, `Home Assistant` en `MQTT`. In `Auto` gebruikt OpenQuatt de hoogste geldige waarde, omdat dat voor koeling de veiligste keuze is.
+
+Een MQTT-dauwpunt blijft 15 minuten geldig. Zonder nieuwe MQTT-publicatie wordt die bron ongeldig en valt OpenQuatt terug op een andere geldige bron of blokkeert koeling volgens de gekozen beveiligingsmodus.
+
 ### Wat doet `Manual Cooling Enable`?
 
 Die schakelaar geeft extra handmatige toestemming, maar vervangt geen normale koelvraag en geen beveiliging.

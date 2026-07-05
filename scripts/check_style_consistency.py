@@ -230,6 +230,7 @@ NESTED_KEY_ORDER_RULES = {
         "oq_energy",
         "oq_cic",
         "oq_ha_inputs",
+        "oq_mqtt_ingress",
         "oq_local_sensors",
         "oq_sensor_sources",
         "oq_ot_slave",

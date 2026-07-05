@@ -131,10 +131,13 @@ Belangrijke keuzes:
 - `Outside Temperature Source`
 - `Room Temperature Source`
 - `Room Setpoint Source`
+- `Cooling Dew Point Source`
 
 En indirect alles wat bepaalt waar buiten-, kamer- en waterwaarden vandaan komen.
 
 Voor `Outside Temperature Source` is `Auto` meestal de verstandigste keuze. OpenQuatt kiest dan zelf een geldige bron en blijft minder gevoelig voor een buitenmeting die tijdelijk niet betrouwbaar is.
+
+Voor `Cooling Dew Point Source` is `Auto` meestal ook de veiligste keuze. OpenQuatt gebruikt dan de hoogste geldige dauwpuntwaarde van Home Assistant en MQTT. Kies `Home Assistant` of `MQTT` alleen als je die bron expliciet wilt vereisen.
 
 ## Welke meetwaarden wil je meestal zien?
 

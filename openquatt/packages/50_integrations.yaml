@@ -13,6 +13,7 @@ packages:
       cic_secondary_enabled: "${cic_secondary_enabled}"
       cic_hp2_sensor_internal: "${cic_hp2_sensor_internal}"
   oq_ha_inputs: !include ../oq_ha_inputs.yaml
+  oq_mqtt_ingress: !include ../oq_mqtt_ingress.yaml
   oq_local_sensors: !include ../oq_local_sensors.yaml
   oq_sensor_sources: !include
     file: ../oq_sensor_sources.yaml

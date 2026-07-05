@@ -1061,6 +1061,7 @@
         : activeGroup === "integrations"
             ? [
                 renderSettingsOpenThermCicSection(),
+                renderSettingsMqttSection(),
                 renderSettingsSensorSelectionSection(),
               ]
             : [
@@ -4308,6 +4309,52 @@
       }
       return "Auto";
     };
+    const getNumericSourceValue = (key) => {
+      if (!hasEntity(key)) {
+        return NaN;
+      }
+      const rawNumeric = Number(getEntityValue(key));
+      if (Number.isFinite(rawNumeric)) {
+        return rawNumeric;
+      }
+      const stateText = String(state.entities[key]?.state ?? "").trim().replace(",", ".");
+      const match = stateText.match(/-?\d+(?:\.\d+)?/);
+      return match ? Number(match[0]) : NaN;
+    };
+    const isValidNumericSource = (valueKey, validKey = "") => {
+      if (!hasEntity(valueKey)) {
+        return false;
+      }
+      const value = getNumericSourceValue(valueKey);
+      const valid = validKey
+        ? isInstallationMonitoringBinaryActive(validKey)
+        : true;
+      return valid && Number.isFinite(value);
+    };
+    const getCoolingDewPointUsedSource = () => {
+      const source = String(getEntityValue("coolingDewPointSource") || "").trim();
+      if (source === "Home Assistant") {
+        return isValidNumericSource("coolingDewPointHa", "coolingDewPointHaValid") ? "HA-invoer" : "HA-invoer ontbreekt";
+      }
+      if (source === "MQTT") {
+        return isValidNumericSource("mqttCoolingDewPoint", "mqttCoolingDewPointValid") ? "MQTT" : "MQTT ontbreekt";
+      }
+
+      const haValid = isValidNumericSource("coolingDewPointHa", "coolingDewPointHaValid");
+      const mqttValid = isValidNumericSource("mqttCoolingDewPoint", "mqttCoolingDewPointValid");
+      if (haValid && mqttValid) {
+        const ha = getNumericSourceValue("coolingDewPointHa");
+        const mqtt = getNumericSourceValue("mqttCoolingDewPoint");
+        return mqtt > ha ? "MQTT" : "HA-invoer";
+      }
+      if (haValid) {
+        return "HA-invoer";
+      }
+      if (mqttValid) {
+        return "MQTT";
+      }
+      return source ? formatSettingsOptionLabel(source) : "Auto";
+    };
     const renderSourceRow = ({ label, value = "", key = "", active = false, status = "", statusTone = "", statusTitle = "" }) => {
       const text = value || (key ? getSettingsStatValue(key) : "");
       if (!text && !status) {
@@ -4614,6 +4661,36 @@
           }),
         ],
       }),
+      renderSourceCard({
+        key: "cooling-dew-point",
+        title: "Koelingsdauwpunt",
+        icon: "thermometer",
+        select: {
+          key: "coolingDewPointSource",
+          label: "Bron",
+          haKeys: ["coolingDewPointHa", "coolingDewPointHaValid"],
+          infoId: "coolingDewPointSource-info",
+          infoCopy: "Auto gebruikt de hoogste geldige waarde als Home Assistant en MQTT tegelijk geldig zijn. Kies Home Assistant of MQTT om die bron expliciet te vereisen.",
+        },
+        activeRows: [
+          renderSourceRow({ label: "Waarde", key: "coolingDewPointSelected" }),
+          renderSourceRow({ label: "Bron", value: getCoolingDewPointUsedSource() }),
+        ],
+        measurementRows: [
+          ...renderHaSourceRows({ valueKey: "coolingDewPointHa", validKey: "coolingDewPointHaValid" }),
+          renderSourceRow({
+            label: "MQTT",
+            value: isInstallationMonitoringBinaryActive("mqttCoolingDewPointValid")
+              ? getSettingsStatValue("mqttCoolingDewPoint")
+              : "—",
+            status: hasEntity("mqttCoolingDewPointValid") ? getMqttDewPointValidityLabel() : "",
+            statusTone: isInstallationMonitoringBinaryActive("mqttCoolingDewPointValid") ? "valid" : "invalid",
+            statusTitle: isInstallationMonitoringBinaryActive("mqttCoolingDewPointValid")
+              ? "MQTT heeft een geldige, recente dauwpuntwaarde ontvangen."
+              : "MQTT heeft nog geen geldige recente dauwpuntwaarde ontvangen.",
+          }),
+        ],
+      }),
     ].filter(Boolean);
 
     if (!sourceCards.length) {
@@ -4625,6 +4702,58 @@
       "Sensorselectie",
       "Kies welke bron OpenQuatt gebruikt voor metingen en vraag-signalen. Uitgeschakelde integraties verdwijnen uit de keuzes.",
       `<div class="oq-settings-source-grid">${sourceCards.join("")}</div>`,
+    );
+  }
+
+  function renderSettingsMqttSection() {
+    const liveValue = formatMqttDewPointValue();
+    const mqttEnabled = state.mqttStatus?.enabled === true;
+    const sensorsPanel = mqttEnabled ? `
+      <section class="oq-settings-mqtt-panel oq-settings-mqtt-panel--sensors oq-settings-mqtt-panel--compact">
+        <div class="oq-settings-quickstart-status-row oq-settings-mqtt-status-row">
+          <div>
+            <p class="oq-settings-quickstart-status-label">MQTT sensoren</p>
+            <strong class="oq-settings-quickstart-status-value">Dauwpunt: ${escapeHtml(liveValue)}</strong>
+          </div>
+          <button
+            class="oq-helper-button oq-helper-button--ghost"
+            type="button"
+            data-oq-action="open-mqtt-sensors-modal"
+          >
+            Details
+          </button>
+        </div>
+      </section>
+    ` : "";
+
+    return renderSettingsSection(
+      "Integratie",
+      "MQTT inputbronnen",
+      "Beheer de brokerverbinding voor externe MQTT-bronwaarden.",
+      `
+        <div class="oq-settings-mqtt-shell">
+          <section class="oq-settings-mqtt-panel oq-settings-mqtt-panel--broker">
+            <div class="oq-settings-field-head">
+              <h3>MQTT brokerconfiguratie</h3>
+            </div>
+            <div class="oq-settings-quickstart-status-row oq-settings-mqtt-status-row">
+              <div>
+                <p class="oq-settings-quickstart-status-label">Huidige status</p>
+                <strong class="oq-settings-quickstart-status-value">${escapeHtml(getMqttStatusLabel())}</strong>
+                <p class="oq-settings-quickstart-status-copy">${escapeHtml(getMqttStatusDetail())}</p>
+              </div>
+              <button
+                class="oq-helper-button oq-helper-button--ghost"
+                type="button"
+                data-oq-action="open-mqtt-modal"
+              >
+                Aanpassen
+              </button>
+            </div>
+          </section>
+          ${sensorsPanel}
+        </div>
+      `,
     );
   }
 

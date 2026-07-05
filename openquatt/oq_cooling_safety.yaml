@@ -3,12 +3,14 @@
 # ==============================================================================
 #
 # Goal:
-#   Build the cooling safety layer from one HA-provided aggregate dew point.
+#   Build the cooling safety layer from one HA-provided aggregate dew point and
+#   one optional MQTT-provided external dew point.
 #
 # Scope:
-#   - Home Assistant calculates the highest valid dew point across configured
+#   - Home Assistant can calculate the highest valid dew point across configured
 #     cooling rooms.
-#   - ESPHome only consumes the aggregate dew point and validity flag.
+#   - MQTT can provide one external aggregate dew point on a fixed topic.
+#   - ESPHome consumes the aggregate values and selects the configured source.
 #   - Derive the minimum safe supply temperature and fallback guardrails.
 #
 # ==============================================================================
@@ -48,6 +50,14 @@ globals:
     type: bool
     restore_value: false
     initial_value: 'false'
+  - id: oq_cooling_dew_point_selected_last_mode_code
+    type: int
+    restore_value: false
+    initial_value: '0'
+  - id: oq_cooling_dew_point_selected_last_route_code
+    type: int
+    restore_value: false
+    initial_value: '0'
 
 number:
   - platform: template
@@ -100,6 +110,21 @@ number:
 
 select:
   - platform: template
+    id: cooling_dew_point_source
+    name: "Cooling Dew Point Source"
+    icon: mdi:source-branch
+    entity_category: config
+    optimistic: true
+    restore_value: true
+    options:
+      - "Auto"
+      - "Home Assistant"
+      - "MQTT"
+    initial_option: Auto
+    web_server:
+      sorting_group_id: oq_cooling
+
+  - platform: template
     id: cooling_without_dew_point_mode
     name: "Cooling Without Dew Point"
     icon: mdi:water-alert
@@ -141,8 +166,7 @@ binary_sensor:
     device_class: running
     lambda: |-
       const bool dew_point_configured =
-          id(cooling_dew_point_valid_ha).has_state() && id(cooling_dew_point_valid_ha).state &&
-          id(cooling_dew_point_ha).has_state() && !isnan(id(cooling_dew_point_ha).state);
+          id(cooling_dew_point_selected).has_state() && !isnan(id(cooling_dew_point_selected).state);
       const bool fallback_floor_ok =
           id(cooling_fallback_min_supply_temp).has_state() && !isnan(id(cooling_fallback_min_supply_temp).state);
       return !dew_point_configured &&
@@ -243,6 +267,10 @@ text_sensor:
         return {"User responsibility"};
       }
       if (id(cooling_dew_point_available).state) {
+        if (id(cooling_dew_point_source).has_state()) {
+          if (id(cooling_dew_point_source).current_option() == "MQTT") return {"Dew point (MQTT)"};
+          if (id(cooling_dew_point_source).current_option() == "Home Assistant") return {"Dew point (HA)"};
+        }
         return {"Dew point"};
       }
       if (!id(cooling_without_dew_point_enabled).state) {
@@ -343,21 +371,73 @@ sensor:
     accuracy_decimals: 2
     update_interval: 10s
     lambda: |-
-      // Hold the last valid HA aggregate briefly through HA reload gaps.
+      // Hold the last valid selected aggregate briefly through source reload gaps.
       const uint32_t hold_ms = (uint32_t)(${oq_selected_input_stale_hold_s}UL * 1000UL);
       const uint32_t now_ms = (uint32_t) millis();
+      std::string source = "Auto";
+      if (id(cooling_dew_point_source).has_state()) {
+        source = id(cooling_dew_point_source).current_option();
+      }
+      const int source_mode_code = source == "MQTT" ? 2 : (source == "Home Assistant" ? 1 : 3);
 
-      if (id(cooling_dew_point_valid_ha).has_state() && id(cooling_dew_point_valid_ha).state &&
-          id(cooling_dew_point_ha).has_state() && !isnan(id(cooling_dew_point_ha).state)) {
-        id(oq_cooling_dew_point_selected_last_valid_c) = id(cooling_dew_point_ha).state;
+      const bool ha_valid =
+          id(cooling_dew_point_valid_ha).has_state() && id(cooling_dew_point_valid_ha).state &&
+          id(cooling_dew_point_ha).has_state() && !isnan(id(cooling_dew_point_ha).state);
+      const bool mqtt_valid =
+          id(mqtt_cooling_dew_point_valid).has_state() && id(mqtt_cooling_dew_point_valid).state &&
+          id(mqtt_cooling_dew_point).has_state() && !isnan(id(mqtt_cooling_dew_point).state);
+
+      bool selected_valid = false;
+      float selected_c = NAN;
+      int selected_route_code = 0;
+      if (source == "MQTT") {
+        if (mqtt_valid) {
+          selected_valid = true;
+          selected_c = id(mqtt_cooling_dew_point).state;
+          selected_route_code = 2;
+        }
+      } else if (source == "Home Assistant") {
+        if (ha_valid) {
+          selected_valid = true;
+          selected_c = id(cooling_dew_point_ha).state;
+          selected_route_code = 1;
+        }
+      } else {
+        if (ha_valid && mqtt_valid) {
+          selected_valid = true;
+          if (id(cooling_dew_point_ha).state > id(mqtt_cooling_dew_point).state) {
+            selected_c = id(cooling_dew_point_ha).state;
+            selected_route_code = 1;
+          } else {
+            selected_c = id(mqtt_cooling_dew_point).state;
+            selected_route_code = 2;
+          }
+        } else if (ha_valid) {
+          selected_valid = true;
+          selected_c = id(cooling_dew_point_ha).state;
+          selected_route_code = 1;
+        } else if (mqtt_valid) {
+          selected_valid = true;
+          selected_c = id(mqtt_cooling_dew_point).state;
+          selected_route_code = 2;
+        }
+      }
+
+      if (selected_valid && !isnan(selected_c)) {
+        id(oq_cooling_dew_point_selected_last_valid_c) = selected_c;
         id(oq_cooling_dew_point_selected_last_valid_ms) = now_ms;
+        id(oq_cooling_dew_point_selected_last_mode_code) = source_mode_code;
+        id(oq_cooling_dew_point_selected_last_route_code) = selected_route_code;
         id(oq_cooling_dew_point_selected_hold_active) = false;
-        return id(cooling_dew_point_ha).state;
+        return selected_c;
       }
 
       id(oq_cooling_dew_point_selected_hold_active) = false;
+      const bool selected_hold_allowed = id(oq_cooling_dew_point_selected_last_route_code) != 2;
       if (hold_ms > 0 &&
+          selected_hold_allowed &&
           id(oq_cooling_dew_point_selected_last_valid_ms) > 0 &&
+          id(oq_cooling_dew_point_selected_last_mode_code) == source_mode_code &&
           (uint32_t)(now_ms - id(oq_cooling_dew_point_selected_last_valid_ms)) < hold_ms &&
           !isnan(id(oq_cooling_dew_point_selected_last_valid_c))) {
         id(oq_cooling_dew_point_selected_hold_active) = true;

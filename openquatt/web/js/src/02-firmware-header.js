@@ -1731,6 +1731,262 @@
     `;
   }
 
+  function getMqttStatusLabel() {
+    const status = state.mqttStatus;
+    if (!status) {
+      return "Laden...";
+    }
+    if (status.enabled && status.connected) {
+      return "Verbonden";
+    }
+    if (status.enabled) {
+      return "Ingeschakeld";
+    }
+    if (status.broker) {
+      return "Uit";
+    }
+    return "Niet ingesteld";
+  }
+
+  function getMqttStatusDetail() {
+    const status = state.mqttStatus;
+    if (!status) {
+      return "MQTT-status wordt geladen.";
+    }
+    const broker = String(status.broker || "").trim();
+    const port = Number(status.port || 1883);
+    const endpoint = broker ? `${broker}:${port}` : "geen broker";
+    if (status.enabled && status.connected) {
+      return `Verbonden met ${endpoint}.`;
+    }
+    if (status.enabled) {
+      return broker
+        ? `MQTT staat aan; verbinding met ${endpoint} is nog niet bevestigd.`
+        : "MQTT staat aan, maar er is nog geen broker ingesteld.";
+    }
+    if (broker) {
+      return `Broker ${endpoint} is opgeslagen, maar MQTT inputbronnen staan uit.`;
+    }
+    return "MQTT inputbronnen staan uit. Stel een broker in om externe bronwaarden te ontvangen.";
+  }
+
+  function formatMqttDewPointValue() {
+    const value = getEntityNumericValue("mqttCoolingDewPoint");
+    if (!Number.isFinite(value)) {
+      return "Geen meting";
+    }
+    return `${value.toFixed(2)} °C`;
+  }
+
+  function formatMqttDewPointAge() {
+    const age = getEntityNumericValue("mqttCoolingDewPointAge");
+    if (!Number.isFinite(age)) {
+      return "—";
+    }
+    if (age < 60) {
+      return `${Math.round(age)} s`;
+    }
+    if (age < 3600) {
+      return `${Math.round(age / 60)} min`;
+    }
+    return `${Math.round(age / 3600)} u`;
+  }
+
+  function getMqttDewPointValidityLabel() {
+    if (!hasEntity("mqttCoolingDewPointValid")) {
+      return "Nog geen status";
+    }
+    return isEntityActive("mqttCoolingDewPointValid") ? "Geldig" : "Ontbreekt of verouderd";
+  }
+
+  function getMqttInputTopic(key) {
+    const topics = state.mqttStatus?.input_topics;
+    if (topics && typeof topics === "object") {
+      const value = String(topics[key] || "").trim();
+      if (value) {
+        return value;
+      }
+    }
+    if (key === "cooling_dew_point") {
+      return String(state.mqttStatus?.dew_point_topic || "").trim();
+    }
+    return "";
+  }
+
+  function renderMqttModal() {
+    const status = state.mqttStatus || {};
+    const enabled = Boolean(state.mqttDraftEnabled);
+    const clearPassword = Boolean(state.mqttDraftClearPassword);
+    const passwordPlaceholder = status.password_set
+      ? "Leeg laten om huidig wachtwoord te behouden"
+      : "Optioneel";
+    const noticeMarkup = state.mqttNotice
+      ? `<div class="oq-helper-modal-success oq-helper-modal-success--compact" aria-live="polite"><strong>Status</strong><span>${escapeHtml(state.mqttNotice)}</span></div>`
+      : "";
+    const errorMarkup = state.mqttError
+      ? `<div class="oq-helper-modal-note oq-helper-modal-note--error" aria-live="assertive">${escapeHtml(state.mqttError)}</div>`
+      : "";
+
+    return `
+      <div class="oq-helper-modal-backdrop${state.overviewTheme === "dark" ? " oq-helper-modal-backdrop--dark" : ""}" data-oq-modal="system">
+        <section class="oq-helper-modal" role="dialog" aria-modal="true" aria-labelledby="oq-mqtt-modal-title">
+          <div class="oq-helper-modal-head">
+            <div>
+              <p class="oq-helper-modal-kicker">Integratie</p>
+              <h2 class="oq-helper-modal-title" id="oq-mqtt-modal-title">MQTT brokerconfiguratie</h2>
+            </div>
+            <button class="oq-helper-modal-close" type="button" data-oq-action="close-system-modal" aria-label="Sluit MQTT brokerconfiguratie">×</button>
+          </div>
+          <p class="oq-helper-modal-copy">Stel de broker in waarop OpenQuatt MQTT-inputs beluistert.</p>
+          ${noticeMarkup}
+          ${errorMarkup}
+          <div class="oq-settings-mqtt-form-grid">
+            <label class="oq-settings-mqtt-toggle">
+              <input
+                type="checkbox"
+                data-oq-mqtt-field="enabled"
+                ${enabled ? "checked" : ""}
+                ${state.mqttBusy ? "disabled" : ""}
+              >
+              <span>MQTT inputbronnen inschakelen</span>
+            </label>
+            <label class="oq-helper-modal-auth-field oq-settings-mqtt-field">
+              <span>Broker</span>
+              <input
+                class="oq-helper-input"
+                type="text"
+                data-oq-mqtt-field="broker"
+                value="${escapeHtml(state.mqttDraftBroker)}"
+                placeholder="mqtt.local"
+                autocomplete="off"
+                ${state.mqttBusy ? "disabled" : ""}
+              >
+            </label>
+            <label class="oq-helper-modal-auth-field oq-settings-mqtt-field oq-settings-mqtt-field--port">
+              <span>Poort</span>
+              <input
+                class="oq-helper-input"
+                type="number"
+                min="1"
+                max="65535"
+                step="1"
+                inputmode="numeric"
+                data-oq-mqtt-field="port"
+                value="${escapeHtml(state.mqttDraftPort)}"
+                ${state.mqttBusy ? "disabled" : ""}
+              >
+            </label>
+            <label class="oq-helper-modal-auth-field oq-settings-mqtt-field">
+              <span>Gebruikersnaam</span>
+              <input
+                class="oq-helper-input"
+                type="text"
+                data-oq-mqtt-field="username"
+                value="${escapeHtml(state.mqttDraftUsername)}"
+                autocomplete="username"
+                ${state.mqttBusy ? "disabled" : ""}
+              >
+            </label>
+            <label class="oq-helper-modal-auth-field oq-settings-mqtt-field">
+              <span>Wachtwoord</span>
+              <input
+                class="oq-helper-input"
+                type="password"
+                data-oq-mqtt-field="password"
+                value="${escapeHtml(state.mqttDraftPassword)}"
+                placeholder="${escapeHtml(passwordPlaceholder)}"
+                autocomplete="current-password"
+                ${state.mqttBusy || clearPassword ? "disabled" : ""}
+              >
+            </label>
+            ${status.password_set ? `
+              <label class="oq-settings-mqtt-toggle">
+                <input
+                  type="checkbox"
+                  data-oq-mqtt-field="clear-password"
+                  ${clearPassword ? "checked" : ""}
+                  ${state.mqttBusy ? "disabled" : ""}
+                >
+                <span>Opgeslagen wachtwoord wissen</span>
+              </label>
+            ` : ""}
+          </div>
+          <div class="oq-helper-modal-actions">
+            <button class="oq-helper-button oq-helper-button--ghost" type="button" data-oq-action="close-system-modal" ${state.mqttBusy ? "disabled" : ""}>Gereed</button>
+            <button class="oq-helper-button oq-helper-button--primary" type="button" data-oq-action="save-mqtt-config" ${state.mqttBusy || !status.csrf_token ? "disabled" : ""}>
+              ${state.mqttBusy ? "Opslaan..." : "Opslaan"}
+            </button>
+          </div>
+        </section>
+      </div>
+    `;
+  }
+
+  function renderMqttSensorsModal() {
+    const topic = getMqttInputTopic("cooling_dew_point");
+    const topicDisplay = topic || "Wordt geladen...";
+    const value = formatMqttDewPointValue();
+    const age = formatMqttDewPointAge();
+    const valid = isEntityActive("mqttCoolingDewPointValid");
+    const validityLabel = getMqttDewPointValidityLabel();
+    const statusLabel = validityLabel;
+    const statusTitle = valid
+      ? `Laatste MQTT-publicatie ${age === "—" ? "onbekend" : `${age} geleden`}. Zonder nieuwe MQTT-publicatie wordt de waarde na 15 minuten ongeldig.`
+      : age === "—"
+        ? "Nog geen geldige MQTT-publicatie ontvangen."
+        : `Laatste MQTT-publicatie ${age} geleden; de waarde is niet meer geldig.`;
+    const noticeMarkup = state.mqttNotice
+      ? `<div class="oq-helper-modal-success oq-helper-modal-success--compact oq-settings-mqtt-sensor-notice" aria-live="polite"><strong>Status</strong><span>${escapeHtml(state.mqttNotice)}</span></div>`
+      : "";
+    const errorMarkup = state.mqttError
+      ? `<div class="oq-helper-modal-note oq-helper-modal-note--error" aria-live="assertive">${escapeHtml(state.mqttError)}</div>`
+      : "";
+
+    return `
+      <div class="oq-helper-modal-backdrop${state.overviewTheme === "dark" ? " oq-helper-modal-backdrop--dark" : ""}" data-oq-modal="system">
+        <section class="oq-helper-modal" role="dialog" aria-modal="true" aria-labelledby="oq-mqtt-sensors-modal-title">
+          <div class="oq-helper-modal-head">
+            <div>
+              <p class="oq-helper-modal-kicker">Integratie</p>
+              <h2 class="oq-helper-modal-title" id="oq-mqtt-sensors-modal-title">MQTT sensoren</h2>
+            </div>
+            <button class="oq-helper-modal-close" type="button" data-oq-action="close-system-modal" aria-label="Sluit MQTT sensoren">×</button>
+          </div>
+          ${noticeMarkup}
+          ${errorMarkup}
+          <div class="oq-settings-mqtt-sensor-detail">
+            <div class="oq-settings-mqtt-sensor-head">
+              <div>
+                <p class="oq-settings-quickstart-status-label">Dauwpunt</p>
+                <strong>${escapeHtml(value)}</strong>
+              </div>
+              <em
+                class="oq-settings-source-status oq-settings-source-status--${valid ? "valid" : "invalid"}"
+                title="${escapeHtml(statusTitle)}"
+                aria-label="${escapeHtml(statusTitle)}"
+              >${escapeHtml(statusLabel)}</em>
+            </div>
+            <div class="oq-settings-mqtt-sensor-topic">
+              <span>Subscribe-topic</span>
+              <code>${escapeHtml(topicDisplay)}</code>
+            </div>
+            <div class="oq-helper-modal-actions oq-helper-modal-actions--compact">
+              <button
+                class="oq-helper-button oq-helper-button--ghost"
+                type="button"
+                data-oq-action="copy-mqtt-dew-topic"
+                ${!topic ? "disabled" : ""}
+              >
+                Kopieer topic
+              </button>
+              <button class="oq-helper-button oq-helper-button--primary" type="button" data-oq-action="close-system-modal">Gereed</button>
+            </div>
+          </div>
+        </section>
+      </div>
+    `;
+  }
+
   function getConnectivityModalRows() {
     const rows = [
       ["Netwerkstatus", getConnectivityStatus()],
@@ -2272,6 +2528,14 @@
 
     if (state.systemModal === "api-security") {
       return renderApiSecurityModal();
+    }
+
+    if (state.systemModal === "mqtt") {
+      return renderMqttModal();
+    }
+
+    if (state.systemModal === "mqtt-sensors") {
+      return renderMqttSensorsModal();
     }
 
     if (state.systemModal === "connectivity") {

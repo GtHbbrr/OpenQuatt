@@ -822,7 +822,6 @@ sensor:
   - platform: debug
     free:
       name: "Heap Free"
-      internal: true
       icon: mdi:memory
       entity_category: diagnostic
       disabled_by_default: true

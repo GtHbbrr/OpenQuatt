@@ -1,0 +1,63 @@
+# ==============================================================================
+# OpenQuatt - MQTT Ingress
+# ==============================================================================
+#
+# Goal:
+#   Accept optional external input values over MQTT.
+#
+# Scope:
+#   - Uses a small OpenQuatt-specific ESP-IDF MQTT client, not ESPHome's global
+#     MQTT component.
+#   - No MQTT discovery, entity export, logging, telemetry snapshots or publish
+#     profiles are generated.
+#   - Subscribe topics are fixed by substitution and shown read-only in the web
+#     app through /mqtt/status.
+#   - Current input: cooling dew point. Future inputs should follow the same
+#     openquatt/${device_name}/input/... topic convention.
+#
+# ==============================================================================
+
+openquatt_mqtt_config:
+  id: oq_mqtt_config
+  bootstrap_broker: "${mqtt_bootstrap_broker}"
+  bootstrap_port: ${mqtt_bootstrap_port}
+  bootstrap_username: "${mqtt_bootstrap_username}"
+  bootstrap_password: "${mqtt_bootstrap_password}"
+  dew_point_topic: "${mqtt_cooling_dew_point_topic}"
+  dew_point_stale: ${mqtt_cooling_dew_point_stale_s}s
+  dew_point_sensor: mqtt_cooling_dew_point
+  dew_point_age_sensor: mqtt_cooling_dew_point_age
+  dew_point_valid_binary_sensor: mqtt_cooling_dew_point_valid
+  default_enabled: ${mqtt_default_enabled}
+
+sensor:
+  - platform: template
+    id: mqtt_cooling_dew_point
+    name: "MQTT Cooling Dew Point"
+    icon: mdi:water-thermometer
+    unit_of_measurement: "°C"
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 2
+    update_interval: never
+    web_server:
+      sorting_group_id: oq_ha_inputs
+
+  - platform: template
+    id: mqtt_cooling_dew_point_age
+    name: "MQTT Cooling Dew Point Age"
+    icon: mdi:timer-outline
+    unit_of_measurement: "s"
+    accuracy_decimals: 0
+    update_interval: never
+    web_server:
+      sorting_group_id: oq_ha_inputs
+
+binary_sensor:
+  - platform: template
+    id: mqtt_cooling_dew_point_valid
+    name: "MQTT Cooling Dew Point Valid"
+    icon: mdi:water-check
+    device_class: connectivity
+    web_server:
+      sorting_group_id: oq_ha_inputs

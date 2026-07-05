@@ -42,6 +42,13 @@ oq_webserver_js_url: ""                               # Custom OpenQuatt app is 
 web_auth_bootstrap_username: "admin"                  # Bootstrap username used to keep web auth support compiled in.
 web_auth_bootstrap_password: "openquatt"              # Bootstrap password used to keep web auth support compiled in.
 web_auth_default_enabled: false                       # Web auth is opt-in by default for new installs.
+mqtt_bootstrap_broker: ""                             # Bootstrap MQTT broker kept empty until the web app stores one.
+mqtt_bootstrap_port: "1883"                           # Default MQTT broker port used for runtime storage.
+mqtt_bootstrap_username: ""                           # Bootstrap MQTT username.
+mqtt_bootstrap_password: ""                           # Bootstrap MQTT password.
+mqtt_default_enabled: false                           # MQTT starts disabled until the user enables it explicitly.
+mqtt_cooling_dew_point_topic: "openquatt/${device_name}/input/cooling/dew_point" # Fixed MQTT input topic for external cooling dew point [degC].
+mqtt_cooling_dew_point_stale_s: "900"                 # Maximum age for the last valid MQTT dew point before it becomes invalid [s].
 
 # ----------------------------
 # HARDWARE

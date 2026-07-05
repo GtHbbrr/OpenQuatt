@@ -92,6 +92,20 @@
       source: "bootstrap-disabled",
       csrfToken: "",
     },
+    mqtt: {
+      enabled: true,
+      connected: true,
+      broker: "mqtt.local",
+      port: 1883,
+      username: "openquatt",
+      passwordSet: true,
+      source: "runtime-enabled",
+      csrfToken: "",
+      inputTopics: {
+        cooling_dew_point: "openquatt/openquatt/input/cooling/dew_point",
+      },
+      lastDewPointAt: Date.now() - 42000,
+    },
     trendFlashWrites: 437,
     trendFlashStoredKiB: 182.5,
     trendFlashOldestAt: Date.now() - Math.round(18.4 * 24 * 60 * 60 * 1000),
@@ -547,6 +561,10 @@
     state.apiSecurity.csrfToken = generateAuthToken();
   }
 
+  function refreshMqttToken() {
+    state.mqtt.csrfToken = generateAuthToken();
+  }
+
   function getAuthStatusPayload() {
     return {
       enabled: Boolean(state.auth.enabled),
@@ -575,6 +593,53 @@
 
   function parseBulkEntityFormBody(init) {
     return parseAuthFormBody(init);
+  }
+
+  function getMqttDewPointAgeSeconds() {
+    const lastAt = Number(state.mqtt.lastDewPointAt || 0);
+    if (!lastAt) {
+      return NaN;
+    }
+    return Math.max(0, Math.round((Date.now() - lastAt) / 1000));
+  }
+
+  function syncMqttDewPointAgeEntity() {
+    setNumber("MQTT Cooling Dew Point Age", getMqttDewPointAgeSeconds(), "s");
+  }
+
+  function applyCoolingDewPointSourceSelection() {
+    const source = String(getEntity("select", "Cooling Dew Point Source")?.value || "Auto");
+    const ha = Number(getEntity("sensor", "HA - Cooling Dew Point")?.value);
+    const mqtt = Number(getEntity("sensor", "MQTT Cooling Dew Point")?.value);
+    const haValid = Boolean(getEntity("binary_sensor", "HA - Cooling Dew Point Valid")?.value);
+    const mqttValid = Boolean(getEntity("binary_sensor", "MQTT Cooling Dew Point Valid")?.value);
+    let selected = NaN;
+    let guardMode = "Geen geldig dauwpunt";
+
+    if (source === "Home Assistant") {
+      if (haValid && Number.isFinite(ha)) {
+        selected = ha;
+        guardMode = "Dew point (HA)";
+      }
+    } else if (source === "MQTT") {
+      if (mqttValid && Number.isFinite(mqtt)) {
+        selected = mqtt;
+        guardMode = "Dew point (MQTT)";
+      }
+    } else if (haValid && mqttValid && Number.isFinite(ha) && Number.isFinite(mqtt)) {
+      selected = Math.max(ha, mqtt);
+      guardMode = selected === mqtt ? "Dew point (MQTT)" : "Dew point (HA)";
+    } else if (haValid && Number.isFinite(ha)) {
+      selected = ha;
+      guardMode = "Dew point (HA)";
+    } else if (mqttValid && Number.isFinite(mqtt)) {
+      selected = mqtt;
+      guardMode = "Dew point (MQTT)";
+    }
+
+    setNumber("Cooling Dew Point (Selected)", selected, "°C");
+    setText("text_sensor", "Cooling Guard Mode", guardMode);
+    syncMqttDewPointAgeEntity();
   }
 
   const SERVICE_STATUS_ENTITY_MAP = {
@@ -801,6 +866,70 @@
     return makeAuthResponse(200, {
       ok: true,
       status: getApiSecurityStatusPayload(),
+    });
+  }
+
+  function getMqttStatusPayload() {
+    const broker = String(state.mqtt.broker || "").trim();
+    const port = Number(state.mqtt.port || 1883);
+    const inputTopics = {
+      cooling_dew_point: String(state.mqtt.inputTopics?.cooling_dew_point || ""),
+    };
+    return {
+      enabled: Boolean(state.mqtt.enabled),
+      connected: Boolean(state.mqtt.enabled && state.mqtt.connected && broker),
+      broker,
+      port: Number.isInteger(port) && port >= 1 && port <= 65535 ? port : 1883,
+      username: String(state.mqtt.username || ""),
+      password_set: Boolean(state.mqtt.passwordSet),
+      dew_point_topic: inputTopics.cooling_dew_point,
+      input_topics: inputTopics,
+      source: String(state.mqtt.source || ""),
+      csrf_token: String(state.mqtt.csrfToken || ""),
+    };
+  }
+
+  function handleMqttStatus() {
+    return makeAuthResponse(200, getMqttStatusPayload());
+  }
+
+  function handleMqttSave(init) {
+    const params = parseAuthFormBody(init);
+    const status = getMqttStatusPayload();
+    if (params.get("csrf_token") !== status.csrf_token) {
+      return makeAuthResponse(403, { ok: false, error: "forbidden" });
+    }
+
+    const enabled = String(params.get("enabled") || "") === "true";
+    const broker = String(params.get("broker") || "").trim();
+    const rawPort = Number(String(params.get("port") || "").trim());
+    const username = String(params.get("username") || "").trim();
+    const password = String(params.get("password") || "");
+    const clearPassword = String(params.get("clear_password") || "") === "true";
+
+    if (!Number.isInteger(rawPort) || rawPort < 1 || rawPort > 65535) {
+      return makeAuthResponse(400, { ok: false, error: "invalid_port" });
+    }
+    if (enabled && !broker) {
+      return makeAuthResponse(400, { ok: false, error: "missing_broker" });
+    }
+
+    state.mqtt.enabled = enabled;
+    state.mqtt.connected = enabled && Boolean(broker);
+    state.mqtt.broker = broker;
+    state.mqtt.port = rawPort;
+    state.mqtt.username = username;
+    if (clearPassword) {
+      state.mqtt.passwordSet = false;
+    } else if (password) {
+      state.mqtt.passwordSet = true;
+    }
+    state.mqtt.source = enabled ? "runtime-enabled" : "runtime-disabled";
+    refreshMqttToken();
+
+    return makeAuthResponse(200, {
+      ok: true,
+      status: getMqttStatusPayload(),
     });
   }
 
@@ -1117,6 +1246,11 @@
         "Allow without dew point, user responsibility",
       ],
     });
+    setEntity("select", "Cooling Dew Point Source", {
+      value: "Auto",
+      state: "Auto",
+      option: ["Auto", "Home Assistant", "MQTT"],
+    });
     setEntity("select", "Water Supply Source", {
       value: "Local",
       state: "Local",
@@ -1301,6 +1435,7 @@
       ["HA - Water Supply Temperature", 28.9, "\u00B0C"],
       ["HA - Thermostat Setpoint", 20.0, "\u00B0C"],
       ["HA - Thermostat Room Temperature", 21.2, "\u00B0C"],
+      ["HA - Cooling Dew Point", 15.9, "°C"],
       ["Room Temperature (Selected)", 20.6, "°C"],
       ["Room Setpoint (Selected)", 21.0, "°C"],
       ["Water Supply Temp (Selected)", 29.5, "°C"],
@@ -1308,6 +1443,8 @@
       ["Heating Curve Supply Target", 33.0, "°C"],
       ["Power House – P_house", 2500, "W"],
       ["Power House – P_req", 2800, "W"],
+      ["MQTT Cooling Dew Point", 16.2, "°C"],
+      ["MQTT Cooling Dew Point Age", getMqttDewPointAgeSeconds(), "s"],
       ["Cooling Dew Point (Selected)", 16.1, "°C"],
       ["Cooling Minimum Safe Supply Temp", 18.1, "°C"],
       ["Cooling Effective Minimum Supply Temp", 18.1, "°C"],
@@ -1394,10 +1531,12 @@
       ["HA - Water Supply Temperature Valid", true],
       ["HA - Room Setpoint Valid", true],
       ["HA - Room Temperature Valid", true],
+      ["HA - Cooling Dew Point Valid", true],
       ["HA - Heating Enable", false],
       ["HA - Heating Enable Valid", true],
       ["HA - Cooling Enable", false],
       ["HA - Cooling Enable Valid", true],
+      ["MQTT Cooling Dew Point Valid", true],
       ["CIC - Data stale", false],
       ["OT - Link Problem", false],
       ["HP1 - Defrost", false],
@@ -1407,6 +1546,8 @@
     ].forEach(([name, value]) => {
       setEntity("binary_sensor", name, { value });
     });
+
+    applyCoolingDewPointSourceSelection();
 
     seedOduRuntimeFrequencyEntities("HP1");
     seedHp2Entities();
@@ -2021,6 +2162,7 @@
     const waveInt = (base, amp, offset = 0) => Math.round(base + Math.sin(t + offset) * amp);
     const single = state.installation === "single";
 
+    syncMqttDewPointAgeEntity();
     setBinary("Silent active", false);
     setBinary("Sticky pump active", false);
     setBinary("HP1 - Defrost", false);
@@ -2287,8 +2429,11 @@
       setBinary("Cooling Request Active", true);
       setBinary("Cooling Permitted", true);
       setText("text_sensor", "Cooling Block Reason", "Ready");
-      setText("text_sensor", "Cooling Guard Mode", "Dew point");
-      setNumber("Cooling Dew Point (Selected)", wave(16.0, 0.15), "°C");
+      setNumber("HA - Cooling Dew Point", wave(15.9, 0.12, 0.2), "°C");
+      setBinary("HA - Cooling Dew Point Valid", true);
+      setNumber("MQTT Cooling Dew Point", wave(16.2, 0.12), "°C");
+      setBinary("MQTT Cooling Dew Point Valid", true);
+      applyCoolingDewPointSourceSelection();
       setNumber("Cooling Minimum Safe Supply Temp", wave(18.0, 0.15), "°C");
       setNumber("Cooling Effective Minimum Supply Temp", wave(18.0, 0.15), "°C");
       setNumber("Cooling Fallback Night Minimum Outdoor Temp", wave(15.4, 0.1), "°C");
@@ -2573,6 +2718,9 @@
       }
     }
     applyScenario(state.scenario);
+    if (name === "Cooling Dew Point Source") {
+      applyCoolingDewPointSourceSelection();
+    }
     updateSummary();
     notifyMockUpdated();
   }
@@ -3703,6 +3851,12 @@
       if (url.pathname === "/api-security/disable" && String(init?.method || "GET").toUpperCase() === "POST") {
         return handleApiSecurityDisable(init || {});
       }
+      if (url.pathname === "/mqtt/status" && method === "GET") {
+        return handleMqttStatus();
+      }
+      if (url.pathname === "/mqtt/save" && method === "POST") {
+        return handleMqttSave(init || {});
+      }
       if (url.pathname.endsWith("/openquatt/logs/recent") && String(init?.method || "GET").toUpperCase() === "GET") {
         return mockResponse(200, {
           enabled: Boolean(state.logHistoryEnabled),
@@ -3979,6 +4133,7 @@
   seedEntities();
   refreshAuthToken();
   refreshApiSecurityToken();
+  refreshMqttToken();
   setInstallationMode(state.installation);
   applyScenario(state.scenario);
   updateSummary();

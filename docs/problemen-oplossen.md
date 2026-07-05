@@ -138,6 +138,16 @@ Gebruik je dauwpuntbronnen uit Home Assistant, controleer dan ook:
 
 Zie [Dashboard installeren](dashboard/README.md#optioneel-dynamische-koelbronnen-via-home-assistant) voor de dynamische koelbronnen in Home Assistant.
 
+Gebruik je MQTT voor het dauwpunt, controleer dan ook:
+
+- staan MQTT inputbronnen aan in de web-app;
+- is de broker verbonden;
+- publiceer je op het topic dat de web-app bij **MQTT sensoren** toont;
+- is de payload een geldige Celsius-waarde, zoals `15.6` of `{"value":15.6}`;
+- komt er minstens elke 15 minuten een nieuwe waarde binnen.
+
+Zie [MQTT inputbronnen](mqtt.md) voor topic en payload.
+
 ## Wanneer niets veranderen?
 
 Verander bij voorkeur niets als:
