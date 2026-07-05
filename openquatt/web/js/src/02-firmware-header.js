@@ -1593,22 +1593,39 @@
     if (!status) {
       return "We halen de huidige API-beveiliging op.";
     }
-    if (status.pending_restart) {
+    const restartPending = Boolean(status.pending_restart
+      || (typeof status.enabled === "boolean"
+        && typeof status.transport_active === "boolean"
+        && status.enabled !== status.transport_active));
+    if (restartPending) {
+      if (status.enabled === true && status.transport_active === false) {
+        return "API-encryptie wordt ingeschakeld na herstart. Kopieer de sleutel nu alvast voor Home Assistant.";
+      }
+      if (status.enabled === false && status.transport_active === true) {
+        return "API-encryptie wordt uitgeschakeld na herstart. Tot die tijd blijft de native API nog beveiligd.";
+      }
       return "Deze wijziging wordt actief na herstart. Je kunt de sleutel hier bekijken, kopiëren of vernieuwen.";
     }
     if (status.transport_active === true) {
       return "De native API is beveiligd. Je kunt de sleutel hier bekijken, kopiëren of vernieuwen.";
     }
-    if (status.key) {
-      return "De sleutel blijft opgeslagen, ook wanneer encryptie uit staat. Je kunt hem hier meteen kopiëren of opnieuw inschakelen.";
-    }
-    return "Er is nog geen API-sleutel opgeslagen. Deze wijziging wordt actief na herstart.";
+    return "API-encryptie staat uit. Schakel in om een sleutel te bekijken, kopiëren of vernieuwen.";
   }
 
   function getApiSecurityToggleLabel() {
     const status = state.apiSecurityStatus;
     if (!status) {
       return "Laden...";
+    }
+    const restartPending = Boolean(status.pending_restart
+      || (typeof status.enabled === "boolean"
+        && typeof status.transport_active === "boolean"
+        && status.enabled !== status.transport_active));
+    if (restartPending && status.enabled === true && status.transport_active === false) {
+      return "Annuleer inschakelen";
+    }
+    if (restartPending && status.enabled === false && status.transport_active === true) {
+      return "Annuleer uitschakelen";
     }
     return status.enabled ? "Uitschakelen" : "Inschakelen";
   }
@@ -1640,7 +1657,11 @@
     const status = state.apiSecurityStatus || {};
     const enabled = status.enabled === true;
     const hasKey = Boolean(status.key);
-    const restartPending = Boolean(status.pending_restart);
+    const restartPending = Boolean(status.pending_restart
+      || (typeof status.enabled === "boolean"
+        && typeof status.transport_active === "boolean"
+        && status.enabled !== status.transport_active));
+    const showKeySection = hasKey || status.transport_active === true || restartPending;
     const modalNotice = state.apiSecurityNotice;
     const errorMarkup = state.apiSecurityError
       ? `<div class="oq-helper-modal-note oq-helper-modal-note--error" aria-live="assertive">${escapeHtml(state.apiSecurityError)}</div>`
@@ -1675,6 +1696,7 @@
                 ${escapeHtml(getApiSecurityToggleLabel())}
               </button>
             </div>
+            ${showKeySection ? `
             <div class="oq-settings-api-security-key">
               <div class="oq-settings-field-head">
                 <h3>API-sleutel</h3>
@@ -1686,7 +1708,7 @@
                 : (status.transport_active
                     ? "Gebruik deze sleutel in Home Assistant voor de ESPHome-integratie."
                     : status.key
-                      ? "De sleutel blijft opgeslagen, maar de native API staat nu open op je lokale netwerk."
+                      ? "Bewaar deze sleutel voor later gebruik of kopieer hem nu."
                       : "Er is nog geen API-sleutel opgeslagen."))}</p>
               ${hasKey ? `<div class="oq-settings-api-security-key-row"><div class="oq-settings-api-security-key-value">${escapeHtml(status.key)}</div></div>` : ""}
               ${hasKey
@@ -1712,6 +1734,7 @@
                 `
                 : ""}
             </div>
+            ` : ""}
           </div>
           <div class="oq-helper-modal-actions">
             ${restartPending ? `

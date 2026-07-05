@@ -4848,7 +4848,11 @@
     if (!status) {
       return "Laden...";
     }
-    if (status.pending_restart) {
+    const restartPending = Boolean(status.pending_restart
+      || (typeof status.enabled === "boolean"
+        && typeof status.transport_active === "boolean"
+        && status.enabled !== status.transport_active));
+    if (restartPending) {
       return "Herstart nodig";
     }
     if (status.transport_active === true) {
@@ -4865,7 +4869,11 @@
     if (!status) {
       return "API-encryptie wordt geladen.";
     }
-    if (status.pending_restart) {
+    const restartPending = Boolean(status.pending_restart
+      || (typeof status.enabled === "boolean"
+        && typeof status.transport_active === "boolean"
+        && status.enabled !== status.transport_active));
+    if (restartPending) {
       if (status.enabled === true && status.transport_active === false) {
         return "API-encryptie wordt ingeschakeld na herstart. Kopieer de sleutel nu voor Home Assistant.";
       }
@@ -4879,10 +4887,7 @@
     if (status.transport_active === true) {
       return "API-encryptie staat aan. Gebruik dezelfde sleutel in Home Assistant.";
     }
-    if (status.key) {
-      return "De sleutel blijft opgeslagen, maar de native API staat nu open op je lokale netwerk.";
-    }
-    return "Er is nog geen API-sleutel opgeslagen.";
+    return "De native API staat nu open op je lokale netwerk.";
   }
 
   function getApiSecurityActionLabel() {
@@ -5214,7 +5219,7 @@
   }
 
   function renderSettingsCoolingSection() {
-    const roomRequestRequired = !hasEntity("coolingRoomRequestRequired") || Boolean(getEntityValue("coolingRoomRequestRequired"));
+    const roomRequestRequired = !hasEntity("coolingRoomRequestRequired") || isEntityActive("coolingRoomRequestRequired");
     const tuningFields = [
       renderSettingsNumberField("coolingMinimumSupplyTemp", "Minimale koel-aanvoer", "Ondergrens voor het koeldoel. OpenQuatt gebruikt de hoogste waarde van deze instelling en de dauwpuntveilige grens."),
       renderSettingsSliderField("coolingDemandMax", "Maximale koelsterkte", "Bepaalt hoe krachtig OpenQuatt mag koelen. Lager geeft langere, rustigere runs; hoger geeft meer koelvermogen bij warm weer.", "", {

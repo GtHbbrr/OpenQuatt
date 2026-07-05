@@ -242,14 +242,20 @@ class OpenQuattWebAuthRequestHandler : public AsyncWebHandler {
     }
 
     if (url == "/api-security/status" && request->method() == HTTP_GET) {
-      const std::string key = json_escape_string_(this->parent_->get_api_security_key());
+      const bool enabled = this->parent_->is_api_security_enabled();
+      const bool transport_active = this->parent_->is_api_security_transport_active();
+      const bool pending_restart = this->parent_->is_api_security_restart_pending();
+      const bool key_present = this->parent_->has_api_security_key();
+      const bool expose_key = key_present && (enabled || transport_active || pending_restart);
+      const std::string key = expose_key ? json_escape_string_(this->parent_->get_api_security_key()) : "";
       const std::string source = json_escape_string_(this->parent_->get_api_security_source());
       const std::string csrf_token = json_escape_string_(this->parent_->get_csrf_token());
       auto *stream = request->beginResponseStream("application/json");
-      stream->printf(R"({"enabled":%s,"transport_active":%s,"pending_restart":%s,"key":"%s","source":"%s","csrf_token":"%s"})",
-                     this->parent_->is_api_security_enabled() ? "true" : "false",
-                     this->parent_->is_api_security_transport_active() ? "true" : "false",
-                     this->parent_->is_api_security_restart_pending() ? "true" : "false",
+      stream->printf(R"({"enabled":%s,"transport_active":%s,"pending_restart":%s,"key_present":%s,"key":"%s","source":"%s","csrf_token":"%s"})",
+                     enabled ? "true" : "false",
+                     transport_active ? "true" : "false",
+                     pending_restart ? "true" : "false",
+                     key_present ? "true" : "false",
                      key.c_str(),
                      source.c_str(),
                      csrf_token.c_str());
@@ -365,8 +371,16 @@ void OpenQuattWebAuth::loop() {
   }
 #ifdef USE_API_NOISE
   if (api::global_api_server != nullptr) {
-    this->api_security_transport_active_ = api::global_api_server->get_noise_ctx().has_psk();
-    if (!this->api_security_restart_pending_ && this->api_security_enabled_ == this->api_security_transport_active_) {
+    const bool transport_active = api::global_api_server->get_noise_ctx().has_psk();
+    this->api_security_transport_active_ = transport_active;
+    bool pending_applied = this->api_security_enabled_ == transport_active;
+    if (pending_applied && this->api_security_enabled_) {
+      ApiSecurityStorage storage{};
+      pending_applied = this->load_api_security_storage_(&storage) && storage.key_present &&
+                        std::equal(storage.key.begin(), storage.key.end(),
+                                   api::global_api_server->get_noise_ctx().get_psk().begin());
+    }
+    if (this->api_security_restart_pending_ && pending_applied) {
       this->api_security_restart_pending_ = false;
     }
   }
@@ -684,7 +698,7 @@ bool OpenQuattWebAuth::initialize_api_security_() {
   if (this->api_security_ready_) {
     return true;
   }
-  if (api::global_api_server == nullptr) {
+  if (api::global_api_server == nullptr || !api::global_api_server->is_in_loop_state()) {
     return false;
   }
 
