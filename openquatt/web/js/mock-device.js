@@ -1123,6 +1123,7 @@
     setEntity("switch", "OpenQuatt Enabled", { value: true, state: true });
     setEntity("switch", "Boiler assist enabled", { value: true, state: true });
     setEntity("switch", "Manual Cooling Enable", { value: false, state: false });
+    setEntity("switch", "Cooling Room Request Required", { value: true, state: true });
     setEntity("switch", "CIC - Enable polling", { value: false, state: false });
     setEntity("text", "CIC - Feed URL", { value: "http://192.168.2.117:8080/beta/feed/data.json", state: "http://192.168.2.117:8080/beta/feed/data.json" });
     setEntity("switch", "OpenTherm Enabled", { value: false, state: false });
@@ -2557,6 +2558,7 @@
     applyOpenQuattResumeSchedule();
     const openquattEnabled = isSwitchEnabled("OpenQuatt Enabled");
     const manualCoolingEnabled = isSwitchEnabled("Manual Cooling Enable");
+    const coolingRoomRequestRequired = isSwitchEnabled("Cooling Room Request Required");
     const silentModeOverride = String(getEntity("select", "Silent Mode Override")?.value || "Schedule");
     const commissioningActive = Boolean(state.commissioning.cm100Active);
 
@@ -2568,8 +2570,15 @@
 
     if (manualCoolingEnabled) {
       setBinary("Cooling Enable (Selected)", true);
-      if (!getEntity("text_sensor", "Cooling Block Reason")?.state || getEntity("text_sensor", "Cooling Block Reason")?.state === "Ready") {
-        setText("text_sensor", "Cooling Block Reason", state.scenario === "cooling" ? "Ready" : "Wacht op kamervraag");
+      const currentCoolingBlockReason = String(getEntity("text_sensor", "Cooling Block Reason")?.state || "");
+      const waitingForRoomRequest =
+        currentCoolingBlockReason === "Wacht op kamervraag" ||
+        currentCoolingBlockReason === "Koeling toegestaan, wacht op kamertemperatuur boven koel-setpoint";
+      if (!coolingRoomRequestRequired) {
+        setBinary("Cooling Request Active", true);
+      }
+      if (!currentCoolingBlockReason || currentCoolingBlockReason === "Ready" || waitingForRoomRequest) {
+        setText("text_sensor", "Cooling Block Reason", state.scenario === "cooling" || !coolingRoomRequestRequired ? "Ready" : "Koeling toegestaan, wacht op kamertemperatuur boven koel-setpoint");
       }
     }
 

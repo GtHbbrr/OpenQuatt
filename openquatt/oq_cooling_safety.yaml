@@ -59,6 +59,17 @@ globals:
     restore_value: false
     initial_value: '0'
 
+switch:
+  - platform: template
+    id: cooling_room_request_required
+    name: "Cooling Room Request Required"
+    icon: mdi:home-thermometer
+    restore_mode: RESTORE_DEFAULT_ON
+    optimistic: true
+    entity_category: config
+    web_server:
+      sorting_group_id: oq_control
+
 number:
   - platform: template
     id: cooling_safety_margin
@@ -202,6 +213,11 @@ binary_sensor:
     icon: mdi:snowflake-thermometer
     device_class: running
     lambda: |-
+      if (!id(cooling_room_request_required).state) {
+        id(oq_cooling_request_latched) = false;
+        return id(cooling_enable_selected).has_state() && id(cooling_enable_selected).state;
+      }
+
       // Apply simple room-temperature hysteresis so CM5 does not chatter around setpoint.
       if (!id(room_temp_selected).has_state() || isnan(id(room_temp_selected).state)) {
         id(oq_cooling_request_latched) = false;
@@ -333,7 +349,7 @@ text_sensor:
         return {"Safe supply floor unavailable"};
       }
       if (!id(cooling_request_active).has_state() || !id(cooling_request_active).state) {
-        return {"Waiting for room request"};
+        return {"Cooling enabled, waiting for room temperature above cooling setpoint"};
       }
       if (!id(flow_rate_selected).has_state() || isnan(id(flow_rate_selected).state)) {
         return {"Flow unavailable"};

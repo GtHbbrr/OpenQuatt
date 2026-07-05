@@ -83,6 +83,7 @@ Voor koeling zijn vooral belangrijk:
 
 - `Cooling Minimum Supply Temp`
 - `Cooling Demand Max`
+- `Cooling Room Request Required`
 - `Cooling Request On Delta`
 - `Cooling Request Off Delta`
 - `Cooling Safety Margin`

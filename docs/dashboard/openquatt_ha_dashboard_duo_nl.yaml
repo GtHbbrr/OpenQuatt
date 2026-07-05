@@ -2862,6 +2862,10 @@ views:
               - **Cooling Restart Delta** bepaalt hoeveel de aanvoer boven
               target moet liggen voordat de watercyclus opnieuw start.
 
+              - **Cooling Room Request Required** bepaalt of koeling echte
+              kamervraag nodig heeft. Staat deze uit, dan telt koeltoestemming
+              direct als koelvraag.
+
               - **Cooling Request On Delta** bepaalt hoeveel de kamer boven
               setpoint moet zitten voordat koelvraag start.
 
@@ -2887,6 +2891,8 @@ views:
                 name: Cooling demand max
               - entity: number.openquatt_cooling_restart_delta
                 name: Cooling restart delta
+              - entity: switch.openquatt_cooling_room_request_required
+                name: Cooling room request required
               - entity: number.openquatt_cooling_request_on_delta
                 name: Cooling request on delta
               - entity: number.openquatt_cooling_request_off_delta

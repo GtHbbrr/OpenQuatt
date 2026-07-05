@@ -222,7 +222,12 @@
 
   function isCoolingWaitingForRoomRequest(reason, requestActive) {
     const normalized = String(reason || "").trim().toLowerCase();
-    if (normalized === "waiting for room request" || normalized === "wacht op kamervraag") {
+    if (
+      normalized === "waiting for room request" ||
+      normalized === "wacht op kamervraag" ||
+      normalized === "cooling enabled, waiting for room temperature above cooling setpoint" ||
+      normalized === "koeling toegestaan, wacht op kamertemperatuur boven koel-setpoint"
+    ) {
       return true;
     }
     if (requestActive) {
@@ -332,7 +337,7 @@
 
     if (waitingForRoomRequest) {
       statusTitle = "Wacht op koelvraag";
-      statusCopy = "Koeling staat aan en wacht nog op actieve koelvraag vanuit de kamerregeling.";
+      statusCopy = "Koeling is toegestaan en wacht tot de kamertemperatuur boven het koel-setpoint komt.";
     } else if (!permitted) {
       statusTitle = "Koeling geblokkeerd";
       statusCopy = `Blokkade: ${blockReason}.`;
@@ -599,7 +604,7 @@
       coolingCopy = "Koeling draait nu.";
     } else if (manualCoolingEnabled && coolingWaitingForRoomRequest) {
       coolingStatus = "Aan";
-      coolingCopy = "Koeling staat aan en wacht op koelvraag.";
+      coolingCopy = "Koeling is toegestaan en wacht op kamertemperatuur boven het koel-setpoint.";
     } else if (manualCoolingEnabled && coolingBlocked) {
       coolingStatus = "Geblokkeerd";
       coolingCopy = formatCoolingBlockReason(coolingBlockReasonRaw || "Koeling wacht nog op veilige condities.");

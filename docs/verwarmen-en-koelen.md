@@ -105,12 +105,15 @@ Daarom werkt OpenQuatt bij koeling terughoudend:
 - de minimale veilige watertemperatuur moet bewaakt worden;
 - dauwpuntinformatie is normaal gesproken nodig.
 
-Koelvraag heeft een kleine hysterese rond het kamer-setpoint. Standaard start koelvraag pas wanneer de kamertemperatuur meer dan `0,4°C` boven het setpoint zit. De koelvraag stopt weer zodra de kamer onder `setpoint + 0,1°C` komt. Dit voorkomt dat koeling steeds kort aan en uit schakelt rond het setpoint.
+Standaard gebruikt OpenQuatt de kamerthermostaat om te bepalen of er echte koelvraag is. Koelvraag heeft dan een kleine hysterese rond het kamer-setpoint: de koelvraag start pas wanneer de kamertemperatuur meer dan `0,4°C` boven het setpoint zit. De koelvraag stopt weer zodra de kamer onder `setpoint + 0,1°C` komt. Dit voorkomt dat koeling steeds kort aan en uit schakelt rond het setpoint.
 
-Deze marges zijn runtime-instellingen:
+Deze kamerlaag hoort bij deze runtime-instellingen:
 
+- `Cooling Room Request Required`
 - `Cooling Request On Delta`
 - `Cooling Request Off Delta`
+
+Als `Cooling Room Request Required` uit staat, telt koeltoestemming direct als koelvraag. De start- en stopmarge rond het kamer-setpoint worden dan niet gebruikt.
 
 Als er koelvraag is, stuurt OpenQuatt niet rechtstreeks op de kamertemperatuur. De kamerlaag bepaalt alleen of koeling nodig is. Daarna kijkt de waterregeling naar de aanvoertemperatuur.
 

@@ -665,7 +665,8 @@
 
     const labels = {
       Ready: "Gereed",
-      "Waiting for room request": "Wacht op kamervraag",
+      "Waiting for room request": "Koeling toegestaan, wacht op kamertemperatuur boven koel-setpoint",
+      "Cooling enabled, waiting for room temperature above cooling setpoint": "Koeling toegestaan, wacht op kamertemperatuur boven koel-setpoint",
       "No dew point source": "Geen dauwpuntbron",
       "OpenQuatt paused": "OpenQuatt gepauzeerd",
       "Cooling disabled": "Koeling uitgeschakeld",
@@ -5192,6 +5193,7 @@
   }
 
   function renderSettingsCoolingSection() {
+    const roomRequestRequired = !hasEntity("coolingRoomRequestRequired") || Boolean(getEntityValue("coolingRoomRequestRequired"));
     const tuningFields = [
       renderSettingsNumberField("coolingMinimumSupplyTemp", "Minimale koel-aanvoer", "Ondergrens voor het koeldoel. OpenQuatt gebruikt de hoogste waarde van deze instelling en de dauwpuntveilige grens."),
       renderSettingsSliderField("coolingDemandMax", "Maximale koelsterkte", "Bepaalt hoe krachtig OpenQuatt mag koelen. Lager geeft langere, rustigere runs; hoger geeft meer koelvermogen bij warm weer.", "", {
@@ -5200,10 +5202,21 @@
         valueLabel: `${formatValue("coolingDemandMax")} max`,
       }),
       renderSettingsNumberField("coolingRestartDelta", "Herstartmarge watertemperatuur", "Na het bereiken van het koel-aanvoerdoel start de watercyclus pas opnieuw zodra de aanvoer deze marge boven het doel ligt."),
-      renderSettingsNumberField("coolingRequestOnDelta", "Koelvraag start boven setpoint", "Koelvraag wordt actief zodra de kamer warmer is dan setpoint plus deze marge."),
-      renderSettingsNumberField("coolingRequestOffDelta", "Koelvraag stopt boven setpoint", "Koelvraag valt weer af zodra de kamer koeler is dan setpoint plus deze marge."),
       renderSettingsNumberField("coolingSafetyMargin", "Dauwpunt veiligheidsmarge", "Extra marge boven het geselecteerde dauwpunt voor de minimale veilige watertemperatuur."),
     ].filter(Boolean);
+    const roomRequestFields = [
+      hasEntity("coolingRoomRequestRequired") ? renderSettingsSwitchField(
+        "coolingRoomRequestRequired",
+        "Koelvraag via kamerthermostaat",
+        "Aan: OpenQuatt wacht op echte koelvraag vanuit de kamer. Uit: koeltoestemming geldt direct als koelvraag.",
+        "Koelvraag start en stopt met de marges hieronder.",
+        "Koeltoestemming geldt direct als koelvraag. De start- en stopmarge worden nu niet gebruikt.",
+        "oq-settings-field--span-2",
+      ) : "",
+      roomRequestRequired ? renderSettingsNumberField("coolingRequestOnDelta", "Koelvraag start boven setpoint", "Koelvraag wordt actief zodra de kamer warmer is dan setpoint plus deze marge.") : "",
+      roomRequestRequired ? renderSettingsNumberField("coolingRequestOffDelta", "Koelvraag stopt boven setpoint", "Koelvraag valt weer af zodra de kamer koeler is dan setpoint plus deze marge.") : "",
+    ].filter(Boolean);
+    const hasRoomRequestSettings = roomRequestFields.length > 0;
     const hasFallbackSettings = hasEntity("coolingWithoutDewPointMode");
     const fallbackStatusFields = [
       hasEntity("coolingGuardMode") ? renderSettingsStaticField("coolingGuardMode", "Actieve beveiligingsroute", "Laat zien of koeling nu via dauwpuntmeting, dauwpuntsbenadering of expliciet toestaan wordt begrensd.", getEntityStateText("coolingGuardMode", "Onbekend")) : "",
@@ -5212,7 +5225,7 @@
       hasEntity("coolingEffectiveMinSupplyTemp") ? renderSettingsStaticField("coolingEffectiveMinSupplyTemp", "Actieve minimum ondergrens", "De ondergrens die de koeling nu daadwerkelijk gebruikt: dauwpunt plus marge, dauwpuntsbenadering, of de ingestelde minimumgrens bij expliciet toestaan.", getEntityStateText("coolingEffectiveMinSupplyTemp", "—")) : "",
     ].filter(Boolean);
 
-    if (!tuningFields.length && !hasFallbackSettings && !fallbackStatusFields.length) {
+    if (!tuningFields.length && !hasRoomRequestSettings && !hasFallbackSettings && !fallbackStatusFields.length) {
       return "";
     }
 
@@ -5232,6 +5245,18 @@
         ${tuningFields.length ? `
           <div class="oq-settings-grid">
             ${tuningFields.join("")}
+          </div>
+        ` : ""}
+        ${hasRoomRequestSettings ? `
+          <div class="oq-settings-subpanel oq-settings-subpanel--nested">
+            <div class="oq-settings-subpanel-head">
+              <p class="oq-helper-label">Koelvraag</p>
+              <h4>Kamerthermostaat</h4>
+              <p>Bepaalt of koelen pas start bij kamervraag, of dat koeltoestemming direct als koelvraag telt.</p>
+            </div>
+            <div class="oq-settings-grid">
+              ${roomRequestFields.join("")}
+            </div>
           </div>
         ` : ""}
         ${(hasFallbackSettings || fallbackStatusFields.length) ? `

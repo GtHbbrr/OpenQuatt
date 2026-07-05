@@ -2456,6 +2456,7 @@ views:
               - **Cooling Minimum Supply Temp** begrenst het koeldoel; OpenQuatt gebruikt de hoogste waarde van deze instelling en de dauwpuntveilige aanvoergrens.
               - **Cooling Demand Max** begrenst de maximale koelvraag.
               - **Cooling Restart Delta** bepaalt hoeveel de aanvoer boven target moet liggen voordat de watercyclus opnieuw start.
+              - **Cooling Room Request Required** bepaalt of koeling echte kamervraag nodig heeft. Staat deze uit, dan telt koeltoestemming direct als koelvraag.
               - **Cooling Request On Delta** bepaalt hoeveel de kamer boven setpoint moet zitten voordat koelvraag start.
               - **Cooling Request Off Delta** bepaalt wanneer koelvraag weer stopt.
               - **Cooling Safety Margin** bepaalt de marge boven het geselecteerde dauwpunt.
@@ -2475,6 +2476,8 @@ views:
                 name: Cooling demand max
               - entity: number.openquatt_cooling_restart_delta
                 name: Cooling restart delta
+              - entity: switch.openquatt_cooling_room_request_required
+                name: Cooling room request required
               - entity: number.openquatt_cooling_request_on_delta
                 name: Cooling request on delta
               - entity: number.openquatt_cooling_request_off_delta
