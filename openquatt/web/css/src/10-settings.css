@@ -343,6 +343,61 @@
   line-height: 1.4;
 }
 
+.oq-settings-cooling-facts,
+.oq-settings-cooling-fallback-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
+  gap: 10px;
+}
+
+.oq-settings-cooling-fallback-metrics {
+  margin: 2px 0 14px;
+}
+
+.oq-settings-cooling-fact {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 11px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.oq-helper-shell--dark .oq-settings-cooling-fact {
+  border-color: rgba(148, 163, 184, 0.16);
+  background: rgba(15, 23, 42, 0.28);
+}
+
+.oq-settings-cooling-fact span {
+  color: var(--oq-helper-soft);
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.oq-settings-cooling-fact strong {
+  min-width: 0;
+  color: var(--oq-helper-ink);
+  font-size: 1rem;
+  font-weight: 750;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.oq-helper-shell--dark .oq-settings-cooling-fact strong {
+  color: #f8fafc;
+}
+
+.oq-settings-field--cooling-guard-choice .oq-settings-choice-card {
+  gap: 8px;
+  padding: 14px;
+}
+
+.oq-settings-field--cooling-guard-choice .oq-settings-choice-copy {
+  line-height: 1.45;
+}
+
 .oq-settings-grid,
 .oq-settings-hp-group-grid,
 .oq-settings-curve-grid {

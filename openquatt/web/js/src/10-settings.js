@@ -28,6 +28,15 @@
     return renderSettingsFieldCard(fieldKey, title, copy, `<div class="oq-settings-static-value">${escapeHtml(value)}</div>`, className);
   }
 
+  function renderSettingsCoolingFact(label, value) {
+    return `
+      <div class="oq-settings-cooling-fact">
+        <span>${escapeHtml(label)}</span>
+        <strong>${escapeHtml(value)}</strong>
+      </div>
+    `;
+  }
+
   function getSettingsStatValue(key, options = {}) {
     const config = typeof options === "number"
       ? { decimals: options }
@@ -637,10 +646,16 @@
       [STRATEGY_OPTION_CURVE]: "Stooklijn",
       [STRATEGY_OPTION_POWER_HOUSE]: "Power House",
       "Dew point required": "Dauwpuntmeting vereist",
+      "Dew point": "Dauwpunt",
+      "Dew point (MQTT)": "Dauwpunt (MQTT)",
+      "Dew point (HA)": "Dauwpunt (HA)",
       "Allow without dew point": "Dauwpuntsbenadering",
       "Allow without dew point, use fallback": "Dauwpuntsbenadering",
       "Allow without dew point, use dew point approximation": "Dauwpuntsbenadering",
       "Allow without dew point, user responsibility": "Expliciet toestaan",
+      Fallback: "Dauwpuntsbenadering",
+      "Fallback blocked": "Dauwpuntsbenadering geblokkeerd",
+      "User responsibility": "Expliciet toegestaan",
       Local: "Lokaal",
       CIC: "CIC",
       "HA input": "HA-invoer",
@@ -4851,6 +4866,12 @@
       return "API-encryptie wordt geladen.";
     }
     if (status.pending_restart) {
+      if (status.enabled === true && status.transport_active === false) {
+        return "API-encryptie wordt ingeschakeld na herstart. Kopieer de sleutel nu voor Home Assistant.";
+      }
+      if (status.enabled === false && status.transport_active === true) {
+        return "API-encryptie wordt uitgeschakeld na herstart. Tot die tijd blijft de native API beveiligd.";
+      }
       return status.key
         ? "Deze wijziging wordt actief na herstart. De sleutel blijft opgeslagen voor later gebruik."
         : "Deze wijziging wordt actief na herstart.";
@@ -5218,23 +5239,37 @@
     ].filter(Boolean);
     const hasRoomRequestSettings = roomRequestFields.length > 0;
     const hasFallbackSettings = hasEntity("coolingWithoutDewPointMode");
-    const fallbackStatusFields = [
-      hasEntity("coolingGuardMode") ? renderSettingsStaticField("coolingGuardMode", "Actieve beveiligingsroute", "Laat zien of koeling nu via dauwpuntmeting, dauwpuntsbenadering of expliciet toestaan wordt begrensd.", getEntityStateText("coolingGuardMode", "Onbekend")) : "",
-      hasEntity("coolingFallbackNightMinOutdoorTemp") ? renderSettingsStaticField("coolingFallbackNightMinOutdoorTemp", "Nachtminimum buitentemperatuur", "Minimum buitentemperatuur van de afgelopen nacht. Warme nachten maken de dauwpuntsbenadering conservatiever.", getEntityStateText("coolingFallbackNightMinOutdoorTemp", "—")) : "",
-      hasEntity("coolingFallbackMinSupplyTemp") ? renderSettingsStaticField("coolingFallbackMinSupplyTemp", "Berekende minimum watertemperatuur", "De conservatieve ondergrens die OpenQuatt gebruikt bij de dauwpuntsbenadering. Als die grens door warm weer hoger wordt dan zinvol is, houdt OpenQuatt rekening met de kamertemperatuur.", getEntityStateText("coolingFallbackMinSupplyTemp", "—")) : "",
-      hasEntity("coolingEffectiveMinSupplyTemp") ? renderSettingsStaticField("coolingEffectiveMinSupplyTemp", "Actieve minimum ondergrens", "De ondergrens die de koeling nu daadwerkelijk gebruikt: dauwpunt plus marge, dauwpuntsbenadering, of de ingestelde minimumgrens bij expliciet toestaan.", getEntityStateText("coolingEffectiveMinSupplyTemp", "—")) : "",
+    const guardStatusFacts = [
+      hasEntity("coolingGuardMode") ? renderSettingsCoolingFact("Route", formatSettingsOptionLabel(getEntityStateText("coolingGuardMode", "Onbekend"))) : "",
+      hasEntity("coolingEffectiveMinSupplyTemp") ? renderSettingsCoolingFact("Actieve ondergrens", getEntityStateText("coolingEffectiveMinSupplyTemp", "—")) : "",
     ].filter(Boolean);
+    const guardStatusPanel = guardStatusFacts.length ? renderSettingsFieldCard(
+      "coolingGuardStatus",
+      "Actuele beveiliging",
+      "Laat zien welke route koeling nu begrenst en welke ondergrens daadwerkelijk geldt.",
+      `<div class="oq-settings-cooling-facts">${guardStatusFacts.join("")}</div>`,
+      "oq-settings-field--span-2 oq-settings-field--cooling-status",
+    ) : "";
+    const fallbackMetricFacts = [
+      hasEntity("outsideTempSelected") ? renderSettingsCoolingFact("Actuele buitentemperatuur", getEntityStateText("outsideTempSelected", "—")) : "",
+      hasEntity("coolingFallbackNightMinOutdoorTemp") ? renderSettingsCoolingFact("Nachtminimum buitentemperatuur", getEntityStateText("coolingFallbackNightMinOutdoorTemp", "—")) : "",
+      hasEntity("coolingFallbackMinSupplyTemp") ? renderSettingsCoolingFact("Berekende minimum watertemperatuur", getEntityStateText("coolingFallbackMinSupplyTemp", "—")) : "",
+    ].filter(Boolean);
+    const fallbackMetricsMarkup = fallbackMetricFacts.length ? `<div class="oq-settings-cooling-fallback-metrics">${fallbackMetricFacts.join("")}</div>` : "";
+    const hasFallbackDetails = hasFallbackSettings || fallbackMetricFacts.length > 0;
+    const activeCoolingGuardMode = getEntityStateText("coolingGuardMode", "");
+    const openFallbackDetails = activeCoolingGuardMode.toLowerCase().includes("fallback");
 
-    if (!tuningFields.length && !hasRoomRequestSettings && !hasFallbackSettings && !fallbackStatusFields.length) {
+    if (!tuningFields.length && !hasRoomRequestSettings && !hasFallbackSettings && !guardStatusPanel && !hasFallbackDetails) {
       return "";
     }
 
     const fallbackModeCopy = {
-      "Dew point required": "Koel alleen als er een betrouwbare dauwpuntmeting beschikbaar is. Zonder dauwpuntmeting blijft koeling geblokkeerd.",
-      "Allow without dew point": "Gebruik een echte dauwpuntmeting als die beschikbaar is. Ontbreekt die, koel dan alleen via een conservatieve dauwpuntsbenadering.",
-      "Allow without dew point, use fallback": "Gebruik een echte dauwpuntmeting als die beschikbaar is. Ontbreekt die, koel dan alleen via een conservatieve dauwpuntsbenadering.",
-      "Allow without dew point, use dew point approximation": "Gebruik een echte dauwpuntmeting als die beschikbaar is. Ontbreekt die, koel dan alleen via een conservatieve dauwpuntsbenadering.",
-      "Allow without dew point, user responsibility": "Sta koeling expliciet toe zonder dauwpuntgrens. Ook een beschikbare dauwpuntmeting wordt dan genegeerd; alleen de ingestelde minimale koel-aanvoer geldt.",
+      "Dew point required": "Gebruik alleen een betrouwbare dauwpuntmeting. Zonder meting blijft koeling uit.",
+      "Allow without dew point": "Gebruik dauwpunt waar mogelijk. Zonder meting geldt de conservatieve benadering hieronder.",
+      "Allow without dew point, use fallback": "Gebruik dauwpunt waar mogelijk. Zonder meting geldt de conservatieve benadering hieronder.",
+      "Allow without dew point, use dew point approximation": "Gebruik dauwpunt waar mogelijk. Zonder meting geldt de conservatieve benadering hieronder.",
+      "Allow without dew point, user responsibility": "Negeer dauwpunt en benadering; alleen de ingestelde minimale koel-aanvoer geldt.",
     };
 
     return renderSettingsSection(
@@ -5259,13 +5294,15 @@
             </div>
           </div>
         ` : ""}
-        ${(hasFallbackSettings || fallbackStatusFields.length) ? `
+        ${(hasFallbackSettings || guardStatusPanel || hasFallbackDetails) ? `
           <div class="oq-settings-grid">
-            ${hasFallbackSettings ? renderSettingsOptionCardsField("coolingWithoutDewPointMode", "Keuze koelbeveiliging", "Kies welke veiligheidsgrens OpenQuatt gebruikt: dauwpuntmeting, dauwpuntsbenadering bij ontbrekende meting, of expliciet toestaan zonder dauwpuntgrens.", fallbackModeCopy, "oq-settings-field--span-2") : ""}
-            ${hasFallbackSettings ? `
-              <details class="oq-settings-callout oq-settings-callout--cooling oq-settings-callout--inline">
+            ${hasFallbackSettings ? renderSettingsOptionCardsField("coolingWithoutDewPointMode", "Keuze koelbeveiliging", "Kies welke veiligheidsgrens OpenQuatt gebruikt: dauwpuntmeting, dauwpuntsbenadering bij ontbrekende meting, of expliciet toestaan zonder dauwpuntgrens.", fallbackModeCopy, "oq-settings-field--span-2 oq-settings-field--cooling-guard-choice") : ""}
+            ${guardStatusPanel}
+            ${hasFallbackDetails ? `
+              <details class="oq-settings-callout oq-settings-callout--cooling oq-settings-callout--inline"${openFallbackDetails ? " open" : ""}>
               <summary>Dauwpuntsbenadering bekijken</summary>
               <div class="oq-settings-callout-body">
+                ${fallbackMetricsMarkup}
                 <p>Zonder dauwpuntmeting weet OpenQuatt niet zeker hoe koud het water mag worden zonder condensrisico. De dauwpuntsbenadering gebruikt daarom een voorzichtige minimum watertemperatuur.</p>
                 <p>Onder de 20°C buiten blijft koeling via deze benadering uit. Daarboven loopt de ondergrens geleidelijk op van 19°C bij 20°C buiten naar 22°C bij 32°C buiten. Warme nachten verhogen die grens nog iets.</p>
                 <p>Wordt die grens hoger dan zinvol is voor de kamer, dan verlaagt OpenQuatt hem beperkt: ongeveer 1°C onder de kamertemperatuur, maar nooit lager dan 20°C. Voorbeeld: bij 22°C kamer en een berekende grens van 23,5°C wordt de grens ongeveer 21°C. Zo kan OpenQuatt nog voorzichtig koelen. Een echte dauwpuntmeting blijft veiliger.</p>
@@ -5313,7 +5350,6 @@
               </div>
             </details>
             ` : ""}
-            ${fallbackStatusFields.join("")}
           </div>
         ` : ""}
       `,
