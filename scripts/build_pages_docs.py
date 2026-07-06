@@ -181,8 +181,8 @@ def render_inline(text: str, source: PurePosixPath, current_output: PurePosixPat
     text = escape(text, quote=False)
     text = re.sub(r"\*\*([^*]+)\*\*", lambda match: f"<strong>{match.group(1)}</strong>", text)
     text = re.sub(r"(?<!\*)\*([^*]+)\*(?!\*)", lambda match: f"<em>{match.group(1)}</em>", text)
-    for key, value in tokens.items():
-        text = text.replace(key, value)
+    for key in reversed(list(tokens)):
+        text = text.replace(key, tokens[key])
     return text
 
 
