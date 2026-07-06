@@ -328,8 +328,8 @@
 
   function getHeatPumpFlowKeys(flowKey) {
     const hpGeneration = String(getEntityValue("hpGeneration") || "").trim();
-    const keys = hpGeneration === "V1"
-      ? ["controllerFlow", "flowSelected", "flowLocal", flowKey]
+    const keys = hpGeneration === "V1" && flowKey === "hp1Flow"
+      ? ["flowSelected", "controllerFlow", "flowLocal", flowKey]
       : [flowKey];
     return keys.filter((key, index) => key && keys.indexOf(key) === index);
   }
