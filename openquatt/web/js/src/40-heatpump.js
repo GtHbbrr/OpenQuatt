@@ -326,13 +326,48 @@
     return formatNumericState(numeric, decimals, getEntityDisplayUnit(key, fallbackUnit));
   }
 
+  function getHeatPumpFlowKeys(flowKey) {
+    const hpGeneration = String(getEntityValue("hpGeneration") || "").trim();
+    const keys = hpGeneration === "V1"
+      ? ["controllerFlow", "flowSelected", "flowLocal", flowKey]
+      : [flowKey];
+    return keys.filter((key, index) => key && keys.indexOf(key) === index);
+  }
+
+  function getHeatPumpFlowReading(flowKey) {
+    const flowKeys = getHeatPumpFlowKeys(flowKey);
+    const fallbackKey = flowKeys.find((key) => hasEntity(key)) || flowKey;
+
+    for (const candidateKey of flowKeys) {
+      if (!hasEntity(candidateKey)) {
+        continue;
+      }
+
+      const flowValue = getEntityNumericValue(candidateKey);
+      if (!Number.isNaN(flowValue)) {
+        return {
+          key: candidateKey,
+          value: flowValue,
+          text: formatNumericState(flowValue, 0, getEntityDisplayUnit(candidateKey, "L/h")),
+        };
+      }
+    }
+
+    return {
+      key: fallbackKey,
+      value: Number.NaN,
+      text: getEntityStateText(fallbackKey),
+    };
+  }
+
   function buildHeatPumpSchematicModel(title, keys, accent, mode, defrostActive, failures, running) {
     const freqValue = getEntityNumericValue(keys.freq);
     const freqText = Number.isNaN(freqValue) ? "—" : String(Math.round(freqValue));
     const powerValue = getEntityNumericValue(keys.power);
     const heatValue = getEntityNumericValue(keys.heat);
     const coolingValue = getEntityNumericValue(keys.cooling);
-    const flowValue = getEntityNumericValue(keys.flow);
+    const flowReading = getHeatPumpFlowReading(keys.flow);
+    const flowValue = flowReading.value;
     const thermalValue = mode === "Koelen" ? coolingValue : heatValue;
     const animated = running || (!Number.isNaN(freqValue) && freqValue > 0) || (!Number.isNaN(powerValue) && powerValue > 80) || (!Number.isNaN(heatValue) && heatValue > 150);
     const waterFlowActive = !Number.isNaN(flowValue) && flowValue > 0;
@@ -342,9 +377,7 @@
     const defrostText = defrostActive ? "Actief" : "Uit";
     const waterOutText = formatHeatPumpReading(keys.waterOut, 1, "°C");
     const waterInText = formatHeatPumpReading(keys.waterIn, 1, "°C");
-    const flowText = Number.isNaN(flowValue)
-      ? getEntityStateText(keys.flow)
-      : formatNumericState(flowValue, 0, getEntityDisplayUnit(keys.flow, "L/h"));
+    const flowText = flowReading.text;
     const evaporatorCoilTempText = formatHeatPumpReading(keys.evaporatorCoilTemp, 1, "°C");
     const innerCoilTempText = formatHeatPumpReading(keys.innerCoilTemp, 1, "°C");
     const outsideTempText = formatHeatPumpReading(keys.outsideTemp, 1, "°C");
