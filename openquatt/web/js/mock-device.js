@@ -103,8 +103,26 @@
       csrfToken: "",
       inputTopics: {
         cooling_dew_point: "openquatt/openquatt/input/cooling/dew_point",
+        outside_temperature: "openquatt/openquatt/input/weather/outdoor_temperature",
+        room_temperature: "openquatt/openquatt/input/thermostat/room_temperature",
+        room_setpoint: "openquatt/openquatt/input/thermostat/room_setpoint",
+        heating_enable: "openquatt/openquatt/input/thermostat/heating_enable",
+        cooling_enable: "openquatt/openquatt/input/thermostat/cooling_enable",
+      },
+      inputEnabled: {
+        cooling_dew_point: true,
+        outside_temperature: true,
+        room_temperature: true,
+        room_setpoint: true,
+        heating_enable: true,
+        cooling_enable: true,
       },
       lastDewPointAt: Date.now() - 42000,
+      lastOutsideTemperatureAt: Date.now() - 120000,
+      lastRoomTemperatureAt: Date.now() - 36000,
+      lastRoomSetpointAt: Date.now() - 180000,
+      lastHeatingEnableAt: Date.now() - 28000,
+      lastCoolingEnableAt: Date.now() - 54000,
     },
     trendFlashWrites: 437,
     trendFlashStoredKiB: 182.5,
@@ -595,16 +613,25 @@
     return parseAuthFormBody(init);
   }
 
-  function getMqttDewPointAgeSeconds() {
-    const lastAt = Number(state.mqtt.lastDewPointAt || 0);
+  function getMqttAgeSeconds(lastAt) {
+    lastAt = Number(lastAt || 0);
     if (!lastAt) {
       return NaN;
     }
     return Math.max(0, Math.round((Date.now() - lastAt) / 1000));
   }
 
-  function syncMqttDewPointAgeEntity() {
+  function getMqttDewPointAgeSeconds() {
+    return getMqttAgeSeconds(state.mqtt.lastDewPointAt);
+  }
+
+  function syncMqttInputAgeEntities() {
     setNumber("MQTT Cooling Dew Point Age", getMqttDewPointAgeSeconds(), "s");
+    setNumber("MQTT Outside Temperature Age", getMqttAgeSeconds(state.mqtt.lastOutsideTemperatureAt), "s");
+    setNumber("MQTT Room Temperature Age", getMqttAgeSeconds(state.mqtt.lastRoomTemperatureAt), "s");
+    setNumber("MQTT Room Setpoint Age", getMqttAgeSeconds(state.mqtt.lastRoomSetpointAt), "s");
+    setNumber("MQTT Heating Enable Age", getMqttAgeSeconds(state.mqtt.lastHeatingEnableAt), "s");
+    setNumber("MQTT Cooling Enable Age", getMqttAgeSeconds(state.mqtt.lastCoolingEnableAt), "s");
   }
 
   function applyCoolingDewPointSourceSelection() {
@@ -639,7 +666,7 @@
 
     setNumber("Cooling Dew Point (Selected)", selected, "°C");
     setText("text_sensor", "Cooling Guard Mode", guardMode);
-    syncMqttDewPointAgeEntity();
+    syncMqttInputAgeEntities();
   }
 
   const SERVICE_STATUS_ENTITY_MAP = {
@@ -874,6 +901,19 @@
     const port = Number(state.mqtt.port || 1883);
     const inputTopics = {
       cooling_dew_point: String(state.mqtt.inputTopics?.cooling_dew_point || ""),
+      outside_temperature: String(state.mqtt.inputTopics?.outside_temperature || ""),
+      room_temperature: String(state.mqtt.inputTopics?.room_temperature || ""),
+      room_setpoint: String(state.mqtt.inputTopics?.room_setpoint || ""),
+      heating_enable: String(state.mqtt.inputTopics?.heating_enable || ""),
+      cooling_enable: String(state.mqtt.inputTopics?.cooling_enable || ""),
+    };
+    const inputEnabled = {
+      cooling_dew_point: state.mqtt.inputEnabled?.cooling_dew_point !== false,
+      outside_temperature: state.mqtt.inputEnabled?.outside_temperature !== false,
+      room_temperature: state.mqtt.inputEnabled?.room_temperature !== false,
+      room_setpoint: state.mqtt.inputEnabled?.room_setpoint !== false,
+      heating_enable: state.mqtt.inputEnabled?.heating_enable !== false,
+      cooling_enable: state.mqtt.inputEnabled?.cooling_enable !== false,
     };
     return {
       enabled: Boolean(state.mqtt.enabled),
@@ -884,6 +924,7 @@
       password_set: Boolean(state.mqtt.passwordSet),
       dew_point_topic: inputTopics.cooling_dew_point,
       input_topics: inputTopics,
+      input_enabled: inputEnabled,
       source: String(state.mqtt.source || ""),
       csrf_token: String(state.mqtt.csrfToken || ""),
     };
@@ -930,6 +971,29 @@
     return makeAuthResponse(200, {
       ok: true,
       status: getMqttStatusPayload(),
+    });
+  }
+
+  function handleMqttInputSave(init) {
+    const params = parseAuthFormBody(init);
+    const status = getMqttStatusPayload();
+    if (params.get("csrf_token") !== status.csrf_token) {
+      return makeAuthResponse(403, { ok: false, error: "forbidden" });
+    }
+
+    const input = String(params.get("input") || "");
+    if (!Object.prototype.hasOwnProperty.call(status.input_enabled, input)) {
+      return makeAuthResponse(400, { ok: false, error: "invalid_input" });
+    }
+
+    state.mqtt.inputEnabled[input] = String(params.get("enabled") || "") === "true";
+    state.mqtt.source = state.mqtt.enabled ? "runtime-enabled" : "runtime-disabled";
+    refreshMqttToken();
+
+    return makeAuthResponse(200, {
+      ok: true,
+      enabled: state.mqtt.inputEnabled[input],
+      connected: Boolean(state.mqtt.enabled && state.mqtt.connected),
     });
   }
 
@@ -1280,27 +1344,27 @@
     setEntity("select", "Outside Temperature Source", {
       value: "Auto",
       state: "Auto",
-      option: ["Auto", "Outdoor unit", "HA input"],
+      option: ["Auto", "Outdoor unit", "HA input", "MQTT"],
     });
     setEntity("select", "Room Temperature Source", {
       value: "OT thermostat",
       state: "OT thermostat",
-      option: ["CIC", "OT thermostat", "HA input"],
+      option: ["CIC", "OT thermostat", "HA input", "MQTT"],
     });
     setEntity("select", "Room Setpoint Source", {
       value: "OT thermostat",
       state: "OT thermostat",
-      option: ["CIC", "OT thermostat", "HA input"],
+      option: ["CIC", "OT thermostat", "HA input", "MQTT"],
     });
     setEntity("select", "Cooling Enable Source", {
       value: "HA input",
       state: "HA input",
-      option: ["CIC", "HA input", "CIC or HA input"],
+      option: ["CIC", "HA input", "MQTT", "CIC or HA input"],
     });
     setEntity("select", "Heating Enable Source", {
       value: "Disabled",
       state: "Disabled",
-      option: ["Disabled", "OT thermostat", "CIC", "HA input"],
+      option: ["Disabled", "OT thermostat", "CIC", "HA input", "MQTT"],
     });
     setEntity("select", "Firmware Update Channel", {
       value: "dev",
@@ -1446,6 +1510,14 @@
       ["Power House – P_req", 2800, "W"],
       ["MQTT Cooling Dew Point", 16.2, "°C"],
       ["MQTT Cooling Dew Point Age", getMqttDewPointAgeSeconds(), "s"],
+      ["MQTT Outside Temperature", 14.9, "°C"],
+      ["MQTT Outside Temperature Age", getMqttAgeSeconds(state.mqtt.lastOutsideTemperatureAt), "s"],
+      ["MQTT Room Temperature", 21.0, "°C"],
+      ["MQTT Room Temperature Age", getMqttAgeSeconds(state.mqtt.lastRoomTemperatureAt), "s"],
+      ["MQTT Room Setpoint", 21.0, "°C"],
+      ["MQTT Room Setpoint Age", getMqttAgeSeconds(state.mqtt.lastRoomSetpointAt), "s"],
+      ["MQTT Heating Enable Age", getMqttAgeSeconds(state.mqtt.lastHeatingEnableAt), "s"],
+      ["MQTT Cooling Enable Age", getMqttAgeSeconds(state.mqtt.lastCoolingEnableAt), "s"],
       ["Cooling Dew Point (Selected)", 16.1, "°C"],
       ["Cooling Minimum Safe Supply Temp", 18.1, "°C"],
       ["Cooling Effective Minimum Supply Temp", 18.1, "°C"],
@@ -1538,6 +1610,13 @@
       ["HA - Cooling Enable", false],
       ["HA - Cooling Enable Valid", true],
       ["MQTT Cooling Dew Point Valid", true],
+      ["MQTT Outside Temperature Valid", true],
+      ["MQTT Room Temperature Valid", true],
+      ["MQTT Room Setpoint Valid", true],
+      ["MQTT Heating Enable", false],
+      ["MQTT Heating Enable Valid", true],
+      ["MQTT Cooling Enable", false],
+      ["MQTT Cooling Enable Valid", true],
       ["CIC - Data stale", false],
       ["OT - Link Problem", false],
       ["HP1 - Defrost", false],
@@ -1678,6 +1757,10 @@
     setBinary("CIC - JSON Feed OK", true);
     setBinary("HA - Heating Enable", state.scenario !== "idle");
     setBinary("HA - Cooling Enable", state.scenario === "cooling");
+    setBinary("MQTT Heating Enable", state.scenario !== "idle");
+    setBinary("MQTT Heating Enable Valid", true);
+    setBinary("MQTT Cooling Enable", state.scenario === "cooling");
+    setBinary("MQTT Cooling Enable Valid", true);
     setBinary("CIC - Data stale", !isSwitchEnabled("CIC - Enable polling"));
     setBinary("OT - Link Problem", false);
     setBinary("OT - Thermostat Status Valid", true);
@@ -1685,18 +1768,38 @@
     const heatingEnableValid = heatingEnableSource === "Disabled"
       || (heatingEnableSource === "OT thermostat" && Boolean(getEntity("binary_sensor", "OT - Thermostat Status Valid")?.value))
       || (heatingEnableSource === "CIC" && Boolean(getEntity("binary_sensor", "CIC - CH enable valid")?.value))
-      || (heatingEnableSource === "HA input" && Boolean(getEntity("binary_sensor", "HA - Heating Enable Valid")?.value));
+      || (heatingEnableSource === "HA input" && Boolean(getEntity("binary_sensor", "HA - Heating Enable Valid")?.value))
+      || (heatingEnableSource === "MQTT" && Boolean(getEntity("binary_sensor", "MQTT Heating Enable Valid")?.value));
     const heatingEnableSelected = heatingEnableSource === "Disabled"
       || (heatingEnableValid && heatingEnableSource === "OT thermostat" && Boolean(getEntity("binary_sensor", "OT - Thermostat CH Enable")?.value))
       || (heatingEnableValid && heatingEnableSource === "CIC" && Boolean(getEntity("binary_sensor", "CIC - CH enabled")?.value))
-      || (heatingEnableValid && heatingEnableSource === "HA input" && Boolean(getEntity("binary_sensor", "HA - Heating Enable")?.value));
+      || (heatingEnableValid && heatingEnableSource === "HA input" && Boolean(getEntity("binary_sensor", "HA - Heating Enable")?.value))
+      || (heatingEnableValid && heatingEnableSource === "MQTT" && Boolean(getEntity("binary_sensor", "MQTT Heating Enable")?.value));
+    const coolingEnableSource = String(getEntity("select", "Cooling Enable Source")?.value || "HA input");
+    const manualCoolingEnabled = isSwitchEnabled("Manual Cooling Enable");
+    const cicCoolingEnabled = Boolean(getEntity("binary_sensor", "CIC - Cooling enabled")?.value);
+    const haCoolingEnabled = Boolean(getEntity("binary_sensor", "HA - Cooling Enable Valid")?.value)
+      && Boolean(getEntity("binary_sensor", "HA - Cooling Enable")?.value);
+    const mqttCoolingEnabled = Boolean(getEntity("binary_sensor", "MQTT Cooling Enable Valid")?.value)
+      && Boolean(getEntity("binary_sensor", "MQTT Cooling Enable")?.value);
+    const coolingEnableSelected = manualCoolingEnabled
+      || (coolingEnableSource === "CIC" && cicCoolingEnabled)
+      || (coolingEnableSource === "HA input" && haCoolingEnabled)
+      || (coolingEnableSource === "MQTT" && mqttCoolingEnabled)
+      || (coolingEnableSource === "CIC or HA input" && (cicCoolingEnabled || haCoolingEnabled));
+    const coolingEnableEffectiveSource = manualCoolingEnabled
+      ? "Manual"
+      : coolingEnableSource === "MQTT" && !mqttCoolingEnabled
+        ? "None"
+        : coolingEnableSource;
     setBinary("Heating Enable Valid", heatingEnableValid);
     setBinary("Heating Enable (Selected)", heatingEnableSelected);
+    setBinary("Cooling Enable (Selected)", coolingEnableSelected);
     setBinary("Heating blocked by thermostat", state.scenario !== "idle" && !heatingEnableSelected);
     setText("text_sensor", "Room Temperature Effective Source", String(getEntity("select", "Room Temperature Source")?.value || "Unknown"));
     setText("text_sensor", "Room Setpoint Effective Source", String(getEntity("select", "Room Setpoint Source")?.value || "Unknown"));
     setText("text_sensor", "Heating Enable Effective Source", heatingEnableSource === "Disabled" ? "None" : heatingEnableSource);
-    setText("text_sensor", "Cooling Enable Effective Source", String(getEntity("select", "Cooling Enable Source")?.value || "Unknown"));
+    setText("text_sensor", "Cooling Enable Effective Source", coolingEnableEffectiveSource);
     setNumber("OT - Control Setpoint", state.scenario === "cooling" ? 18.0 : 30.0, "\u00B0C");
     setNumber("OT - Room Setpoint", state.scenario === "cooling" ? 23.0 : 21.0, "\u00B0C");
     setNumber("OT - Room Temperature", Number(getEntity("sensor", "Room Temperature (Selected)")?.value || 20.6), "\u00B0C");
@@ -2163,7 +2266,13 @@
     const waveInt = (base, amp, offset = 0) => Math.round(base + Math.sin(t + offset) * amp);
     const single = state.installation === "single";
 
-    syncMqttDewPointAgeEntity();
+    syncMqttInputAgeEntities();
+    setNumber("MQTT Outside Temperature", wave(14.9, 0.2), "°C");
+    setNumber("MQTT Room Temperature", wave(state.scenario === "cooling" ? 24.0 : 21.0, 0.08, 0.3), "°C");
+    setNumber("MQTT Room Setpoint", state.scenario === "cooling" ? 23.0 : 21.0, "°C");
+    setBinary("MQTT Outside Temperature Valid", true);
+    setBinary("MQTT Room Temperature Valid", true);
+    setBinary("MQTT Room Setpoint Valid", true);
     setBinary("Silent active", false);
     setBinary("Sticky pump active", false);
     setBinary("HP1 - Defrost", false);
@@ -3865,6 +3974,9 @@
       }
       if (url.pathname === "/mqtt/save" && method === "POST") {
         return handleMqttSave(init || {});
+      }
+      if (url.pathname === "/mqtt/input/save" && method === "POST") {
+        return handleMqttInputSave(init || {});
       }
       if (url.pathname.endsWith("/openquatt/logs/recent") && String(init?.method || "GET").toUpperCase() === "GET") {
         return mockResponse(200, {

@@ -4216,6 +4216,26 @@
       && isInstallationMonitoringBinaryActive(validKey)
     );
     const hasHaSource = (config = {}) => hasValidHaSource(getHaValueKey(config), getHaValidKey(config));
+    const mqttTopicKeyByValueKey = {
+      mqttCoolingDewPoint: "cooling_dew_point",
+      mqttOutsideTemperature: "outside_temperature",
+      mqttRoomTemperature: "room_temperature",
+      mqttRoomSetpoint: "room_setpoint",
+      mqttHeatingEnable: "heating_enable",
+      mqttCoolingEnable: "cooling_enable",
+    };
+    const getMqttTopicKey = (config = {}) => config.mqttTopicKey || mqttTopicKeyByValueKey[config.valueKey] || "";
+    const isMqttInputTopicEnabled = (topicKey = "") => {
+      if (!topicKey) {
+        return true;
+      }
+      const inputEnabled = state.mqttStatus?.input_enabled;
+      if (inputEnabled && typeof inputEnabled === "object" && Object.prototype.hasOwnProperty.call(inputEnabled, topicKey)) {
+        return inputEnabled[topicKey] !== false;
+      }
+      return true;
+    };
+    const isMqttOption = (option) => /\bMQTT\b/i.test(String(option || ""));
     const isSourceAvailable = (option, config = {}) => {
       if (option === "CIC") {
         return cicAvailable;
@@ -4228,6 +4248,9 @@
       }
       if (option === "CIC or HA input") {
         return cicAvailable || hasHaSource(config);
+      }
+      if (isMqttOption(option)) {
+        return isMqttInputTopicEnabled(getMqttTopicKey(config));
       }
       if (option === "Flowmeter HP2") {
         return hasEntity("hp2Flow");
@@ -4249,6 +4272,9 @@
       }
       if (option === "CIC or HA input" && !cicAvailable && !hasHaSource(config)) {
         return "CIC en HA ontbreken";
+      }
+      if (isMqttOption(option) && !isMqttInputTopicEnabled(getMqttTopicKey(config))) {
+        return "MQTT-topic staat uit";
       }
       if (option === "Flowmeter HP2" && !hasEntity("hp2Flow")) {
         return "HP2-flow ontbreekt";
@@ -4305,23 +4331,30 @@
     };
     const getOutsideTempUsedSource = () => {
       const source = String(getEntityValue("outsideTempSource") || "").trim();
+      if (source === "MQTT" && !isMqttInputTopicEnabled("outside_temperature")) {
+        return "MQTT-topic staat uit";
+      }
       if (source !== "Auto") {
         return formatSettingsOptionLabel(source);
       }
       const unitTemp = getEntityNumericValue("outsideTempLocalAggregated");
       const haTemp = getEntityNumericValue("outsideTempHa");
+      const mqttTemp = getEntityNumericValue("mqttOutsideTemperature");
       const unitValid = !Number.isNaN(unitTemp);
       const haValid = hasEntity("outsideTempHaValid")
         ? isInstallationMonitoringBinaryActive("outsideTempHaValid") && !Number.isNaN(haTemp)
         : !Number.isNaN(haTemp);
-      if (unitValid && haValid) {
-        return haTemp <= unitTemp ? "HA-invoer" : "Buitenunit";
-      }
-      if (haValid) {
-        return "HA-invoer";
-      }
-      if (unitValid) {
-        return "Buitenunit";
+      const mqttValid = isMqttInputTopicEnabled("outside_temperature")
+        && hasEntity("mqttOutsideTemperatureValid")
+        && isInstallationMonitoringBinaryActive("mqttOutsideTemperatureValid")
+        && !Number.isNaN(mqttTemp);
+      const candidates = [
+        unitValid ? { label: "Buitenunit", value: unitTemp } : null,
+        haValid ? { label: "HA-invoer", value: haTemp } : null,
+        mqttValid ? { label: "MQTT", value: mqttTemp } : null,
+      ].filter(Boolean);
+      if (candidates.length) {
+        return candidates.reduce((best, item) => (item.value < best.value ? item : best), candidates[0]).label;
       }
       return "Auto";
     };
@@ -4353,11 +4386,15 @@
         return isValidNumericSource("coolingDewPointHa", "coolingDewPointHaValid") ? "HA-invoer" : "HA-invoer ontbreekt";
       }
       if (source === "MQTT") {
-        return isValidNumericSource("mqttCoolingDewPoint", "mqttCoolingDewPointValid") ? "MQTT" : "MQTT ontbreekt";
+        if (!isMqttInputTopicEnabled("cooling_dew_point")) {
+          return "MQTT-topic staat uit";
+        }
+        return isValidNumericSource("mqttCoolingDewPoint", "mqttCoolingDewPointValid") ? "MQTT" : "MQTT ontbreekt of verouderd";
       }
 
       const haValid = isValidNumericSource("coolingDewPointHa", "coolingDewPointHaValid");
-      const mqttValid = isValidNumericSource("mqttCoolingDewPoint", "mqttCoolingDewPointValid");
+      const mqttValid = isMqttInputTopicEnabled("cooling_dew_point") &&
+        isValidNumericSource("mqttCoolingDewPoint", "mqttCoolingDewPointValid");
       if (haValid && mqttValid) {
         const ha = getNumericSourceValue("coolingDewPointHa");
         const mqtt = getNumericSourceValue("mqttCoolingDewPoint");
@@ -4401,6 +4438,26 @@
         key: valueKey,
         value,
         status: valid ? "Geldig" : "Ongeldig",
+        statusTone: valid ? "valid" : "invalid",
+        statusTitle,
+      })];
+    };
+    const renderMqttSourceRows = ({ label = "MQTT", valueKey = "", validKey = "", value = "", topicKey = "" }) => {
+      if (!valueKey || !validKey || !hasEntity(valueKey) || !hasEntity(validKey)) {
+        return [];
+      }
+      if (!isMqttInputTopicEnabled(topicKey || mqttTopicKeyByValueKey[valueKey])) {
+        return [];
+      }
+      const valid = isInstallationMonitoringBinaryActive(validKey);
+      const statusTitle = valid
+        ? "MQTT heeft een geldige, recente waarde ontvangen. OpenQuatt mag deze MQTT-invoer gebruiken."
+        : "MQTT heeft nog geen geldige recente waarde ontvangen. OpenQuatt gebruikt deze MQTT-invoer dan niet als bron.";
+      return [renderSourceRow({
+        label,
+        key: valueKey,
+        value: valid ? value : "—",
+        status: getMqttValidityLabel(validKey),
         statusTone: valid ? "valid" : "invalid",
         statusTitle,
       })];
@@ -4525,7 +4582,7 @@
         key: "room-temperature",
         title: "Kamertemperatuur",
         icon: "thermometer",
-        select: { key: "roomTempSource", label: "Bron", haKeys: ["roomTempHa", "roomTempHaValid"] },
+        select: { key: "roomTempSource", label: "Bron", haKeys: ["roomTempHa", "roomTempHaValid"], mqttTopicKey: "room_temperature" },
         activeRows: [
           renderSourceRow({ label: "Waarde", key: "roomTemp" }),
           renderSourceRow({ label: "Bron", value: formattedTextSourceValue("roomTempEffectiveSource") }),
@@ -4534,13 +4591,14 @@
           cicAvailable ? renderSourceRow({ label: "CIC", key: "cicRoomTemp" }) : "",
           otAvailable ? renderSourceRow({ label: "OpenTherm", key: "otRoomTemp" }) : "",
           ...renderHaSourceRows({ valueKey: "roomTempHa", validKey: "roomTempHaValid" }),
+          ...renderMqttSourceRows({ valueKey: "mqttRoomTemperature", validKey: "mqttRoomTemperatureValid" }),
         ],
       }),
       renderSourceCard({
         key: "room-setpoint",
         title: "Kamer setpoint",
         icon: "target",
-        select: { key: "roomSetpointSource", label: "Bron", haKeys: ["roomSetpointHa", "roomSetpointHaValid"] },
+        select: { key: "roomSetpointSource", label: "Bron", haKeys: ["roomSetpointHa", "roomSetpointHaValid"], mqttTopicKey: "room_setpoint" },
         activeRows: [
           renderSourceRow({ label: "Waarde", key: "roomSetpoint" }),
           renderSourceRow({ label: "Bron", value: formattedTextSourceValue("roomSetpointEffectiveSource") }),
@@ -4549,6 +4607,7 @@
           cicAvailable ? renderSourceRow({ label: "CIC", key: "cicRoomSetpoint" }) : "",
           otAvailable ? renderSourceRow({ label: "OpenTherm", key: "otRoomSetpoint" }) : "",
           ...renderHaSourceRows({ valueKey: "roomSetpointHa", validKey: "roomSetpointHaValid" }),
+          ...renderMqttSourceRows({ valueKey: "mqttRoomSetpoint", validKey: "mqttRoomSetpointValid" }),
         ],
       }),
       renderSourceCard({
@@ -4614,10 +4673,11 @@
           key: "outsideTempSource",
           label: "Buiten bron",
           haKeys: ["outsideTempHa", "outsideTempHaValid"],
+          mqttTopicKey: "outside_temperature",
           infoId: "outsideTempSource-auto-info",
           infoCopy: hasValidHaSource("outsideTempHa", "outsideTempHaValid")
-            ? "Auto gebruikt de laagste geldige buitentemperatuurbron. Zijn zowel buitenunit als HA-invoer geldig, dan kiest OpenQuatt de laagste waarde. Is er maar een van beide geldig, dan wordt die gebruikt."
-            : "Auto gebruikt de geldige buitentemperatuur van de buitenunit.",
+            ? "Auto gebruikt de laagste geldige buitentemperatuurbron. Zijn buitenunit, HA-invoer en MQTT geldig, dan kiest OpenQuatt de laagste waarde. Is er maar een bron geldig, dan wordt die gebruikt."
+            : "Auto gebruikt de laagste geldige buitentemperatuurbron.",
         },
         activeRows: [
           renderSourceRow({ label: "Waarde", key: "outsideTempSelected" }),
@@ -4626,6 +4686,7 @@
         measurementRows: [
           renderSourceRow({ label: "Buitenunit", key: "outsideTempLocalAggregated" }),
           ...renderHaSourceRows({ valueKey: "outsideTempHa", validKey: "outsideTempHaValid" }),
+          ...renderMqttSourceRows({ valueKey: "mqttOutsideTemperature", validKey: "mqttOutsideTemperatureValid" }),
         ],
       }),
       renderSourceCard({
@@ -4637,20 +4698,26 @@
           label: "Bron",
           optionLabels: { Disabled: "Niet gebruiken" },
           haKeys: ["heatingEnableHa", "heatingEnableHaValid"],
+          mqttTopicKey: "heating_enable",
           keepUnavailableCurrent: true,
         },
         activeRows: [
-          renderSourceRow({ label: "Toegestaan", value: sourceStateText("heatingEnableSelected", "Ja", "Nee") }),
-          renderSourceRow({ label: "Externe bron", value: formattedTextSourceValue("heatingEnableEffectiveSource") }),
+          renderSourceRow({ label: "Waarde", value: sourceStateText("heatingEnableSelected", "Toegestaan", "Geblokkeerd") }),
+          renderSourceRow({ label: "Bron", value: formattedTextSourceValue("heatingEnableEffectiveSource") }),
         ],
         measurementRows: [
           renderSourceRow({ label: "Bronselectie", value: sourceStateText("heatingEnableValid", "Geldig", "Ongeldig") }),
-          otAvailable ? renderSourceRow({ label: "OpenTherm", value: sourceStateText("otThermostatChEnable", "Toestemming", "Geen toestemming") }) : "",
-          cicAvailable ? renderSourceRow({ label: "CIC", value: sourceStateText("cicChEnabled", "Toestemming", "Geen toestemming") }) : "",
+          otAvailable ? renderSourceRow({ label: "OpenTherm", value: sourceStateText("otThermostatChEnable", "Toegestaan", "Geblokkeerd") }) : "",
+          cicAvailable ? renderSourceRow({ label: "CIC", value: sourceStateText("cicChEnabled", "Toegestaan", "Geblokkeerd") }) : "",
           ...renderHaSourceRows({
             valueKey: "heatingEnableHa",
             validKey: "heatingEnableHaValid",
-            value: sourceStateText("heatingEnableHa", "Toestemming", "Geen toestemming"),
+            value: sourceStateText("heatingEnableHa", "Toegestaan", "Geblokkeerd"),
+          }),
+          ...renderMqttSourceRows({
+            valueKey: "mqttHeatingEnable",
+            validKey: "mqttHeatingEnableValid",
+            value: sourceStateText("mqttHeatingEnable", "Toegestaan", "Geblokkeerd"),
           }),
         ],
       }),
@@ -4662,18 +4729,24 @@
           key: "coolingEnableSource",
           label: "Bron",
           haKeys: ["coolingEnableHa", "coolingEnableHaValid"],
+          mqttTopicKey: "cooling_enable",
         },
         activeRows: [
-          renderSourceRow({ label: "Waarde", value: sourceStateText("coolingEnableSelected", "Actief", "Niet actief") }),
+          renderSourceRow({ label: "Waarde", value: sourceStateText("coolingEnableSelected", "Toegestaan", "Geblokkeerd") }),
           renderSourceRow({ label: "Bron", value: formattedTextSourceValue("coolingEnableEffectiveSource") }),
         ],
         measurementRows: [
           renderSourceRow({ label: "Handmatig", value: sourceStateText("manualCoolingEnable", "Aan", "Uit") }),
-          cicAvailable ? renderSourceRow({ label: "CIC", value: sourceStateText("cicCoolingEnabled", "Actief", "Normaal") }) : "",
+          cicAvailable ? renderSourceRow({ label: "CIC", value: sourceStateText("cicCoolingEnabled", "Toegestaan", "Geblokkeerd") }) : "",
           ...renderHaSourceRows({
             valueKey: "coolingEnableHa",
             validKey: "coolingEnableHaValid",
-            value: sourceStateText("coolingEnableHa", "Actief", "Normaal"),
+            value: sourceStateText("coolingEnableHa", "Toegestaan", "Geblokkeerd"),
+          }),
+          ...renderMqttSourceRows({
+            valueKey: "mqttCoolingEnable",
+            validKey: "mqttCoolingEnableValid",
+            value: sourceStateText("mqttCoolingEnable", "Toegestaan", "Geblokkeerd"),
           }),
         ],
       }),
@@ -4685,6 +4758,7 @@
           key: "coolingDewPointSource",
           label: "Bron",
           haKeys: ["coolingDewPointHa", "coolingDewPointHaValid"],
+          mqttTopicKey: "cooling_dew_point",
           infoId: "coolingDewPointSource-info",
           infoCopy: "Auto gebruikt de hoogste geldige waarde als Home Assistant en MQTT tegelijk geldig zijn. Kies Home Assistant of MQTT om die bron expliciet te vereisen.",
         },
@@ -4694,17 +4768,7 @@
         ],
         measurementRows: [
           ...renderHaSourceRows({ valueKey: "coolingDewPointHa", validKey: "coolingDewPointHaValid" }),
-          renderSourceRow({
-            label: "MQTT",
-            value: isInstallationMonitoringBinaryActive("mqttCoolingDewPointValid")
-              ? getSettingsStatValue("mqttCoolingDewPoint")
-              : "—",
-            status: hasEntity("mqttCoolingDewPointValid") ? getMqttDewPointValidityLabel() : "",
-            statusTone: isInstallationMonitoringBinaryActive("mqttCoolingDewPointValid") ? "valid" : "invalid",
-            statusTitle: isInstallationMonitoringBinaryActive("mqttCoolingDewPointValid")
-              ? "MQTT heeft een geldige, recente dauwpuntwaarde ontvangen."
-              : "MQTT heeft nog geen geldige recente dauwpuntwaarde ontvangen.",
-          }),
+          ...renderMqttSourceRows({ valueKey: "mqttCoolingDewPoint", validKey: "mqttCoolingDewPointValid" }),
         ],
       }),
     ].filter(Boolean);
@@ -4722,14 +4786,14 @@
   }
 
   function renderSettingsMqttSection() {
-    const liveValue = formatMqttDewPointValue();
+    const sensorSummary = formatMqttSensorValiditySummary();
     const mqttEnabled = state.mqttStatus?.enabled === true;
     const sensorsPanel = mqttEnabled ? `
       <section class="oq-settings-mqtt-panel oq-settings-mqtt-panel--sensors oq-settings-mqtt-panel--compact">
         <div class="oq-settings-quickstart-status-row oq-settings-mqtt-status-row">
           <div>
             <p class="oq-settings-quickstart-status-label">MQTT sensoren</p>
-            <strong class="oq-settings-quickstart-status-value">Dauwpunt: ${escapeHtml(liveValue)}</strong>
+            <strong class="oq-settings-quickstart-status-value">${escapeHtml(sensorSummary)}</strong>
           </div>
           <button
             class="oq-helper-button oq-helper-button--ghost"

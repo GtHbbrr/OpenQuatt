@@ -2096,6 +2096,9 @@
     const inputTopics = status.input_topics && typeof status.input_topics === "object"
       ? status.input_topics
       : {};
+    const inputEnabled = status.input_enabled && typeof status.input_enabled === "object"
+      ? status.input_enabled
+      : {};
     return [
       status.enabled ? "on" : "off",
       status.connected ? "connected" : "idle",
@@ -2105,9 +2108,39 @@
       status.password_set ? "password" : "nopassword",
       String(status.dew_point_topic || ""),
       JSON.stringify(inputTopics),
+      JSON.stringify(inputEnabled),
       String(status.source || ""),
       String(status.csrf_token || ""),
     ].join(":");
+  }
+
+  function getMqttSensorsModalRenderSignature() {
+    return [
+      state.systemModal,
+      state.mqttExpandedTopicKey || "",
+      state.mqttCopiedTopicKey || "",
+      state.mqttInputToggleBusyKey || "",
+      state.mqttError || "",
+      getMqttStatusSignature(),
+      getEntitySignatureFragment("mqttCoolingDewPoint"),
+      getEntitySignatureFragment("mqttCoolingDewPointAge"),
+      getEntitySignatureFragment("mqttCoolingDewPointValid"),
+      getEntitySignatureFragment("mqttOutsideTemperature"),
+      getEntitySignatureFragment("mqttOutsideTemperatureAge"),
+      getEntitySignatureFragment("mqttOutsideTemperatureValid"),
+      getEntitySignatureFragment("mqttRoomTemperature"),
+      getEntitySignatureFragment("mqttRoomTemperatureAge"),
+      getEntitySignatureFragment("mqttRoomTemperatureValid"),
+      getEntitySignatureFragment("mqttRoomSetpoint"),
+      getEntitySignatureFragment("mqttRoomSetpointAge"),
+      getEntitySignatureFragment("mqttRoomSetpointValid"),
+      getEntitySignatureFragment("mqttHeatingEnable"),
+      getEntitySignatureFragment("mqttHeatingEnableAge"),
+      getEntitySignatureFragment("mqttHeatingEnableValid"),
+      getEntitySignatureFragment("mqttCoolingEnable"),
+      getEntitySignatureFragment("mqttCoolingEnableAge"),
+      getEntitySignatureFragment("mqttCoolingEnableValid"),
+    ].join("|");
   }
 
   function syncMqttDraftsFromStatus() {
@@ -2318,6 +2351,13 @@
       Object.entries(rawInputTopics).forEach(([key, value]) => {
         inputTopics[String(key)] = String(value || "");
       });
+      const rawInputEnabled = payload.input_enabled && typeof payload.input_enabled === "object"
+        ? payload.input_enabled
+        : {};
+      const inputEnabled = {};
+      Object.entries(rawInputEnabled).forEach(([key, value]) => {
+        inputEnabled[String(key)] = value !== false && String(value).toLowerCase() !== "false";
+      });
       const coolingDewPointTopic = String(inputTopics.cooling_dew_point || payload.dew_point_topic || "");
       inputTopics.cooling_dew_point = coolingDewPointTopic;
       const nextStatus = {
@@ -2329,6 +2369,7 @@
         password_set: Boolean(payload.password_set),
         dew_point_topic: coolingDewPointTopic,
         input_topics: inputTopics,
+        input_enabled: inputEnabled,
         source: String(payload.source || ""),
         csrf_token: String(payload.csrf_token || ""),
       };
@@ -2377,21 +2418,78 @@
     return success;
   }
 
-  async function copyMqttDewPointTopic() {
-    const topic = getMqttInputTopic("cooling_dew_point");
+  async function copyMqttTopic(topicKey = "cooling_dew_point") {
+    const topic = getMqttInputTopic(topicKey);
     if (!topic) {
       state.mqttError = "MQTT-topic is nog niet geladen.";
+      state.mqttCopiedTopicKey = "";
       render();
       return;
     }
     try {
       const copied = await copyTextToClipboard(topic);
-      state.mqttNotice = copied ? "MQTT-topic gekopieerd." : "Kopiëren is niet gelukt.";
-      state.mqttError = "";
+      state.mqttNotice = "";
+      state.mqttError = copied ? "" : "Kopiëren is niet gelukt.";
+      state.mqttCopiedTopicKey = copied ? topicKey : "";
+      if (state.mqttCopiedTopicTimer) {
+        window.clearTimeout(state.mqttCopiedTopicTimer);
+      }
+      if (copied) {
+        state.mqttCopiedTopicTimer = window.setTimeout(() => {
+          state.mqttCopiedTopicKey = "";
+          state.mqttCopiedTopicTimer = null;
+          if (state.systemModal === "mqtt-sensors") {
+            render();
+          }
+        }, 1800);
+      }
     } catch (error) {
       state.mqttError = `Kopiëren is mislukt. ${error.message}`;
+      state.mqttCopiedTopicKey = "";
     }
     render();
+  }
+
+  async function commitMqttInputEnabled(topicKey, enabled) {
+    const status = state.mqttStatus || {};
+    if (!status.csrf_token) {
+      state.mqttError = "MQTT-status wordt nog geladen. Probeer het zo opnieuw.";
+      render();
+      return;
+    }
+
+    state.mqttInputToggleBusyKey = topicKey;
+    state.mqttNotice = "";
+    state.mqttError = "";
+    render();
+
+    try {
+      const params = new URLSearchParams();
+      params.set("csrf_token", status.csrf_token);
+      params.set("input", topicKey);
+      params.set("enabled", enabled ? "true" : "false");
+
+      const response = await fetch("/mqtt/input/save", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: params,
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || payload?.ok === false) {
+        throw new Error(payload?.error || `HTTP ${response.status}`);
+      }
+      state.lastMqttStatusRefreshAt = 0;
+      await refreshMqttStatus({ force: true });
+    } catch (error) {
+      state.mqttError = `MQTT-topic kon niet worden opgeslagen. ${error.message}`;
+    } finally {
+      if (state.mqttInputToggleBusyKey === topicKey) {
+        state.mqttInputToggleBusyKey = "";
+      }
+      render();
+    }
   }
 
   async function restartForApiSecurityChange() {
@@ -3557,11 +3655,14 @@
         render();
         return;
       }
-      if (mqttChanged && state.appView === "settings") {
-        render();
+      if (state.systemModal === "mqtt-sensors") {
+        const nextMqttSensorsSignature = getMqttSensorsModalRenderSignature();
+        if (nextMqttSensorsSignature !== state.mqttSensorsModalRenderSignature) {
+          render();
+        }
         return;
       }
-      if (state.systemModal === "mqtt-sensors") {
+      if (mqttChanged && state.appView === "settings") {
         render();
         return;
       }
@@ -4227,13 +4328,34 @@
       state.systemModal = "mqtt-sensors";
       state.mqttNotice = "";
       state.mqttError = "";
+      state.mqttCopiedTopicKey = "";
+      state.mqttExpandedTopicKey = "";
+      state.mqttInputToggleBusyKey = "";
       render();
-      void refreshMqttStatus({ force: true });
+      void refreshMqttStatus({ force: true }).then((changed) => {
+        if (changed && state.systemModal === "mqtt-sensors") {
+          render();
+        }
+      });
       return;
     }
 
-    if (action === "copy-mqtt-dew-topic") {
-      void copyMqttDewPointTopic();
+    if (action === "toggle-mqtt-sensor-topic") {
+      const topicKey = button.dataset?.oqMqttTopicKey || "cooling_dew_point";
+      state.mqttExpandedTopicKey = state.mqttExpandedTopicKey === topicKey ? "" : topicKey;
+      state.mqttError = "";
+      render();
+      return;
+    }
+
+    if (action === "toggle-mqtt-input") {
+      const topicKey = button.dataset?.oqMqttTopicKey || "cooling_dew_point";
+      void commitMqttInputEnabled(topicKey, !isMqttInputEnabled(topicKey));
+      return;
+    }
+
+    if (action === "copy-mqtt-topic" || action === "copy-mqtt-dew-topic") {
+      void copyMqttTopic(button.dataset?.oqMqttTopicKey || "cooling_dew_point");
       return;
     }
 

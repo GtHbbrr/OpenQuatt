@@ -104,7 +104,7 @@ const char *skip_spaces_(const char *cursor) {
   return cursor;
 }
 
-bool parse_dew_point_scalar_(const char *payload, float *value) {
+bool parse_numeric_scalar_(const char *payload, float *value) {
   if (payload == nullptr || value == nullptr) {
     return false;
   }
@@ -142,7 +142,7 @@ bool parse_dew_point_scalar_(const char *payload, float *value) {
   return true;
 }
 
-bool parse_dew_point_json_(const char *payload, float *value) {
+bool parse_numeric_json_(const char *payload, float *value) {
   if (payload == nullptr || value == nullptr) {
     return false;
   }
@@ -159,22 +159,100 @@ bool parse_dew_point_json_(const char *payload, float *value) {
     *value = static_cast<float>(item->valuedouble);
     ok = std::isfinite(*value);
   } else if (cJSON_IsString(item) && item->valuestring != nullptr) {
-    ok = parse_dew_point_scalar_(item->valuestring, value);
+    ok = parse_numeric_scalar_(item->valuestring, value);
   }
 
   cJSON_Delete(root);
   return ok;
 }
 
-bool parse_dew_point_payload_(const char *payload, float *value) {
+bool parse_numeric_payload_(const char *payload, float *value) {
   const char *trimmed = skip_spaces_(payload);
   if (trimmed == nullptr || *trimmed == '\0') {
     return false;
   }
   if (*trimmed == '{' || *trimmed == '[') {
-    return parse_dew_point_json_(trimmed, value);
+    return parse_numeric_json_(trimmed, value);
   }
-  return parse_dew_point_scalar_(trimmed, value);
+  return parse_numeric_scalar_(trimmed, value);
+}
+
+std::string lowercase_trimmed_(const char *payload) {
+  std::string out;
+  const char *cursor = skip_spaces_(payload);
+  if (cursor == nullptr) {
+    return out;
+  }
+  while (*cursor != '\0') {
+    out.push_back(static_cast<char>(std::tolower(static_cast<unsigned char>(*cursor))));
+    cursor++;
+  }
+  while (!out.empty() && std::isspace(static_cast<unsigned char>(out.back())) != 0) {
+    out.pop_back();
+  }
+  return out;
+}
+
+bool parse_binary_scalar_(const char *payload, bool *value) {
+  if (payload == nullptr || value == nullptr) {
+    return false;
+  }
+  const std::string text = lowercase_trimmed_(payload);
+  if (text.empty()) {
+    return false;
+  }
+  if (text == "1" || text == "true" || text == "on" || text == "yes") {
+    *value = true;
+    return true;
+  }
+  if (text == "0" || text == "false" || text == "off" || text == "no") {
+    *value = false;
+    return true;
+  }
+  return false;
+}
+
+bool parse_binary_json_(const char *payload, bool *value) {
+  if (payload == nullptr || value == nullptr) {
+    return false;
+  }
+
+  const size_t len = strlen(payload);
+  cJSON *root = cJSON_ParseWithLength(payload, len);
+  if (root == nullptr) {
+    return false;
+  }
+
+  bool ok = false;
+  const cJSON *item = cJSON_IsObject(root) ? cJSON_GetObjectItemCaseSensitive(root, "value") : root;
+  if (cJSON_IsBool(item)) {
+    *value = cJSON_IsTrue(item);
+    ok = true;
+  } else if (cJSON_IsNumber(item)) {
+    if (item->valuedouble == 0.0) {
+      *value = false;
+      ok = true;
+    } else if (item->valuedouble == 1.0) {
+      *value = true;
+      ok = true;
+    }
+  } else if (cJSON_IsString(item) && item->valuestring != nullptr) {
+    ok = parse_binary_scalar_(item->valuestring, value);
+  }
+
+  cJSON_Delete(root);
+  return ok;
+}
+
+bool parse_binary_payload_(const char *payload, bool *value) {
+  const char *trimmed = skip_spaces_(payload);
+  if (trimmed == nullptr || *trimmed == '\0') {
+    return false;
+  }
+  if (*trimmed == '{' || *trimmed == '[') {
+    return parse_binary_json_(trimmed, value);
+  }
+  return parse_binary_scalar_(trimmed, value);
 }
 
 class MqttConfigHandler : public AsyncWebHandler {
@@ -190,6 +268,9 @@ class MqttConfigHandler : public AsyncWebHandler {
     if (url == "/mqtt/save" && request->method() == HTTP_POST) {
       return true;
     }
+    if (url == "/mqtt/input/save" && request->method() == HTTP_POST) {
+      return true;
+    }
     return false;
   }
 
@@ -200,15 +281,38 @@ class MqttConfigHandler : public AsyncWebHandler {
       const auto status = this->parent_->get_status_snapshot();
       const std::string broker = json_escape_(status.broker);
       const std::string username = json_escape_(status.username);
+      const auto outside_index =
+          static_cast<size_t>(OpenQuattMqttConfig::NumericInputKind::OUTSIDE_TEMPERATURE);
+      const auto room_temp_index =
+          static_cast<size_t>(OpenQuattMqttConfig::NumericInputKind::ROOM_TEMPERATURE);
+      const auto room_setpoint_index =
+          static_cast<size_t>(OpenQuattMqttConfig::NumericInputKind::ROOM_SETPOINT);
+      const auto heating_enable_index =
+          static_cast<size_t>(OpenQuattMqttConfig::BinaryInputKind::HEATING_ENABLE);
+      const auto cooling_enable_index =
+          static_cast<size_t>(OpenQuattMqttConfig::BinaryInputKind::COOLING_ENABLE);
       const std::string topic = json_escape_(status.dew_point_topic);
+      const std::string outside_topic = json_escape_(status.input_topics[outside_index]);
+      const std::string room_temp_topic = json_escape_(status.input_topics[room_temp_index]);
+      const std::string room_setpoint_topic = json_escape_(status.input_topics[room_setpoint_index]);
+      const std::string heating_enable_topic = json_escape_(status.binary_input_topics[heating_enable_index]);
+      const std::string cooling_enable_topic = json_escape_(status.binary_input_topics[cooling_enable_index]);
       const std::string source = json_escape_(status.config_source);
       const std::string csrf_token = json_escape_(status.csrf_token);
       auto *stream = request->beginResponseStream("application/json");
       stream->printf(
-          R"({"enabled":%s,"connected":%s,"broker":"%s","port":%u,"username":"%s","password_set":%s,"dew_point_topic":"%s","input_topics":{"cooling_dew_point":"%s"},"source":"%s","csrf_token":"%s"})",
+          R"({"enabled":%s,"connected":%s,"broker":"%s","port":%u,"username":"%s","password_set":%s,"dew_point_topic":"%s","input_topics":{"cooling_dew_point":"%s","outside_temperature":"%s","room_temperature":"%s","room_setpoint":"%s","heating_enable":"%s","cooling_enable":"%s"},"input_enabled":{"cooling_dew_point":%s,"outside_temperature":%s,"room_temperature":%s,"room_setpoint":%s,"heating_enable":%s,"cooling_enable":%s},"source":"%s","csrf_token":"%s"})",
           status.enabled ? "true" : "false", status.connected ? "true" : "false", broker.c_str(), status.port,
-          username.c_str(), status.password_set ? "true" : "false", topic.c_str(), topic.c_str(), source.c_str(),
-          csrf_token.c_str());
+          username.c_str(), status.password_set ? "true" : "false", topic.c_str(), topic.c_str(),
+          outside_topic.c_str(), room_temp_topic.c_str(), room_setpoint_topic.c_str(), heating_enable_topic.c_str(),
+          cooling_enable_topic.c_str(),
+          status.input_enabled[static_cast<size_t>(OpenQuattMqttConfig::NumericInputKind::COOLING_DEW_POINT)] ? "true" : "false",
+          status.input_enabled[outside_index] ? "true" : "false",
+          status.input_enabled[room_temp_index] ? "true" : "false",
+          status.input_enabled[room_setpoint_index] ? "true" : "false",
+          status.binary_input_enabled[heating_enable_index] ? "true" : "false",
+          status.binary_input_enabled[cooling_enable_index] ? "true" : "false",
+          source.c_str(), csrf_token.c_str());
       request->send(stream);
       return;
     }
@@ -263,6 +367,28 @@ class MqttConfigHandler : public AsyncWebHandler {
       return;
     }
 
+    if (url == "/mqtt/input/save" && request->method() == HTTP_POST) {
+      if (!this->passes_same_origin_(request) || !this->passes_csrf_(request)) {
+        request->send(403, "application/json", R"({"ok":false,"error":"forbidden"})");
+        return;
+      }
+
+      const std::string input = request->arg("input");
+      const std::string enabled_arg = request->arg("enabled");
+      const bool enabled = enabled_arg == "true" || enabled_arg == "1" || enabled_arg == "on";
+      if (!this->parent_->set_input_enabled(input, enabled)) {
+        request->send(409, "application/json", R"({"ok":false,"error":"save_failed"})");
+        return;
+      }
+
+      const auto status = this->parent_->get_status_snapshot();
+      auto *stream = request->beginResponseStream("application/json");
+      stream->printf(R"({"ok":true,"enabled":%s,"connected":%s})", enabled ? "true" : "false",
+                     status.connected ? "true" : "false");
+      request->send(stream);
+      return;
+    }
+
     request->send(404, "application/json", R"({"ok":false,"error":"not_found"})");
   }
 
@@ -312,7 +438,7 @@ void OpenQuattMqttConfig::setup() {
   Storage storage{};
   if (!this->load_storage_(&storage)) {
     if (!this->build_storage_(this->bootstrap_broker_, this->bootstrap_port_, this->bootstrap_username_,
-                              this->bootstrap_password_, this->default_enabled_, &storage) ||
+                              this->bootstrap_password_, this->default_enabled_, 0U, &storage) ||
         !this->save_storage_(storage)) {
       ESP_LOGE(TAG, "MQTT bootstrap configuration could not be prepared");
       return;
@@ -332,7 +458,16 @@ OpenQuattMqttConfig::StatusSnapshot OpenQuattMqttConfig::get_status_snapshot() {
   snapshot.port = this->port_;
   snapshot.username = this->username_;
   snapshot.password_set = !this->password_.empty();
-  snapshot.dew_point_topic = this->dew_point_topic_;
+  for (size_t i = 0; i < this->numeric_inputs_.size(); i++) {
+    snapshot.input_topics[i] = this->numeric_inputs_[i].topic;
+    snapshot.input_enabled[i] = this->is_numeric_input_enabled_(i);
+  }
+  for (size_t i = 0; i < this->binary_inputs_.size(); i++) {
+    snapshot.binary_input_topics[i] = this->binary_inputs_[i].topic;
+    snapshot.binary_input_enabled[i] = this->is_binary_input_enabled_(i);
+  }
+  snapshot.dew_point_topic =
+      this->numeric_input_(NumericInputKind::COOLING_DEW_POINT).topic;
   snapshot.config_source = this->config_source_;
   snapshot.csrf_token = this->csrf_token_;
   this->unlock_config_();
@@ -340,7 +475,9 @@ OpenQuattMqttConfig::StatusSnapshot OpenQuattMqttConfig::get_status_snapshot() {
 }
 
 void OpenQuattMqttConfig::loop() {
-  this->consume_pending_dew_point_payload_();
+  this->consume_pending_numeric_payloads_();
+  this->consume_pending_binary_payloads_();
+  this->process_pending_input_subscriptions_();
   this->publish_runtime_state_(this->force_publish_.exchange(false));
 }
 
@@ -350,7 +487,14 @@ void OpenQuattMqttConfig::dump_config() {
   ESP_LOGCONFIG(TAG, "  Enabled: %s", YESNO(status.enabled));
   ESP_LOGCONFIG(TAG, "  Broker: %s:%u", status.broker.empty() ? "<none>" : status.broker.c_str(), status.port);
   ESP_LOGCONFIG(TAG, "  Username: %s", status.username.empty() ? "<none>" : status.username.c_str());
-  ESP_LOGCONFIG(TAG, "  Dew point topic: %s", status.dew_point_topic.empty() ? "<none>" : status.dew_point_topic.c_str());
+  for (size_t i = 0; i < this->numeric_inputs_.size(); i++) {
+    ESP_LOGCONFIG(TAG, "  %s topic: %s", this->numeric_inputs_[i].log_name,
+                  status.input_topics[i].empty() ? "<none>" : status.input_topics[i].c_str());
+  }
+  for (size_t i = 0; i < this->binary_inputs_.size(); i++) {
+    ESP_LOGCONFIG(TAG, "  %s topic: %s", this->binary_inputs_[i].log_name,
+                  status.binary_input_topics[i].empty() ? "<none>" : status.binary_input_topics[i].c_str());
+  }
   ESP_LOGCONFIG(TAG, "  Runtime source: %s", status.config_source.empty() ? "<unknown>" : status.config_source.c_str());
   ESP_LOGCONFIG(TAG, "  HTTP handlers registered: %s", YESNO(this->handlers_registered_));
 }
@@ -363,18 +507,19 @@ bool OpenQuattMqttConfig::set_runtime_config(const std::string &broker, uint16_t
   Storage storage{};
   if (!this->load_storage_(&storage)) {
     if (!this->build_storage_(this->bootstrap_broker_, this->bootstrap_port_, this->bootstrap_username_,
-                              this->bootstrap_password_, this->default_enabled_, &storage)) {
+                              this->bootstrap_password_, this->default_enabled_, 0U, &storage)) {
       this->unlock_runtime_();
       return false;
     }
   }
+  const uint8_t input_disabled_mask = storage.input_disabled_mask & INPUT_MASK_ALL;
 
   this->lock_config_();
   const std::string current_password = this->password_;
   this->unlock_config_();
 
   const std::string next_password = clear_password ? "" : (password.empty() ? current_password : password);
-  if (!this->build_storage_(broker, port, username, next_password, enabled, &storage)) {
+  if (!this->build_storage_(broker, port, username, next_password, enabled, input_disabled_mask, &storage)) {
     this->unlock_runtime_();
     return false;
   }
@@ -385,6 +530,57 @@ bool OpenQuattMqttConfig::set_runtime_config(const std::string &broker, uint16_t
   if (!this->apply_storage_(storage, "runtime")) {
     ESP_LOGW(TAG, "MQTT configuration was saved but the client could not be started");
   }
+  this->unlock_runtime_();
+  return true;
+}
+
+bool OpenQuattMqttConfig::set_input_enabled(const std::string &key, bool enabled) {
+  uint8_t input_mask = 0;
+  if (!this->input_mask_for_key_(key, &input_mask)) {
+    return false;
+  }
+
+  this->lock_runtime_();
+  Storage storage{};
+  if (!this->load_storage_(&storage)) {
+    this->lock_config_();
+    const std::string current_broker = this->broker_;
+    const uint16_t current_port = this->port_;
+    const std::string current_username = this->username_;
+    const std::string current_password = this->password_;
+    const bool current_enabled = this->enabled_.load();
+    const uint8_t current_input_disabled_mask = this->input_disabled_mask_.load() & INPUT_MASK_ALL;
+    this->unlock_config_();
+    if (!this->build_storage_(current_broker, current_port, current_username, current_password, current_enabled,
+                              current_input_disabled_mask, &storage)) {
+      this->unlock_runtime_();
+      return false;
+    }
+  }
+
+  uint8_t input_disabled_mask = storage.input_disabled_mask & INPUT_MASK_ALL;
+  if (enabled) {
+    input_disabled_mask &= static_cast<uint8_t>(~input_mask);
+  } else {
+    input_disabled_mask |= input_mask;
+  }
+  storage.input_disabled_mask = input_disabled_mask & INPUT_MASK_ALL;
+
+  if (!this->save_storage_(storage)) {
+    this->unlock_runtime_();
+    return false;
+  }
+
+  this->lock_config_();
+  this->input_disabled_mask_.store(storage.input_disabled_mask & INPUT_MASK_ALL);
+  this->config_source_ = "runtime";
+  this->unlock_config_();
+  this->clear_disabled_inputs_();
+  if (enabled) {
+    this->resubscribe_inputs_.store(true);
+  }
+  this->force_publish_.store(true);
+  App.wake_loop_threadsafe();
   this->unlock_runtime_();
   return true;
 }
@@ -421,9 +617,11 @@ bool OpenQuattMqttConfig::apply_storage_(const Storage &storage, const char *sou
   this->username_ = storage.username;
   this->password_ = storage.password;
   this->enabled_.store(enabled);
+  this->input_disabled_mask_.store(storage.input_disabled_mask & INPUT_MASK_ALL);
   this->config_source_ = source != nullptr ? source : "";
   const bool broker_empty = this->broker_.empty();
   this->unlock_config_();
+  this->clear_disabled_inputs_();
 
   if (!enabled || broker_empty) {
     if (enabled) {
@@ -439,7 +637,8 @@ bool OpenQuattMqttConfig::apply_storage_(const Storage &storage, const char *sou
 }
 
 bool OpenQuattMqttConfig::build_storage_(const std::string &broker, uint16_t port, const std::string &username,
-                                         const std::string &password, bool enabled, Storage *storage) {
+                                         const std::string &password, bool enabled, uint8_t input_disabled_mask,
+                                         Storage *storage) {
   if (storage == nullptr) {
     return false;
   }
@@ -455,6 +654,7 @@ bool OpenQuattMqttConfig::build_storage_(const std::string &broker, uint16_t por
   storage->version = STORAGE_VERSION;
   storage->port = port;
   storage->enabled = enabled ? 1U : 0U;
+  storage->input_disabled_mask = input_disabled_mask & INPUT_MASK_ALL;
   copy_string_field_(storage->broker, BROKER_MAX_LEN, broker);
   copy_string_field_(storage->username, USERNAME_MAX_LEN, username);
   copy_string_field_(storage->password, PASSWORD_MAX_LEN, password);
@@ -564,16 +764,218 @@ void OpenQuattMqttConfig::stop_client_() {
   this->connected_.store(false);
 }
 
-void OpenQuattMqttConfig::subscribe_dew_point_(esp_mqtt_client_handle_t client) {
-  if (client == nullptr || this->dew_point_topic_.empty()) {
+void OpenQuattMqttConfig::set_numeric_input_topic_(NumericInputKind kind, const std::string &topic) {
+  this->numeric_input_(kind).topic = topic;
+}
+
+void OpenQuattMqttConfig::set_numeric_input_stale_ms_(NumericInputKind kind, uint32_t stale_ms) {
+  this->numeric_input_(kind).stale_ms = stale_ms;
+}
+
+void OpenQuattMqttConfig::set_numeric_input_sensor_(NumericInputKind kind, sensor::Sensor *sensor) {
+  this->numeric_input_(kind).sensor = sensor;
+}
+
+void OpenQuattMqttConfig::set_numeric_input_age_sensor_(NumericInputKind kind, sensor::Sensor *sensor) {
+  this->numeric_input_(kind).age_sensor = sensor;
+}
+
+void OpenQuattMqttConfig::set_numeric_input_valid_binary_sensor_(NumericInputKind kind,
+                                                                 binary_sensor::BinarySensor *binary_sensor) {
+  this->numeric_input_(kind).valid_binary_sensor = binary_sensor;
+}
+
+OpenQuattMqttConfig::NumericInput &OpenQuattMqttConfig::numeric_input_(NumericInputKind kind) {
+  return this->numeric_inputs_[static_cast<size_t>(kind)];
+}
+
+const OpenQuattMqttConfig::NumericInput &OpenQuattMqttConfig::numeric_input_(NumericInputKind kind) const {
+  return this->numeric_inputs_[static_cast<size_t>(kind)];
+}
+
+void OpenQuattMqttConfig::set_binary_input_topic_(BinaryInputKind kind, const std::string &topic) {
+  this->binary_input_(kind).topic = topic;
+}
+
+void OpenQuattMqttConfig::set_binary_input_stale_ms_(BinaryInputKind kind, uint32_t stale_ms) {
+  this->binary_input_(kind).stale_ms = stale_ms;
+}
+
+void OpenQuattMqttConfig::set_binary_input_binary_sensor_(BinaryInputKind kind,
+                                                          binary_sensor::BinarySensor *binary_sensor) {
+  this->binary_input_(kind).binary_sensor = binary_sensor;
+}
+
+void OpenQuattMqttConfig::set_binary_input_age_sensor_(BinaryInputKind kind, sensor::Sensor *sensor) {
+  this->binary_input_(kind).age_sensor = sensor;
+}
+
+void OpenQuattMqttConfig::set_binary_input_valid_binary_sensor_(BinaryInputKind kind,
+                                                                binary_sensor::BinarySensor *binary_sensor) {
+  this->binary_input_(kind).valid_binary_sensor = binary_sensor;
+}
+
+OpenQuattMqttConfig::BinaryInput &OpenQuattMqttConfig::binary_input_(BinaryInputKind kind) {
+  return this->binary_inputs_[static_cast<size_t>(kind)];
+}
+
+const OpenQuattMqttConfig::BinaryInput &OpenQuattMqttConfig::binary_input_(BinaryInputKind kind) const {
+  return this->binary_inputs_[static_cast<size_t>(kind)];
+}
+
+uint8_t OpenQuattMqttConfig::numeric_input_mask_(NumericInputKind kind) {
+  return static_cast<uint8_t>(1U << static_cast<uint8_t>(kind));
+}
+
+uint8_t OpenQuattMqttConfig::binary_input_mask_(BinaryInputKind kind) {
+  return static_cast<uint8_t>(1U << (NUMERIC_INPUT_COUNT + static_cast<uint8_t>(kind)));
+}
+
+bool OpenQuattMqttConfig::is_numeric_input_enabled_(size_t input_index) const {
+  if (input_index >= this->numeric_inputs_.size()) {
+    return false;
+  }
+  const uint8_t mask = static_cast<uint8_t>(1U << input_index);
+  return (this->input_disabled_mask_.load() & mask) == 0U;
+}
+
+bool OpenQuattMqttConfig::is_binary_input_enabled_(size_t input_index) const {
+  if (input_index >= this->binary_inputs_.size()) {
+    return false;
+  }
+  const uint8_t mask = static_cast<uint8_t>(1U << (NUMERIC_INPUT_COUNT + input_index));
+  return (this->input_disabled_mask_.load() & mask) == 0U;
+}
+
+bool OpenQuattMqttConfig::input_mask_for_key_(const std::string &key, uint8_t *mask) const {
+  if (mask == nullptr) {
+    return false;
+  }
+  for (size_t i = 0; i < this->numeric_inputs_.size(); i++) {
+    if (key == this->numeric_inputs_[i].key) {
+      *mask = static_cast<uint8_t>(1U << i);
+      return true;
+    }
+  }
+  for (size_t i = 0; i < this->binary_inputs_.size(); i++) {
+    if (key == this->binary_inputs_[i].key) {
+      *mask = static_cast<uint8_t>(1U << (NUMERIC_INPUT_COUNT + i));
+      return true;
+    }
+  }
+  return false;
+}
+
+void OpenQuattMqttConfig::clear_disabled_inputs_() {
+  const uint8_t disabled_mask = this->input_disabled_mask_.load() & INPUT_MASK_ALL;
+  portENTER_CRITICAL(&this->pending_lock_);
+  for (size_t i = 0; i < this->numeric_inputs_.size(); i++) {
+    if ((disabled_mask & static_cast<uint8_t>(1U << i)) == 0U) {
+      continue;
+    }
+    auto &input = this->numeric_inputs_[i];
+    input.pending_payload_ready = false;
+    input.last_valid_value = NAN;
+    input.last_valid_ms = 0;
+  }
+  for (size_t i = 0; i < this->binary_inputs_.size(); i++) {
+    const uint8_t mask = static_cast<uint8_t>(1U << (NUMERIC_INPUT_COUNT + i));
+    if ((disabled_mask & mask) == 0U) {
+      continue;
+    }
+    auto &input = this->binary_inputs_[i];
+    input.pending_payload_ready = false;
+    input.pending_invalid_payload_ready = false;
+    input.last_valid_value = false;
+    input.last_valid_ms = 0;
+  }
+  portEXIT_CRITICAL(&this->pending_lock_);
+}
+
+void OpenQuattMqttConfig::process_pending_input_subscriptions_() {
+  if (!this->resubscribe_inputs_.exchange(false)) {
     return;
   }
-  const int msg_id = esp_mqtt_client_subscribe(client, this->dew_point_topic_.c_str(), 0);
-  if (msg_id < 0) {
-    ESP_LOGW(TAG, "Failed to subscribe to %s", this->dew_point_topic_.c_str());
-  } else {
-    ESP_LOGI(TAG, "Subscribed to MQTT cooling dew point topic %s", this->dew_point_topic_.c_str());
+  if (!this->enabled_.load() || !this->connected_.load()) {
+    return;
   }
+
+  this->lock_runtime_();
+  esp_mqtt_client_handle_t client = this->mqtt_client_;
+  if (client != nullptr) {
+    this->subscribe_inputs_(client);
+  }
+  this->unlock_runtime_();
+}
+
+void OpenQuattMqttConfig::subscribe_inputs_(esp_mqtt_client_handle_t client) {
+  if (client == nullptr) {
+    return;
+  }
+
+  for (size_t i = 0; i < this->numeric_inputs_.size(); i++) {
+    const auto &input = this->numeric_inputs_[i];
+    if (!this->is_numeric_input_enabled_(i)) {
+      continue;
+    }
+    if (input.topic.empty()) {
+      continue;
+    }
+    const int msg_id = esp_mqtt_client_subscribe(client, input.topic.c_str(), 0);
+    if (msg_id < 0) {
+      ESP_LOGW(TAG, "Failed to subscribe to %s", input.topic.c_str());
+    } else {
+      ESP_LOGI(TAG, "Subscribed to MQTT %s topic %s", input.log_name, input.topic.c_str());
+    }
+  }
+
+  for (size_t i = 0; i < this->binary_inputs_.size(); i++) {
+    const auto &input = this->binary_inputs_[i];
+    if (!this->is_binary_input_enabled_(i)) {
+      continue;
+    }
+    if (input.topic.empty()) {
+      continue;
+    }
+    const int msg_id = esp_mqtt_client_subscribe(client, input.topic.c_str(), 0);
+    if (msg_id < 0) {
+      ESP_LOGW(TAG, "Failed to subscribe to %s", input.topic.c_str());
+    } else {
+      ESP_LOGI(TAG, "Subscribed to MQTT %s topic %s", input.log_name, input.topic.c_str());
+    }
+  }
+}
+
+int OpenQuattMqttConfig::find_numeric_input_index_by_topic_(const char *topic, int topic_len) const {
+  if (topic == nullptr || topic_len <= 0) {
+    return -1;
+  }
+
+  for (size_t i = 0; i < this->numeric_inputs_.size(); i++) {
+    const auto &input = this->numeric_inputs_[i];
+    if (this->is_numeric_input_enabled_(i) && !input.topic.empty() &&
+        input.topic.size() == static_cast<size_t>(topic_len) &&
+        memcmp(topic, input.topic.data(), topic_len) == 0) {
+      return static_cast<int>(i);
+    }
+  }
+  return -1;
+}
+
+int OpenQuattMqttConfig::find_binary_input_index_by_topic_(const char *topic, int topic_len) const {
+  if (topic == nullptr || topic_len <= 0) {
+    return -1;
+  }
+
+  for (size_t i = 0; i < this->binary_inputs_.size(); i++) {
+    const auto &input = this->binary_inputs_[i];
+    if (this->is_binary_input_enabled_(i) && !input.topic.empty() &&
+        input.topic.size() == static_cast<size_t>(topic_len) &&
+        memcmp(topic, input.topic.data(), topic_len) == 0) {
+      return static_cast<int>(i);
+    }
+  }
+  return -1;
 }
 
 void OpenQuattMqttConfig::mqtt_event_handler_(void *handler_args, esp_event_base_t base, int32_t event_id,
@@ -587,21 +989,33 @@ void OpenQuattMqttConfig::mqtt_event_handler_(void *handler_args, esp_event_base
   switch (event_id) {
     case MQTT_EVENT_CONNECTED:
       self->connected_.store(true);
-      self->subscribe_dew_point_(event->client);
+      self->subscribe_inputs_(event->client);
       break;
     case MQTT_EVENT_DISCONNECTED:
       self->connected_.store(false);
       break;
     case MQTT_EVENT_DATA:
       if (event->topic != nullptr && event->data != nullptr && event->current_data_offset == 0 &&
-          event->data_len == event->total_data_len &&
-          self->dew_point_topic_.size() == static_cast<size_t>(event->topic_len) &&
-          memcmp(event->topic, self->dew_point_topic_.data(), event->topic_len) == 0) {
-        if (event->retain) {
-          ESP_LOGW(TAG, "Ignoring retained MQTT cooling dew point payload");
+          event->data_len == event->total_data_len) {
+        const int numeric_input_index = self->find_numeric_input_index_by_topic_(event->topic, event->topic_len);
+        if (numeric_input_index >= 0) {
+          const auto &input = self->numeric_inputs_[static_cast<size_t>(numeric_input_index)];
+          if (event->retain) {
+            ESP_LOGW(TAG, "Ignoring retained MQTT %s payload", input.log_name);
+            break;
+          }
+          self->queue_numeric_payload_(static_cast<size_t>(numeric_input_index), event->data, event->data_len);
           break;
         }
-        self->queue_dew_point_payload_(event->data, event->data_len);
+        const int binary_input_index = self->find_binary_input_index_by_topic_(event->topic, event->topic_len);
+        if (binary_input_index >= 0) {
+          const auto &input = self->binary_inputs_[static_cast<size_t>(binary_input_index)];
+          if (event->retain) {
+            ESP_LOGW(TAG, "Ignoring retained MQTT %s payload", input.log_name);
+            break;
+          }
+          self->queue_binary_payload_(static_cast<size_t>(binary_input_index), event->data, event->data_len);
+        }
       }
       break;
     case MQTT_EVENT_ERROR:
@@ -612,61 +1026,150 @@ void OpenQuattMqttConfig::mqtt_event_handler_(void *handler_args, esp_event_base
   }
 }
 
-void OpenQuattMqttConfig::queue_dew_point_payload_(const char *data, int len) {
-  if (data == nullptr || len < 0) {
+void OpenQuattMqttConfig::queue_numeric_payload_(size_t input_index, const char *data, int len) {
+  if (input_index >= this->numeric_inputs_.size() || data == nullptr || len < 0) {
     return;
   }
-  size_t copy_len = 0;
+
+  auto &input = this->numeric_inputs_[input_index];
   if (static_cast<size_t>(len) >= PAYLOAD_MAX_LEN) {
-    ESP_LOGW(TAG, "Ignoring overlong MQTT cooling dew point payload (%d bytes)", len);
-  } else {
-    copy_len = std::min(static_cast<size_t>(len), PAYLOAD_MAX_LEN - 1U);
+    ESP_LOGW(TAG, "Ignoring overlong MQTT %s payload (%d bytes)", input.log_name, len);
+    return;
   }
+  const size_t copy_len = std::min(static_cast<size_t>(len), PAYLOAD_MAX_LEN - 1U);
   portENTER_CRITICAL(&this->pending_lock_);
-  memcpy(this->pending_dew_point_payload_, data, copy_len);
-  this->pending_dew_point_payload_[copy_len] = '\0';
-  this->pending_dew_point_payload_ready_ = true;
+  memcpy(input.pending_payload, data, copy_len);
+  input.pending_payload[copy_len] = '\0';
+  input.pending_payload_ready = true;
   portEXIT_CRITICAL(&this->pending_lock_);
   App.wake_loop_threadsafe();
 }
 
-void OpenQuattMqttConfig::consume_pending_dew_point_payload_() {
-  char payload[PAYLOAD_MAX_LEN]{};
-  bool ready = false;
-
-  portENTER_CRITICAL(&this->pending_lock_);
-  if (this->pending_dew_point_payload_ready_) {
-    memcpy(payload, this->pending_dew_point_payload_, sizeof(payload));
-    this->pending_dew_point_payload_ready_ = false;
-    ready = true;
+void OpenQuattMqttConfig::queue_binary_payload_(size_t input_index, const char *data, int len) {
+  if (input_index >= this->binary_inputs_.size() || data == nullptr || len < 0) {
+    return;
   }
-  portEXIT_CRITICAL(&this->pending_lock_);
 
-  if (ready) {
-    this->handle_dew_point_payload_(payload);
+  auto &input = this->binary_inputs_[input_index];
+  if (static_cast<size_t>(len) >= PAYLOAD_MAX_LEN) {
+    ESP_LOGW(TAG, "Invalidating MQTT %s after overlong payload (%d bytes)", input.log_name, len);
+    portENTER_CRITICAL(&this->pending_lock_);
+    input.pending_payload_ready = false;
+    input.pending_invalid_payload_ready = true;
+    portEXIT_CRITICAL(&this->pending_lock_);
+    App.wake_loop_threadsafe();
+    return;
+  }
+  const size_t copy_len = std::min(static_cast<size_t>(len), PAYLOAD_MAX_LEN - 1U);
+  portENTER_CRITICAL(&this->pending_lock_);
+  memcpy(input.pending_payload, data, copy_len);
+  input.pending_payload[copy_len] = '\0';
+  input.pending_payload_ready = true;
+  input.pending_invalid_payload_ready = false;
+  portEXIT_CRITICAL(&this->pending_lock_);
+  App.wake_loop_threadsafe();
+}
+
+void OpenQuattMqttConfig::consume_pending_numeric_payloads_() {
+  for (size_t i = 0; i < this->numeric_inputs_.size(); i++) {
+    char payload[PAYLOAD_MAX_LEN]{};
+    bool ready = false;
+
+    portENTER_CRITICAL(&this->pending_lock_);
+    auto &input = this->numeric_inputs_[i];
+    if (input.pending_payload_ready) {
+      memcpy(payload, input.pending_payload, sizeof(payload));
+      input.pending_payload_ready = false;
+      ready = true;
+    }
+    portEXIT_CRITICAL(&this->pending_lock_);
+
+    if (ready) {
+      this->handle_numeric_payload_(i, payload);
+    }
   }
 }
 
-void OpenQuattMqttConfig::handle_dew_point_payload_(const char *payload) {
-  if (payload == nullptr) {
+void OpenQuattMqttConfig::consume_pending_binary_payloads_() {
+  for (size_t i = 0; i < this->binary_inputs_.size(); i++) {
+    char payload[PAYLOAD_MAX_LEN]{};
+    bool ready = false;
+    bool invalid = false;
+
+    portENTER_CRITICAL(&this->pending_lock_);
+    auto &input = this->binary_inputs_[i];
+    if (input.pending_invalid_payload_ready) {
+      input.pending_invalid_payload_ready = false;
+      input.pending_payload_ready = false;
+      invalid = true;
+    } else if (input.pending_payload_ready) {
+      memcpy(payload, input.pending_payload, sizeof(payload));
+      input.pending_payload_ready = false;
+      ready = true;
+    }
+    portEXIT_CRITICAL(&this->pending_lock_);
+
+    if (invalid) {
+      this->invalidate_binary_input_(i);
+    } else if (ready) {
+      this->handle_binary_payload_(i, payload);
+    }
+  }
+}
+
+void OpenQuattMqttConfig::handle_numeric_payload_(size_t input_index, const char *payload) {
+  if (input_index >= this->numeric_inputs_.size() || payload == nullptr) {
     return;
   }
 
+  auto &input = this->numeric_inputs_[input_index];
   float value = NAN;
-  if (!parse_dew_point_payload_(payload, &value) || value < -20.0f || value > 35.0f) {
-    ESP_LOGW(TAG, "Invalidating MQTT cooling dew point after invalid payload: %s", payload);
-    this->invalidate_dew_point_();
+  if (!parse_numeric_payload_(payload, &value) || value < input.min_value || value > input.max_value) {
+    ESP_LOGW(TAG, "Invalidating MQTT %s after invalid payload: %s", input.log_name, payload);
+    this->invalidate_numeric_input_(input_index);
     return;
   }
 
-  this->last_valid_dew_point_c_ = value;
-  this->last_valid_dew_point_ms_ = millis();
+  input.last_valid_value = value;
+  input.last_valid_ms = millis();
   this->publish_runtime_state_(true);
 }
 
-void OpenQuattMqttConfig::invalidate_dew_point_() {
-  this->last_valid_dew_point_c_ = NAN;
-  this->last_valid_dew_point_ms_ = 0;
+void OpenQuattMqttConfig::handle_binary_payload_(size_t input_index, const char *payload) {
+  if (input_index >= this->binary_inputs_.size() || payload == nullptr) {
+    return;
+  }
+
+  auto &input = this->binary_inputs_[input_index];
+  bool value = false;
+  if (!parse_binary_payload_(payload, &value)) {
+    ESP_LOGW(TAG, "Invalidating MQTT %s after invalid payload: %s", input.log_name, payload);
+    this->invalidate_binary_input_(input_index);
+    return;
+  }
+
+  input.last_valid_value = value;
+  input.last_valid_ms = millis();
+  this->publish_runtime_state_(true);
+}
+
+void OpenQuattMqttConfig::invalidate_numeric_input_(size_t input_index) {
+  if (input_index >= this->numeric_inputs_.size()) {
+    return;
+  }
+  auto &input = this->numeric_inputs_[input_index];
+  input.last_valid_value = NAN;
+  input.last_valid_ms = 0;
+  this->publish_runtime_state_(true);
+}
+
+void OpenQuattMqttConfig::invalidate_binary_input_(size_t input_index) {
+  if (input_index >= this->binary_inputs_.size()) {
+    return;
+  }
+  auto &input = this->binary_inputs_[input_index];
+  input.last_valid_value = false;
+  input.last_valid_ms = 0;
   this->publish_runtime_state_(true);
 }
 
@@ -677,13 +1180,32 @@ void OpenQuattMqttConfig::publish_runtime_state_(bool force) {
   }
   this->last_sensor_publish_ms_ = now_ms;
 
-  const bool has_sample = this->last_valid_dew_point_ms_ != 0 && std::isfinite(this->last_valid_dew_point_c_);
-  const uint32_t age_ms = has_sample ? (uint32_t)(now_ms - this->last_valid_dew_point_ms_) : 0U;
-  const bool valid = this->enabled_.load() && has_sample && age_ms <= this->dew_point_stale_ms_;
+  const bool mqtt_enabled = this->enabled_.load();
+  for (size_t i = 0; i < this->numeric_inputs_.size(); i++) {
+    auto &input = this->numeric_inputs_[i];
+    const bool input_enabled = mqtt_enabled && this->is_numeric_input_enabled_(i);
+    const bool has_sample = input.last_valid_ms != 0 && std::isfinite(input.last_valid_value);
+    const uint32_t age_ms = has_sample ? (uint32_t)(now_ms - input.last_valid_ms) : 0U;
+    const bool valid = input_enabled && has_sample && age_ms <= input.stale_ms;
 
-  this->publish_binary_if_changed_(this->dew_point_valid_binary_sensor_, valid, force);
-  this->publish_float_if_changed_(this->dew_point_age_sensor_, has_sample ? static_cast<float>(age_ms / 1000U) : NAN, force);
-  this->publish_float_if_changed_(this->dew_point_sensor_, valid ? this->last_valid_dew_point_c_ : NAN, force);
+    this->publish_binary_if_changed_(input.valid_binary_sensor, valid, force);
+    this->publish_float_if_changed_(input.age_sensor,
+                                    input_enabled && has_sample ? static_cast<float>(age_ms / 1000U) : NAN, force);
+    this->publish_float_if_changed_(input.sensor, valid ? input.last_valid_value : NAN, force);
+  }
+
+  for (size_t i = 0; i < this->binary_inputs_.size(); i++) {
+    auto &input = this->binary_inputs_[i];
+    const bool input_enabled = mqtt_enabled && this->is_binary_input_enabled_(i);
+    const bool has_sample = input.last_valid_ms != 0;
+    const uint32_t age_ms = has_sample ? (uint32_t)(now_ms - input.last_valid_ms) : 0U;
+    const bool valid = input_enabled && has_sample && age_ms <= input.stale_ms;
+
+    this->publish_binary_if_changed_(input.valid_binary_sensor, valid, force);
+    this->publish_float_if_changed_(input.age_sensor,
+                                    input_enabled && has_sample ? static_cast<float>(age_ms / 1000U) : NAN, force);
+    this->publish_binary_if_changed_(input.binary_sensor, valid && input.last_valid_value, force);
+  }
 }
 
 void OpenQuattMqttConfig::publish_float_if_changed_(sensor::Sensor *sensor, float value, bool force) {

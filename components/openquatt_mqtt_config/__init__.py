@@ -14,6 +14,31 @@ CONF_DEW_POINT_STALE = "dew_point_stale"
 CONF_DEW_POINT_SENSOR = "dew_point_sensor"
 CONF_DEW_POINT_AGE_SENSOR = "dew_point_age_sensor"
 CONF_DEW_POINT_VALID_BINARY_SENSOR = "dew_point_valid_binary_sensor"
+CONF_OUTSIDE_TEMPERATURE_TOPIC = "outside_temperature_topic"
+CONF_OUTSIDE_TEMPERATURE_STALE = "outside_temperature_stale"
+CONF_OUTSIDE_TEMPERATURE_SENSOR = "outside_temperature_sensor"
+CONF_OUTSIDE_TEMPERATURE_AGE_SENSOR = "outside_temperature_age_sensor"
+CONF_OUTSIDE_TEMPERATURE_VALID_BINARY_SENSOR = "outside_temperature_valid_binary_sensor"
+CONF_ROOM_TEMPERATURE_TOPIC = "room_temperature_topic"
+CONF_ROOM_TEMPERATURE_STALE = "room_temperature_stale"
+CONF_ROOM_TEMPERATURE_SENSOR = "room_temperature_sensor"
+CONF_ROOM_TEMPERATURE_AGE_SENSOR = "room_temperature_age_sensor"
+CONF_ROOM_TEMPERATURE_VALID_BINARY_SENSOR = "room_temperature_valid_binary_sensor"
+CONF_ROOM_SETPOINT_TOPIC = "room_setpoint_topic"
+CONF_ROOM_SETPOINT_STALE = "room_setpoint_stale"
+CONF_ROOM_SETPOINT_SENSOR = "room_setpoint_sensor"
+CONF_ROOM_SETPOINT_AGE_SENSOR = "room_setpoint_age_sensor"
+CONF_ROOM_SETPOINT_VALID_BINARY_SENSOR = "room_setpoint_valid_binary_sensor"
+CONF_HEATING_ENABLE_TOPIC = "heating_enable_topic"
+CONF_HEATING_ENABLE_STALE = "heating_enable_stale"
+CONF_HEATING_ENABLE_BINARY_SENSOR = "heating_enable_binary_sensor"
+CONF_HEATING_ENABLE_AGE_SENSOR = "heating_enable_age_sensor"
+CONF_HEATING_ENABLE_VALID_BINARY_SENSOR = "heating_enable_valid_binary_sensor"
+CONF_COOLING_ENABLE_TOPIC = "cooling_enable_topic"
+CONF_COOLING_ENABLE_STALE = "cooling_enable_stale"
+CONF_COOLING_ENABLE_BINARY_SENSOR = "cooling_enable_binary_sensor"
+CONF_COOLING_ENABLE_AGE_SENSOR = "cooling_enable_age_sensor"
+CONF_COOLING_ENABLE_VALID_BINARY_SENSOR = "cooling_enable_valid_binary_sensor"
 CONF_DEFAULT_ENABLED = "default_enabled"
 
 openquatt_mqtt_config_ns = cg.esphome_ns.namespace("openquatt_mqtt_config")
@@ -35,6 +60,31 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Required(CONF_DEW_POINT_AGE_SENSOR): cv.use_id(sensor.Sensor),
         cv.Required(CONF_DEW_POINT_VALID_BINARY_SENSOR): cv.use_id(binary_sensor.BinarySensor),
         cv.Optional(CONF_DEW_POINT_STALE, default="900s"): cv.positive_time_period_milliseconds,
+        cv.Required(CONF_OUTSIDE_TEMPERATURE_TOPIC): cv.All(cv.subscribe_topic, cv.Length(max=96)),
+        cv.Required(CONF_OUTSIDE_TEMPERATURE_SENSOR): cv.use_id(sensor.Sensor),
+        cv.Required(CONF_OUTSIDE_TEMPERATURE_AGE_SENSOR): cv.use_id(sensor.Sensor),
+        cv.Required(CONF_OUTSIDE_TEMPERATURE_VALID_BINARY_SENSOR): cv.use_id(binary_sensor.BinarySensor),
+        cv.Optional(CONF_OUTSIDE_TEMPERATURE_STALE, default="1800s"): cv.positive_time_period_milliseconds,
+        cv.Required(CONF_ROOM_TEMPERATURE_TOPIC): cv.All(cv.subscribe_topic, cv.Length(max=96)),
+        cv.Required(CONF_ROOM_TEMPERATURE_SENSOR): cv.use_id(sensor.Sensor),
+        cv.Required(CONF_ROOM_TEMPERATURE_AGE_SENSOR): cv.use_id(sensor.Sensor),
+        cv.Required(CONF_ROOM_TEMPERATURE_VALID_BINARY_SENSOR): cv.use_id(binary_sensor.BinarySensor),
+        cv.Optional(CONF_ROOM_TEMPERATURE_STALE, default="600s"): cv.positive_time_period_milliseconds,
+        cv.Required(CONF_ROOM_SETPOINT_TOPIC): cv.All(cv.subscribe_topic, cv.Length(max=96)),
+        cv.Required(CONF_ROOM_SETPOINT_SENSOR): cv.use_id(sensor.Sensor),
+        cv.Required(CONF_ROOM_SETPOINT_AGE_SENSOR): cv.use_id(sensor.Sensor),
+        cv.Required(CONF_ROOM_SETPOINT_VALID_BINARY_SENSOR): cv.use_id(binary_sensor.BinarySensor),
+        cv.Optional(CONF_ROOM_SETPOINT_STALE, default="1800s"): cv.positive_time_period_milliseconds,
+        cv.Required(CONF_HEATING_ENABLE_TOPIC): cv.All(cv.subscribe_topic, cv.Length(max=96)),
+        cv.Required(CONF_HEATING_ENABLE_BINARY_SENSOR): cv.use_id(binary_sensor.BinarySensor),
+        cv.Required(CONF_HEATING_ENABLE_AGE_SENSOR): cv.use_id(sensor.Sensor),
+        cv.Required(CONF_HEATING_ENABLE_VALID_BINARY_SENSOR): cv.use_id(binary_sensor.BinarySensor),
+        cv.Optional(CONF_HEATING_ENABLE_STALE, default="600s"): cv.positive_time_period_milliseconds,
+        cv.Required(CONF_COOLING_ENABLE_TOPIC): cv.All(cv.subscribe_topic, cv.Length(max=96)),
+        cv.Required(CONF_COOLING_ENABLE_BINARY_SENSOR): cv.use_id(binary_sensor.BinarySensor),
+        cv.Required(CONF_COOLING_ENABLE_AGE_SENSOR): cv.use_id(sensor.Sensor),
+        cv.Required(CONF_COOLING_ENABLE_VALID_BINARY_SENSOR): cv.use_id(binary_sensor.BinarySensor),
+        cv.Optional(CONF_COOLING_ENABLE_STALE, default="600s"): cv.positive_time_period_milliseconds,
         cv.Optional(CONF_DEFAULT_ENABLED, default=False): cv.boolean,
     }
 ).extend(cv.COMPONENT_SCHEMA)
@@ -64,4 +114,46 @@ async def to_code(config):
     cg.add(var.set_dew_point_age_sensor(dew_point_age_sensor))
     dew_point_valid_binary_sensor = await cg.get_variable(config[CONF_DEW_POINT_VALID_BINARY_SENSOR])
     cg.add(var.set_dew_point_valid_binary_sensor(dew_point_valid_binary_sensor))
+    cg.add(var.set_outside_temperature_topic(config[CONF_OUTSIDE_TEMPERATURE_TOPIC]))
+    cg.add(var.set_outside_temperature_stale_ms(config[CONF_OUTSIDE_TEMPERATURE_STALE].total_milliseconds))
+    outside_temperature_sensor = await cg.get_variable(config[CONF_OUTSIDE_TEMPERATURE_SENSOR])
+    cg.add(var.set_outside_temperature_sensor(outside_temperature_sensor))
+    outside_temperature_age_sensor = await cg.get_variable(config[CONF_OUTSIDE_TEMPERATURE_AGE_SENSOR])
+    cg.add(var.set_outside_temperature_age_sensor(outside_temperature_age_sensor))
+    outside_temperature_valid_binary_sensor = await cg.get_variable(
+        config[CONF_OUTSIDE_TEMPERATURE_VALID_BINARY_SENSOR]
+    )
+    cg.add(var.set_outside_temperature_valid_binary_sensor(outside_temperature_valid_binary_sensor))
+    cg.add(var.set_room_temperature_topic(config[CONF_ROOM_TEMPERATURE_TOPIC]))
+    cg.add(var.set_room_temperature_stale_ms(config[CONF_ROOM_TEMPERATURE_STALE].total_milliseconds))
+    room_temperature_sensor = await cg.get_variable(config[CONF_ROOM_TEMPERATURE_SENSOR])
+    cg.add(var.set_room_temperature_sensor(room_temperature_sensor))
+    room_temperature_age_sensor = await cg.get_variable(config[CONF_ROOM_TEMPERATURE_AGE_SENSOR])
+    cg.add(var.set_room_temperature_age_sensor(room_temperature_age_sensor))
+    room_temperature_valid_binary_sensor = await cg.get_variable(config[CONF_ROOM_TEMPERATURE_VALID_BINARY_SENSOR])
+    cg.add(var.set_room_temperature_valid_binary_sensor(room_temperature_valid_binary_sensor))
+    cg.add(var.set_room_setpoint_topic(config[CONF_ROOM_SETPOINT_TOPIC]))
+    cg.add(var.set_room_setpoint_stale_ms(config[CONF_ROOM_SETPOINT_STALE].total_milliseconds))
+    room_setpoint_sensor = await cg.get_variable(config[CONF_ROOM_SETPOINT_SENSOR])
+    cg.add(var.set_room_setpoint_sensor(room_setpoint_sensor))
+    room_setpoint_age_sensor = await cg.get_variable(config[CONF_ROOM_SETPOINT_AGE_SENSOR])
+    cg.add(var.set_room_setpoint_age_sensor(room_setpoint_age_sensor))
+    room_setpoint_valid_binary_sensor = await cg.get_variable(config[CONF_ROOM_SETPOINT_VALID_BINARY_SENSOR])
+    cg.add(var.set_room_setpoint_valid_binary_sensor(room_setpoint_valid_binary_sensor))
+    cg.add(var.set_heating_enable_topic(config[CONF_HEATING_ENABLE_TOPIC]))
+    cg.add(var.set_heating_enable_stale_ms(config[CONF_HEATING_ENABLE_STALE].total_milliseconds))
+    heating_enable_binary_sensor = await cg.get_variable(config[CONF_HEATING_ENABLE_BINARY_SENSOR])
+    cg.add(var.set_heating_enable_binary_sensor(heating_enable_binary_sensor))
+    heating_enable_age_sensor = await cg.get_variable(config[CONF_HEATING_ENABLE_AGE_SENSOR])
+    cg.add(var.set_heating_enable_age_sensor(heating_enable_age_sensor))
+    heating_enable_valid_binary_sensor = await cg.get_variable(config[CONF_HEATING_ENABLE_VALID_BINARY_SENSOR])
+    cg.add(var.set_heating_enable_valid_binary_sensor(heating_enable_valid_binary_sensor))
+    cg.add(var.set_cooling_enable_topic(config[CONF_COOLING_ENABLE_TOPIC]))
+    cg.add(var.set_cooling_enable_stale_ms(config[CONF_COOLING_ENABLE_STALE].total_milliseconds))
+    cooling_enable_binary_sensor = await cg.get_variable(config[CONF_COOLING_ENABLE_BINARY_SENSOR])
+    cg.add(var.set_cooling_enable_binary_sensor(cooling_enable_binary_sensor))
+    cooling_enable_age_sensor = await cg.get_variable(config[CONF_COOLING_ENABLE_AGE_SENSOR])
+    cg.add(var.set_cooling_enable_age_sensor(cooling_enable_age_sensor))
+    cooling_enable_valid_binary_sensor = await cg.get_variable(config[CONF_COOLING_ENABLE_VALID_BINARY_SENSOR])
+    cg.add(var.set_cooling_enable_valid_binary_sensor(cooling_enable_valid_binary_sensor))
     cg.add(var.set_default_enabled(config[CONF_DEFAULT_ENABLED]))

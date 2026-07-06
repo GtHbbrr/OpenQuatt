@@ -145,7 +145,7 @@ Bij `Expliciet toestaan` gebruikt OpenQuatt geen dauwpuntgrens: ook een beschikb
 
 Wil je dauwpuntbronnen uit Home Assistant gebruiken, kijk dan bij [Dashboard installeren](dashboard/README.md#optioneel-dynamische-koelbronnen-via-home-assistant). De web-app kiest daarna welke koelingsdauwpuntbron OpenQuatt gebruikt: `Auto`, `Home Assistant` of `MQTT`. In `Auto` gebruikt OpenQuatt de hoogste geldige dauwpuntwaarde.
 
-Wil je een dauwpunt via MQTT aanleveren, configureer dan eerst de broker bij **Integratie -> MQTT inputbronnen**. Zie [MQTT inputbronnen](mqtt.md) voor topic, payload en geldigheid.
+Wil je externe bronwaarden of toestemmingssignalen via MQTT aanleveren, configureer dan eerst de broker bij **Integratie -> MQTT inputbronnen**. In **MQTT sensoren** kun je per topic zien wat OpenQuatt verwacht en ongebruikte topics uitzetten. Zie [MQTT inputbronnen](mqtt.md) voor topics, payload en geldigheid.
 
 ### Geavanceerd
 
@@ -155,7 +155,7 @@ Je kunt hier ook de directe integraties beheren:
 
 - `OpenTherm`: zet de lokale OpenTherm-thermostaatkoppeling aan of uit;
 - `CIC-polling`: zet het uitlezen van een externe CIC JSON-feed aan of uit en pas de feed-URL aan;
-- `MQTT inputbronnen`: configureer een broker voor externe MQTT-bronwaarden zoals koelingsdauwpunt;
+- `MQTT inputbronnen`: configureer een broker voor externe MQTT-bronwaarden zoals dauwpunt, buiten- en kamerwaarden en toestemmingssignalen, en zet ongebruikte topics uit;
 - `CiC-compatibiliteit`: gebruik dit alleen als de Quatt app via de CiC moet blijven meekijken.
 
 Dezelfde sectie toont compacte diagnostiek voor OpenTherm en CIC, zoals linkstatus, JSON-feedstatus, kamertemperatuur, setpoint en flow wanneer de firmware die signalen exposeert.

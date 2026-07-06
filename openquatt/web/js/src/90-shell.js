@@ -123,6 +123,7 @@ function renderSettingsView() {
       `;
       state.settingsRenderSignature = "";
       state.headerRenderSignature = getHeaderRenderSignature();
+      state.mqttSensorsModalRenderSignature = "";
       stopMotionLoop();
       syncNativeVisibility();
       syncWebServerLogStream();
@@ -172,6 +173,7 @@ function renderSettingsView() {
     `;
     state.settingsRenderSignature = state.appView === "settings" ? getSettingsRenderSignature() : "";
     state.headerRenderSignature = getHeaderRenderSignature();
+    state.mqttSensorsModalRenderSignature = state.systemModal === "mqtt-sensors" ? getMqttSensorsModalRenderSignature() : "";
     clearLegacyMotionVariables();
     syncTechTooltipLayers();
     syncWebServerLogStream();

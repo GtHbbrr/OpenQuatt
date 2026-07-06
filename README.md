@@ -108,7 +108,7 @@ Belangrijkste pagina's voor gebruikers:
 - [Dashboard installeren](docs/dashboard/README.md) voor het importeren van dashboards
 - [Dashboard gebruiken](docs/dashboardoverzicht.md) voor dagelijkse controle in Home Assistant
 - [Verwarmen en koelen uitgelegd](docs/verwarmen-en-koelen.md) voor een eenvoudige uitleg van `Power House`, stooklijnregeling, koeling, `Single` en `Duo`
-- [MQTT inputbronnen](docs/mqtt.md) voor externe MQTT-bronwaarden zoals koelingsdauwpunt
+- [MQTT inputbronnen](docs/mqtt.md) voor externe MQTT-bronwaarden zoals dauwpunt, buiten- en kamerwaarden en toestemmingssignalen
 - [Problemen oplossen](docs/problemen-oplossen.md) voor diagnose zonder meteen te gaan tunen
 
 Meer heb je voor normaal gebruik meestal niet nodig.

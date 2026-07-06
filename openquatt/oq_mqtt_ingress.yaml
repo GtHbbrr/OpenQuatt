@@ -12,8 +12,10 @@
 #     profiles are generated.
 #   - Subscribe topics are fixed by substitution and shown read-only in the web
 #     app through /mqtt/status.
-#   - Current input: cooling dew point. Future inputs should follow the same
-#     openquatt/${device_name}/input/... topic convention.
+#   - Current inputs: cooling dew point, outside temperature, room temperature,
+#     room setpoint, heating enable and cooling enable.
+#   - Future inputs should follow the same openquatt/${device_name}/input/...
+#     topic convention.
 #
 # ==============================================================================
 
@@ -28,6 +30,31 @@ openquatt_mqtt_config:
   dew_point_sensor: mqtt_cooling_dew_point
   dew_point_age_sensor: mqtt_cooling_dew_point_age
   dew_point_valid_binary_sensor: mqtt_cooling_dew_point_valid
+  outside_temperature_topic: "${mqtt_outside_temperature_topic}"
+  outside_temperature_stale: ${mqtt_outside_temperature_stale_s}s
+  outside_temperature_sensor: mqtt_outside_temperature
+  outside_temperature_age_sensor: mqtt_outside_temperature_age
+  outside_temperature_valid_binary_sensor: mqtt_outside_temperature_valid
+  room_temperature_topic: "${mqtt_room_temperature_topic}"
+  room_temperature_stale: ${mqtt_room_temperature_stale_s}s
+  room_temperature_sensor: mqtt_room_temperature
+  room_temperature_age_sensor: mqtt_room_temperature_age
+  room_temperature_valid_binary_sensor: mqtt_room_temperature_valid
+  room_setpoint_topic: "${mqtt_room_setpoint_topic}"
+  room_setpoint_stale: ${mqtt_room_setpoint_stale_s}s
+  room_setpoint_sensor: mqtt_room_setpoint
+  room_setpoint_age_sensor: mqtt_room_setpoint_age
+  room_setpoint_valid_binary_sensor: mqtt_room_setpoint_valid
+  heating_enable_topic: "${mqtt_heating_enable_topic}"
+  heating_enable_stale: ${mqtt_heating_enable_stale_s}s
+  heating_enable_binary_sensor: mqtt_heating_enable
+  heating_enable_age_sensor: mqtt_heating_enable_age
+  heating_enable_valid_binary_sensor: mqtt_heating_enable_valid
+  cooling_enable_topic: "${mqtt_cooling_enable_topic}"
+  cooling_enable_stale: ${mqtt_cooling_enable_stale_s}s
+  cooling_enable_binary_sensor: mqtt_cooling_enable
+  cooling_enable_age_sensor: mqtt_cooling_enable_age
+  cooling_enable_valid_binary_sensor: mqtt_cooling_enable_valid
   default_enabled: ${mqtt_default_enabled}
 
 sensor:
@@ -53,11 +80,153 @@ sensor:
     web_server:
       sorting_group_id: oq_ha_inputs
 
+  - platform: template
+    id: mqtt_outside_temperature
+    name: "MQTT Outside Temperature"
+    icon: mdi:thermometer
+    unit_of_measurement: "°C"
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 2
+    update_interval: never
+    web_server:
+      sorting_group_id: oq_ha_inputs
+
+  - platform: template
+    id: mqtt_outside_temperature_age
+    name: "MQTT Outside Temperature Age"
+    icon: mdi:timer-outline
+    unit_of_measurement: "s"
+    accuracy_decimals: 0
+    update_interval: never
+    web_server:
+      sorting_group_id: oq_ha_inputs
+
+  - platform: template
+    id: mqtt_room_temperature
+    name: "MQTT Room Temperature"
+    icon: mdi:home-thermometer
+    unit_of_measurement: "°C"
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 2
+    update_interval: never
+    web_server:
+      sorting_group_id: oq_ha_inputs
+
+  - platform: template
+    id: mqtt_room_temperature_age
+    name: "MQTT Room Temperature Age"
+    icon: mdi:timer-outline
+    unit_of_measurement: "s"
+    accuracy_decimals: 0
+    update_interval: never
+    web_server:
+      sorting_group_id: oq_ha_inputs
+
+  - platform: template
+    id: mqtt_room_setpoint
+    name: "MQTT Room Setpoint"
+    icon: mdi:thermostat
+    unit_of_measurement: "°C"
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 2
+    update_interval: never
+    web_server:
+      sorting_group_id: oq_ha_inputs
+
+  - platform: template
+    id: mqtt_room_setpoint_age
+    name: "MQTT Room Setpoint Age"
+    icon: mdi:timer-outline
+    unit_of_measurement: "s"
+    accuracy_decimals: 0
+    update_interval: never
+    web_server:
+      sorting_group_id: oq_ha_inputs
+
+  - platform: template
+    id: mqtt_heating_enable_age
+    name: "MQTT Heating Enable Age"
+    icon: mdi:timer-outline
+    unit_of_measurement: "s"
+    accuracy_decimals: 0
+    update_interval: never
+    web_server:
+      sorting_group_id: oq_ha_inputs
+
+  - platform: template
+    id: mqtt_cooling_enable_age
+    name: "MQTT Cooling Enable Age"
+    icon: mdi:timer-outline
+    unit_of_measurement: "s"
+    accuracy_decimals: 0
+    update_interval: never
+    web_server:
+      sorting_group_id: oq_ha_inputs
+
 binary_sensor:
   - platform: template
     id: mqtt_cooling_dew_point_valid
     name: "MQTT Cooling Dew Point Valid"
     icon: mdi:water-check
+    device_class: connectivity
+    web_server:
+      sorting_group_id: oq_ha_inputs
+
+  - platform: template
+    id: mqtt_outside_temperature_valid
+    name: "MQTT Outside Temperature Valid"
+    icon: mdi:check-decagram
+    device_class: connectivity
+    web_server:
+      sorting_group_id: oq_ha_inputs
+
+  - platform: template
+    id: mqtt_room_temperature_valid
+    name: "MQTT Room Temperature Valid"
+    icon: mdi:check-decagram
+    device_class: connectivity
+    web_server:
+      sorting_group_id: oq_ha_inputs
+
+  - platform: template
+    id: mqtt_room_setpoint_valid
+    name: "MQTT Room Setpoint Valid"
+    icon: mdi:check-decagram
+    device_class: connectivity
+    web_server:
+      sorting_group_id: oq_ha_inputs
+
+  - platform: template
+    id: mqtt_heating_enable
+    name: "MQTT Heating Enable"
+    icon: mdi:radiator
+    device_class: heat
+    web_server:
+      sorting_group_id: oq_ha_inputs
+
+  - platform: template
+    id: mqtt_heating_enable_valid
+    name: "MQTT Heating Enable Valid"
+    icon: mdi:check-decagram
+    device_class: connectivity
+    web_server:
+      sorting_group_id: oq_ha_inputs
+
+  - platform: template
+    id: mqtt_cooling_enable
+    name: "MQTT Cooling Enable"
+    icon: mdi:snowflake-check
+    device_class: cold
+    web_server:
+      sorting_group_id: oq_ha_inputs
+
+  - platform: template
+    id: mqtt_cooling_enable_valid
+    name: "MQTT Cooling Enable Valid"
+    icon: mdi:check-decagram
     device_class: connectivity
     web_server:
       sorting_group_id: oq_ha_inputs

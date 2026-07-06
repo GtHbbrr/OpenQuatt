@@ -124,6 +124,7 @@ select:
       - Auto
       - Outdoor unit
       - HA input
+      - MQTT
     initial_option: Auto
     web_server:
       sorting_group_id: oq_sensor_selection
@@ -139,6 +140,7 @@ select:
       - CIC
       - OT thermostat
       - HA input
+      - MQTT
     initial_option: OT thermostat
     web_server:
       sorting_group_id: oq_sensor_selection
@@ -154,6 +156,7 @@ select:
       - CIC
       - OT thermostat
       - HA input
+      - MQTT
     initial_option: OT thermostat
     web_server:
       sorting_group_id: oq_sensor_selection
@@ -168,6 +171,7 @@ select:
     options:
       - CIC
       - HA input
+      - MQTT
       - CIC or HA input
     initial_option: CIC or HA input
     web_server:
@@ -185,6 +189,7 @@ select:
       - OT thermostat
       - CIC
       - HA input
+      - MQTT
     initial_option: Disabled
     web_server:
       sorting_group_id: oq_sensor_selection
@@ -206,6 +211,7 @@ binary_sensor:
     icon: mdi:check-decagram
     entity_category: diagnostic
     lambda: |-
+      // Validate only the currently selected heating enable source.
       if (!id(heating_enable_source).has_state()) return false;
       const auto source = id(heating_enable_source).current_option();
       if (source == "Disabled") return true;
@@ -216,6 +222,8 @@ binary_sensor:
                id(cic_ch_enable_valid).has_state() && id(cic_ch_enable_valid).state;
       }
       if (source == "HA input") return id(heating_enable_valid_ha).state && id(heating_enable_ha).has_state();
+      if (source == "MQTT") return id(mqtt_heating_enable_valid).has_state() && id(mqtt_heating_enable_valid).state &&
+                                  id(mqtt_heating_enable).has_state();
       return false;
     web_server:
       sorting_group_id: oq_sensor_selection
@@ -233,6 +241,7 @@ binary_sensor:
       if (source == "OT thermostat") return id(ot_thermostat_ch_enable).state;
       if (source == "CIC") return id(cic_ch_enabled).state;
       if (source == "HA input") return id(heating_enable_ha).state;
+      if (source == "MQTT") return id(mqtt_heating_enable).state;
       return false;
     web_server:
       sorting_group_id: oq_sensor_selection
@@ -255,13 +264,17 @@ binary_sensor:
     icon: mdi:snowflake-check
     device_class: cold
     lambda: |-
+      // Cooling may be enabled by the selected source or by the manual override.
       if (!id(cooling_enable_source).has_state()) return false;
       const auto source = id(cooling_enable_source).current_option();
       const bool cic_enabled = id(cic_cooling_enabled).has_state() && id(cic_cooling_enabled).state;
       const bool ha_enabled = id(cooling_enable_valid_ha).state && id(cooling_enable_ha).has_state() && id(cooling_enable_ha).state;
+      const bool mqtt_enabled = id(mqtt_cooling_enable_valid).has_state() && id(mqtt_cooling_enable_valid).state &&
+                                id(mqtt_cooling_enable).has_state() && id(mqtt_cooling_enable).state;
       const bool manual_enabled = id(oq_manual_cooling_enable).state;
       if (source == "CIC") return cic_enabled || manual_enabled;
       if (source == "HA input") return ha_enabled || manual_enabled;
+      if (source == "MQTT") return mqtt_enabled || manual_enabled;
       if (source == "CIC or HA input") return cic_enabled || ha_enabled || manual_enabled;
       return false;
     web_server:
@@ -278,6 +291,7 @@ text_sensor:
       if (!id(heating_enable_source).has_state()) return {"Unknown"};
       const auto source = id(heating_enable_source).current_option();
       if (source == "Disabled") return {"None"};
+      if (!id(heating_enable_valid).state) return {"None"};
       return {source.c_str()};
     web_server:
       sorting_group_id: oq_sensor_selection
@@ -319,6 +333,8 @@ text_sensor:
       const auto source = id(cooling_enable_source).current_option();
       const bool cic_enabled = id(cic_cooling_enabled).has_state() && id(cic_cooling_enabled).state;
       const bool ha_enabled = id(cooling_enable_valid_ha).state && id(cooling_enable_ha).has_state() && id(cooling_enable_ha).state;
+      const bool mqtt_enabled = id(mqtt_cooling_enable_valid).has_state() && id(mqtt_cooling_enable_valid).state &&
+                                id(mqtt_cooling_enable).has_state() && id(mqtt_cooling_enable).state;
       const bool manual_enabled = id(oq_manual_cooling_enable).state;
 
       auto with_manual = [&](const std::string &base) -> std::string {
@@ -329,6 +345,7 @@ text_sensor:
 
       if (source == "CIC") return {with_manual(cic_enabled ? "CIC" : "None")};
       if (source == "HA input") return {with_manual(ha_enabled ? "HA input" : "None")};
+      if (source == "MQTT") return {with_manual(mqtt_enabled ? "MQTT" : "None")};
       if (source == "CIC or HA input") {
         if (cic_enabled && ha_enabled) return {with_manual("CIC + HA input")};
         if (cic_enabled) return {with_manual("CIC")};
@@ -481,23 +498,28 @@ sensor:
       const uint32_t hold_ms = (uint32_t)(${oq_selected_input_stale_hold_s}UL * 1000UL);
       const bool hp_valid = id(outside_temp_hp_avg).has_state() && !isnan(id(outside_temp_hp_avg).state);
       const bool ha_valid = id(outside_temp_valid_ha).state && id(outside_temp_ha).has_state() && !isnan(id(outside_temp_ha).state);
+      const bool mqtt_valid =
+          id(mqtt_outside_temperature_valid).has_state() && id(mqtt_outside_temperature_valid).state &&
+          id(mqtt_outside_temperature).has_state() && !isnan(id(mqtt_outside_temperature).state);
       const bool hold_enabled = source == "HA input";
 
       float selected_c = NAN;
+      auto take_lowest = [&](float value) {
+        if (isnan(selected_c) || value < selected_c) selected_c = value;
+      };
       if (source == "Auto" || source == "Lowest valid") {
-        if (ha_valid && hp_valid) {
-          selected_c = std::min(id(outside_temp_ha).state, id(outside_temp_hp_avg).state);
-        } else if (ha_valid) {
-          selected_c = id(outside_temp_ha).state;
-        } else if (hp_valid) {
-          selected_c = id(outside_temp_hp_avg).state;
-        }
+        if (ha_valid) take_lowest(id(outside_temp_ha).state);
+        if (hp_valid) take_lowest(id(outside_temp_hp_avg).state);
+        if (mqtt_valid) take_lowest(id(mqtt_outside_temperature).state);
       }
       if (source == "HA input") {
         if (ha_valid) selected_c = id(outside_temp_ha).state;
       }
       if (source == "Outdoor unit") {
         if (hp_valid) selected_c = id(outside_temp_hp_avg).state;
+      }
+      if (source == "MQTT") {
+        if (mqtt_valid) selected_c = id(mqtt_outside_temperature).state;
       }
 
       const bool selected_valid = !isnan(selected_c);
@@ -538,6 +560,9 @@ sensor:
       const bool hold_enabled = source == "HA input";
       const uint32_t hold_ms = (uint32_t)(${oq_selected_input_stale_hold_s}UL * 1000UL);
       const uint32_t now_ms = (uint32_t) millis();
+      const bool mqtt_valid =
+          id(mqtt_room_temperature_valid).has_state() && id(mqtt_room_temperature_valid).state &&
+          id(mqtt_room_temperature).has_state() && !isnan(id(mqtt_room_temperature).state);
 
       float selected_c = NAN;
       if (source == "HA input") {
@@ -548,6 +573,9 @@ sensor:
       }
       if (source == "CIC") {
         if (id(cic_room_temp).has_state()) selected_c = id(cic_room_temp).state;
+      }
+      if (source == "MQTT") {
+        if (mqtt_valid) selected_c = id(mqtt_room_temperature).state;
       }
 
       const bool selected_valid = !isnan(selected_c);
@@ -588,6 +616,9 @@ sensor:
       const bool hold_enabled = source == "HA input";
       const uint32_t hold_ms = (uint32_t)(${oq_selected_input_stale_hold_s}UL * 1000UL);
       const uint32_t now_ms = (uint32_t) millis();
+      const bool mqtt_valid =
+          id(mqtt_room_setpoint_valid).has_state() && id(mqtt_room_setpoint_valid).state &&
+          id(mqtt_room_setpoint).has_state() && !isnan(id(mqtt_room_setpoint).state);
 
       float selected_c = NAN;
       if (source == "HA input") {
@@ -598,6 +629,9 @@ sensor:
       }
       if (source == "CIC") {
         if (id(cic_room_setpoint).has_state()) selected_c = id(cic_room_setpoint).state;
+      }
+      if (source == "MQTT") {
+        if (mqtt_valid) selected_c = id(mqtt_room_setpoint).state;
       }
 
       const bool selected_valid = !isnan(selected_c);
