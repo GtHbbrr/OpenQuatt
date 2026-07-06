@@ -204,7 +204,7 @@ number:
     mode: slider
     optimistic: true
     restore_value: true
-    initial_value: 18.0
+    initial_value: 14.0
     entity_category: config
     web_server:
       sorting_group_id: oq_cooling
