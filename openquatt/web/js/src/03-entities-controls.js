@@ -1230,7 +1230,7 @@
     heating: ["strategy"],
     cooling: ["manualCoolingEnable", "coolingWithoutDewPointMode"],
     integrations: ["otEnabled", "cicPollingEnabled", "flowSource"],
-    system: ["setupComplete", "projectVersionText", "releaseChannelText", "firmwareUpdateChannel"],
+    system: ["setupComplete", "projectVersionText", "releaseChannelText", "firmwareUpdateChannel", "statusLedsEnabled"],
   };
   const INITIAL_SETTINGS_READY_TIMEOUT_MS = 5000;
   const INITIAL_SETTINGS_READY_POLL_MS = 250;
@@ -1292,6 +1292,7 @@
       "firmwareUpdateChannel",
       "projectVersionText",
       "releaseChannelText",
+      "statusLedsEnabled",
       ...SETTINGS_STORAGE_KEYS,
       "webServerLogHistoryEnabled",
       "debugLevel",

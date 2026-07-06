@@ -208,6 +208,7 @@ const LOGO_MARKUP = `
     connectionText: { domain: "text_sensor", name: "OpenQuatt Connection", optional: true },
     wifiSignal: { domain: "sensor", name: "WiFi Signal", optional: true },
     espInternalTemp: { domain: "sensor", name: "ESP Internal Temperature", optional: true },
+    statusLedsEnabled: { domain: "switch", name: "Status LEDs enabled", optional: true },
     hpGeneration: { domain: "select", name: "Quatt Hybrid version" },
     strategy: { domain: "select", name: "Heating Control Mode" },
     openquattEnabled: { domain: "switch", name: "OpenQuatt Enabled", optional: true },
@@ -1660,6 +1661,7 @@ const LOGO_MARKUP = `
     "coolingFallbackNightMinOutdoorTemp",
     "coolingFallbackMinSupplyTemp",
     "coolingEffectiveMinSupplyTemp",
+    "statusLedsEnabled",
   ]);
   // Keep this aligned with persisted UI settings. The build checks that new
   // writable settings are backed up or explicitly excluded above.

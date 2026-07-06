@@ -1,0 +1,95 @@
+# ==============================================================================
+# OpenQuatt - Heatpump Controller Q-edition status LEDs
+# ==============================================================================
+#
+# Purpose:
+#   Drives the optional front-panel LEDs on the Q-edition controller.
+#
+# Behavior:
+#   - Yellow LED: on while the active network interface is connected.
+#   - Red LED: on while a firmware, OpenTherm, heat-pump or hard safety fault
+#     is active.
+#   - Status LEDs enabled: disables both LED outputs when off.
+#
+# ==============================================================================
+
+output:
+  - platform: gpio
+    id: oq_q_status_led_yellow_out
+    pin:
+      number: ${hpcq_status_led_yellow_pin}
+      inverted: ${hpcq_status_led_inverted}
+
+  - platform: gpio
+    id: oq_q_status_led_red_out
+    pin:
+      number: ${hpcq_status_led_red_pin}
+      inverted: ${hpcq_status_led_inverted}
+
+switch:
+  - platform: template
+    id: oq_q_status_leds_enabled
+    name: "Status LEDs enabled"
+    internal: true
+    icon: mdi:led-on
+    entity_category: config
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_ON
+    web_server:
+      sorting_group_id: oq_system_diagnostics
+
+interval:
+  - interval: 1s
+    then:
+      - lambda: |-
+          const bool leds_enabled = id(oq_q_status_leds_enabled).state;
+          if (!leds_enabled) {
+            id(oq_q_status_led_yellow_out).turn_off();
+            id(oq_q_status_led_red_out).turn_off();
+            return;
+          }
+
+          // Network status follows the active connection profile, independent of HA/API.
+          bool network_connected = false;
+          #ifdef USE_WIFI
+          network_connected =
+              wifi::global_wifi_component != nullptr &&
+              wifi::global_wifi_component->is_connected();
+          #endif
+          #ifdef USE_ETHERNET
+          network_connected =
+              ethernet::global_eth_component != nullptr &&
+              ethernet::global_eth_component->is_connected();
+          #endif
+
+          // Red LED is reserved for faults that need local attention.
+          const bool ota_fault = id(oq_ota_phase_code) == 5 || id(oq_ota_phase_code) == 6;
+          const bool ot_problem =
+              id(ot_link_problem).has_state() && id(ot_link_problem).state;
+          const bool hp1_fault =
+              id(hp1_ot_fault_active).has_state() && id(hp1_ot_fault_active).state;
+          const bool secondary_fault =
+              (${flow_secondary_enabled} != 0) &&
+              id(${secondary_hp_id}_ot_fault_active).has_state() &&
+              id(${secondary_hp_id}_ot_fault_active).state;
+          const bool hp_fault = hp1_fault || secondary_fault;
+
+          const bool fault_active =
+              ota_fault ||
+              ot_problem ||
+              hp_fault ||
+              id(oq_lowflow_fault_active) ||
+              id(oq_strategy_water_hard_trip_active);
+
+          // Keep the hardware outputs deterministic even when both states change.
+          if (network_connected) {
+            id(oq_q_status_led_yellow_out).turn_on();
+          } else {
+            id(oq_q_status_led_yellow_out).turn_off();
+          }
+
+          if (fault_active) {
+            id(oq_q_status_led_red_out).turn_on();
+          } else {
+            id(oq_q_status_led_red_out).turn_off();
+          }

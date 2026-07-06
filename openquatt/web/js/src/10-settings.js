@@ -5229,6 +5229,21 @@
               ${busyRestart ? "Herstarten..." : "Herstarten"}
             </button>
           </div>
+          ${hasEntity("statusLedsEnabled") ? `
+            <div class="oq-settings-system-row oq-settings-system-row--with-action" data-oq-diagnostics-row="statusLeds">
+              <div class="oq-settings-system-row-copy">
+                <p class="oq-settings-system-row-label">Status-LEDs</p>
+                <strong class="oq-settings-system-row-value">${escapeHtml(isEntityActive("statusLedsEnabled") ? "Aan" : "Uit")}</strong>
+                <p class="oq-settings-system-row-note">Schakelt de gele netwerk-LED en rode storings-LED op de Q-edition controller.</p>
+              </div>
+              ${renderSettingsCompactSwitchControl(
+                "statusLedsEnabled",
+                "Status-LEDs",
+                isEntityActive("statusLedsEnabled"),
+                state.loadingEntities || state.busyAction === "switch-statusLedsEnabled",
+              )}
+            </div>
+          ` : ""}
         </div>
       `,
     );

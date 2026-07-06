@@ -35,8 +35,12 @@ substitutions:
   hpcq_flow_pin: "GPIO6"                                # V1 central flowmeter pulse input.
   hpcq_flow_kf_lpm_per_hz: "0.05"                       # DN15 datasheet Kff: Qv[l/min] = Kf * f[Hz] + Q0.
   hpcq_flow_q0_lpm: "0"                                 # DN15 datasheet intercept [l/min].
+  hpcq_status_led_yellow_pin: "GPIO47"                  # Yellow status LED output.
+  hpcq_status_led_red_pin: "GPIO48"                     # Red status LED output.
+  hpcq_status_led_inverted: "false"                     # Set true when the board LED is active-low.
 
 packages:
+  oq_status_leds: !include heatpump_controller_q_status_leds.yaml
   oq_cic_compatibility: !include heatpump_controller_q_cic_compatibility.yaml
   oq_sensor_source_selects_opentherm: !include ../oq_sensor_source_selects_opentherm.yaml
   oq_ot_slave: !include
