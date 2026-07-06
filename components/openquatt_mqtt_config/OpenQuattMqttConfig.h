@@ -204,6 +204,7 @@ class OpenQuattMqttConfig : public Component {
     binary_sensor::BinarySensor *valid_binary_sensor{nullptr};
     char pending_payload[PAYLOAD_MAX_LEN]{};
     bool pending_payload_ready{false};
+    bool pending_invalid_payload_ready{false};
     float last_valid_value{NAN};
     uint32_t last_valid_ms{0};
   };
@@ -242,6 +243,7 @@ class OpenQuattMqttConfig : public Component {
   bool is_numeric_input_enabled_(size_t input_index) const;
   bool is_binary_input_enabled_(size_t input_index) const;
   bool input_mask_for_key_(const std::string &key, uint8_t *mask) const;
+  void clear_all_inputs_();
   void clear_disabled_inputs_();
   void process_pending_input_subscriptions_();
   void subscribe_inputs_(esp_mqtt_client_handle_t client);

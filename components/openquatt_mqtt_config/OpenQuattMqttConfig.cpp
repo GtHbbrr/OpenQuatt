@@ -621,7 +621,11 @@ bool OpenQuattMqttConfig::apply_storage_(const Storage &storage, const char *sou
   this->config_source_ = source != nullptr ? source : "";
   const bool broker_empty = this->broker_.empty();
   this->unlock_config_();
-  this->clear_disabled_inputs_();
+  if (enabled) {
+    this->clear_disabled_inputs_();
+  } else {
+    this->clear_all_inputs_();
+  }
 
   if (!enabled || broker_empty) {
     if (enabled) {
@@ -866,6 +870,23 @@ bool OpenQuattMqttConfig::input_mask_for_key_(const std::string &key, uint8_t *m
   return false;
 }
 
+void OpenQuattMqttConfig::clear_all_inputs_() {
+  portENTER_CRITICAL(&this->pending_lock_);
+  for (auto &input : this->numeric_inputs_) {
+    input.pending_payload_ready = false;
+    input.pending_invalid_payload_ready = false;
+    input.last_valid_value = NAN;
+    input.last_valid_ms = 0;
+  }
+  for (auto &input : this->binary_inputs_) {
+    input.pending_payload_ready = false;
+    input.pending_invalid_payload_ready = false;
+    input.last_valid_value = false;
+    input.last_valid_ms = 0;
+  }
+  portEXIT_CRITICAL(&this->pending_lock_);
+}
+
 void OpenQuattMqttConfig::clear_disabled_inputs_() {
   const uint8_t disabled_mask = this->input_disabled_mask_.load() & INPUT_MASK_ALL;
   portENTER_CRITICAL(&this->pending_lock_);
@@ -875,6 +896,7 @@ void OpenQuattMqttConfig::clear_disabled_inputs_() {
     }
     auto &input = this->numeric_inputs_[i];
     input.pending_payload_ready = false;
+    input.pending_invalid_payload_ready = false;
     input.last_valid_value = NAN;
     input.last_valid_ms = 0;
   }
@@ -1033,7 +1055,12 @@ void OpenQuattMqttConfig::queue_numeric_payload_(size_t input_index, const char 
 
   auto &input = this->numeric_inputs_[input_index];
   if (static_cast<size_t>(len) >= PAYLOAD_MAX_LEN) {
-    ESP_LOGW(TAG, "Ignoring overlong MQTT %s payload (%d bytes)", input.log_name, len);
+    ESP_LOGW(TAG, "Invalidating MQTT %s after overlong payload (%d bytes)", input.log_name, len);
+    portENTER_CRITICAL(&this->pending_lock_);
+    input.pending_payload_ready = false;
+    input.pending_invalid_payload_ready = true;
+    portEXIT_CRITICAL(&this->pending_lock_);
+    App.wake_loop_threadsafe();
     return;
   }
   const size_t copy_len = std::min(static_cast<size_t>(len), PAYLOAD_MAX_LEN - 1U);
@@ -1041,6 +1068,7 @@ void OpenQuattMqttConfig::queue_numeric_payload_(size_t input_index, const char 
   memcpy(input.pending_payload, data, copy_len);
   input.pending_payload[copy_len] = '\0';
   input.pending_payload_ready = true;
+  input.pending_invalid_payload_ready = false;
   portEXIT_CRITICAL(&this->pending_lock_);
   App.wake_loop_threadsafe();
 }
@@ -1074,17 +1102,24 @@ void OpenQuattMqttConfig::consume_pending_numeric_payloads_() {
   for (size_t i = 0; i < this->numeric_inputs_.size(); i++) {
     char payload[PAYLOAD_MAX_LEN]{};
     bool ready = false;
+    bool invalid = false;
 
     portENTER_CRITICAL(&this->pending_lock_);
     auto &input = this->numeric_inputs_[i];
-    if (input.pending_payload_ready) {
+    if (input.pending_invalid_payload_ready) {
+      input.pending_invalid_payload_ready = false;
+      input.pending_payload_ready = false;
+      invalid = true;
+    } else if (input.pending_payload_ready) {
       memcpy(payload, input.pending_payload, sizeof(payload));
       input.pending_payload_ready = false;
       ready = true;
     }
     portEXIT_CRITICAL(&this->pending_lock_);
 
-    if (ready) {
+    if (invalid) {
+      this->invalidate_numeric_input_(i);
+    } else if (ready) {
       this->handle_numeric_payload_(i, payload);
     }
   }
