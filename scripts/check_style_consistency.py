@@ -232,7 +232,6 @@ NESTED_KEY_ORDER_RULES = {
         "oq_mqtt_ingress",
         "oq_local_sensors",
         "oq_sensor_sources",
-        "oq_ot_slave",
     ),
     ("openquatt/packages/60_ui_runtime.yaml", "packages"): (
         "oq_setup_status",
@@ -245,6 +244,8 @@ NESTED_KEY_ORDER_RULES = {
     ),
     ("openquatt/profiles/heatpump_controller_q.yaml", "packages"): (
         "oq_cic_compatibility",
+        "oq_sensor_source_selects_opentherm",
+        "oq_ot_slave",
     ),
 }
 

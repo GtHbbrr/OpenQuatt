@@ -1,0 +1,58 @@
+# ==============================================================================
+# OpenQuatt - Sensor Source Selects: OpenTherm-capable
+# ==============================================================================
+#
+# Scope:
+#   Source selectors that expose the direct OpenTherm thermostat path.
+#   Include only on hardware profiles that actually provide the OT slave bridge.
+# ==============================================================================
+
+select:
+  - platform: template
+    name: "Room Temperature Source"
+    id: room_temp_source
+    icon: mdi:source-branch
+    entity_category: config
+    optimistic: true
+    restore_value: true
+    options:
+      - CIC
+      - OT thermostat
+      - HA input
+      - MQTT
+    initial_option: OT thermostat
+    web_server:
+      sorting_group_id: oq_sensor_selection
+
+  - platform: template
+    name: "Room Setpoint Source"
+    id: room_setpoint_source
+    icon: mdi:source-branch
+    entity_category: config
+    optimistic: true
+    restore_value: true
+    options:
+      - CIC
+      - OT thermostat
+      - HA input
+      - MQTT
+    initial_option: OT thermostat
+    web_server:
+      sorting_group_id: oq_sensor_selection
+
+  - platform: template
+    name: "Heating Enable Source"
+    id: heating_enable_source
+    icon: mdi:source-branch
+    entity_category: config
+    optimistic: true
+    restore_value: true
+    options:
+      - Disabled
+      - OT thermostat
+      - CIC
+      - HA input
+      - MQTT
+    initial_option: Disabled
+    web_server:
+      sorting_group_id: oq_sensor_selection

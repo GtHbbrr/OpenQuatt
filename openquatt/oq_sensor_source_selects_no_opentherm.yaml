@@ -1,0 +1,80 @@
+# ==============================================================================
+# OpenQuatt - Sensor Source Selects: No OpenTherm
+# ==============================================================================
+#
+# Scope:
+#   Source selectors for hardware profiles without a supported OT thermostat bus.
+# ==============================================================================
+
+select:
+  - platform: template
+    name: "Room Temperature Source"
+    id: room_temp_source
+    icon: mdi:source-branch
+    entity_category: config
+    optimistic: true
+    restore_value: true
+    options:
+      - CIC
+      - HA input
+      - MQTT
+    initial_option: CIC
+    web_server:
+      sorting_group_id: oq_sensor_selection
+
+  - platform: template
+    name: "Room Setpoint Source"
+    id: room_setpoint_source
+    icon: mdi:source-branch
+    entity_category: config
+    optimistic: true
+    restore_value: true
+    options:
+      - CIC
+      - HA input
+      - MQTT
+    initial_option: CIC
+    web_server:
+      sorting_group_id: oq_sensor_selection
+
+  - platform: template
+    name: "Heating Enable Source"
+    id: heating_enable_source
+    icon: mdi:source-branch
+    entity_category: config
+    optimistic: true
+    restore_value: true
+    options:
+      - Disabled
+      - CIC
+      - HA input
+      - MQTT
+    initial_option: Disabled
+    web_server:
+      sorting_group_id: oq_sensor_selection
+
+binary_sensor:
+  - platform: template
+    id: ot_thermostat_status_valid
+    internal: true
+    lambda: |-
+      return false;
+
+  - platform: template
+    id: ot_thermostat_ch_enable
+    internal: true
+    lambda: |-
+      return false;
+
+sensor:
+  - platform: template
+    id: ot_thermostat_room_temp
+    internal: true
+    lambda: |-
+      return NAN;
+
+  - platform: template
+    id: ot_thermostat_room_setpoint
+    internal: true
+    lambda: |-
+      return NAN;

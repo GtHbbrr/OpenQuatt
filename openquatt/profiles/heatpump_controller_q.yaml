@@ -38,6 +38,11 @@ substitutions:
 
 packages:
   oq_cic_compatibility: !include heatpump_controller_q_cic_compatibility.yaml
+  oq_sensor_source_selects_opentherm: !include ../oq_sensor_source_selects_opentherm.yaml
+  oq_ot_slave: !include
+    file: ../oq_ot_slave.yaml
+    vars:
+      ot_secondary_present: "${ot_secondary_present}"
 
 psram:
   mode: octal

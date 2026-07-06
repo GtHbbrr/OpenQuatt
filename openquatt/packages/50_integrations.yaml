@@ -19,7 +19,3 @@ packages:
     file: ../oq_sensor_sources.yaml
     vars:
       sensor_sources_duo_flow_internal: "${sensor_sources_duo_flow_internal}"
-  oq_ot_slave: !include
-    file: ../oq_ot_slave.yaml
-    vars:
-      ot_secondary_present: "${ot_secondary_present}"

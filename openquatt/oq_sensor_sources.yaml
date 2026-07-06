@@ -130,38 +130,6 @@ select:
       sorting_group_id: oq_sensor_selection
 
   - platform: template
-    name: "Room Temperature Source"
-    id: room_temp_source
-    icon: mdi:source-branch
-    entity_category: config
-    optimistic: true
-    restore_value: true
-    options:
-      - CIC
-      - OT thermostat
-      - HA input
-      - MQTT
-    initial_option: OT thermostat
-    web_server:
-      sorting_group_id: oq_sensor_selection
-
-  - platform: template
-    name: "Room Setpoint Source"
-    id: room_setpoint_source
-    icon: mdi:source-branch
-    entity_category: config
-    optimistic: true
-    restore_value: true
-    options:
-      - CIC
-      - OT thermostat
-      - HA input
-      - MQTT
-    initial_option: OT thermostat
-    web_server:
-      sorting_group_id: oq_sensor_selection
-
-  - platform: template
     name: "Cooling Enable Source"
     id: cooling_enable_source
     icon: mdi:source-branch
@@ -174,23 +142,6 @@ select:
       - MQTT
       - CIC or HA input
     initial_option: CIC or HA input
-    web_server:
-      sorting_group_id: oq_sensor_selection
-
-  - platform: template
-    name: "Heating Enable Source"
-    id: heating_enable_source
-    icon: mdi:source-branch
-    entity_category: config
-    optimistic: true
-    restore_value: true
-    options:
-      - Disabled
-      - OT thermostat
-      - CIC
-      - HA input
-      - MQTT
-    initial_option: Disabled
     web_server:
       sorting_group_id: oq_sensor_selection
 
@@ -215,7 +166,9 @@ binary_sensor:
       if (!id(heating_enable_source).has_state()) return false;
       const auto source = id(heating_enable_source).current_option();
       if (source == "Disabled") return true;
+      #if OQ_HARDWARE_HEATPUMP_CONTROLLER_Q
       if (source == "OT thermostat") return id(ot_thermostat_status_valid).has_state() && id(ot_thermostat_status_valid).state;
+      #endif
       if (source == "CIC") {
         return id(feed_ok).has_state() && id(feed_ok).state &&
                id(cic_data_stale).has_state() && !id(cic_data_stale).state &&
@@ -238,7 +191,9 @@ binary_sensor:
       const auto source = id(heating_enable_source).current_option();
       if (source == "Disabled") return true;
       if (!id(heating_enable_valid).state) return false;
+      #if OQ_HARDWARE_HEATPUMP_CONTROLLER_Q
       if (source == "OT thermostat") return id(ot_thermostat_ch_enable).state;
+      #endif
       if (source == "CIC") return id(cic_ch_enabled).state;
       if (source == "HA input") return id(heating_enable_ha).state;
       if (source == "MQTT") return id(mqtt_heating_enable).state;
@@ -568,9 +523,11 @@ sensor:
       if (source == "HA input") {
         if (id(room_temp_valid_ha).state && id(thermostat_room_temp_ha).has_state()) selected_c = id(thermostat_room_temp_ha).state;
       }
+      #if OQ_HARDWARE_HEATPUMP_CONTROLLER_Q
       if (source == "OT thermostat") {
         if (id(ot_thermostat_room_temp).has_state()) selected_c = id(ot_thermostat_room_temp).state;
       }
+      #endif
       if (source == "CIC") {
         if (id(cic_room_temp).has_state()) selected_c = id(cic_room_temp).state;
       }
@@ -624,9 +581,11 @@ sensor:
       if (source == "HA input") {
         if (id(room_setpoint_valid_ha).state && id(thermostat_setpoint_ha).has_state()) selected_c = id(thermostat_setpoint_ha).state;
       }
+      #if OQ_HARDWARE_HEATPUMP_CONTROLLER_Q
       if (source == "OT thermostat") {
         if (id(ot_thermostat_room_setpoint).has_state()) selected_c = id(ot_thermostat_room_setpoint).state;
       }
+      #endif
       if (source == "CIC") {
         if (id(cic_room_setpoint).has_state()) selected_c = id(cic_room_setpoint).state;
       }

@@ -1670,8 +1670,13 @@ views:
                     name: Geselecteerde kamertemperatuur
                   - entity: sensor.openquatt_cic_room_temperature
                     name: Kamertemperatuur (CIC)
-                  - entity: sensor.openquatt_ot_room_temperature
-                    name: Kamertemperatuur (OT-thermostaat)
+                  - type: conditional
+                    conditions:
+                      - entity: switch.openquatt_opentherm_enabled
+                        state_not: unavailable
+                    row:
+                      entity: sensor.openquatt_ot_room_temperature
+                      name: Kamertemperatuur (OT-thermostaat)
                   - entity: sensor.openquatt_ha_thermostat_room_temperature
                     name: Kamertemperatuur (HA-invoer)
           - type: vertical-stack
@@ -1748,8 +1753,13 @@ views:
                     name: Geselecteerd kamer setpoint
                   - entity: sensor.openquatt_cic_room_setpoint
                     name: Kamer setpoint (CIC)
-                  - entity: sensor.openquatt_ot_room_setpoint
-                    name: Kamer setpoint (OT-thermostaat)
+                  - type: conditional
+                    conditions:
+                      - entity: switch.openquatt_opentherm_enabled
+                        state_not: unavailable
+                    row:
+                      entity: sensor.openquatt_ot_room_setpoint
+                      name: Kamer setpoint (OT-thermostaat)
                   - entity: sensor.openquatt_ha_thermostat_setpoint
                     name: Kamer setpoint (HA-invoer)
           - type: vertical-stack
@@ -1772,8 +1782,13 @@ views:
                     name: Bronselectie geldig
                   - entity: binary_sensor.openquatt_heating_blocked_by_thermostat
                     name: Verwarming geblokkeerd door thermostaat
-                  - entity: binary_sensor.openquatt_ot_thermostat_ch_enable
-                    name: Warmtetoestemming (OT-thermostaat)
+                  - type: conditional
+                    conditions:
+                      - entity: switch.openquatt_opentherm_enabled
+                        state_not: unavailable
+                    row:
+                      entity: binary_sensor.openquatt_ot_thermostat_ch_enable
+                      name: Warmtetoestemming (OT-thermostaat)
                   - entity: binary_sensor.openquatt_cic_ch_enabled
                     name: Warmtetoestemming (CIC)
                   - entity: binary_sensor.openquatt_ha_heating_enable
@@ -2186,46 +2201,51 @@ views:
                 entity: input_number.openquatt_cooling_room_count
                 above: 5
         column_span: 3
-      - type: grid
-        cards:
-          - type: heading
-            icon: mdi:thermostat-box
-            heading: OpenTherm-thermostaat
-            heading_style: title
-          - type: markdown
-            content: |-
-              <details>
-              <summary><strong>Uitleg</strong></summary>
+      - type: conditional
+        conditions:
+          - entity: switch.openquatt_opentherm_enabled
+            state_not: unavailable
+        card:
+          type: grid
+          cards:
+            - type: heading
+              icon: mdi:thermostat-box
+              heading: OpenTherm-thermostaat
+              heading_style: title
+            - type: markdown
+              content: |-
+                <details>
+                <summary><strong>Uitleg</strong></summary>
 
-              Dit blok toont de directe OpenTherm-thermostaatkoppeling. Gebruik het om te controleren dat OpenQuatt warmtevraag, koelvraag en kamerwaarden rechtstreeks van de thermostaat ziet, dus buiten CIC of Home Assistant om.
+                Dit blok toont de directe OpenTherm-thermostaatkoppeling. Gebruik het om te controleren dat OpenQuatt warmtevraag, koelvraag en kamerwaarden rechtstreeks van de thermostaat ziet, dus buiten CIC of Home Assistant om.
 
-              Controleer bij afwijkingen eerst:
-              - `OpenTherm Enabled`
-              - `OT link problem`
-              - `Thermostaat CH enable`
-              - `Control setpoint`
-              - `Room setpoint`
-              - `Room temperature`
+                Controleer bij afwijkingen eerst:
+                - `OpenTherm Enabled`
+                - `OT link problem`
+                - `Thermostaat CH enable`
+                - `Control setpoint`
+                - `Room setpoint`
+                - `Room temperature`
 
-              </details>
-            text_only: true
-          - type: entities
-            show_header_toggle: false
-            entities:
-              - entity: switch.openquatt_opentherm_enabled
-                name: OpenTherm Enabled
-              - entity: binary_sensor.openquatt_ot_link_problem
-                name: OT link problem
-              - entity: binary_sensor.openquatt_ot_thermostat_ch_enable
-                name: Thermostaat CH enable
-              - entity: binary_sensor.openquatt_ot_thermostat_cooling_enable
-                name: Thermostaat cooling enable
-              - entity: sensor.openquatt_ot_control_setpoint
-                name: Control setpoint
-              - entity: sensor.openquatt_ot_room_setpoint
-                name: Room setpoint
-              - entity: sensor.openquatt_ot_room_temperature
-                name: Room temperature
+                </details>
+              text_only: true
+            - type: entities
+              show_header_toggle: false
+              entities:
+                - entity: switch.openquatt_opentherm_enabled
+                  name: OpenTherm Enabled
+                - entity: binary_sensor.openquatt_ot_link_problem
+                  name: OT link problem
+                - entity: binary_sensor.openquatt_ot_thermostat_ch_enable
+                  name: Thermostaat CH enable
+                - entity: binary_sensor.openquatt_ot_thermostat_cooling_enable
+                  name: Thermostaat cooling enable
+                - entity: sensor.openquatt_ot_control_setpoint
+                  name: Control setpoint
+                - entity: sensor.openquatt_ot_room_setpoint
+                  name: Room setpoint
+                - entity: sensor.openquatt_ot_room_temperature
+                  name: Room temperature
       - type: grid
         cards:
           - type: heading
