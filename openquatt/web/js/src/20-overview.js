@@ -833,6 +833,7 @@
   }
 
   const OVERVIEW_TREND_MAX_POINTS = 360;
+  const OVERVIEW_TREND_MIN_EFFICIENCY_INPUT_W = 100;
 
   function getOverviewTrendWindowHours() {
     const normalized = normalizeTrendWindowHours(state.trendWindowHours || DEFAULT_TREND_WINDOW_HOURS);
@@ -1031,7 +1032,7 @@
             derive: (sample) => {
               const input = Number(sample?.input);
               const output = Number(sample?.output);
-              if (!Number.isFinite(input) || !Number.isFinite(output) || input <= 0) {
+              if (!Number.isFinite(input) || !Number.isFinite(output) || input < OVERVIEW_TREND_MIN_EFFICIENCY_INPUT_W) {
                 return Number.NaN;
               }
               return output / input;
