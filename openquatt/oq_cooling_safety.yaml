@@ -82,7 +82,7 @@ number:
     mode: box
     optimistic: true
     restore_value: true
-    initial_value: 2.0
+    initial_value: 1.0
     entity_category: config
     web_server:
       sorting_group_id: oq_control
