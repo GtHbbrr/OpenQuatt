@@ -1860,6 +1860,7 @@
           <div class="oq-settings-odu-runtime-warning" role="alert">
             <strong>Schrijft direct naar ODU runtime registers.</strong>
             <p>Gebruik dit alleen voor gecontroleerde tests. Apply werkt alleen wanneer de HP in standby staat, de compressor uit is en de enable-schakelaar bewust aan staat.</p>
+            <p>Verlaag koel-frequenties onder de OEM-ondergrens rond 30 Hz alleen met superheat-bewaking. Bij te lage suction superheat kan natte zuigretour richting compressor ontstaan.</p>
           </div>
           <div class="oq-settings-odu-runtime-panels">
             ${hpIndexes.map((hpIndex) => renderOduRuntimeFrequencyHpPanel(hpIndex)).join("")}
