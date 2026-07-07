@@ -114,7 +114,7 @@ globals:
 
   # 0=inactive, 1=full, 2=projected_floor, 3=simmer, 4=falling_gap, 5=buffer_stop,
   # 6=dew_stop, 7=fallback_floor, 8=restart_wait, 9=room_cap, 10=fallback_cap1,
-  # 11=level1_hold, 12=oil_return_hold
+  # 11=level1_hold, 12=oil_return_hold, 13=oil_return_recovery
   - id: oq_cooling_limiter_reason_code
     type: int
     restore_value: false
@@ -152,6 +152,16 @@ globals:
     initial_value: '0'
 
   - id: oq_cooling_oil_return_hold_until_ms
+    type: uint32_t
+    restore_value: false
+    initial_value: '0'
+
+  - id: oq_cooling_oil_return_recovery_stable_since_ms
+    type: uint32_t
+    restore_value: false
+    initial_value: '0'
+
+  - id: oq_cooling_oil_return_recovery_cap_until_ms
     type: uint32_t
     restore_value: false
     initial_value: '0'
@@ -585,6 +595,11 @@ interval:
           const float projected_floor_fast_fall_rate_c_per_min = 0.20f;
           const float projected_floor_fast_fall_brake_gain = 1.0f;
           const float projected_floor_fast_fall_brake_max_c = 0.15f;
+          const uint32_t oil_return_recovery_stable_ms = 120000UL;
+          const uint32_t oil_return_recovery_cap_ms = 120000UL;
+          const float oil_return_recovery_dew_extra_c = 0.30f;
+          const float oil_return_recovery_projected_extra_c = 0.15f;
+          const float oil_return_recovery_fast_fall_rate_c_per_min = -0.05f;
           const float simmer_enable_gap_c = -0.20f;
           const float simmer_disable_gap_c = -0.30f;
           const float buffer_hard_stop_gap_c = -0.70f;
@@ -616,6 +631,8 @@ interval:
           #endif
           if (oil_return_active) {
             id(oq_cooling_oil_return_hold_until_ms) = now_ms + oil_return_hold_ms;
+            id(oq_cooling_oil_return_recovery_stable_since_ms) = 0;
+            id(oq_cooling_oil_return_recovery_cap_until_ms) = 0;
           }
 
           const bool active =
@@ -643,6 +660,8 @@ interval:
             id(oq_cooling_last_demand_change_ms) = 0;
             id(oq_cooling_stop_candidate_since_ms) = 0;
             id(oq_cooling_dew_stop_candidate_since_ms) = 0;
+            id(oq_cooling_oil_return_recovery_stable_since_ms) = 0;
+            id(oq_cooling_oil_return_recovery_cap_until_ms) = 0;
             return;
           }
 
@@ -680,6 +699,8 @@ interval:
             id(oq_cooling_last_demand_change_ms) = 0;
             id(oq_cooling_stop_candidate_since_ms) = 0;
             id(oq_cooling_dew_stop_candidate_since_ms) = 0;
+            id(oq_cooling_oil_return_recovery_stable_since_ms) = 0;
+            id(oq_cooling_oil_return_recovery_cap_until_ms) = 0;
             id(oq_cooling_buffer_gap_rate_ref_ms) = 0;
             id(oq_cooling_pid_integral) = 0.0f;
             id(oq_cooling_pid_last_error_c) = buffer_gap_c;
@@ -729,25 +750,88 @@ interval:
               hard_dew_stop_base_gap_c + (hard_dew_stop_margin_gain_c * safety_margin_c);
           const float hard_dew_restart_gap_c = hard_dew_stop_gap_c + hard_dew_restart_hyst_c;
 
-          const bool oil_return_hold_window_active =
+          const float projected_gap_c =
+              filtered_gap_c + (gap_rate_c_per_min * projection_horizon_min);
+          id(oq_cooling_projected_gap_c) = projected_gap_c;
+
+          bool oil_return_hold_window_active =
               id(oq_cooling_oil_return_hold_until_ms) > 0 &&
               now_ms < id(oq_cooling_oil_return_hold_until_ms);
           bool oil_return_mask_active = oil_return_active || oil_return_hold_window_active;
-          const bool oil_return_dew_recovered =
-              dew_mode && !isnan(dew_gap_c) && dew_gap_c > hard_dew_restart_gap_c;
-          const bool oil_return_fallback_recovered =
-              fallback_mode && filtered_gap_c > fallback_cap1_gap_c;
+          bool oil_return_recovery_cap_active =
+              id(oq_cooling_oil_return_recovery_cap_until_ms) > 0 &&
+              now_ms < id(oq_cooling_oil_return_recovery_cap_until_ms);
+          if (!oil_return_recovery_cap_active &&
+              id(oq_cooling_oil_return_recovery_cap_until_ms) > 0) {
+            id(oq_cooling_oil_return_recovery_cap_until_ms) = 0;
+          }
+
           const bool oil_return_recovery_not_needed = !dew_mode && !fallback_mode;
-          if (!oil_return_active && oil_return_hold_window_active &&
-              (oil_return_recovery_not_needed ||
-               oil_return_dew_recovered ||
-               oil_return_fallback_recovered)) {
+          const bool oil_return_dew_recovered =
+              !dew_mode ||
+              (!isnan(dew_gap_c) &&
+               dew_gap_c >= hard_dew_restart_gap_c + oil_return_recovery_dew_extra_c);
+          const bool oil_return_fallback_recovered =
+              !fallback_mode ||
+              filtered_gap_c >= fallback_cap1_gap_c + oil_return_recovery_dew_extra_c;
+          const bool oil_return_filtered_recovered =
+              filtered_gap_c >= 0.0f ||
+              (filtered_gap_c > limiter_soft_stop_gap_c && gap_rate_c_per_min > 0.10f);
+          const bool oil_return_projected_recovered =
+              projected_gap_c >= projected_floor_release_gap_c + oil_return_recovery_projected_extra_c;
+          const bool oil_return_trend_recovered =
+              gap_rate_c_per_min >= oil_return_recovery_fast_fall_rate_c_per_min;
+          const bool oil_return_recovery_safe =
+              !oil_return_recovery_not_needed &&
+              oil_return_dew_recovered &&
+              oil_return_fallback_recovered &&
+              oil_return_filtered_recovered &&
+              oil_return_projected_recovered &&
+              oil_return_trend_recovered;
+
+          bool oil_return_recovery_stable = false;
+          if (!oil_return_active && oil_return_hold_window_active && oil_return_recovery_safe) {
+            uint32_t stable_since_ms = id(oq_cooling_oil_return_recovery_stable_since_ms);
+            if (stable_since_ms == 0 || now_ms <= stable_since_ms) {
+              id(oq_cooling_oil_return_recovery_stable_since_ms) = now_ms;
+              stable_since_ms = now_ms;
+            }
+            oil_return_recovery_stable =
+                (uint32_t)(now_ms - stable_since_ms) >= oil_return_recovery_stable_ms;
+          } else if (!oil_return_active) {
+            id(oq_cooling_oil_return_recovery_stable_since_ms) = 0;
+          }
+
+          if (!oil_return_active && oil_return_hold_window_active && oil_return_recovery_not_needed) {
             id(oq_cooling_oil_return_hold_until_ms) = 0;
+            id(oq_cooling_oil_return_recovery_stable_since_ms) = 0;
+            id(oq_cooling_oil_return_recovery_cap_until_ms) = 0;
+            oil_return_hold_window_active = false;
             oil_return_mask_active = false;
+            oil_return_recovery_cap_active = false;
+          } else if (!oil_return_active && oil_return_hold_window_active && oil_return_recovery_stable) {
+            id(oq_cooling_oil_return_hold_until_ms) = 0;
+            id(oq_cooling_oil_return_recovery_stable_since_ms) = 0;
+            id(oq_cooling_oil_return_recovery_cap_until_ms) = now_ms + oil_return_recovery_cap_ms;
+            id(oq_cooling_pid_integral) = 0.0f;
+            id(oq_cooling_last_demand_change_ms) = now_ms;
+            oil_return_hold_window_active = false;
+            oil_return_mask_active = false;
+            oil_return_recovery_cap_active = true;
           } else if (!oil_return_active &&
               id(oq_cooling_oil_return_hold_until_ms) > 0 &&
               !oil_return_hold_window_active) {
             id(oq_cooling_oil_return_hold_until_ms) = 0;
+            id(oq_cooling_oil_return_recovery_stable_since_ms) = 0;
+            if (oil_return_recovery_not_needed) {
+              id(oq_cooling_oil_return_recovery_cap_until_ms) = 0;
+              oil_return_recovery_cap_active = false;
+            } else {
+              id(oq_cooling_oil_return_recovery_cap_until_ms) = now_ms + oil_return_recovery_cap_ms;
+              id(oq_cooling_pid_integral) = 0.0f;
+              id(oq_cooling_last_demand_change_ms) = now_ms;
+              oil_return_recovery_cap_active = true;
+            }
             oil_return_mask_active = false;
           }
           static bool last_oil_return_mask_active = false;
@@ -759,9 +843,6 @@ interval:
             last_oil_return_mask_active = oil_return_mask_active;
           }
 
-          const float projected_gap_c =
-              filtered_gap_c + (gap_rate_c_per_min * projection_horizon_min);
-          id(oq_cooling_projected_gap_c) = projected_gap_c;
           float projected_floor_dynamic_brake_gap_c = projected_floor_brake_gap_c;
           if (gap_rate_c_per_min < -projected_floor_fast_fall_rate_c_per_min) {
             const float fast_fall_extra_c =
@@ -791,6 +872,9 @@ interval:
           if (isnan(kd) || kd < 0.0f) kd = 0.0f;
 
           float integral = id(oq_cooling_pid_integral);
+          if (oil_return_mask_active || oil_return_recovery_cap_active) {
+            integral = fminf(integral, 0.0f);
+          }
 
           float derivative = 0.0f;
           if (dt_s > 0.0f) {
@@ -831,6 +915,7 @@ interval:
               case 10: return "fallback_cap1";
               case 11: return "level1_hold";
               case 12: return "oil_return_hold";
+              case 13: return "oil_return_recovery";
               default: return "inactive";
             }
           };
@@ -927,6 +1012,9 @@ interval:
               id(oq_cooling_stop_candidate_since_ms) = 0;
             }
             reason_code = 12;
+          } else if (oil_return_recovery_cap_active && allowed_max > 0) {
+            allowed_max = std::min(allowed_max, 1);
+            reason_code = 13;
           }
 
           // Soft-stop near target: avoid an immediate drop to 0 from limiter logic
@@ -1046,7 +1134,8 @@ interval:
           // may hold level 1 when the PI would round to zero, but only if the
           // limiter says level 1 is safe and the room still has meaningful demand.
           int demand_candidate = std::min(base_demand, allowed_max);
-          const bool oil_return_level1_hold = (reason_code == 12) && allowed_max >= 1;
+          const bool oil_return_level1_hold =
+              (reason_code == 12 || reason_code == 13) && allowed_max >= 1;
           const bool can_simmer =
               oil_return_level1_hold ||
               ((!room_error_valid || room_error_c > simmer_room_error_min_c) &&
@@ -1054,7 +1143,9 @@ interval:
                (reason_code == 3 || reason_code == 4 || fallback_mode));
           if (can_simmer && demand_candidate < 1) {
             demand_candidate = 1;
-            if (reason_code != 4 && reason_code != 10 && reason_code != 12) reason_code = 3;
+            if (reason_code != 4 && reason_code != 10 && reason_code != 12 && reason_code != 13) {
+              reason_code = 3;
+            }
           }
 
           // Slow upward changes for comfort and compressor calmness; allow
@@ -1358,6 +1449,7 @@ interval:
               case 10: return "fallback_cap1";
               case 11: return "level1_hold";
               case 12: return "oil_return_hold";
+              case 13: return "oil_return_recovery";
               default: return "inactive";
             }
           };
