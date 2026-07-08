@@ -1,0 +1,791 @@
+import { getEntityNumericValue, hasEntity } from "../core/app-shared.js";
+import { renderOqIcon, SENSOR_SELECTION_KEYS } from "../core/config.js";
+import { getEntityValue, getInputDraftValue } from "../core/entity-store.js";
+import { isInstallationMonitoringBinaryActive, isInstallationMonitoringIntegrationEnabled } from "../core/installation-monitoring.js";
+import { state } from "../core/state.js";
+import { formatMqttSensorValiditySummary, getMqttStatusDetail, getMqttStatusLabel, getMqttValidityLabel } from "../features/mqtt.js";
+import { formatSettingsOptionLabel, getSelectEntityOptions, getSettingsStatValue, getSettingsTextStatValue, renderSettingsInfoToggle, renderSettingsIntegrationSwitchCard, renderSettingsSection } from "./controls.js";
+import { escapeHtml } from "../core/html.js";
+
+  export function renderSettingsOpenThermCicSection() {
+    const hasOpenThermConfig = hasEntity("otEnabled");
+    const hasCicConfig = hasEntity("cicPollingEnabled") || hasEntity("cicFeedUrl");
+    const hasCicCompatibilityConfig = hasEntity("cicCompatibilityMode");
+    const hasStatus = hasEntity("otLinkProblem") || hasEntity("cicDataStale") || hasEntity("cicJsonFeedOk");
+    if (!hasOpenThermConfig && !hasCicConfig && !hasCicCompatibilityConfig && !hasStatus) {
+      return "";
+    }
+
+    const cicPollingEnabled = isInstallationMonitoringIntegrationEnabled("cicPollingEnabled");
+    const otEnabled = isInstallationMonitoringIntegrationEnabled("otEnabled");
+    const renderDiagnosticItem = ({ label, value, active = false }) => `
+      <div class="oq-settings-integration-diagnostic-item${active ? " is-warning" : ""}">
+        <dt>${escapeHtml(label)}</dt>
+        <dd>${escapeHtml(value)}</dd>
+      </div>
+    `;
+
+    const renderBinaryDiagnosticItem = (key, label, activeLabel = "Actief", inactiveLabel = "Normaal", options = {}) => {
+      if (!hasEntity(key)) {
+        return "";
+      }
+      const active = isInstallationMonitoringBinaryActive(key);
+      return renderDiagnosticItem({
+        label,
+        value: active ? activeLabel : inactiveLabel,
+        active: options.warningWhenActive ? active : false,
+      });
+    };
+
+    const renderValueDiagnosticItem = (key, label, options = {}) => {
+      const fallbackKey = options.fallbackKey || "";
+      if (!hasEntity(key) && !(fallbackKey && hasEntity(fallbackKey))) {
+        return "";
+      }
+      return renderDiagnosticItem({
+        label,
+        value: getSettingsStatValue(hasEntity(key) ? key : fallbackKey, options),
+      });
+    };
+
+    const renderDiagnosticGroup = (title, rows) => {
+      const content = rows.filter(Boolean).join("");
+      if (!content) {
+        return "";
+      }
+      return `
+        <article class="oq-settings-integration-diagnostic-group">
+          <h4>${escapeHtml(title)}</h4>
+          <dl>${content}</dl>
+        </article>
+      `;
+    };
+
+    const urlField = hasEntity("cicFeedUrl") ? `
+      <article class="oq-settings-integration-card oq-settings-integration-card--wide" data-oq-settings-field="cicFeedUrl">
+        <div class="oq-settings-integration-card-head">
+          <h4>CIC feed URL</h4>
+          <span class="oq-settings-integration-pill">Lokaal</span>
+        </div>
+        <label class="oq-settings-control oq-settings-control--text">
+          <input
+            class="oq-helper-input oq-settings-integration-url-input"
+            type="url"
+            data-oq-field="cicFeedUrl"
+            value="${escapeHtml(String(getInputDraftValue("cicFeedUrl") || ""))}"
+            placeholder="http://<host>:<poort>/beta/feed/data.json"
+            autocomplete="off"
+            spellcheck="false"
+            ${state.loadingEntities ? "disabled" : ""}
+          >
+        </label>
+        <p>Gebruik de lokale JSON-feed van de CiC.</p>
+      </article>
+    ` : "";
+
+    const otDiagnosticPanel = renderDiagnosticGroup("OpenTherm", [
+      hasEntity("otLinkProblem") ? renderDiagnosticItem({
+        label: "OT-link",
+        value: !otEnabled
+          ? "Uitgeschakeld"
+          : isInstallationMonitoringBinaryActive("otLinkProblem") ? "Probleem" : "OK",
+        active: otEnabled && isInstallationMonitoringBinaryActive("otLinkProblem"),
+      }) : "",
+      renderBinaryDiagnosticItem("otThermostatChEnable", "Thermostaat CH", "Actief", "Normaal"),
+      renderBinaryDiagnosticItem("otThermostatCoolingEnable", "Thermostaat koeling", "Actief", "Normaal"),
+      renderValueDiagnosticItem("otControlSetpoint", "Control setpoint"),
+      renderValueDiagnosticItem("otRoomSetpoint", "Room setpoint", { fallbackKey: "roomSetpoint" }),
+      renderValueDiagnosticItem("otRoomTemp", "Room temperature", { fallbackKey: "roomTemp" }),
+    ]);
+
+    const cicDiagnosticPanel = renderDiagnosticGroup("CIC-feed", [
+      hasEntity("cicJsonFeedOk") ? renderDiagnosticItem({
+        label: "JSON-feed",
+        value: !cicPollingEnabled
+          ? "Polling uit"
+          : isInstallationMonitoringBinaryActive("cicJsonFeedOk") ? "OK" : "Probleem",
+        active: cicPollingEnabled && !isInstallationMonitoringBinaryActive("cicJsonFeedOk"),
+      }) : "",
+      hasEntity("cicDataStale") ? renderDiagnosticItem({
+        label: "Data",
+        value: !cicPollingEnabled
+          ? "Polling uit"
+          : isInstallationMonitoringBinaryActive("cicDataStale") ? "Verouderd" : "Actueel",
+        active: cicPollingEnabled && isInstallationMonitoringBinaryActive("cicDataStale"),
+      }) : "",
+      renderBinaryDiagnosticItem("cicChEnabled", "CH-vraag", "Actief", "Normaal"),
+      renderBinaryDiagnosticItem("cicCoolingEnabled", "Koeling", "Actief", "Normaal"),
+      renderValueDiagnosticItem("cicControlSetpoint", "Control setpoint"),
+      renderValueDiagnosticItem("cicRoomSetpoint", "Room setpoint"),
+      renderValueDiagnosticItem("cicRoomTemp", "Room temperature"),
+      renderValueDiagnosticItem("cicFlowrate", "Flow"),
+      renderValueDiagnosticItem("cicLastSuccessAge", "Laatste succes"),
+    ]);
+
+    const diagnosticsPanel = otDiagnosticPanel || cicDiagnosticPanel ? `
+      <details class="oq-settings-integration-diagnostics"${state.integrationDiagnosticsOpen ? " open" : ""}>
+        <summary data-oq-action="toggle-integration-diagnostics">
+          <strong>Diagnostiek</strong>
+          <span>OpenTherm- en CIC-signalen</span>
+        </summary>
+        <div class="oq-settings-integration-diagnostic-grid">
+          ${otDiagnosticPanel}
+          ${cicDiagnosticPanel}
+        </div>
+      </details>
+    ` : "";
+
+    return renderSettingsSection(
+      "Integratie",
+      "OpenTherm & CIC-polling",
+      "Configureer de directe thermostaatbus, externe CIC-feed en Quatt app-compatibiliteit.",
+      `
+        <div class="oq-settings-integration-grid">
+          ${renderSettingsIntegrationSwitchCard("otEnabled", "OpenTherm", "Thermostaatbus voor warmtevraag en kamerwaarden.")}
+          ${renderSettingsIntegrationSwitchCard("cicPollingEnabled", "CIC-polling", "JSON-feed uitlezen voor setpoint, kamerwaarden en flow.")}
+          ${renderSettingsIntegrationSwitchCard("cicCompatibilityMode", "CiC-compatibiliteit", "Gegevens doorgeven zodat de Quatt app kan blijven meekijken.")}
+          ${urlField}
+        </div>
+        ${diagnosticsPanel}
+      `,
+    );
+  }
+
+  export function renderSettingsSensorSelectionSection() {
+    const hasSelectors = SENSOR_SELECTION_KEYS.some((key) => hasEntity(key));
+    if (!hasSelectors) {
+      return "";
+    }
+
+    const cicAvailable = isInstallationMonitoringIntegrationEnabled("cicPollingEnabled");
+    const otAvailable = isInstallationMonitoringIntegrationEnabled("otEnabled");
+    const getHaValueKey = (config = {}) => config.haValueKey || (config.haKeys || []).find((key) => !/valid$/i.test(key)) || "";
+    const getHaValidKey = (config = {}) => config.haValidKey || (config.haKeys || []).find((key) => /valid$/i.test(key)) || "";
+    const hasValidHaSource = (valueKey = "", validKey = "") => (
+      Boolean(valueKey)
+      && Boolean(validKey)
+      && hasEntity(valueKey)
+      && hasEntity(validKey)
+      && isInstallationMonitoringBinaryActive(validKey)
+    );
+    const hasHaSource = (config = {}) => hasValidHaSource(getHaValueKey(config), getHaValidKey(config));
+    const mqttTopicKeyByValueKey = {
+      mqttCoolingDewPoint: "cooling_dew_point",
+      mqttOutsideTemperature: "outside_temperature",
+      mqttRoomTemperature: "room_temperature",
+      mqttRoomSetpoint: "room_setpoint",
+      mqttHeatingEnable: "heating_enable",
+      mqttCoolingEnable: "cooling_enable",
+    };
+    const getMqttTopicKey = (config = {}) => config.mqttTopicKey || mqttTopicKeyByValueKey[config.valueKey] || "";
+    const isMqttInputTopicEnabled = (topicKey = "") => {
+      if (!topicKey) {
+        return true;
+      }
+      const inputEnabled = state.mqttStatus?.input_enabled;
+      if (inputEnabled && typeof inputEnabled === "object" && Object.prototype.hasOwnProperty.call(inputEnabled, topicKey)) {
+        return inputEnabled[topicKey] !== false;
+      }
+      return true;
+    };
+    const isMqttOption = (option) => /\bMQTT\b/i.test(String(option || ""));
+    const isSourceAvailable = (option, config = {}) => {
+      if (option === "CIC") {
+        return cicAvailable;
+      }
+      if (option === "OT thermostat") {
+        return otAvailable;
+      }
+      if (option === "HA input") {
+        return hasHaSource(config);
+      }
+      if (option === "CIC or HA input") {
+        return cicAvailable || hasHaSource(config);
+      }
+      if (isMqttOption(option)) {
+        return isMqttInputTopicEnabled(getMqttTopicKey(config));
+      }
+      if (option === "Flowmeter HP2") {
+        return hasEntity("hp2Flow");
+      }
+      if (option === "Local aggregate HP1/HP2") {
+        return hasEntity("flowLocal") || hasEntity("hp2Flow");
+      }
+      return true;
+    };
+    const getUnavailableSourceReason = (option, config = {}) => {
+      if (option === "CIC" && !cicAvailable) {
+        return "CIC-polling staat uit";
+      }
+      if (option === "OT thermostat" && !otAvailable) {
+        return "OpenTherm staat uit";
+      }
+      if (option === "HA input" && !hasHaSource(config)) {
+        return "HA-bron ongeldig";
+      }
+      if (option === "CIC or HA input" && !cicAvailable && !hasHaSource(config)) {
+        return "CIC en HA ontbreken";
+      }
+      if (isMqttOption(option) && !isMqttInputTopicEnabled(getMqttTopicKey(config))) {
+        return "MQTT-topic staat uit";
+      }
+      if (option === "Flowmeter HP2" && !hasEntity("hp2Flow")) {
+        return "HP2-flow ontbreekt";
+      }
+      if (option === "Local aggregate HP1/HP2" && !hasEntity("flowLocal") && !hasEntity("hp2Flow")) {
+        return "Lokale flow ontbreekt";
+      }
+      return "";
+    };
+    const sourceStateText = (key, activeLabel = "Actief", inactiveLabel = "Normaal") => {
+      if (!hasEntity(key)) {
+        return "";
+      }
+      return isInstallationMonitoringBinaryActive(key) ? activeLabel : inactiveLabel;
+    };
+    const formatSourceOptionLabel = (option, config = {}) => {
+      const value = String(option || "").trim();
+      if (!value) {
+        return "";
+      }
+      return config.optionLabels?.[value] || formatSettingsOptionLabel(value);
+    };
+    const formattedSourceValue = (key, config = {}) => {
+      const value = String(getEntityValue(key) || "").trim();
+      return value ? formatSourceOptionLabel(value, config) : "";
+    };
+    const formattedTextSourceValue = (key) => {
+      const value = getSettingsTextStatValue(key, "");
+      return value ? formatSettingsOptionLabel(value) : "";
+    };
+    const firstAvailableSourceLabel = (...values) => values.find((value) => String(value || "").trim()) || "";
+    const getWaterSupplyUsedSource = () => {
+      const source = formattedSourceValue("waterSupplySource");
+      if (String(getEntityValue("waterSupplySource") || "") === "Local" && hasEntity("localWaterSupplyTempSource")) {
+        const local = formattedSourceValue("localWaterSupplyTempSource");
+        return local ? `${source} - ${local}` : source;
+      }
+      return source;
+    };
+    const getFlowUsedSource = () => {
+      const source = String(getEntityValue("flowSource") || "").trim();
+      if (source === "Outdoor unit") {
+        if (hasEntity("qFlowSource")) {
+          const qSource = String(getEntityValue("qFlowSource") || "").trim();
+          const hpGeneration = String(getEntityValue("hpGeneration") || "").trim();
+          if (qSource === "Local" || (qSource === "Auto" && hpGeneration === "V1")) {
+            return qSource === "Auto" ? "Lokaal (auto)" : "Lokaal";
+          }
+          return firstAvailableSourceLabel(formattedSourceValue("outdoorUnitFlowMode"), qSource === "Auto" ? "Buitenunit (auto)" : "Buitenunit");
+        }
+        return firstAvailableSourceLabel(formattedSourceValue("outdoorUnitFlowMode"), "Quatt-flow");
+      }
+      return formatSettingsOptionLabel(source);
+    };
+    const getOutsideTempUsedSource = () => {
+      const source = String(getEntityValue("outsideTempSource") || "").trim();
+      if (source === "MQTT" && !isMqttInputTopicEnabled("outside_temperature")) {
+        return "MQTT-topic staat uit";
+      }
+      if (source !== "Auto") {
+        return formatSettingsOptionLabel(source);
+      }
+      const unitTemp = getEntityNumericValue("outsideTempLocalAggregated");
+      const haTemp = getEntityNumericValue("outsideTempHa");
+      const mqttTemp = getEntityNumericValue("mqttOutsideTemperature");
+      const unitValid = !Number.isNaN(unitTemp);
+      const haValid = hasEntity("outsideTempHaValid")
+        ? isInstallationMonitoringBinaryActive("outsideTempHaValid") && !Number.isNaN(haTemp)
+        : !Number.isNaN(haTemp);
+      const mqttValid = isMqttInputTopicEnabled("outside_temperature")
+        && hasEntity("mqttOutsideTemperatureValid")
+        && isInstallationMonitoringBinaryActive("mqttOutsideTemperatureValid")
+        && !Number.isNaN(mqttTemp);
+      const candidates = [
+        unitValid ? { label: "Buitenunit", value: unitTemp } : null,
+        haValid ? { label: "HA-invoer", value: haTemp } : null,
+        mqttValid ? { label: "MQTT", value: mqttTemp } : null,
+      ].filter(Boolean);
+      if (candidates.length) {
+        return candidates.reduce((best, item) => (item.value < best.value ? item : best), candidates[0]).label;
+      }
+      return "Auto";
+    };
+    const getNumericSourceValue = (key) => {
+      if (!hasEntity(key)) {
+        return NaN;
+      }
+      const rawNumeric = Number(getEntityValue(key));
+      if (Number.isFinite(rawNumeric)) {
+        return rawNumeric;
+      }
+      const stateText = String(state.entities[key]?.state ?? "").trim().replace(",", ".");
+      const match = stateText.match(/-?\d+(?:\.\d+)?/);
+      return match ? Number(match[0]) : NaN;
+    };
+    const isValidNumericSource = (valueKey, validKey = "") => {
+      if (!hasEntity(valueKey)) {
+        return false;
+      }
+      const value = getNumericSourceValue(valueKey);
+      const valid = validKey
+        ? isInstallationMonitoringBinaryActive(validKey)
+        : true;
+      return valid && Number.isFinite(value);
+    };
+    const getCoolingDewPointUsedSource = () => {
+      const source = String(getEntityValue("coolingDewPointSource") || "").trim();
+      if (source === "Home Assistant") {
+        return isValidNumericSource("coolingDewPointHa", "coolingDewPointHaValid") ? "HA-invoer" : "HA-invoer ontbreekt";
+      }
+      if (source === "MQTT") {
+        if (!isMqttInputTopicEnabled("cooling_dew_point")) {
+          return "MQTT-topic staat uit";
+        }
+        return isValidNumericSource("mqttCoolingDewPoint", "mqttCoolingDewPointValid") ? "MQTT" : "MQTT ontbreekt of verouderd";
+      }
+
+      const haValid = isValidNumericSource("coolingDewPointHa", "coolingDewPointHaValid");
+      const mqttValid = isMqttInputTopicEnabled("cooling_dew_point") &&
+        isValidNumericSource("mqttCoolingDewPoint", "mqttCoolingDewPointValid");
+      if (haValid && mqttValid) {
+        const ha = getNumericSourceValue("coolingDewPointHa");
+        const mqtt = getNumericSourceValue("mqttCoolingDewPoint");
+        return mqtt > ha ? "MQTT" : "HA-invoer";
+      }
+      if (haValid) {
+        return "HA-invoer";
+      }
+      if (mqttValid) {
+        return "MQTT";
+      }
+      return source ? formatSettingsOptionLabel(source) : "Auto";
+    };
+    const renderSourceRow = ({ label, value = "", key = "", active = false, status = "", statusTone = "", statusTitle = "" }) => {
+      const text = value || (key ? getSettingsStatValue(key) : "");
+      if (!text && !status) {
+        return "";
+      }
+      const safeStatusTone = String(statusTone || "").replace(/[^a-z0-9_-]/gi, "");
+      const safeStatusTitle = statusTitle || status;
+      const statusMarkup = status
+        ? `<em class="oq-settings-source-status${safeStatusTone ? ` oq-settings-source-status--${escapeHtml(safeStatusTone)}` : ""}" title="${escapeHtml(safeStatusTitle)}" aria-label="${escapeHtml(`${status}: ${safeStatusTitle}`)}">${escapeHtml(status)}</em>`
+        : "";
+      return `
+        <div class="oq-settings-source-row${active ? " is-warning" : ""}${status ? " has-status" : ""}">
+          <span>${escapeHtml(label)}${statusMarkup}</span>
+          <strong>${escapeHtml(text)}</strong>
+        </div>
+      `;
+    };
+    const renderHaSourceRows = ({ label = "HA-invoer", valueKey = "", validKey = "", value = "" }) => {
+      if (!valueKey || !validKey || !hasEntity(valueKey) || !hasEntity(validKey)) {
+        return [];
+      }
+      const valid = isInstallationMonitoringBinaryActive(validKey);
+      const statusTitle = valid
+        ? "Home Assistant geeft dit signaal geldig door. OpenQuatt mag deze HA-invoer gebruiken."
+        : "Home Assistant geeft dit signaal niet geldig door. OpenQuatt gebruikt deze HA-invoer dan niet als bron.";
+      return [renderSourceRow({
+        label,
+        key: valueKey,
+        value,
+        status: valid ? "Geldig" : "Ongeldig",
+        statusTone: valid ? "valid" : "invalid",
+        statusTitle,
+      })];
+    };
+    const renderMqttSourceRows = ({ label = "MQTT", valueKey = "", validKey = "", value = "", topicKey = "" }) => {
+      if (!valueKey || !validKey || !hasEntity(valueKey) || !hasEntity(validKey)) {
+        return [];
+      }
+      if (!isMqttInputTopicEnabled(topicKey || mqttTopicKeyByValueKey[valueKey])) {
+        return [];
+      }
+      const valid = isInstallationMonitoringBinaryActive(validKey);
+      const statusTitle = valid
+        ? "MQTT heeft een geldige, recente waarde ontvangen. OpenQuatt mag deze MQTT-invoer gebruiken."
+        : "MQTT heeft nog geen geldige recente waarde ontvangen. OpenQuatt gebruikt deze MQTT-invoer dan niet als bron.";
+      return [renderSourceRow({
+        label,
+        key: valueKey,
+        value: valid ? value : "—",
+        status: getMqttValidityLabel(validKey),
+        statusTone: valid ? "valid" : "invalid",
+        statusTitle,
+      })];
+    };
+    const renderSourceGroup = ({ title, icon = "", content = "", rows = [], copy = "", className = "" }) => {
+      const rowMarkup = rows.filter(Boolean).join("");
+      if (!content && !rowMarkup && !copy) {
+        return "";
+      }
+      return `
+        <section class="oq-settings-source-group${className ? ` ${escapeHtml(className)}` : ""}">
+          <h5>
+            ${icon ? `<span class="oq-settings-source-group-icon">${renderOqIcon(icon, "oq-settings-source-group-icon-svg")}</span>` : ""}
+            <span>${escapeHtml(title)}</span>
+          </h5>
+          ${content ? `<div class="oq-settings-source-group-content">${content}</div>` : ""}
+          ${rowMarkup ? `<div class="oq-settings-source-rows">${rowMarkup}</div>` : ""}
+          ${copy ? `<p class="oq-settings-source-group-copy">${escapeHtml(copy)}</p>` : ""}
+        </section>
+      `;
+    };
+    const renderSourceSelect = (key, config = {}) => {
+      if (!hasEntity(key)) {
+        return { markup: "", warning: "" };
+      }
+      const entity = state.entities[key] || {};
+      const current = String(getEntityValue(key) || "");
+      const allOptions = getSelectEntityOptions(entity);
+      const availableOptions = allOptions.filter((option) => isSourceAvailable(option, config));
+      const currentUnavailable = current && !isSourceAvailable(current, config);
+      const hideUnavailableCurrent = current === "HA input" && config.keepUnavailableCurrent !== true;
+      const renderOptions = currentUnavailable && !hideUnavailableCurrent && !availableOptions.includes(current)
+        ? [current, ...availableOptions]
+        : availableOptions;
+      const optionMarkup = renderOptions.map((option) => {
+        const displayLabel = formatSourceOptionLabel(option, config);
+        return `<option value="${escapeHtml(option)}" ${option === current ? "selected" : ""}>${escapeHtml(displayLabel)}</option>`;
+      }).join("");
+      return {
+        markup: `
+          <label class="oq-settings-source-select">
+            <span class="oq-settings-source-select-head">
+              <span>${escapeHtml(config.label || "Bron")}</span>
+              ${config.infoCopy ? renderSettingsInfoToggle(config.infoId || key, config.infoTitle || config.label || "Bron", config.infoCopy) : ""}
+            </span>
+            <select class="oq-helper-select" data-oq-field="${escapeHtml(key)}" ${state.loadingEntities ? "disabled" : ""}>
+              ${optionMarkup}
+            </select>
+          </label>
+        `,
+        warning: currentUnavailable ? `Huidige bron niet beschikbaar: ${getUnavailableSourceReason(current, config)}` : "",
+      };
+    };
+    const renderSourceCard = ({
+      key,
+      title,
+      icon = "",
+      select,
+      secondarySelect = null,
+      secondarySelects = null,
+      activeRows = [],
+      measurementRows = [],
+      activeCopy = "",
+      rows = [],
+    }) => {
+      const mainSelect = select && select.when !== false
+        ? renderSourceSelect(select.key, select)
+        : { markup: "", warning: "" };
+      const secondaryConfigs = Array.isArray(secondarySelects)
+        ? secondarySelects
+        : secondarySelect ? [secondarySelect] : [];
+      const secondaries = secondaryConfigs
+        .filter((config) => config && config.when !== false)
+        .map((config) => renderSourceSelect(config.key, config))
+        .filter((item) => item.markup);
+      const secondaryMarkup = secondaries.map((item) => item.markup).join("");
+      const secondaryWarning = secondaries.map((item) => item.warning).find(Boolean) || "";
+      const bodyRows = rows.filter(Boolean).join("");
+      const controlsMarkup = `${mainSelect.markup}${secondaryMarkup}`;
+      const warning = mainSelect.warning || secondaryWarning;
+      const groupedMarkup = [
+        renderSourceGroup({
+          title: "Configuratie",
+          icon: "settings",
+          className: "oq-settings-source-group--config",
+          content: controlsMarkup ? `
+            <div class="oq-settings-source-controls">
+              ${controlsMarkup}
+            </div>
+            ${warning ? `<p class="oq-settings-source-warning">${escapeHtml(warning)}</p>` : ""}
+          ` : "",
+        }),
+        renderSourceGroup({ title: "Actief", icon: "target", rows: activeRows, copy: activeCopy, className: "oq-settings-source-group--active" }),
+        renderSourceGroup({ title: "Metingen", icon: "activity", rows: measurementRows, className: "oq-settings-source-group--measurements" }),
+      ].filter(Boolean).join("");
+      if (!groupedMarkup && !controlsMarkup && !bodyRows) {
+        return "";
+      }
+      return `
+        <article class="oq-settings-source-card" data-oq-settings-field="${escapeHtml(key || select.key)}">
+          <div class="oq-settings-source-card-head">
+            ${icon ? `<span class="oq-settings-source-card-icon">${renderOqIcon(icon, "oq-settings-source-card-icon-svg")}</span>` : ""}
+            <h4>${escapeHtml(title)}</h4>
+          </div>
+          ${groupedMarkup || `
+            ${controlsMarkup ? `
+              <div class="oq-settings-source-controls">
+                ${controlsMarkup}
+              </div>
+            ` : ""}
+            ${warning ? `<p class="oq-settings-source-warning">${escapeHtml(warning)}</p>` : ""}
+            ${bodyRows ? `<div class="oq-settings-source-rows">${bodyRows}</div>` : ""}
+          `}
+        </article>
+      `;
+    };
+    const currentWaterSupplySource = String(getEntityValue("waterSupplySource") || "");
+    const currentFlowSource = String(getEntityValue("flowSource") || "");
+    const currentQFlowSource = String(getEntityValue("qFlowSource") || "");
+    const sourceCards = [
+      renderSourceCard({
+        key: "room-temperature",
+        title: "Kamertemperatuur",
+        icon: "thermometer",
+        select: { key: "roomTempSource", label: "Bron", haKeys: ["roomTempHa", "roomTempHaValid"], mqttTopicKey: "room_temperature" },
+        activeRows: [
+          renderSourceRow({ label: "Waarde", key: "roomTemp" }),
+          renderSourceRow({ label: "Bron", value: formattedTextSourceValue("roomTempEffectiveSource") }),
+        ],
+        measurementRows: [
+          cicAvailable ? renderSourceRow({ label: "CIC", key: "cicRoomTemp" }) : "",
+          otAvailable ? renderSourceRow({ label: "OpenTherm", key: "otRoomTemp" }) : "",
+          ...renderHaSourceRows({ valueKey: "roomTempHa", validKey: "roomTempHaValid" }),
+          ...renderMqttSourceRows({ valueKey: "mqttRoomTemperature", validKey: "mqttRoomTemperatureValid" }),
+        ],
+      }),
+      renderSourceCard({
+        key: "room-setpoint",
+        title: "Kamer setpoint",
+        icon: "target",
+        select: { key: "roomSetpointSource", label: "Bron", haKeys: ["roomSetpointHa", "roomSetpointHaValid"], mqttTopicKey: "room_setpoint" },
+        activeRows: [
+          renderSourceRow({ label: "Waarde", key: "roomSetpoint" }),
+          renderSourceRow({ label: "Bron", value: formattedTextSourceValue("roomSetpointEffectiveSource") }),
+        ],
+        measurementRows: [
+          cicAvailable ? renderSourceRow({ label: "CIC", key: "cicRoomSetpoint" }) : "",
+          otAvailable ? renderSourceRow({ label: "OpenTherm", key: "otRoomSetpoint" }) : "",
+          ...renderHaSourceRows({ valueKey: "roomSetpointHa", validKey: "roomSetpointHaValid" }),
+          ...renderMqttSourceRows({ valueKey: "mqttRoomSetpoint", validKey: "mqttRoomSetpointValid" }),
+        ],
+      }),
+      renderSourceCard({
+        key: "water-supply",
+        title: "Aanvoertemperatuur",
+        icon: "droplet",
+        select: { key: "waterSupplySource", label: "Bron", haKeys: ["waterSupplyTempHa", "waterSupplyTempHaValid"] },
+        secondarySelect: {
+          key: "localWaterSupplyTempSource",
+          label: "Lokale sensor",
+          when: currentWaterSupplySource === "Local" && hasEntity("localWaterSupplyTempSource"),
+        },
+        activeRows: [
+          renderSourceRow({ label: "Waarde", key: "supplyTemp" }),
+          renderSourceRow({ label: "Bron", value: getWaterSupplyUsedSource() }),
+        ],
+        measurementRows: [
+          renderSourceRow({ label: "Lokale selectie", key: "waterSupplyTempEsp" }),
+          renderSourceRow({ label: "PT1000", key: "waterSupplyTempPt1000" }),
+          renderSourceRow({ label: "DS18B20", key: "waterSupplyTempDs18b20" }),
+          cicAvailable ? renderSourceRow({ label: "CIC", key: "cicWaterSupplyTemp" }) : "",
+          ...renderHaSourceRows({ valueKey: "waterSupplyTempHa", validKey: "waterSupplyTempHaValid" }),
+        ],
+      }),
+      renderSourceCard({
+        key: "flow-source",
+        title: "Flow",
+        icon: "waves",
+        select: { key: "flowSource", label: "Bron", optionLabels: { "Outdoor unit": "Quatt-flow" }, when: cicAvailable || currentFlowSource === "CIC" },
+        secondarySelects: [
+          {
+            key: "qFlowSource",
+            label: "Flowpad",
+            infoId: "qFlowSource-info",
+            infoCopy: "Auto behoudt het bestaande gedrag: V1 gebruikt de lokale controller-flowmeter, V1.5 gebruikt de flow uit de buitenunit via Modbus. Kies Lokaal of Buitenunit om dit expliciet vast te zetten.",
+            when: currentFlowSource === "Outdoor unit" && hasEntity("qFlowSource"),
+          },
+          {
+            key: "outdoorUnitFlowMode",
+            label: "Meterkeuze",
+            infoId: "outdoorUnitFlowMode-info",
+            infoCopy: "Kies welke buitenunit-flowmeting wordt gebruikt. Flowmeter HP1 en HP2 gebruiken direct die meter. Gecombineerde flow HP1/HP2 gebruikt normaal het gemiddelde, met een guard die bij sterk afwijkende meters de meest aannemelijke waarde kiest.",
+            when: currentFlowSource === "Outdoor unit" && hasEntity("outdoorUnitFlowMode") && (!hasEntity("qFlowSource") || currentQFlowSource !== "Local"),
+          },
+        ],
+        activeRows: [
+          renderSourceRow({ label: "OpenQuatt-flow", key: "flowSelected" }),
+          renderSourceRow({ label: "Bron", value: getFlowUsedSource() }),
+        ],
+        measurementRows: [
+          renderSourceRow({ label: "Controller-flowmeter", key: "controllerFlow" }),
+          renderSourceRow({ label: "Gecombineerd HP1/HP2", key: "flowLocal" }),
+          renderSourceRow({ label: "Flowmeter HP1", key: "hp1Flow" }),
+          renderSourceRow({ label: "Flowmeter HP2", key: "hp2Flow" }),
+          cicAvailable ? renderSourceRow({ label: "CIC", key: "cicFlowrate" }) : "",
+        ],
+      }),
+      renderSourceCard({
+        key: "outside-temperature",
+        title: "Buitentemperatuur",
+        icon: "sun",
+        select: {
+          key: "outsideTempSource",
+          label: "Buiten bron",
+          haKeys: ["outsideTempHa", "outsideTempHaValid"],
+          mqttTopicKey: "outside_temperature",
+          infoId: "outsideTempSource-auto-info",
+          infoCopy: hasValidHaSource("outsideTempHa", "outsideTempHaValid")
+            ? "Auto gebruikt de laagste geldige buitentemperatuurbron. Zijn buitenunit, HA-invoer en MQTT geldig, dan kiest OpenQuatt de laagste waarde. Is er maar een bron geldig, dan wordt die gebruikt."
+            : "Auto gebruikt de laagste geldige buitentemperatuurbron.",
+        },
+        activeRows: [
+          renderSourceRow({ label: "Waarde", key: "outsideTempSelected" }),
+          renderSourceRow({ label: "Bron", value: getOutsideTempUsedSource() }),
+        ],
+        measurementRows: [
+          renderSourceRow({ label: "Buitenunit", key: "outsideTempLocalAggregated" }),
+          ...renderHaSourceRows({ valueKey: "outsideTempHa", validKey: "outsideTempHaValid" }),
+          ...renderMqttSourceRows({ valueKey: "mqttOutsideTemperature", validKey: "mqttOutsideTemperatureValid" }),
+        ],
+      }),
+      renderSourceCard({
+        key: "heating-enable",
+        title: "Warmtetoestemming",
+        icon: "flame",
+        select: {
+          key: "heatingEnableSource",
+          label: "Bron",
+          optionLabels: { Disabled: "Niet gebruiken" },
+          haKeys: ["heatingEnableHa", "heatingEnableHaValid"],
+          mqttTopicKey: "heating_enable",
+          keepUnavailableCurrent: true,
+        },
+        activeRows: [
+          renderSourceRow({ label: "Waarde", value: sourceStateText("heatingEnableSelected", "Toegestaan", "Geblokkeerd") }),
+          renderSourceRow({ label: "Bron", value: formattedTextSourceValue("heatingEnableEffectiveSource") }),
+        ],
+        measurementRows: [
+          renderSourceRow({ label: "Bronselectie", value: sourceStateText("heatingEnableValid", "Geldig", "Ongeldig") }),
+          otAvailable ? renderSourceRow({ label: "OpenTherm", value: sourceStateText("otThermostatChEnable", "Toegestaan", "Geblokkeerd") }) : "",
+          cicAvailable ? renderSourceRow({ label: "CIC", value: sourceStateText("cicChEnabled", "Toegestaan", "Geblokkeerd") }) : "",
+          ...renderHaSourceRows({
+            valueKey: "heatingEnableHa",
+            validKey: "heatingEnableHaValid",
+            value: sourceStateText("heatingEnableHa", "Toegestaan", "Geblokkeerd"),
+          }),
+          ...renderMqttSourceRows({
+            valueKey: "mqttHeatingEnable",
+            validKey: "mqttHeatingEnableValid",
+            value: sourceStateText("mqttHeatingEnable", "Toegestaan", "Geblokkeerd"),
+          }),
+        ],
+      }),
+      renderSourceCard({
+        key: "cooling-enable",
+        title: "Koeltoestemming",
+        icon: "snowflake",
+        select: {
+          key: "coolingEnableSource",
+          label: "Bron",
+          haKeys: ["coolingEnableHa", "coolingEnableHaValid"],
+          mqttTopicKey: "cooling_enable",
+        },
+        activeRows: [
+          renderSourceRow({ label: "Waarde", value: sourceStateText("coolingEnableSelected", "Toegestaan", "Geblokkeerd") }),
+          renderSourceRow({ label: "Bron", value: formattedTextSourceValue("coolingEnableEffectiveSource") }),
+        ],
+        measurementRows: [
+          renderSourceRow({ label: "Handmatig", value: sourceStateText("manualCoolingEnable", "Aan", "Uit") }),
+          cicAvailable ? renderSourceRow({ label: "CIC", value: sourceStateText("cicCoolingEnabled", "Toegestaan", "Geblokkeerd") }) : "",
+          ...renderHaSourceRows({
+            valueKey: "coolingEnableHa",
+            validKey: "coolingEnableHaValid",
+            value: sourceStateText("coolingEnableHa", "Toegestaan", "Geblokkeerd"),
+          }),
+          ...renderMqttSourceRows({
+            valueKey: "mqttCoolingEnable",
+            validKey: "mqttCoolingEnableValid",
+            value: sourceStateText("mqttCoolingEnable", "Toegestaan", "Geblokkeerd"),
+          }),
+        ],
+      }),
+      renderSourceCard({
+        key: "cooling-dew-point",
+        title: "Koelingsdauwpunt",
+        icon: "thermometer",
+        select: {
+          key: "coolingDewPointSource",
+          label: "Bron",
+          haKeys: ["coolingDewPointHa", "coolingDewPointHaValid"],
+          mqttTopicKey: "cooling_dew_point",
+          infoId: "coolingDewPointSource-info",
+          infoCopy: "Auto gebruikt de hoogste geldige waarde als Home Assistant en MQTT tegelijk geldig zijn. Kies Home Assistant of MQTT om die bron expliciet te vereisen.",
+        },
+        activeRows: [
+          renderSourceRow({ label: "Waarde", key: "coolingDewPointSelected" }),
+          renderSourceRow({ label: "Bron", value: getCoolingDewPointUsedSource() }),
+        ],
+        measurementRows: [
+          ...renderHaSourceRows({ valueKey: "coolingDewPointHa", validKey: "coolingDewPointHaValid" }),
+          ...renderMqttSourceRows({ valueKey: "mqttCoolingDewPoint", validKey: "mqttCoolingDewPointValid" }),
+        ],
+      }),
+    ].filter(Boolean);
+
+    if (!sourceCards.length) {
+      return "";
+    }
+
+    return renderSettingsSection(
+      "Bronnen",
+      "Sensorselectie",
+      "Kies welke bron OpenQuatt gebruikt voor metingen en vraag-signalen. Uitgeschakelde integraties verdwijnen uit de keuzes.",
+      `<div class="oq-settings-source-grid">${sourceCards.join("")}</div>`,
+    );
+  }
+
+  export function renderSettingsMqttSection() {
+    const sensorSummary = formatMqttSensorValiditySummary();
+    const mqttEnabled = state.mqttStatus?.enabled === true;
+    const sensorsPanel = mqttEnabled ? `
+      <section class="oq-settings-mqtt-panel oq-settings-mqtt-panel--sensors oq-settings-mqtt-panel--compact">
+        <div class="oq-settings-quickstart-status-row oq-settings-mqtt-status-row">
+          <div>
+            <p class="oq-settings-quickstart-status-label">MQTT sensoren</p>
+            <strong class="oq-settings-quickstart-status-value">${escapeHtml(sensorSummary)}</strong>
+          </div>
+          <button
+            class="oq-helper-button oq-helper-button--ghost"
+            type="button"
+            data-oq-action="open-mqtt-sensors-modal"
+          >
+            Details
+          </button>
+        </div>
+      </section>
+    ` : "";
+
+    return renderSettingsSection(
+      "Integratie",
+      "MQTT inputbronnen",
+      "Beheer de brokerverbinding voor externe MQTT-bronwaarden.",
+      `
+        <div class="oq-settings-mqtt-shell">
+          <section class="oq-settings-mqtt-panel oq-settings-mqtt-panel--broker">
+            <div class="oq-settings-field-head">
+              <h3>MQTT brokerconfiguratie</h3>
+            </div>
+            <div class="oq-settings-quickstart-status-row oq-settings-mqtt-status-row">
+              <div>
+                <p class="oq-settings-quickstart-status-label">Huidige status</p>
+                <strong class="oq-settings-quickstart-status-value">${escapeHtml(getMqttStatusLabel())}</strong>
+                <p class="oq-settings-quickstart-status-copy">${escapeHtml(getMqttStatusDetail())}</p>
+              </div>
+              <button
+                class="oq-helper-button oq-helper-button--ghost"
+                type="button"
+                data-oq-action="open-mqtt-modal"
+              >
+                Aanpassen
+              </button>
+            </div>
+          </section>
+          ${sensorsPanel}
+        </div>
+      `,
+    );
+  }

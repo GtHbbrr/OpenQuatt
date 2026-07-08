@@ -5,7 +5,7 @@ import vm from "node:vm";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const DEFAULT_CONFIG_PATH = path.join(__dirname, "js", "src", "00-config.js");
+const DEFAULT_CONFIG_PATH = path.join(__dirname, "js", "src", "core", "config.js");
 
 function formatList(values) {
   return values.length ? values.join(", ") : "none";
@@ -44,9 +44,12 @@ function validateSectionShape(section) {
 
 async function loadConfig(configPath) {
   const source = await readFile(configPath, "utf8");
+  const scriptSource = source
+    .replace(/^import\s+[\s\S]*?;\n/gm, "")
+    .replace(/\bexport\s+(?=(?:async\s+)?function|const\s)/g, "");
   const sandbox = {};
   vm.runInNewContext(
-    `${source}
+    `${scriptSource}
 
 globalThis.__settingsBackupCheckConfig = {
   ENTITY_DEFS,

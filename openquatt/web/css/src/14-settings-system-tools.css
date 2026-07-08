@@ -1,0 +1,316 @@
+.oq-settings-installation-summary,
+.oq-settings-system-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 18px;
+  border-radius: var(--oq-helper-radius-lg);
+  border: 1px solid var(--oq-helper-line);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(249, 250, 251, 0.98));
+}
+
+.oq-helper-shell--dark .oq-settings-installation-summary,
+.oq-helper-shell--dark .oq-settings-system-row {
+  background: linear-gradient(180deg, rgba(66, 32, 14, 0.26), rgba(22, 33, 49, 0.94));
+}
+
+.oq-settings-installation-summary-copy,
+.oq-settings-system-row-copy {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.oq-settings-system-summary {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.oq-settings-backup-shell {
+  display: grid;
+  gap: 14px;
+}
+
+.oq-settings-backup-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.oq-settings-backup-stat {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  padding: 14px 16px;
+  border-radius: 18px;
+  border: 1px solid var(--oq-helper-line);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(249, 250, 251, 0.98));
+}
+
+.oq-helper-shell--dark .oq-settings-backup-stat {
+  background: linear-gradient(180deg, rgba(66, 32, 14, 0.24), rgba(22, 33, 49, 0.94));
+}
+
+.oq-settings-backup-stat-label {
+  color: var(--oq-helper-faint);
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.oq-settings-backup-stat-value {
+  color: var(--oq-helper-ink);
+  font-size: 1.05rem;
+  font-weight: 800;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+}
+
+.oq-settings-backup-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.oq-settings-backup-actions .oq-helper-button {
+  width: 100%;
+}
+
+.oq-settings-backup-input {
+  display: none;
+}
+
+.oq-settings-backup-import-input {
+  display: block;
+  width: 100%;
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px dashed var(--oq-helper-line);
+  background: rgba(255, 255, 255, 0.7);
+  color: var(--oq-helper-faint);
+}
+
+.oq-helper-shell--dark .oq-settings-backup-import-input {
+  background: rgba(13, 18, 28, 0.72);
+}
+
+.oq-settings-backup-error {
+  margin: 0;
+  color: #b45309;
+  font-weight: 600;
+  line-height: 1.55;
+}
+
+.oq-helper-shell--dark .oq-settings-backup-error {
+  color: #fdba74;
+}
+
+.oq-settings-installation-summary-label,
+.oq-settings-system-row-label {
+  margin: 0;
+  color: var(--oq-helper-faint);
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.oq-settings-installation-summary-value,
+.oq-settings-system-row-value {
+  color: var(--oq-helper-ink);
+  font-size: 1.0rem;
+  font-weight: 700;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+}
+
+.oq-settings-installation-summary-note,
+.oq-settings-system-row-note {
+  margin: 0;
+  color: var(--oq-helper-soft);
+  line-height: 1.5;
+}
+
+.oq-settings-system-row--with-action {
+  align-items: flex-start;
+}
+
+.oq-settings-system-row--with-action .oq-settings-system-row-copy {
+  flex: 1;
+}
+
+.oq-webserver-log-history-shell {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr));
+  align-items: stretch;
+  gap: 12px;
+}
+
+.oq-webserver-log-level-control {
+  position: relative;
+  display: block;
+  flex: 0 0 220px;
+  width: min(220px, 100%);
+}
+
+.oq-webserver-log-level-control .oq-helper-select {
+  min-height: 46px;
+  padding-right: 40px;
+}
+
+.oq-webserver-log-modal .oq-helper-modal-copy code,
+.oq-webserver-log-modal .oq-helper-modal-note code {
+  padding: 0 0.35em;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.14);
+  color: inherit;
+}
+
+.oq-webserver-log-panel {
+  margin-top: 16px;
+  max-height: min(58svh, 560px);
+  overflow: auto;
+  padding: 12px 14px;
+  border: 1px solid var(--oq-helper-line);
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(249, 250, 251, 0.98));
+  overflow-anchor: none;
+}
+
+.oq-helper-shell--dark .oq-webserver-log-panel {
+  background: linear-gradient(180deg, rgba(18, 27, 41, 0.9), rgba(13, 19, 31, 0.96));
+}
+
+.oq-webserver-log-output {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: stretch;
+  justify-content: flex-start;
+  font-family: "SFMono-Regular", "Consolas", "Liberation Mono", "Menlo", monospace;
+  font-size: 0.82rem;
+  line-height: 1.55;
+}
+
+.oq-webserver-log-empty {
+  margin: 0;
+  color: var(--oq-helper-soft);
+  line-height: 1.55;
+}
+
+.oq-webserver-log-entry {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 0.36rem;
+  align-items: baseline;
+  padding: 0.02rem 0;
+  margin: 0;
+  white-space: normal;
+  word-break: break-word;
+}
+
+.oq-webserver-log-entry-time {
+  display: block;
+  color: var(--oq-helper-faint);
+  font-size: 0.82rem;
+  line-height: 1.55;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+  letter-spacing: 0.01em;
+  padding-top: 0;
+}
+
+.oq-webserver-log-entry-text {
+  display: block;
+  min-width: 0;
+  white-space: pre-wrap;
+}
+
+.oq-webserver-log-entry span {
+  display: block;
+}
+
+.oq-webserver-log-entry--plain {
+  color: var(--oq-helper-soft);
+}
+
+.oq-webserver-log-entry--error {
+  color: #b91c1c;
+  font-weight: 700;
+}
+
+.oq-webserver-log-entry--warning {
+  color: #b45309;
+  font-weight: 600;
+}
+
+.oq-webserver-log-entry--info {
+  color: #0f766e;
+}
+
+.oq-webserver-log-entry--debug {
+  color: #1d4ed8;
+}
+
+.oq-webserver-log-entry--verbose {
+  color: var(--oq-helper-faint);
+}
+
+.oq-helper-shell--dark .oq-webserver-log-empty,
+.oq-helper-shell--dark .oq-webserver-log-entry--plain {
+  color: #cbd5e1;
+}
+
+.oq-helper-shell--dark .oq-webserver-log-entry-time {
+  color: #94a3b8;
+}
+
+.oq-helper-shell--dark .oq-webserver-log-entry--error {
+  color: #fca5a5;
+}
+
+.oq-helper-shell--dark .oq-webserver-log-entry--warning {
+  color: #fdba74;
+}
+
+.oq-helper-shell--dark .oq-webserver-log-entry--info {
+  color: #5eead4;
+}
+
+.oq-helper-shell--dark .oq-webserver-log-entry--debug {
+  color: #93c5fd;
+}
+
+.oq-helper-shell--dark .oq-webserver-log-entry--verbose {
+  color: #94a3b8;
+}
+
+.oq-settings-action-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  align-items: flex-start;
+}
+
+.oq-settings-action-note {
+  margin: 0;
+  color: var(--oq-helper-soft);
+  line-height: 1.5;
+}
+
+.oq-settings-action-note a {
+  color: var(--oq-helper-accent-deep);
+  font-weight: 750;
+}
+
+.oq-settings-action-note--warning {
+  color: var(--oq-helper-accent-deep);
+}
+
+.oq-helper-shell--dark .oq-settings-action-note--warning {
+  color: #fdba74;
+}

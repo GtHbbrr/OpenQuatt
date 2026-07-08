@@ -1,21 +1,17 @@
-`openquatt/web/js/src/` contains the source fragments for the bundled web app.
+`openquatt/web/js/src/` contains the ES module source for the bundled web app.
 
 Current split:
-- `00-config.js`: bootstrap-adjacent constants, entity definitions and shared config
-- `01-runtime.js`: state storage, mount/runtime wiring, surface switching and motion bootstrapping
-- `02-firmware-header.js`: firmware, header, native surface and modal rendering helpers
-- `03-entities-controls.js`: entity state access, signatures, syncing, input handling and commit helpers
-- `05-app-shared.js`: cross-view app helpers such as entity state access, nav and document sync
-- `06-webserver-logs.js`: ESPHome web_server v3 log stream helpers and modal rendering
-- `10-settings.js`: settings helpers and settings section rendering
-- `15-quickstart.js`: Quick Start workspaces, sidebar and review rendering
-- `20-overview.js`: overview models and overview panel rendering
-- `30-energy.js`: energy view rendering
-- `40-heatpump.js`: heat pump rendering, overview assembly and patching
-- `90-shell.js`: settings view shell, loading view, root render, boot close-out
+- `app.js`: bundle entrypoint; imports and starts `boot()`
+- `core/`: shared config, state/runtime, entity store, sync, actions, browser helpers and small formatting/domain helpers
+- `features/`: feature flows such as firmware update, header status, security, MQTT, quickstart, storage/history, webserver logs and debug recording
+- `settings/`: settings shell helpers and domain renderers for storage, heating, water, installation, integrations, security, service, silent mode and cooling
+- `views/`: overview, energy, heat pump and root shell rendering
 
 The deployed/runtime file remains:
 - `openquatt/web/js/openquatt-app.js`
 
 Rebuild the bundle with:
-- `node openquatt/web/build-assets.mjs`
+- `rtk npm run build:web`
+
+Run the local web smoke checks with:
+- `rtk npm run smoke:web`

@@ -1,8 +1,9 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { transform } from "esbuild";
+import { build, transform } from "esbuild";
 import { checkSettingsBackupConfig } from "./check-settings-backup.mjs";
+import { resolveCssSources } from "./css-source-list.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -11,71 +12,45 @@ const bundles = [
   {
     label: "JS",
     output: path.join(__dirname, "js", "openquatt-app.js"),
-    sources: [
-      path.join(__dirname, "js", "src", "00-config.js"),
-      path.join(__dirname, "js", "src", "01-runtime.js"),
-      path.join(__dirname, "js", "src", "02-firmware-header.js"),
-      path.join(__dirname, "js", "src", "03-entities-controls.js"),
-      path.join(__dirname, "js", "src", "05-app-shared.js"),
-      path.join(__dirname, "js", "src", "06-webserver-logs.js"),
-      path.join(__dirname, "js", "src", "07-debug-recording.js"),
-      path.join(__dirname, "js", "src", "10-settings.js"),
-      path.join(__dirname, "js", "src", "15-quickstart.js"),
-      path.join(__dirname, "js", "src", "20-overview.js"),
-      path.join(__dirname, "js", "src", "30-energy.js"),
-      path.join(__dirname, "js", "src", "40-heatpump.js"),
-      path.join(__dirname, "js", "src", "90-shell.js"),
-    ],
+    entryPoint: path.join(__dirname, "js", "src", "app.js"),
   },
   {
     label: "CSS",
     output: path.join(__dirname, "css", "openquatt-app.css"),
-    sources: [
-      path.join(__dirname, "css", "src", "00-base.css"),
-      path.join(__dirname, "css", "src", "10-settings.css"),
-      path.join(__dirname, "css", "src", "20-overview.css"),
-      path.join(__dirname, "css", "src", "30-energy.css"),
-      path.join(__dirname, "css", "src", "40-heatpump.css"),
-      path.join(__dirname, "css", "src", "90-responsive.css"),
-    ],
+    sources: resolveCssSources(__dirname),
   },
 ];
 
-async function minifyJavaScript(source) {
-  const result = await transform(source, {
-    format: "iife",
-    legalComments: "none",
-    minify: true,
-    target: "es2020",
-  });
-  return result.code.trim();
-}
-
-function minifyCss(source) {
-  return source
-    .replace(/\/\*[\s\S]*?\*\//g, "")
-    .replace(/\s+/g, " ")
-    .replace(/\s*([{}:;,>~])\s*/g, "$1")
-    .replace(/;}/g, "}")
-    .trim();
-}
-
-async function buildEmbeddedAssetBlock() {
+async function buildEmbeddedAssetModule() {
   const assets = [
     ["HP_GENERATION_IMAGE_V1", path.join(__dirname, "assets", "quatt-hybrid-v1.webp")],
     ["HP_GENERATION_IMAGE_V2", path.join(__dirname, "assets", "quatt-hybrid-v2.webp")],
   ];
 
-  const lines = [
-    "/* --- embedded web assets --- */",
-  ];
+  const lines = [];
 
   for (const [name, assetPath] of assets) {
     const bytes = await readFile(assetPath);
-    lines.push(`const ${name} = "data:image/webp;base64,${bytes.toString("base64")}";`);
+    lines.push(`export const ${name} = "data:image/webp;base64,${bytes.toString("base64")}";`);
   }
 
   return lines.join("\n");
+}
+
+function embeddedAssetsPlugin() {
+  return {
+    name: "openquatt-embedded-assets",
+    setup(pluginBuild) {
+      pluginBuild.onResolve({ filter: /^virtual:embedded-assets$/ }, (args) => ({
+        path: args.path,
+        namespace: "openquatt-embedded-assets",
+      }));
+      pluginBuild.onLoad({ filter: /.*/, namespace: "openquatt-embedded-assets" }, async () => ({
+        contents: await buildEmbeddedAssetModule(),
+        loader: "js",
+      }));
+    },
+  };
 }
 
 function toBundlePath(value) {
@@ -83,6 +58,11 @@ function toBundlePath(value) {
 }
 
 async function buildBundle(bundle) {
+  if (bundle.label === "JS") {
+    await buildJavaScriptBundle(bundle);
+    return;
+  }
+
   const parts = await Promise.all(
     bundle.sources.map(async (source) => ({
       source,
@@ -95,13 +75,31 @@ async function buildBundle(bundle) {
     "/* Source files are in ./js/src and ./css/src. Rebuild with: node openquatt/web/build-assets.mjs */",
   ].join("\n");
   const bodySegments = parts.map(({ content }) => content.trimEnd());
-  if (bundle.label === "JS") {
-    bodySegments.splice(5, 0, await buildEmbeddedAssetBlock());
-  }
   const body = bodySegments.join("\n");
-  const minified = bundle.label === "JS" ? await minifyJavaScript(body) : minifyCss(body);
+  const minified = (await transform(body, { loader: "css", minify: true })).code.trim();
   await mkdir(path.dirname(bundle.output), { recursive: true });
   await writeFile(bundle.output, `${header}\n${minified}\n`, "utf8");
+  console.log(`${bundle.label} bundle rebuilt: ${path.relative(__dirname, bundle.output)}`);
+}
+
+async function buildJavaScriptBundle(bundle) {
+  const result = await build({
+    entryPoints: [bundle.entryPoint],
+    bundle: true,
+    format: "iife",
+    legalComments: "none",
+    minify: true,
+    target: "es2020",
+    write: false,
+    plugins: [embeddedAssetsPlugin()],
+  });
+  const header = [
+    `/* Generated minified bundle: ${toBundlePath(path.relative(__dirname, bundle.output))}. */`,
+    "/* Source files are in ./js/src and ./css/src. Rebuild with: node openquatt/web/build-assets.mjs */",
+  ].join("\n");
+  const output = result.outputFiles[0]?.text || "";
+  await mkdir(path.dirname(bundle.output), { recursive: true });
+  await writeFile(bundle.output, `${header}\n${output.trim()}\n`, "utf8");
   console.log(`${bundle.label} bundle rebuilt: ${path.relative(__dirname, bundle.output)}`);
 }
 

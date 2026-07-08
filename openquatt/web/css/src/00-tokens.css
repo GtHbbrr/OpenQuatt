@@ -1,0 +1,21 @@
+#oq-helper-root {
+  --oq-helper-bg: #f9fafb;
+  --oq-helper-card: #ffffff;
+  --oq-helper-card-muted: #f3f4f6;
+  --oq-helper-line: #e5e7eb;
+  --oq-helper-line-strong: #d1d5db;
+  --oq-helper-ink: #111827;
+  --oq-helper-soft: #4b5563;
+  --oq-helper-faint: #6b7280;
+  --oq-helper-muted: #6b7280;
+  --oq-helper-accent: #ea580c;
+  --oq-helper-accent-deep: #c2410c;
+  --oq-helper-accent-soft: #fff7ed;
+  --oq-helper-note-soft: #eff6ff;
+  --oq-helper-tip-soft: #ecfdf5;
+  --oq-helper-sky: #1d4ed8;
+  --oq-helper-shadow: 0 1px 2px rgba(15, 23, 42, 0.05), 0 14px 40px rgba(15, 23, 42, 0.05);
+  --oq-helper-radius-lg: 16px;
+  --oq-helper-radius-md: 12px;
+  --oq-helper-radius-sm: 10px;
+}
