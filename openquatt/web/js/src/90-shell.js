@@ -89,6 +89,63 @@ function renderSettingsView() {
     select.addEventListener("change", flush, { once: true });
   }
 
+  function captureSettingsPageScrollState() {
+    if (
+      state.nativeOpen ||
+      state.appView !== "settings" ||
+      state.renderedAppView !== "settings" ||
+      state.renderedSettingsGroup !== state.settingsGroup
+    ) {
+      return null;
+    }
+
+    const scroller = document.scrollingElement || document.documentElement;
+    const top = Number(window.scrollY || scroller?.scrollTop || 0);
+    if (!Number.isFinite(top) || top <= 0) {
+      return null;
+    }
+
+    return {
+      group: state.settingsGroup,
+      left: Number(window.scrollX || scroller?.scrollLeft || 0),
+      top,
+    };
+  }
+
+  function queueSettingsPageScrollRestore(scrollState) {
+    if (!scrollState) {
+      return;
+    }
+
+    const token = (state.settingsPageScrollRestoreToken || 0) + 1;
+    state.settingsPageScrollRestoreToken = token;
+    const restore = () => {
+      if (
+        token !== state.settingsPageScrollRestoreToken ||
+        state.nativeOpen ||
+        state.appView !== "settings" ||
+        state.settingsGroup !== scrollState.group
+      ) {
+        return;
+      }
+
+      const scroller = document.scrollingElement || document.documentElement;
+      if (!scroller) {
+        return;
+      }
+
+      const maxTop = Math.max(0, scroller.scrollHeight - scroller.clientHeight);
+      const top = Math.min(scrollState.top, maxTop);
+      window.scrollTo({ left: scrollState.left, top, behavior: "auto" });
+    };
+
+    window.requestAnimationFrame(() => {
+      restore();
+      window.requestAnimationFrame(restore);
+      window.setTimeout(restore, 80);
+    });
+  }
+
   function render() {
     if (!state.root) {
       return;
@@ -115,12 +172,15 @@ function renderSettingsView() {
     const quickStartScrollState = state.quickStartModalOpen
       ? captureQuickStartScrollState()
       : null;
+    const settingsPageScrollState = captureSettingsPageScrollState();
 
     if (state.nativeOpen) {
       state.root.innerHTML = `
         ${renderDevPanel()}
         ${renderNativeSurfaceShell()}
       `;
+      state.renderedAppView = "native";
+      state.renderedSettingsGroup = "";
       state.settingsRenderSignature = "";
       state.headerRenderSignature = getHeaderRenderSignature();
       state.mqttSensorsModalRenderSignature = "";
@@ -171,6 +231,8 @@ function renderSettingsView() {
       ${renderSystemModal()}
       ${renderDeviceReconnectModal()}
     `;
+    state.renderedAppView = state.appView;
+    state.renderedSettingsGroup = state.appView === "settings" ? state.settingsGroup : "";
     state.settingsRenderSignature = state.appView === "settings" ? getSettingsRenderSignature() : "";
     state.headerRenderSignature = getHeaderRenderSignature();
     state.mqttSensorsModalRenderSignature = state.systemModal === "mqtt-sensors" ? getMqttSensorsModalRenderSignature() : "";
@@ -188,6 +250,7 @@ function renderSettingsView() {
     queueServiceTaskModalScrollRestore(serviceTaskModalScrollState);
     queueHistoryStorageModalScrollRestore(historyStorageModalScrollState);
     queueQuickStartScrollRestore(quickStartScrollState);
+    queueSettingsPageScrollRestore(settingsPageScrollState);
   }
 
   function escapeHtml(value) {
