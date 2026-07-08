@@ -241,7 +241,7 @@ number:
     icon: mdi:thermometer-lines
     unit_of_measurement: "°C"
     min_value: 0.0
-    max_value: 2.0
+    max_value: 5.0
     step: 0.1
     mode: slider
     optimistic: true
@@ -673,7 +673,7 @@ interval:
           const float buffer_gap_c = supply_c - target_c;
           float restart_delta_c = id(cooling_restart_delta).state;
           if (isnan(restart_delta_c) || restart_delta_c < 0.0f) restart_delta_c = 1.0f;
-          if (restart_delta_c > 2.0f) restart_delta_c = 2.0f;
+          if (restart_delta_c > 5.0f) restart_delta_c = 5.0f;
 
           const bool user_responsibility_mode =
               id(cooling_without_dew_point_user_responsibility_enabled).has_state() &&
