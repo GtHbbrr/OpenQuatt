@@ -7,6 +7,12 @@ import { resolveCssSources } from "./css-source-list.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const checkOnly = process.argv.includes("--check");
+
+const unsupportedArguments = process.argv.slice(2).filter((argument) => argument !== "--check");
+if (unsupportedArguments.length) {
+  throw new Error(`Unsupported arguments: ${unsupportedArguments.join(", ")}`);
+}
 
 const bundles = [
   {
@@ -57,12 +63,7 @@ function toBundlePath(value) {
   return value.split(path.sep).join("/");
 }
 
-async function buildBundle(bundle) {
-  if (bundle.label === "JS") {
-    await buildJavaScriptBundle(bundle);
-    return;
-  }
-
+async function renderCssBundle(bundle) {
   const parts = await Promise.all(
     bundle.sources.map(async (source) => ({
       source,
@@ -77,12 +78,10 @@ async function buildBundle(bundle) {
   const bodySegments = parts.map(({ content }) => content.trimEnd());
   const body = bodySegments.join("\n");
   const minified = (await transform(body, { loader: "css", minify: true })).code.trim();
-  await mkdir(path.dirname(bundle.output), { recursive: true });
-  await writeFile(bundle.output, `${header}\n${minified}\n`, "utf8");
-  console.log(`${bundle.label} bundle rebuilt: ${path.relative(__dirname, bundle.output)}`);
+  return `${header}\n${minified}\n`;
 }
 
-async function buildJavaScriptBundle(bundle) {
+async function renderJavaScriptBundle(bundle) {
   const result = await build({
     entryPoints: [bundle.entryPoint],
     bundle: true,
@@ -98,10 +97,42 @@ async function buildJavaScriptBundle(bundle) {
     "/* Source files are in ./js/src and ./css/src. Rebuild with: node openquatt/web/build-assets.mjs */",
   ].join("\n");
   const output = result.outputFiles[0]?.text || "";
+  return `${header}\n${output.trim()}\n`;
+}
+
+async function bundleIsCurrent(bundle, expected) {
+  try {
+    return await readFile(bundle.output, "utf8") === expected;
+  } catch (error) {
+    if (error.code === "ENOENT") {
+      return false;
+    }
+    throw error;
+  }
+}
+
+async function buildBundle(bundle) {
+  const output = bundle.label === "JS"
+    ? await renderJavaScriptBundle(bundle)
+    : await renderCssBundle(bundle);
+  if (checkOnly) {
+    return await bundleIsCurrent(bundle, output) ? null : path.relative(process.cwd(), bundle.output);
+  }
+
   await mkdir(path.dirname(bundle.output), { recursive: true });
-  await writeFile(bundle.output, `${header}\n${output.trim()}\n`, "utf8");
+  await writeFile(bundle.output, output, "utf8");
   console.log(`${bundle.label} bundle rebuilt: ${path.relative(__dirname, bundle.output)}`);
+  return null;
 }
 
 await checkSettingsBackupConfig();
-await Promise.all(bundles.map(buildBundle));
+const staleBundles = (await Promise.all(bundles.map(buildBundle))).filter(Boolean);
+
+if (checkOnly) {
+  if (staleBundles.length) {
+    console.error(`Generated web bundles are out of date:\n- ${staleBundles.join("\n- ")}\nRun: rtk npm run build:web`);
+    process.exitCode = 1;
+  } else {
+    console.log("Generated web bundles are up to date");
+  }
+}

@@ -1,0 +1,4 @@
+# Generated web bundles are kept from the current branch during merges.
+# Rebuild them from source with `rtk npm run build:web` after resolving source conflicts.
+openquatt/web/js/openquatt-app.js merge=openquatt-generated linguist-generated=true
+openquatt/web/css/openquatt-app.css merge=openquatt-generated linguist-generated=true

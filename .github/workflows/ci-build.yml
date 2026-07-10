@@ -18,6 +18,12 @@ jobs:
       - name: Run settings-backup consistency check
         run: node openquatt/web/check-settings-backup.mjs
 
+      - name: Install web build dependencies
+        run: npm ci
+
+      - name: Check generated web bundles
+        run: npm run check:web
+
   validate-and-compile:
     needs: validate-web-settings-backup
     uses: ./.github/workflows/esphome-build.yml

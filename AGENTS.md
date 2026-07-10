@@ -55,6 +55,7 @@
 
 - Do not prefix PR titles with `[codex]`; use a concise human-readable title instead.
 - Use `.github/pull_request_template.md` for PR bodies and fill every relevant section.
+- In PRs, issues, review comments, and other GitHub-facing communication, write commands without the `rtk` wrapper (for example, `npm ci`, not `rtk npm ci`). Keep using `rtk` when executing those commands locally.
 
 ## Concise Mode
 

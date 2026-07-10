@@ -34,4 +34,8 @@ rtk npm run build:web
 rtk python3 scripts/check_docs_consistency.py
 ```
 
+## Communication
+
+- Use `rtk` when executing commands locally, but omit the wrapper in PRs, issues, review comments, and other GitHub-facing communication. Write `npm ci`, for example, rather than `rtk npm ci`.
+
 Use `rtk gain` occasionally to confirm savings tracking. If RTK hides needed details, rerun a narrower command rather than dumping broader output.

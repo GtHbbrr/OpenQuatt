@@ -90,3 +90,16 @@ For quick iterations, the standalone checks remain useful:
 - `python3 scripts/check_docs_consistency.py`
 
 The checker is intended as a local quality gate. Add new rules only once the current codebase can satisfy them consistently.
+
+## Generated Web Bundles
+
+The files `openquatt/web/js/openquatt-app.js` and `openquatt/web/css/openquatt-app.css` are generated and committed for firmware and release builds. Configure their merge driver once per clone:
+
+- `rtk npm run setup:git-merge-driver`
+
+The driver keeps the current bundle during a merge instead of creating generated-file conflicts. Resolve conflicts only in `openquatt/web/js/src/` and `openquatt/web/css/src/`, then regenerate and verify the committed bundles:
+
+- `rtk npm run build:web`
+- `rtk npm run check:web`
+
+CI runs the check and fails when the committed bundles do not match their sources.
