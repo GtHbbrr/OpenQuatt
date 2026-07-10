@@ -53,6 +53,23 @@ select:
     web_server:
       sorting_group_id: oq_sensor_selection
 
+  - platform: template
+    name: "Cooling Enable Source"
+    id: cooling_enable_source
+    icon: mdi:source-branch
+    entity_category: config
+    optimistic: true
+    restore_value: true
+    options:
+      - CIC
+      - HA input
+      - MQTT
+      - CIC or HA input
+      - Disabled
+    initial_option: Disabled
+    web_server:
+      sorting_group_id: oq_sensor_selection
+
 binary_sensor:
   - platform: template
     id: ot_thermostat_status_valid
@@ -62,6 +79,12 @@ binary_sensor:
 
   - platform: template
     id: ot_thermostat_ch_enable
+    internal: true
+    lambda: |-
+      return false;
+
+  - platform: template
+    id: ot_thermostat_cooling_enable
     internal: true
     lambda: |-
       return false;

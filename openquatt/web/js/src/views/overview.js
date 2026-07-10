@@ -62,6 +62,29 @@ import { isSystemInStandby, replaceOuterHtmlIfSignatureChanged, setInnerHtmlIfCh
     `;
   }
 
+  function formatOverviewPermissionSource(source) {
+    const value = String(source || "").trim();
+    const labels = {
+      None: "geen bron",
+      Manual: "handmatig",
+      Disabled: "handmatig",
+      "HA input": "HA-invoer",
+      MQTT: "MQTT",
+      "OT thermostat": "OpenTherm",
+      "HA input + Manual": "HA-invoer + handmatig",
+      "MQTT + Manual": "MQTT + handmatig",
+      "OT thermostat + Manual": "OpenTherm + handmatig",
+    };
+    return labels[value] || value;
+  }
+
+  function appendCoolingPermissionSource(copy, sourceLabel) {
+    if (!sourceLabel || sourceLabel === "geen bron") {
+      return copy;
+    }
+    return `${copy} Toestemming: ${sourceLabel}.`;
+  }
+
   export function getHeatPumpPanelStatusLabel(mode, running) {
     if (running) {
       return "Actief";
@@ -596,6 +619,10 @@ import { isSystemInStandby, replaceOuterHtmlIfSignatureChanged, setInnerHtmlIfCh
     const openquattResumeScheduled = hasOpenQuattResumeSchedule(openquattResumeAt);
     const openquattResumeLoading = (state.loadingEntities || state.entitySyncInFlight) && !hasEntity("openquattResumeAt");
     const manualCoolingEnabled = isEntityActive("manualCoolingEnable");
+    const coolingEnabled = hasEntity("coolingEnableSelected") ? isEntityActive("coolingEnableSelected") : manualCoolingEnabled;
+    const coolingEffectiveSource = formatOverviewPermissionSource(getEntityStateText("coolingEnableEffectiveSource", ""));
+    const coolingConfiguredSourceRaw = String(getEntityValue("coolingEnableSource") || "").trim();
+    const coolingConfiguredSource = formatOverviewPermissionSource(getEntityValue("coolingEnableSource"));
     const silentModeOverride = String(getEntityValue("silentModeOverride") || "Schedule");
     const coolingBlocked = !isEntityActive("coolingPermitted");
     const coolingRequestActive = isEntityActive("coolingRequestActive");
@@ -604,22 +631,26 @@ import { isSystemInStandby, replaceOuterHtmlIfSignatureChanged, setInnerHtmlIfCh
     const coolingWaitingForRoomRequest = isCoolingWaitingForRoomRequest(coolingBlockReasonRaw, coolingRequestActive);
 
     let coolingStatus = "Uit";
-    let coolingCopy = "Koeling staat uit.";
-    if (manualCoolingEnabled && coolingModeActive) {
+    let coolingCopy = coolingConfiguredSourceRaw === "Disabled"
+      ? "Koeling is niet toegestaan: handmatig staat uit."
+      : coolingConfiguredSource && coolingConfiguredSource !== "geen bron"
+      ? `Koeling is niet toegestaan: ${coolingConfiguredSource} geeft geen toestemming en handmatig staat uit.`
+      : "Koeling is niet toegestaan.";
+    if (coolingEnabled && coolingModeActive) {
       coolingStatus = "Actief";
-      coolingCopy = "Koeling draait nu.";
-    } else if (manualCoolingEnabled && coolingWaitingForRoomRequest) {
+      coolingCopy = appendCoolingPermissionSource("Koeling draait nu.", coolingEffectiveSource);
+    } else if (coolingEnabled && coolingWaitingForRoomRequest) {
       coolingStatus = "Aan";
-      coolingCopy = "Koeling is toegestaan en wacht op kamertemperatuur boven het koel-setpoint.";
-    } else if (manualCoolingEnabled && coolingBlocked) {
+      coolingCopy = appendCoolingPermissionSource("Koeling is toegestaan en wacht op kamertemperatuur boven het koel-setpoint.", coolingEffectiveSource);
+    } else if (coolingEnabled && coolingBlocked) {
       coolingStatus = "Geblokkeerd";
-      coolingCopy = formatCoolingBlockReason(coolingBlockReasonRaw || "Koeling wacht nog op veilige condities.");
-    } else if (manualCoolingEnabled && coolingRequestActive) {
+      coolingCopy = appendCoolingPermissionSource(formatCoolingBlockReason(coolingBlockReasonRaw || "Koeling wacht nog op veilige condities."), coolingEffectiveSource);
+    } else if (coolingEnabled && coolingRequestActive) {
       coolingStatus = "Start bijna";
-      coolingCopy = "Er is koelvraag. Koeling start zodra dat kan.";
-    } else if (manualCoolingEnabled) {
+      coolingCopy = appendCoolingPermissionSource("Er is koelvraag. Koeling start zodra dat kan.", coolingEffectiveSource);
+    } else if (coolingEnabled) {
       coolingStatus = "Aan";
-      coolingCopy = "Koeling staat aan en wacht op koelvraag.";
+      coolingCopy = appendCoolingPermissionSource("Koeling is toegestaan en wacht op koelvraag.", coolingEffectiveSource);
     }
 
     let silentStatus = "Uit";
@@ -641,7 +672,7 @@ import { isSystemInStandby, replaceOuterHtmlIfSignatureChanged, setInnerHtmlIfCh
 
     return [
       { key: "openquattEnabled", label: "Openquatt regeling", status: openquattEnabled ? "Actief" : "Tijdelijk uit", copy: openquattEnabled ? "Verwarmen en koelen worden automatisch geregeld." : openquattResumeScheduled ? "Verwarming en koeling zijn tijdelijk uitgeschakeld. Beveiligingen blijven actief." : "Verwarming en koeling zijn uitgeschakeld. Beveiligingen blijven actief.", tone: openquattEnabled ? "green" : "orange", kind: "openquatt-control", meta: openquattEnabled ? [] : [openquattResumeLoading ? { label: "Hervatten", value: "Laden…", tone: "neutral", loading: true } : { label: openquattResumeScheduled ? "Hervat automatisch" : "Hervatten", value: openquattResumeScheduled ? formatOpenQuattResumeDateTime(openquattResumeAt, true) : "Handmatig", tone: openquattResumeScheduled ? "orange" : "neutral" }] },
-      { key: "manualCoolingEnable", label: "Koeling", status: coolingStatus, copy: coolingCopy, buttonLabel: manualCoolingEnabled ? "Zet uit" : "Zet aan", nextState: manualCoolingEnabled ? "off" : "on", tone: manualCoolingEnabled ? (coolingModeActive ? "blue" : "sky") : "neutral" },
+      { key: "manualCoolingEnable", label: "Koeling", status: coolingStatus, copy: coolingCopy, buttonLabel: manualCoolingEnabled ? "Handmatig uit" : "Handmatig aan", nextState: manualCoolingEnabled ? "off" : "on", tone: coolingEnabled ? (coolingModeActive ? "blue" : "sky") : "neutral" },
       { key: "silentModeOverride", label: "Stille modus", status: silentStatus, copy: silentCopy, tone: silentTone, kind: "select", selectedOption: silentModeOverride, settingsAction: true, options: [{ value: "Off", label: "Uit" }, { value: "On", label: "Aan" }, { value: "Schedule", label: "Schema" }] },
     ].filter((card) => hasEntity(card.key));
   }

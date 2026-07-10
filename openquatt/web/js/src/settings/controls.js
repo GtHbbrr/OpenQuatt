@@ -150,6 +150,12 @@ export function formatSettingsOptionLabel(option) {
   const labels = {
     None: "Geen",
     Manual: "Handmatig",
+    Disabled: "Niet gebruiken",
+    "HA input + Manual": "HA-invoer + handmatig",
+    "MQTT + Manual": "MQTT + handmatig",
+    "OT thermostat + Manual": "OT-thermostaat + handmatig",
+    "CIC + Manual": "CIC + handmatig",
+    "CIC + HA input + Manual": "CIC + HA-invoer + handmatig",
     Balanced: "Gebalanceerd",
     Stable: "Stabiel",
     Responsive: "Direct",

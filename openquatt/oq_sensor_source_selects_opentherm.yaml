@@ -56,3 +56,21 @@ select:
     initial_option: Disabled
     web_server:
       sorting_group_id: oq_sensor_selection
+
+  - platform: template
+    name: "Cooling Enable Source"
+    id: cooling_enable_source
+    icon: mdi:source-branch
+    entity_category: config
+    optimistic: true
+    restore_value: true
+    options:
+      - CIC
+      - HA input
+      - MQTT
+      - CIC or HA input
+      - Disabled
+      - OT thermostat
+    initial_option: Disabled
+    web_server:
+      sorting_group_id: oq_sensor_selection

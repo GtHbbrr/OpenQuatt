@@ -270,12 +270,15 @@ import { render } from "./render-scheduler.js";
     "flowSelected",
     "totalCop",
     "manualCoolingEnable",
+    "coolingEnableSource",
+    "coolingEnableSelected",
+    "coolingEnableEffectiveSource",
     "silentModeOverride",
     "totalHeat",
     "totalCoolingPower",
   ];
 
-  export const INITIAL_OVERVIEW_TEXT_KEYS = ["strategy", "controlModeLabel", "hpGeneration"];
+  export const INITIAL_OVERVIEW_TEXT_KEYS = ["strategy", "controlModeLabel", "hpGeneration", "coolingEnableEffectiveSource"];
 
   export const INITIAL_OVERVIEW_NUMERIC_KEYS = ["totalPower", "flowSelected"];
 
