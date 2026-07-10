@@ -631,13 +631,16 @@ interval:
                                                    int limited_demand,
                                                    int raw_demand,
                                                    float dew_gap)->void {
-            static bool last_limiter_active = false;
-            static int last_limiter_reason = 0;
-            if (limiter_active == last_limiter_active &&
-                (!limiter_active || limiter_reason == last_limiter_reason)) {
+            // Normal limiter steps remain visible through live cooling diagnostics and
+            // trends. The decision log only records a transition into or out of a
+            // complete cooling pause; otherwise reason changes can alternate each
+            // minute while the heat pump is still cooling normally.
+            const bool pause_active = limiter_active && limited_demand <= 0;
+            static bool last_pause_active = false;
+            if (pause_active == last_pause_active) {
               return;
             }
-            if (limiter_active) {
+            if (pause_active) {
               const auto decision_reason = [](int limiter_reason)->uint8_t {
                 switch (limiter_reason) {
                   case oq_cooling::REASON_PROJECTED_FLOOR: return openquatt_decision_log::REASON_PROJECTED_FLOOR;
@@ -668,7 +671,7 @@ interval:
                   (int16_t) limited_demand,
                   (int16_t) raw_demand,
                   isnan(dew_gap) ? 0 : (int16_t) lroundf(dew_gap * 100.0f));
-            } else if (last_limiter_active) {
+            } else if (last_pause_active) {
               id(oq_decision_log).emit(
                   openquatt_decision_log::EVENT_COOLING_RELEASED,
                   openquatt_decision_log::SUBJECT_COOLING,
@@ -678,8 +681,7 @@ interval:
                   openquatt_decision_log::STATE_LIMITED,
                   openquatt_decision_log::STATE_ACTIVE);
             }
-            last_limiter_active = limiter_active;
-            last_limiter_reason = limiter_active ? limiter_reason : 0;
+            last_pause_active = pause_active;
           };
 
           bool oil_return_active = id(hp1_prot_oil_return).state;

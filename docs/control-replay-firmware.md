@@ -235,6 +235,10 @@ Aanbevolen regels:
   - zelfde reason binnen korte periode terugkomt;
   - geen fault/attention;
   - limiter-level alleen stapgewijs verandert.
+- Normale koelmodulatie met een uitgestuurd niveau boven nul hoort niet als
+  `cooling_limited` in de beslislog. `capacity_cap`, `projected_floor` en andere
+  limiterstappen blijven beschikbaar via live diagnostics en Trends. De
+  beslislog registreert alleen het begin en einde van een volledige koelpauze.
 - Start/stop aandacht tonen als:
   - teller boven drempel in 1u/24u;
   - apart `attention_pattern` event of bucketcounter.

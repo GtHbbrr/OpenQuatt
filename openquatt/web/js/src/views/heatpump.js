@@ -3703,7 +3703,7 @@ import { replaceOuterHtmlIfSignatureChanged, setInnerHtmlIfChanged } from "./vie
   function getDecisionEventDisplaySeverity(event) {
     const eventType = String(event?.event_type || "");
     const reason = String(event?.reason || "");
-    if (eventType === "cooling_limited" && reason === "cooling_limiter") {
+    if (isDecisionCoolingAdjustmentEvent(event)) {
       return "normal";
     }
     if (isControlWorkingCoolingProtectionReason(reason)) {
@@ -3721,6 +3721,17 @@ import { replaceOuterHtmlIfSignatureChanged, setInnerHtmlIfChanged } from "./vie
     return String(event?.severity || "normal");
   }
 
+  function isDecisionCoolingAdjustmentEvent(event) {
+    if (String(event?.event_type || "") !== "cooling_limited") {
+      return false;
+    }
+    const reason = String(event?.reason || "");
+    if (["capacity_cap", "room_cap", "cooling_limiter", "simmer", "falling_gap", "level1_hold"].includes(reason)) {
+      return true;
+    }
+    return reason === "projected_floor" && Number(event?.value_a) > 0;
+  }
+
   function mapDecisionEventToControlWorkingItem(event, selectedWindow, nowMs) {
     const eventType = String(event?.event_type || "");
     const reasonCode = String(event?.reason || "unknown");
@@ -3730,7 +3741,7 @@ import { replaceOuterHtmlIfSignatureChanged, setInnerHtmlIfChanged } from "./vie
     if ((eventType === "defrost_seen_start" || eventType === "defrost_seen_clear") && Number(event?._oq_context_cm ?? event?.cm) === 5) {
       return null;
     }
-    if ((eventType === "cooling_limited" && reasonCode === "cooling_limiter") || eventType === "cooling_released") {
+    if (isDecisionCoolingAdjustmentEvent(event) || eventType === "cooling_released") {
       return null;
     }
     const graphStart = getDecisionEventWindowMinute(event, selectedWindow, nowMs);
