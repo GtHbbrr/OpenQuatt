@@ -1207,6 +1207,21 @@ import { replaceOuterHtmlIfSignatureChanged } from "./view-utils.js";
     return (heatpumpWh / total) * 100;
   }
 
+  export function getEnergyHistoryEfficiencyStat(summary) {
+    const cop = formatEnergyRatio(summary.heatOutputWh, summary.heatingInputWh);
+    const eer = formatEnergyRatio(summary.coolingOutputWh, summary.coolingInputWh);
+    const hasCop = Number(summary.heatOutputWh || 0) > 0 && cop !== "—";
+    const hasEer = Number(summary.coolingOutputWh || 0) > 0 && eer !== "—";
+
+    if (hasCop && hasEer) {
+      return { label: "COP / EER", value: `${cop} / ${eer}` };
+    }
+    if (hasEer) {
+      return { label: "Gemiddelde EER", value: eer };
+    }
+    return { label: "Gemiddelde COP", value: cop };
+  }
+
   export function renderEnergyHistoryStat(label, value, note = "") {
     return `
       <div class="oq-energy-history-stat">
@@ -1564,6 +1579,7 @@ import { replaceOuterHtmlIfSignatureChanged } from "./view-utils.js";
 
   export function renderEnergyHistoryPanel(model = getEnergyHistoryPanelModel()) {
     const summary = model.summary;
+    const efficiencyStat = getEnergyHistoryEfficiencyStat(summary);
     const oldest = model.buckets[0]?.dateKey ? formatEnergyHistoryDateLabel(model.buckets[0].dateKey) : "—";
     const newest = model.buckets[model.buckets.length - 1]?.dateKey ? formatEnergyHistoryDateLabel(model.buckets[model.buckets.length - 1].dateKey) : "—";
     return `
@@ -1581,7 +1597,7 @@ import { replaceOuterHtmlIfSignatureChanged } from "./view-utils.js";
         </div>
         ${state.energyHistoryError ? `<p class="oq-energy-history-error">${escapeHtml(state.energyHistoryError)}</p>` : ""}
         <div class="oq-energy-history-stats">
-          ${renderEnergyHistoryStat("Gemiddelde COP", formatEnergyRatio(summary.heatOutputWh, summary.heatingInputWh), `${escapeHtml(oldest)} - ${escapeHtml(newest)}`)}
+          ${renderEnergyHistoryStat(efficiencyStat.label, efficiencyStat.value, `${escapeHtml(oldest)} - ${escapeHtml(newest)}`)}
           ${renderEnergyHistoryStat("Elektrisch", formatEnergyAdaptiveWh(summary.electricalInputWh, 1), "verbruikt")}
           ${renderEnergyHistoryStat("Warmtepomp", formatEnergyAdaptiveWh(summary.heatOutputWh + summary.coolingOutputWh, 1), "warmte en koeling")}
           ${renderEnergyHistoryStat("Cv-ketel", formatEnergyAdaptiveWh(summary.boilerOutputWh, 1), "thermisch")}
