@@ -733,27 +733,28 @@ bool OpenQuattMqttConfig::start_client_() {
     return true;
   }
 
+  esp_mqtt_client_config_t mqtt_config{};
   this->lock_config_();
-  memset(&this->mqtt_config_, 0, sizeof(this->mqtt_config_));
   this->client_id_ = App.get_name() + std::string("-mqtt-ingress");
-  this->mqtt_config_.broker.address.hostname = this->broker_.c_str();
-  this->mqtt_config_.broker.address.port = this->port_;
-  this->mqtt_config_.broker.address.transport = MQTT_TRANSPORT_OVER_TCP;
-  this->mqtt_config_.credentials.client_id = this->client_id_.c_str();
-  this->mqtt_config_.session.keepalive = 30;
-  this->mqtt_config_.session.disable_clean_session = false;
+  mqtt_config.broker.address.hostname = this->broker_.c_str();
+  mqtt_config.broker.address.port = this->port_;
+  mqtt_config.broker.address.transport = MQTT_TRANSPORT_OVER_TCP;
+  mqtt_config.credentials.client_id = this->client_id_.c_str();
+  mqtt_config.session.keepalive = 30;
+  mqtt_config.session.disable_clean_session = false;
+  mqtt_config.task.stack_size = MQTT_TASK_STACK_SIZE;
 
   if (!this->username_.empty()) {
-    this->mqtt_config_.credentials.username = this->username_.c_str();
+    mqtt_config.credentials.username = this->username_.c_str();
     if (!this->password_.empty()) {
-      this->mqtt_config_.credentials.authentication.password = this->password_.c_str();
+      mqtt_config.credentials.authentication.password = this->password_.c_str();
     }
   }
   const std::string log_broker = this->broker_;
   const uint16_t log_port = this->port_;
   this->unlock_config_();
 
-  this->mqtt_client_ = esp_mqtt_client_init(&this->mqtt_config_);
+  this->mqtt_client_ = esp_mqtt_client_init(&mqtt_config);
   if (this->mqtt_client_ == nullptr) {
     ESP_LOGE(TAG, "Failed to initialize MQTT ingress client");
     return false;
@@ -1043,7 +1044,8 @@ void OpenQuattMqttConfig::mqtt_event_handler_(void *handler_args, esp_event_base
   switch (event_id) {
     case MQTT_EVENT_CONNECTED:
       self->connected_.store(true);
-      self->subscribe_inputs_(event->client);
+      self->resubscribe_inputs_.store(true);
+      App.wake_loop_threadsafe();
       break;
     case MQTT_EVENT_DISCONNECTED:
       self->connected_.store(false);

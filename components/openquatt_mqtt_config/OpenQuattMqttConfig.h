@@ -274,8 +274,8 @@ class OpenQuattMqttConfig : public Component {
   static void copy_string_field_(char *destination, size_t max_len, const std::string &value);
 
   static constexpr uint32_t SENSOR_PUBLISH_INTERVAL_MS = 10000;
+  static constexpr int MQTT_TASK_STACK_SIZE = 8192;
 
-  esp_mqtt_client_config_t mqtt_config_{};
   esp_mqtt_client_handle_t mqtt_client_{nullptr};
   SemaphoreHandle_t config_lock_{nullptr};
   SemaphoreHandle_t runtime_lock_{nullptr};
