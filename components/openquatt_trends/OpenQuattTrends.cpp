@@ -68,6 +68,27 @@ uint32_t parse_window_hours_from_url(const char *url) {
   return kDefaultWindowHours;
 }
 
+void format_temperature_x10(int16_t value, char *buffer, size_t buffer_size) {
+  if (value == INT16_MIN) {
+    std::snprintf(buffer, buffer_size, "nan");
+    return;
+  }
+
+  const int32_t hundredths = static_cast<int32_t>(value) * 10;
+  const bool negative = hundredths < 0;
+  const uint32_t magnitude = static_cast<uint32_t>(negative ? -hundredths : hundredths);
+  std::snprintf(buffer, buffer_size, "%s%lu.%02lu", negative ? "-" : "",
+                static_cast<unsigned long>(magnitude / 100), static_cast<unsigned long>(magnitude % 100));
+}
+
+void format_unsigned_metric(uint16_t value, char *buffer, size_t buffer_size) {
+  if (value == UINT16_MAX) {
+    std::snprintf(buffer, buffer_size, "nan");
+    return;
+  }
+  std::snprintf(buffer, buffer_size, "%u", static_cast<unsigned>(value));
+}
+
 }  // namespace
 
 class ChunkedTextWriter {
@@ -1029,15 +1050,22 @@ bool OpenQuattTrends::write_sample_line_(ChunkedTextWriter *writer, const TrendS
   if (writer == nullptr) {
     return false;
   }
-  const float outside = decode_temp_(sample.values.outside_c_x10);
-  const float supply = decode_temp_(sample.values.supply_c_x10);
-  const float room = decode_temp_(sample.values.room_c_x10);
-  const float setpoint = decode_temp_(sample.values.room_setpoint_c_x10);
-  const float flow = decode_unsigned_(sample.values.flow_lph);
-  const float input = decode_unsigned_(sample.values.input_w);
-  const float output = decode_unsigned_(sample.values.output_w);
+  char outside[16];
+  char supply[16];
+  char room[16];
+  char setpoint[16];
+  char flow[12];
+  char input[12];
+  char output[12];
+  format_temperature_x10(sample.values.outside_c_x10, outside, sizeof(outside));
+  format_temperature_x10(sample.values.supply_c_x10, supply, sizeof(supply));
+  format_temperature_x10(sample.values.room_c_x10, room, sizeof(room));
+  format_temperature_x10(sample.values.room_setpoint_c_x10, setpoint, sizeof(setpoint));
+  format_unsigned_metric(sample.values.flow_lph, flow, sizeof(flow));
+  format_unsigned_metric(sample.values.input_w, input, sizeof(input));
+  format_unsigned_metric(sample.values.output_w, output, sizeof(output));
   return writer->printf(
-    "%llu|%.2f|%.2f|%.2f|%.2f|%.0f|%.0f|%.0f\n",
+    "%llu|%s|%s|%s|%s|%s|%s|%s\n",
     static_cast<unsigned long long>(sample.timestamp_ms),
     outside,
     supply,
