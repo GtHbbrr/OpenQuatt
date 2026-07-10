@@ -54,11 +54,11 @@ mqtt_outside_temperature_stale_s: "1800"              # Maximum age for the last
 mqtt_room_temperature_topic: "openquatt/${device_name}/input/thermostat/room_temperature" # Fixed MQTT input topic for external room temperature [degC].
 mqtt_room_temperature_stale_s: "600"                  # Maximum age for the last valid MQTT room temperature before it becomes invalid [s].
 mqtt_room_setpoint_topic: "openquatt/${device_name}/input/thermostat/room_setpoint" # Fixed MQTT input topic for external room setpoint [degC].
-mqtt_room_setpoint_stale_s: "1800"                    # Maximum age for the last valid MQTT room setpoint before it becomes invalid [s].
+mqtt_room_setpoint_stale_s: "0"                       # Maximum age for MQTT room setpoint [s]; 0 keeps state until a new payload, disable, or restart.
 mqtt_heating_enable_topic: "openquatt/${device_name}/input/thermostat/heating_enable" # Fixed MQTT input topic for external heating enable [boolean].
-mqtt_heating_enable_stale_s: "600"                    # Maximum age for the last valid MQTT heating-enable signal before it becomes invalid [s].
+mqtt_heating_enable_stale_s: "0"                      # Maximum age for MQTT heating-enable [s]; 0 keeps state until a new payload, disable, or restart.
 mqtt_cooling_enable_topic: "openquatt/${device_name}/input/thermostat/cooling_enable" # Fixed MQTT input topic for external cooling enable [boolean].
-mqtt_cooling_enable_stale_s: "600"                    # Maximum age for the last valid MQTT cooling-enable signal before it becomes invalid [s].
+mqtt_cooling_enable_stale_s: "0"                      # Maximum age for MQTT cooling-enable [s]; 0 keeps state until a new payload, disable, or restart.
 
 # ----------------------------
 # HARDWARE

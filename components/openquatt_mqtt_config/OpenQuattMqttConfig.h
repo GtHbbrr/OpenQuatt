@@ -151,6 +151,8 @@ class OpenQuattMqttConfig : public Component {
     std::array<std::string, BINARY_INPUT_COUNT> binary_input_topics;
     std::array<bool, NUMERIC_INPUT_COUNT> input_enabled;
     std::array<bool, BINARY_INPUT_COUNT> binary_input_enabled;
+    std::array<bool, NUMERIC_INPUT_COUNT> input_retained;
+    std::array<bool, BINARY_INPUT_COUNT> binary_input_retained;
     std::string config_source;
     std::string csrf_token;
   };
@@ -205,8 +207,10 @@ class OpenQuattMqttConfig : public Component {
     char pending_payload[PAYLOAD_MAX_LEN]{};
     bool pending_payload_ready{false};
     bool pending_invalid_payload_ready{false};
+    bool pending_retained{false};
     float last_valid_value{NAN};
     uint32_t last_valid_ms{0};
+    bool last_valid_retained{false};
   };
   struct BinaryInput {
     BinaryInput(const char *key, const char *log_name) : key(key), log_name(log_name) {}
@@ -220,8 +224,10 @@ class OpenQuattMqttConfig : public Component {
     char pending_payload[PAYLOAD_MAX_LEN]{};
     bool pending_payload_ready{false};
     bool pending_invalid_payload_ready{false};
+    bool pending_retained{false};
     bool last_valid_value{false};
     uint32_t last_valid_ms{0};
+    bool last_valid_retained{false};
   };
 
   void set_numeric_input_topic_(NumericInputKind kind, const std::string &topic);
@@ -250,12 +256,12 @@ class OpenQuattMqttConfig : public Component {
   int find_numeric_input_index_by_topic_(const char *topic, int topic_len) const;
   int find_binary_input_index_by_topic_(const char *topic, int topic_len) const;
   static void mqtt_event_handler_(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data);
-  void queue_numeric_payload_(size_t input_index, const char *data, int len);
-  void queue_binary_payload_(size_t input_index, const char *data, int len);
+  void queue_numeric_payload_(size_t input_index, const char *data, int len, bool retained);
+  void queue_binary_payload_(size_t input_index, const char *data, int len, bool retained);
   void consume_pending_numeric_payloads_();
   void consume_pending_binary_payloads_();
-  void handle_numeric_payload_(size_t input_index, const char *payload);
-  void handle_binary_payload_(size_t input_index, const char *payload);
+  void handle_numeric_payload_(size_t input_index, const char *payload, bool retained);
+  void handle_binary_payload_(size_t input_index, const char *payload, bool retained);
   void invalidate_numeric_input_(size_t input_index);
   void invalidate_binary_input_(size_t input_index);
   void publish_runtime_state_(bool force);

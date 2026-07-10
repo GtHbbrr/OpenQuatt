@@ -13,6 +13,9 @@ import { render } from "../core/render-scheduler.js";
     const inputEnabled = status.input_enabled && typeof status.input_enabled === "object"
       ? status.input_enabled
       : {};
+    const inputRetained = status.input_retained && typeof status.input_retained === "object"
+      ? status.input_retained
+      : {};
     return [
       status.enabled ? "on" : "off",
       status.connected ? "connected" : "idle",
@@ -23,6 +26,7 @@ import { render } from "../core/render-scheduler.js";
       String(status.dew_point_topic || ""),
       JSON.stringify(inputTopics),
       JSON.stringify(inputEnabled),
+      JSON.stringify(inputRetained),
       String(status.source || ""),
       String(status.csrf_token || ""),
     ].join(":");
@@ -134,6 +138,13 @@ import { render } from "../core/render-scheduler.js";
       Object.entries(rawInputEnabled).forEach(([key, value]) => {
         inputEnabled[String(key)] = value !== false && String(value).toLowerCase() !== "false";
       });
+      const rawInputRetained = payload.input_retained && typeof payload.input_retained === "object"
+        ? payload.input_retained
+        : {};
+      const inputRetained = {};
+      Object.entries(rawInputRetained).forEach(([key, value]) => {
+        inputRetained[String(key)] = value === true || String(value).toLowerCase() === "true";
+      });
       const coolingDewPointTopic = String(inputTopics.cooling_dew_point || payload.dew_point_topic || "");
       inputTopics.cooling_dew_point = coolingDewPointTopic;
       const nextStatus = {
@@ -146,6 +157,7 @@ import { render } from "../core/render-scheduler.js";
         dew_point_topic: coolingDewPointTopic,
         input_topics: inputTopics,
         input_enabled: inputEnabled,
+        input_retained: inputRetained,
         source: String(payload.source || ""),
         csrf_token: String(payload.csrf_token || ""),
       };

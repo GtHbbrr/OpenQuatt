@@ -117,6 +117,14 @@
         heating_enable: true,
         cooling_enable: true,
       },
+      inputRetained: {
+        cooling_dew_point: false,
+        outside_temperature: false,
+        room_temperature: false,
+        room_setpoint: true,
+        heating_enable: false,
+        cooling_enable: true,
+      },
       lastDewPointAt: Date.now() - 42000,
       lastOutsideTemperatureAt: Date.now() - 120000,
       lastRoomTemperatureAt: Date.now() - 36000,
@@ -918,6 +926,14 @@
       heating_enable: state.mqtt.inputEnabled?.heating_enable !== false,
       cooling_enable: state.mqtt.inputEnabled?.cooling_enable !== false,
     };
+    const inputRetained = {
+      cooling_dew_point: Boolean(state.mqtt.inputRetained?.cooling_dew_point),
+      outside_temperature: Boolean(state.mqtt.inputRetained?.outside_temperature),
+      room_temperature: Boolean(state.mqtt.inputRetained?.room_temperature),
+      room_setpoint: Boolean(state.mqtt.inputRetained?.room_setpoint),
+      heating_enable: Boolean(state.mqtt.inputRetained?.heating_enable),
+      cooling_enable: Boolean(state.mqtt.inputRetained?.cooling_enable),
+    };
     return {
       enabled: Boolean(state.mqtt.enabled),
       connected: Boolean(state.mqtt.enabled && state.mqtt.connected && broker),
@@ -928,6 +944,7 @@
       dew_point_topic: inputTopics.cooling_dew_point,
       input_topics: inputTopics,
       input_enabled: inputEnabled,
+      input_retained: inputRetained,
       source: String(state.mqtt.source || ""),
       csrf_token: String(state.mqtt.csrfToken || ""),
     };
