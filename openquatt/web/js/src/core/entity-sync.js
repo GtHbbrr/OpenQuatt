@@ -1093,7 +1093,9 @@ import { render } from "./render-scheduler.js";
           : false;
       const authChanged = shouldDeferSupplementary || !shouldRefreshAuthStatusForCurrentSurface() ? false : await refreshAuthStatus();
       const apiSecurityChanged = shouldDeferSupplementary || !shouldRefreshApiSecurityStatusForCurrentSurface() ? false : await refreshApiSecurityStatus();
-      const mqttChanged = shouldDeferSupplementary || !shouldRefreshMqttStatusForCurrentSurface() ? false : await refreshMqttStatus();
+      const mqttChanged = shouldDeferSupplementary || !shouldRefreshMqttStatusForCurrentSurface()
+        ? false
+        : await refreshMqttStatus({ force: state.systemModal === "mqtt-sensors" });
       const nextHeaderSignature = getHeaderRenderSignature();
       if (shouldDeferSupplementary && !state.nativeOpen) {
         schedulePrimeSupplementaryData(getSupplementaryPrimeDelayMs(syncView));
