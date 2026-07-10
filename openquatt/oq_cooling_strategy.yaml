@@ -630,12 +630,14 @@ interval:
                                                    int limiter_reason,
                                                    int limited_demand,
                                                    int raw_demand,
-                                                   float dew_gap)->void {
+                                                   float dew_gap,
+                                                   bool hard_pause = false)->void {
             // Normal limiter steps remain visible through live cooling diagnostics and
             // trends. The decision log only records a transition into or out of a
             // complete cooling pause; otherwise reason changes can alternate each
             // minute while the heat pump is still cooling normally.
-            const bool pause_active = limiter_active && limited_demand <= 0;
+            const bool pause_active =
+                limiter_active && limited_demand <= 0 && (hard_pause || raw_demand > 0);
             static bool last_pause_active = false;
             if (pause_active == last_pause_active) {
               return;
@@ -1126,7 +1128,7 @@ interval:
                   reason_code == oq_cooling::REASON_FALLBACK_FLOOR) {
                 id(oq_cooling_pid_integral) = 0.0f;
               }
-              publish_cooling_limiter_event(true, id(oq_cooling_limiter_reason_code), 0, 0, dew_gap_c);
+              publish_cooling_limiter_event(true, id(oq_cooling_limiter_reason_code), 0, 0, dew_gap_c, true);
               return;
             }
           }
@@ -1157,7 +1159,7 @@ interval:
                        gap_rate_c_per_min, dew_gap_c);
               last_reason = reason_code;
             }
-            publish_cooling_limiter_event(true, reason_code, 0, 0, dew_gap_c);
+            publish_cooling_limiter_event(true, reason_code, 0, 0, dew_gap_c, true);
             return;
           }
 
