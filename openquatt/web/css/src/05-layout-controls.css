@@ -53,6 +53,23 @@
   stroke-linejoin: round;
 }
 
+.oq-helper-app-tab-badge {
+  border-radius: 999px;
+  background: rgba(234, 88, 12, 0.12);
+  color: var(--oq-helper-accent-deep);
+  font-size: 0.62rem;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 0;
+  padding: 3px 5px;
+  text-transform: uppercase;
+}
+
+.oq-helper-shell--dark .oq-helper-app-tab-badge {
+  background: rgba(249, 115, 22, 0.18);
+  color: #fb923c;
+}
+
 .oq-helper-app-tab:hover {
   border-color: rgba(234, 88, 12, 0.24);
 }

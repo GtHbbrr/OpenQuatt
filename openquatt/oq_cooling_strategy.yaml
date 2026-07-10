@@ -120,7 +120,8 @@ globals:
     restore_value: false
     initial_value: '0'
 
-  # 0=none, 1=limiter, 2=dew, 3=fallback, 4=projected_floor (legacy)
+  # 0=none, 1=limiter, 2=dew, 3=fallback, 4=projected_floor (legacy), 5=request_cleared,
+  # 6=flow_permission_lost, 7=core_permission_lost
   - id: oq_cooling_stop_reason_code
     type: int
     restore_value: false
@@ -625,6 +626,62 @@ interval:
           if (dt_s > 15.0f) dt_s = 15.0f;
           id(oq_cooling_last_loop_ms) = now_ms;
 
+          auto publish_cooling_limiter_event = [&](bool limiter_active,
+                                                   int limiter_reason,
+                                                   int limited_demand,
+                                                   int raw_demand,
+                                                   float dew_gap)->void {
+            static bool last_limiter_active = false;
+            static int last_limiter_reason = 0;
+            if (limiter_active == last_limiter_active &&
+                (!limiter_active || limiter_reason == last_limiter_reason)) {
+              return;
+            }
+            if (limiter_active) {
+              const auto decision_reason = [](int limiter_reason)->uint8_t {
+                switch (limiter_reason) {
+                  case oq_cooling::REASON_PROJECTED_FLOOR: return openquatt_decision_log::REASON_PROJECTED_FLOOR;
+                  case oq_cooling::REASON_SIMMER: return openquatt_decision_log::REASON_SIMMER;
+                  case oq_cooling::REASON_FALLING_GAP: return openquatt_decision_log::REASON_FALLING_GAP;
+                  case oq_cooling::REASON_BUFFER_STOP: return openquatt_decision_log::REASON_BUFFER_STOP;
+                  case oq_cooling::REASON_DEW_STOP: return openquatt_decision_log::REASON_DEW_STOP;
+                  case oq_cooling::REASON_FALLBACK_FLOOR:
+                  case oq_cooling::REASON_FALLBACK_CAP1: return openquatt_decision_log::REASON_SENSOR_FALLBACK;
+                  case oq_cooling::REASON_RESTART_WAIT: return openquatt_decision_log::REASON_RESTART_WAIT;
+                  case oq_cooling::REASON_ROOM_CAP: return openquatt_decision_log::REASON_ROOM_CAP;
+                  case oq_cooling::REASON_LEVEL1_HOLD: return openquatt_decision_log::REASON_LEVEL1_HOLD;
+                  case oq_cooling::REASON_OIL_RETURN_HOLD: return openquatt_decision_log::REASON_OIL_RETURN_HOLD;
+                  case oq_cooling::REASON_OIL_RETURN_RECOVERY: return openquatt_decision_log::REASON_OIL_RETURN_RECOVERY;
+                  case oq_cooling::REASON_CAPACITY_CAP: return openquatt_decision_log::REASON_CAPACITY_CAP;
+                  default: return openquatt_decision_log::REASON_COOLING_LIMITER;
+                }
+              };
+              const uint8_t reason = decision_reason(limiter_reason);
+              id(oq_decision_log).emit(
+                  openquatt_decision_log::EVENT_COOLING_LIMITED,
+                  openquatt_decision_log::SUBJECT_COOLING,
+                  reason,
+                  openquatt_decision_log::SEVERITY_LIMITED,
+                  (uint8_t) id(oq_control_mode_code),
+                  openquatt_decision_log::STATE_ACTIVE,
+                  openquatt_decision_log::STATE_LIMITED,
+                  (int16_t) limited_demand,
+                  (int16_t) raw_demand,
+                  isnan(dew_gap) ? 0 : (int16_t) lroundf(dew_gap * 100.0f));
+            } else if (last_limiter_active) {
+              id(oq_decision_log).emit(
+                  openquatt_decision_log::EVENT_COOLING_RELEASED,
+                  openquatt_decision_log::SUBJECT_COOLING,
+                  openquatt_decision_log::REASON_KEEP_CURRENT,
+                  openquatt_decision_log::SEVERITY_NORMAL,
+                  (uint8_t) id(oq_control_mode_code),
+                  openquatt_decision_log::STATE_LIMITED,
+                  openquatt_decision_log::STATE_ACTIVE);
+            }
+            last_limiter_active = limiter_active;
+            last_limiter_reason = limiter_active ? limiter_reason : 0;
+          };
+
           bool oil_return_active = id(hp1_prot_oil_return).state;
           #if OQ_TOPOLOGY_DUO
           oil_return_active = oil_return_active || id(${secondary_oil_return_id}).state;
@@ -639,10 +696,31 @@ interval:
               id(cooling_enable_selected).state &&
               id(cooling_request_active).state &&
               id(cooling_permitted).state;
-
-          if (!active ||
+          const bool cooling_cycle_was_active =
+              id(oq_cooling_water_cycle_active) ||
+              id(oq_cooling_limited_demand) > 0 ||
+              id(oq_cooling_base_demand_raw) > 0 ||
+              id(oq_cooling_request_hp1_level) > 0 ||
+              id(oq_cooling_request_hp2_level) > 0;
+          const bool cooling_request_cleared =
+              id(cooling_enable_selected).has_state() && id(cooling_enable_selected).state &&
+              id(cooling_request_active).has_state() && !id(cooling_request_active).state;
+          const bool cooling_request_still_active =
+              cooling_cycle_was_active &&
+              id(cooling_enable_selected).has_state() && id(cooling_enable_selected).state &&
+              id(cooling_request_active).has_state() && id(cooling_request_active).state;
+          const bool cooling_core_permission_lost =
+              cooling_request_still_active &&
+              (!id(cooling_permitted_core).has_state() || !id(cooling_permitted_core).state);
+          const bool cooling_flow_permission_lost =
+              cooling_request_still_active &&
+              id(cooling_permitted_core).has_state() && id(cooling_permitted_core).state &&
+              (!id(cooling_permitted).has_state() || !id(cooling_permitted).state);
+          const bool cooling_sensor_missing =
               !id(cooling_supply_target).has_state() || isnan(id(cooling_supply_target).state) ||
-              !id(oq_system_supply_temp).has_state() || isnan(id(oq_system_supply_temp).state)) {
+              !id(oq_system_supply_temp).has_state() || isnan(id(oq_system_supply_temp).state);
+
+          if (!active || cooling_sensor_missing) {
             id(oq_cooling_demand_raw) = 0;
             id(oq_cooling_pid_integral) = 0.0f;
             id(oq_cooling_pid_last_error_c) = 0.0f;
@@ -653,7 +731,11 @@ interval:
             id(oq_cooling_base_demand_raw) = 0;
             id(oq_cooling_limited_demand) = 0;
             id(oq_cooling_limiter_reason_code) = 0;
-            id(oq_cooling_stop_reason_code) = 0;
+            id(oq_cooling_stop_reason_code) =
+                (cooling_cycle_was_active && cooling_request_cleared) ? 5 :
+                (cooling_cycle_was_active && cooling_sensor_missing) ? 3 :
+                cooling_flow_permission_lost ? 6 :
+                cooling_core_permission_lost ? 7 : 0;
             id(oq_cooling_buffer_gap_rate_ref_ms) = 0;
             id(oq_cooling_last_demand_change_ms) = 0;
             id(oq_cooling_oil_return_recovery_stable_since_ms) = 0;
@@ -665,6 +747,7 @@ interval:
             id(oq_cooling_projection_brake_active) = false;
             id(oq_cooling_stop_candidate_since_ms) = 0;
             id(oq_cooling_dew_stop_candidate_since_ms) = 0;
+            publish_cooling_limiter_event(false, 0, 0, 0, NAN);
             id(oq_cooling_capacity_cap) = reset_capacity_cap;
             id(oq_cooling_capacity_last_change_ms) = 0;
             id(oq_cooling_capacity_recovery_since_ms) = 0;
@@ -992,6 +1075,12 @@ interval:
           bool water_cycle_active = id(oq_cooling_water_cycle_active);
           if (!water_cycle_active) {
             int stop_reason_code = id(oq_cooling_stop_reason_code);
+            if (stop_reason_code == 5) {
+              // Request-cleared is informational for the decision log. It must
+              // not trigger water-side restart hysteresis.
+              stop_reason_code = 0;
+              id(oq_cooling_stop_reason_code) = 0;
+            }
             if (stop_reason_code == 4 &&
                 (reason_code == oq_cooling::REASON_DEW_STOP ||
                  reason_code == oq_cooling::REASON_FALLBACK_FLOOR)) {
@@ -1035,6 +1124,7 @@ interval:
                   reason_code == oq_cooling::REASON_FALLBACK_FLOOR) {
                 id(oq_cooling_pid_integral) = 0.0f;
               }
+              publish_cooling_limiter_event(true, id(oq_cooling_limiter_reason_code), 0, 0, dew_gap_c);
               return;
             }
           }
@@ -1065,6 +1155,7 @@ interval:
                        gap_rate_c_per_min, dew_gap_c);
               last_reason = reason_code;
             }
+            publish_cooling_limiter_event(true, reason_code, 0, 0, dew_gap_c);
             return;
           }
 
@@ -1141,6 +1232,7 @@ interval:
           id(oq_cooling_pid_integral) = integral;
           id(oq_cooling_pid_last_error_c) = buffer_gap_c;
           id(oq_cooling_demand_raw) = demand;
+          publish_cooling_limiter_event(reason_code != 1, reason_code, demand, base_demand, dew_gap_c);
 
           static int last_reason = -1;
           if (reason_code != last_reason) {

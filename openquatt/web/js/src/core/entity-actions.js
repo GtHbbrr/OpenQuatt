@@ -4,7 +4,7 @@ import { isCurveMode } from "./domain-helpers.js";
 import { formatValue, getCurveFallbackSuggestion, getEntityValue, getInputDraftValue, getNumberMeta, getOpenQuattPauseDraftValue, getOpenQuattPausePresetValue, normalizeDateTimeValue, normalizeNumber, normalizeTimeValue, parseLooseNumber } from "./entity-store.js";
 import { syncEntities } from "./entity-sync.js";
 import { commitDateTime, commitNumber, commitOpenQuattRegulationPause, commitOpenQuattRegulationResumeNow, commitSelect, commitSwitch, commitText, commitTime, triggerButton, triggerNamedButton, updateCurveDraftFromPointer } from "./entity-write-actions.js";
-import { setAppView } from "./navigation.js";
+import { normalizeControlReplayTab, normalizeControlReplayWindow, setAppView, syncUrlAppView } from "./navigation.js";
 import { state } from "./state.js";
 import { ensureNativeFrontendLoaded, setDevPanelOpen, setHpLayoutMode, setHpVisualMode, setInterfacePanelOpen, setOverviewTheme, setSettingsGroup, setStoredSurface, syncSurfaceRuntime } from "./runtime.js";
 import { setTrendWindowHours } from "./trend-window.js";
@@ -22,6 +22,21 @@ import { handleOduRuntimeFrequencyInputKeyDown } from "../settings/installation.
 import { handleEnergyHistoryPointerMove, setEnergyHistoryPeriodToNow, setEnergyHistoryPeriodValue, setEnergyHistoryView, shiftEnergyHistoryPeriod } from "../views/energy.js";
 import { escapeHtml } from "./html.js";
 import { render } from "./render-scheduler.js";
+
+  const CONTROL_REPLAY_CUSTOM_MAX_RANGE_MS = 7 * 24 * 60 * 60 * 1000;
+
+  function setControlReplayGraphMinute(windowId) {
+    state.controlReplayGraphMinute = windowId === "week"
+      ? 1230
+      : windowId === "today" || windowId === "yesterday"
+      ? 720
+      : 1000;
+  }
+
+  function parseControlReplayCustomDateTime(value) {
+    const epochMs = new Date(String(value || "")).getTime();
+    return Number.isFinite(epochMs) ? epochMs : Number.NaN;
+  }
 
   export function handleFocusChange() {
     window.setTimeout(() => {
@@ -328,6 +343,7 @@ import { render } from "./render-scheduler.js";
     const infoButton = event.target.closest('[data-oq-action="toggle-settings-info"]');
     const infoWrap = event.target.closest("[data-oq-settings-info]");
     const helperHub = event.target.closest(".oq-helper-hub");
+    const controlReplayPeriodMenu = event.target.closest("[data-oq-control-replay-period-menu]");
     const modalBackdrop = event.target.closest("[data-oq-modal]");
     if (infoButton) {
       const infoId = infoButton.dataset.infoId || "";
@@ -346,6 +362,11 @@ import { render } from "./render-scheduler.js";
       }
       if (clickedOutsideInterfacePanel) {
         setInterfacePanelOpen(false);
+        shouldRender = true;
+      }
+      if (state.controlReplayPeriodMenuOpen && !controlReplayPeriodMenu) {
+        state.controlReplayPeriodMenuOpen = false;
+        state.controlReplayCustomPeriodOpen = false;
         shouldRender = true;
       }
       if (modalBackdrop && event.target === modalBackdrop) {
@@ -1173,6 +1194,109 @@ import { render } from "./render-scheduler.js";
       return;
     }
 
+    if (action === "select-control-replay-focus") {
+      state.controlReplayFocusFilter = button.dataset.replayFocus || "all";
+      state.controlReplaySelectedEpisode = "";
+      render();
+      return;
+    }
+
+    if (action === "select-control-replay-tab") {
+      const tab = button.dataset.replayTab || "status";
+      state.controlReplayTab = normalizeControlReplayTab(tab) || "status";
+      if (state.appView === "control") {
+        syncUrlAppView("push");
+      }
+      render();
+      return;
+    }
+
+    if (action === "select-control-replay-window") {
+      const windowId = normalizeControlReplayWindow(button.dataset.replayWindow || "") || "last24";
+      if (windowId !== "custom") {
+        state.controlReplayWindow = windowId;
+        state.controlReplayPeriodMenuOpen = false;
+        state.controlReplayCustomPeriodOpen = false;
+        state.controlReplayCustomPeriodError = "";
+        setControlReplayGraphMinute(windowId);
+        if (state.appView === "control") {
+          syncUrlAppView("push");
+        }
+      }
+      render();
+      return;
+    }
+
+    if (action === "toggle-control-replay-period-menu") {
+      state.controlReplayPeriodMenuOpen = !state.controlReplayPeriodMenuOpen;
+      state.controlReplayCustomPeriodOpen = state.controlReplayPeriodMenuOpen && state.controlReplayWindow === "custom";
+      state.controlReplayCustomPeriodError = "";
+      render();
+      return;
+    }
+
+    if (action === "toggle-control-replay-custom-period") {
+      state.controlReplayCustomPeriodOpen = !state.controlReplayCustomPeriodOpen;
+      state.controlReplayCustomPeriodError = "";
+      render();
+      return;
+    }
+
+    if (action === "apply-control-replay-custom-period") {
+      const menu = button.closest("[data-oq-control-replay-period-menu]");
+      const startDate = String(menu?.querySelector('[data-oq-control-replay-custom-start-date]')?.value || "");
+      const startHour = String(menu?.querySelector('[data-oq-control-replay-custom-start-hour]')?.value || "");
+      const endDate = String(menu?.querySelector('[data-oq-control-replay-custom-end-date]')?.value || "");
+      const endHour = String(menu?.querySelector('[data-oq-control-replay-custom-end-hour]')?.value || "");
+      const start = `${startDate}T${startHour}:00`;
+      const end = `${endDate}T${endHour}:00`;
+      const startEpochMs = parseControlReplayCustomDateTime(start);
+      const endEpochMs = parseControlReplayCustomDateTime(end);
+      if (!Number.isFinite(startEpochMs) || !Number.isFinite(endEpochMs) || endEpochMs <= startEpochMs) {
+        state.controlReplayCustomPeriodError = "Kies een eindtijd na de starttijd.";
+        render();
+        return;
+      }
+      if (endEpochMs - startEpochMs > CONTROL_REPLAY_CUSTOM_MAX_RANGE_MS) {
+        state.controlReplayCustomPeriodError = "Een eigen periode mag maximaal 7 dagen beslaan.";
+        render();
+        return;
+      }
+      const nowMs = Date.now();
+      if (startEpochMs < nowMs - CONTROL_REPLAY_CUSTOM_MAX_RANGE_MS || endEpochMs > nowMs + (60 * 1000)) {
+        state.controlReplayCustomPeriodError = "Kies een periode binnen de laatste 7 dagen.";
+        render();
+        return;
+      }
+      state.controlReplayCustomStart = start;
+      state.controlReplayCustomEnd = end;
+      state.controlReplayCustomPeriodError = "";
+      state.controlReplayWindow = "custom";
+      state.controlReplayPeriodMenuOpen = false;
+      state.controlReplayCustomPeriodOpen = false;
+      setControlReplayGraphMinute("custom");
+      if (state.appView === "control") {
+        syncUrlAppView("push");
+      }
+      render();
+      return;
+    }
+
+    if (action === "select-control-replay-episode") {
+      state.controlReplaySelectedEpisode = button.dataset.replayEpisode || "";
+      render();
+      return;
+    }
+
+    if (action === "toggle-control-replay-support-details") {
+      event.preventDefault();
+      const details = button.closest(".oq-working-support");
+      const itemId = details?.dataset.replaySupportItem || "";
+      state.controlReplaySupportDetailsItemId = details && details.hasAttribute("open") ? "" : itemId;
+      render();
+      return;
+    }
+
     if (action === "select-step") {
       state.currentStep = button.dataset.stepId || "generation";
       render();
@@ -1389,7 +1513,36 @@ import { render } from "./render-scheduler.js";
 
   }
 
+  export function updateControlReplayGraphMinute(rawMinute) {
+    const minute = Math.max(0, Math.min(1440, Math.round(rawMinute / 5) * 5));
+    if (!Number.isNaN(minute) && state.controlReplayGraphMinute !== minute) {
+      state.controlReplayGraphMinute = minute;
+      render();
+    }
+  }
+
+  export function updateControlReplayGraphMinuteFromPointer(clientX, scrubber) {
+    const control = scrubber || state.root?.querySelector("[data-oq-control-replay-scrub]");
+    if (!control) {
+      return;
+    }
+    const rect = control.getBoundingClientRect();
+    if (!rect.width) {
+      return;
+    }
+    const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+    updateControlReplayGraphMinute(ratio * 1440);
+  }
+
   export function handlePointerDown(event) {
+    const replayScrubber = event.target.closest("[data-oq-control-replay-scrub]");
+    if (replayScrubber) {
+      state.controlReplayScrubbing = true;
+      event.preventDefault();
+      updateControlReplayGraphMinuteFromPointer(event.clientX, replayScrubber);
+      return;
+    }
+
     const point = event.target.closest("[data-curve-key]");
     if (!point || !isCurveMode()) {
       return;
@@ -1403,6 +1556,11 @@ import { render } from "./render-scheduler.js";
     if (typeof handleEnergyHistoryPointerMove === "function") {
       handleEnergyHistoryPointerMove(event);
     }
+    if (state.controlReplayScrubbing) {
+      event.preventDefault();
+      updateControlReplayGraphMinuteFromPointer(event.clientX);
+      return;
+    }
     if (!state.draggingCurveKey) {
       return;
     }
@@ -1410,6 +1568,11 @@ import { render } from "./render-scheduler.js";
   }
 
   export function handlePointerUp() {
+    if (state.controlReplayScrubbing) {
+      state.controlReplayScrubbing = false;
+      return;
+    }
+
     if (!state.draggingCurveKey) {
       return;
     }

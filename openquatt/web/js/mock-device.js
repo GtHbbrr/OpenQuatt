@@ -168,6 +168,26 @@
     },
   };
 
+  function isCoolingScenario(name = state.scenario) {
+    return name === "cooling" || name === "cooling_limited" || name === "cooling_stop_reasons" || name === "cooling_limiter_log";
+  }
+
+  function isSummerIdleScenario(name = state.scenario) {
+    return name === "summer_idle";
+  }
+
+  function isFlowHoldScenario(name = state.scenario) {
+    return name === "flow_hold";
+  }
+
+  function isCandidateBlockedScenario(name = state.scenario) {
+    return name === "start_blocked";
+  }
+
+  function isHeatingEnabledScenario(name = state.scenario) {
+    return !isCoolingScenario(name) && !isSummerIdleScenario(name) && name !== "idle";
+  }
+
   const HP2_ENTITIES = [
     ["select", "HP2 - Excluded compressor level A", { value: "None", state: "None", option: ["None", "L1 (H30/C30)", "L2 (H39/C36)", "L3 (H49/C42)", "L4 (H55/C47)", "L5 (H61/C52)", "L6 (H67/C56)", "L7 (H72/C61)", "L8 (H79/C66)", "L9 (H85/C71)", "L10 (H90/C74)"] }],
     ["select", "HP2 - Excluded compressor level B", { value: "None", state: "None", option: ["None", "L1 (H30/C30)", "L2 (H39/C36)", "L3 (H49/C42)", "L4 (H55/C47)", "L5 (H61/C52)", "L6 (H67/C56)", "L7 (H72/C61)", "L8 (H79/C66)", "L9 (H85/C71)", "L10 (H90/C74)"] }],
@@ -340,6 +360,15 @@
 
   function setText(domain, name, value) {
     const entity = getEntity(domain, name);
+    if (!entity) {
+      return;
+    }
+    entity.state = String(value);
+    entity.value = String(value);
+  }
+
+  function setSensorText(name, value) {
+    const entity = getEntity("sensor", name);
     if (!entity) {
       return;
     }
@@ -732,6 +761,196 @@
     });
   }
 
+  function handleDecisionLog() {
+    const nowMs = Date.now();
+    const decisionLogBootedAt = nowMs - (8 * 24 * 60 * 60 * 1000);
+    const bootEpochS = Math.floor(decisionLogBootedAt / 1000);
+    const uptimeS = Math.max(0, Math.floor((nowMs - decisionLogBootedAt) / 1000));
+    let seq = 1;
+    const events = [];
+    const pushEvent = (ageMinutes, eventType, subject, reason, severity, cm, from, to, valueA = 0, valueB = 0, thresholdA = 0, durationS = 0) => {
+      const epochS = Math.max(0, Math.floor((nowMs - (ageMinutes * 60000)) / 1000));
+      events.push({
+        seq: seq++,
+        uptime_s: Math.max(0, epochS - bootEpochS),
+        epoch_s: epochS,
+        event_type: eventType,
+        subject,
+        reason,
+        severity,
+        cm,
+        from,
+        to,
+        value_a: valueA,
+        value_b: valueB,
+        threshold_a: thresholdA,
+        duration_s: durationS,
+        flags: 0,
+      });
+    };
+
+    if (state.scenario !== "cooling_limiter_log" && state.scenario !== "cooling_stop_reasons" && state.scenario !== "heating_stop_reasons") {
+      pushEvent(6 * 24 * 60 + 9 * 60, "sticky_pump_run", "PUMP", "sticky_protection", "normal", 98, "standby", "active", 60, 0, 0, 60);
+      pushEvent(4 * 24 * 60 + 13 * 60, "cooling_limited", "COOLING", "dew_stop", "limited", 5, "active", "limited", 0, 4, 2);
+      pushEvent(4 * 24 * 60 + 12 * 60 + 42, "cooling_released", "COOLING", "keep_current", "normal", 5, "limited", "active", 3, 4, 2);
+      pushEvent(2 * 24 * 60 + 7 * 60 + 20, "source_start", "HP2", "runtime_lead", "normal", 1, "standby", "active");
+      pushEvent(2 * 24 * 60 + 7 * 60 + 5, "topology_change", "BOTH", "better_heat", "normal", 2, "single", "duo", 2, 1, 15);
+      pushEvent(2 * 24 * 60 + 5 * 60 + 55, "defrost_seen_start", "HP1", "defrost_hold", "normal", 2, "active", "limited");
+      pushEvent(2 * 24 * 60 + 5 * 60 + 48, "defrost_seen_clear", "HP1", "defrost_hold", "normal", 2, "limited", "active", 0, 0, 0, 420);
+    }
+
+    if (state.scenario === "summer_idle") {
+      pushEvent(3 * 60, "sticky_pump_run", "PUMP", "sticky_protection", "normal", 98, "standby", "active", 60, 0, 0, 60);
+      pushEvent(24 * 60 + 3 * 60, "sticky_pump_run", "PUMP", "sticky_protection", "normal", 98, "standby", "active", 60, 0, 0, 60);
+    } else if (state.scenario === "heating_stop_reasons") {
+      // One reduced-demand transition, followed by a complete heating stop with a short runtime hold.
+      pushEvent(150, "flow_hold_start", "SYSTEM", "flow_preflow", "normal", 1, "standby", "limited");
+      pushEvent(149, "flow_hold_clear", "SYSTEM", "flow_preflow", "normal", 1, "limited", "active", 2, 0, 0, 45);
+      pushEvent(148, "topology_change", "HP2", "runtime_lead", "normal", 2, "idle", "single", 0, 3);
+      pushEvent(148, "source_start", "HP2", "runtime_lead", "normal", 2, "idle", "active", 3);
+      pushEvent(116, "topology_change", "BOTH", "better_heat", "normal", 2, "single", "duo", 2, 1, 15);
+      pushEvent(115, "source_start", "HP1", "better_heat", "normal", 2, "idle", "active", 2);
+      pushEvent(76, "topology_change", "HP2", "less_power", "normal", 2, "duo", "single", 0, 3);
+      pushEvent(76, "source_stop", "HP1", "less_power", "normal", 2, "active", "idle", 2);
+      pushEvent(29, "flow_hold_start", "SYSTEM", "flow_postflow", "normal", 1, "active", "limited");
+      pushEvent(27, "topology_change", "SYSTEM", "heating_request_cleared", "normal", 1, "single", "idle");
+      pushEvent(27, "source_stop", "HP2", "heating_request_cleared", "normal", 1, "active", "idle", 3);
+      pushEvent(25, "flow_hold_clear", "SYSTEM", "flow_postflow", "normal", 1, "limited", "standby", 0, 0, 0, 120);
+    } else if (isCandidateBlockedScenario()) {
+      pushEvent(18, "source_start", "HP1", "runtime_lead", "normal", 2, "standby", "active", 4);
+      pushEvent(9, "candidate_blocked", "HP2", "candidate_in_rest", "limited", 2, "standby", "blocked", 5, 420);
+      pushEvent(4, "decision_hold", "HP2", "hold_active", "limited", 2, "standby", "blocked", 5);
+    } else if (isFlowHoldScenario()) {
+      pushEvent(16, "flow_hold_start", "SYSTEM", "flow_preflow", "limited", 1, "standby", "limited", 2);
+      pushEvent(9, "flow_hold_clear", "SYSTEM", "flow_preflow", "normal", 1, "limited", "active", 2, 0, 0, 420);
+      pushEvent(6, "source_start", "HP1", "runtime_lead", "normal", 2, "standby", "active", 3);
+      pushEvent(2, "flow_hold_start", "SYSTEM", "flow_postflow", "limited", 1, "active", "limited", 0);
+    } else if (state.scenario === "cooling_stop_reasons") {
+      // Two complete cooling runs: one is stopped by dew-point protection, the other ends normally.
+      pushEvent(96, "flow_hold_start", "SYSTEM", "flow_preflow", "limited", 1, "standby", "limited");
+      pushEvent(95, "flow_hold_clear", "SYSTEM", "flow_preflow", "normal", 1, "limited", "active", 4, 0, 0, 45);
+      pushEvent(94, "topology_change", "HP2", "runtime_lead", "normal", 5, "idle", "single", 0, 1);
+      pushEvent(94, "source_start", "HP2", "runtime_lead", "normal", 5, "idle", "active", 1);
+      pushEvent(61, "cooling_limited", "COOLING", "dew_stop", "limited", 5, "active", "limited", 0, 0, 12);
+      pushEvent(60, "topology_change", "SYSTEM", "dew_stop", "normal", 5, "single", "idle");
+      pushEvent(60, "source_stop", "HP2", "dew_stop", "normal", 5, "active", "idle", 1);
+      pushEvent(43, "topology_change", "HP1", "runtime_lead", "normal", 5, "idle", "single", 1);
+      pushEvent(43, "source_start", "HP1", "runtime_lead", "normal", 5, "idle", "active", 1);
+      pushEvent(18, "topology_change", "SYSTEM", "cooling_request_cleared", "normal", 1, "single", "idle");
+      pushEvent(18, "source_stop", "HP1", "cooling_request_cleared", "normal", 1, "active", "idle", 1);
+      pushEvent(16, "flow_hold_start", "SYSTEM", "flow_postflow", "limited", 1, "active", "limited");
+      pushEvent(12, "flow_hold_clear", "SYSTEM", "flow_postflow", "normal", 1, "limited", "standby", 0, 0, 0, 180);
+    } else if (state.scenario === "cooling_limiter_log") {
+      const logUptimeS = 6608;
+      const pushLogEvent = (eventUptimeS, ...eventArgs) => {
+        pushEvent((logUptimeS - eventUptimeS) / 60, ...eventArgs);
+      };
+      pushLogEvent(186, "flow_hold_start", "SYSTEM", "flow_too_low", "limited", 1, "standby", "limited");
+      pushLogEvent(236, "flow_hold_clear", "SYSTEM", "flow_too_low", "normal", 1, "limited", "active", 5, 0, 0, 50);
+      pushLogEvent(249, "topology_change", "HP2", "runtime_lead", "normal", 5, "idle", "single", 0, 1);
+      pushLogEvent(249, "source_start", "HP2", "runtime_lead", "normal", 5, "idle", "active", 1);
+      pushLogEvent(891, "cooling_limited", "COOLING", "cooling_limiter", "limited", 5, "active", "limited", 2, 3, 119);
+      pushLogEvent(976, "cooling_limited", "COOLING", "cooling_limiter", "limited", 5, "active", "limited", 1, 3, 103);
+      pushLogEvent(1036, "cooling_limited", "COOLING", "cooling_limiter", "limited", 5, "active", "limited", 1, 3, 97);
+      pushLogEvent(1351, "cooling_limited", "COOLING", "cooling_limiter", "limited", 5, "active", "limited", 1, 2, 53);
+      pushLogEvent(1411, "cooling_limited", "COOLING", "cooling_limiter", "limited", 5, "active", "limited", 1, 2, 60);
+      pushLogEvent(1471, "cooling_limited", "COOLING", "cooling_limiter", "limited", 5, "active", "limited", 1, 1, 36);
+      pushLogEvent(2056, "cooling_limited", "COOLING", "dew_stop", "limited", 5, "active", "limited", 0, 0, 12);
+      pushLogEvent(2069, "topology_change", "SYSTEM", "dew_stop", "normal", 5, "single", "idle");
+      pushLogEvent(2069, "source_stop", "HP2", "dew_stop", "normal", 5, "active", "idle", 1);
+      pushLogEvent(2081, "cooling_limited", "COOLING", "cooling_limiter", "limited", 5, "active", "limited", 0, 0, 15);
+      pushLogEvent(2156, "cooling_limited", "COOLING", "cooling_limiter", "limited", 5, "active", "limited", 1, 3, 248);
+      pushLogEvent(2169, "topology_change", "HP1", "runtime_lead", "normal", 5, "idle", "single", 1);
+      pushLogEvent(2169, "source_start", "HP1", "runtime_lead", "normal", 5, "idle", "active", 1);
+      pushLogEvent(2366, "cooling_released", "COOLING", "keep_current", "normal", 5, "limited", "active");
+      pushLogEvent(2366, "flow_hold_start", "SYSTEM", "flow_postflow", "limited", 1, "standby", "limited");
+      pushLogEvent(2494, "topology_change", "SYSTEM", "cooling_request_cleared", "normal", 1, "single", "idle");
+      pushLogEvent(2494, "source_stop", "HP1", "cooling_request_cleared", "normal", 1, "active", "idle", 1);
+      pushLogEvent(2506, "flow_hold_clear", "SYSTEM", "flow_postflow", "normal", 1, "limited", "standby", 0, 0, 0, 140);
+    } else if (isCoolingScenario()) {
+      pushEvent(160, "source_start", "HP1", "runtime_lead", "normal", 5, "standby", "active");
+      pushEvent(112, "cooling_limited", "COOLING", state.scenario === "cooling_limited" ? "dew_stop" : "cooling_limiter", "limited", 5, "active", "limited", 0, 5, 2);
+      pushEvent(82, "decision_hold", "HP1", "soft_guard", "limited", 5, "active", "active", 1, 3, 2);
+      pushEvent(48, "cooling_released", "COOLING", "keep_current", "normal", 5, "limited", "active", 3, 5, 2);
+      pushEvent(22, "source_stop", "HP1", "cooling_request_cleared", "normal", 5, "active", "standby");
+    } else {
+      pushEvent(19 * 60 + 35, "decision_hold", "HP2", "min_rest_active", "limited", 1, "standby", "blocked", 12);
+      pushEvent(17 * 60 + 15, "source_start", "HP1", "runtime_lead", "normal", 1, "standby", "active");
+      pushEvent(16 * 60 + 50, "topology_change", "BOTH", "better_heat", "normal", 2, "single", "duo", 2, 1, 15);
+      pushEvent(14 * 60 + 35, "defrost_seen_start", "HP2", "defrost_hold", "normal", 2, "active", "limited");
+      pushEvent(14 * 60 + 28, "defrost_seen_clear", "HP2", "defrost_hold", "normal", 2, "limited", "active", 0, 0, 0, 420);
+      pushEvent(12 * 60 + 40, "boiler_assist_start", "CV", "boiler_assist", "normal", 3, "standby", "active", 351);
+      pushEvent(12 * 60 + 5, "boiler_assist_stop", "CV", "less_power", "normal", 2, "active", "standby", 363);
+      pushEvent(10 * 60 + 30, "source_stop", "HP2", "less_power", "normal", 1, "active", "standby");
+      pushEvent(75, "attention_pattern", "HP1", "start_stop_rate_high", "attention", 1, "active", "active", 5, 60, 4);
+    }
+
+    if (state.boiler === "on" && !isCoolingScenario() && state.scenario !== "summer_idle" && !isFlowHoldScenario() && !isCandidateBlockedScenario()) {
+      pushEvent(42, "boiler_assist_start", "CV", "boiler_assist", "normal", 3, "standby", "active", 348);
+    }
+
+    events.sort((left, right) => left.uptime_s - right.uptime_s);
+    events.forEach((event, index) => {
+      event.seq = index + 1;
+    });
+
+    const buckets = [];
+    for (let ageHours = 0; ageHours < 168; ageHours += 1) {
+      const hourStartUptimeS = Math.max(0, uptimeS - (ageHours * 3600));
+      const bucketEvents = events.filter((event) => event.uptime_s >= hourStartUptimeS && event.uptime_s < hourStartUptimeS + 3600);
+      if (!bucketEvents.length) {
+        continue;
+      }
+      buckets.push({
+        hour_start_uptime_s: hourStartUptimeS,
+        starts_hp1: bucketEvents.filter((event) => event.event_type === "source_start" && event.subject === "HP1").length,
+        starts_hp2: bucketEvents.filter((event) => event.event_type === "source_start" && event.subject === "HP2").length,
+        stops_hp1: bucketEvents.filter((event) => event.event_type === "source_stop" && event.subject === "HP1").length,
+        stops_hp2: bucketEvents.filter((event) => event.event_type === "source_stop" && event.subject === "HP2").length,
+        topology_single_count: bucketEvents.filter((event) => event.event_type === "topology_change" && event.to === "single").length,
+        topology_duo_count: bucketEvents.filter((event) => event.event_type === "topology_change" && event.to === "duo").length,
+        cv_assist_start_count: bucketEvents.filter((event) => event.event_type === "boiler_assist_start").length,
+        cv_assist_stop_count: bucketEvents.filter((event) => event.event_type === "boiler_assist_stop").length,
+        cooling_limited_count: bucketEvents.filter((event) => event.event_type === "cooling_limited").length,
+        cooling_released_count: bucketEvents.filter((event) => event.event_type === "cooling_released").length,
+        dewpoint_stop_count: bucketEvents.filter((event) => event.reason === "dew_stop").length,
+        sticky_run_count: bucketEvents.filter((event) => event.event_type === "sticky_pump_run").length,
+        defrost_seen_count_hp1: bucketEvents.filter((event) => event.event_type === "defrost_seen_start" && event.subject === "HP1").length,
+        defrost_seen_count_hp2: bucketEvents.filter((event) => event.event_type === "defrost_seen_start" && event.subject === "HP2").length,
+        defrost_hold_count_hp1: bucketEvents.filter((event) => event.event_type === "decision_hold" && event.reason === "defrost_hold" && event.subject === "HP1").length,
+        defrost_hold_count_hp2: bucketEvents.filter((event) => event.event_type === "decision_hold" && event.reason === "defrost_hold" && event.subject === "HP2").length,
+        defrost_boost_count_hp1: 0,
+        defrost_boost_count_hp2: 0,
+        attention_count: bucketEvents.filter((event) => event.severity === "attention").length,
+      });
+    }
+
+    return mockResponse(200, {
+      ok: true,
+      storage: {
+        events: "psram",
+        buckets: "psram",
+        event_capacity: 512,
+        event_requested: 512,
+        bucket_capacity: 168,
+        bucket_requested: 168,
+      },
+      meta: {
+        event_record_size: 32,
+        bucket_record_size: 56,
+        event_count: events.length,
+        dropped_count: 0,
+        boot_epoch_s: bootEpochS,
+        uptime_s: uptimeS,
+        internal_heap_free: 87000,
+        internal_heap_min: 72000,
+        psram_free: 7400000,
+      },
+      events,
+      buckets: buckets.sort((left, right) => left.hour_start_uptime_s - right.hour_start_uptime_s),
+    });
+  }
+
   function handleBulkEntities(init) {
     const params = parseBulkEntityFormBody(init || {});
     const lines = String(params.get("entities") || "").split(/\r?\n/);
@@ -1030,6 +1249,7 @@
     const supplyTemp = Number(getEntity("sensor", "Water Supply Temp (Selected)")?.value);
     const flowLph = Number(getEntity("sensor", "Flow average (Selected)")?.value);
     const totalHeat = Number(getEntity("sensor", "Total Heat Power")?.value);
+    const totalCooling = Number(getEntity("sensor", "Total Cooling Power")?.value);
     const totalPower = Number(getEntity("sensor", "Total Power Input")?.value);
     const strategy = String(getEntity("select", "Heating Control Mode")?.value || "");
     const roomTemp = Number(getEntity("sensor", "Room Temperature (Selected)")?.value);
@@ -1057,12 +1277,14 @@
     const roomDelta = Number.isNaN(roomSetpoint) || Number.isNaN(roomTemp) ? 0 : roomSetpoint - roomTemp;
     const roomCorrection = Number.isNaN(kp) ? 0 : Math.round(Math.max(-1500, Math.min(1500, roomDelta * kp)));
     const powerHouseRequested = Math.max(0, Math.round(houseModel + roomCorrection));
-    const strategyRequested = state.scenario === "cooling"
+    const coolingScenario = isCoolingScenario();
+    const summerIdleScenario = isSummerIdleScenario();
+    const strategyRequested = coolingScenario || summerIdleScenario
       ? 0
       : Math.max(0, Math.round(strategy === "Power House" ? powerHouseRequested : totalHeat || 0));
 
     let capacity = 0;
-    if (state.scenario === "idle") {
+    if (state.scenario === "idle" || summerIdleScenario) {
       capacity = single ? 2800 : 5200;
     } else if (state.scenario === "heating") {
       capacity = single ? 3200 : 5200;
@@ -1070,13 +1292,13 @@
       capacity = 5200;
     } else if (state.scenario === "defrost") {
       capacity = single ? 1800 : 3200;
-    } else if (state.scenario === "cooling") {
+    } else if (coolingScenario) {
       capacity = single ? 2600 : 4200;
     }
 
     setNumber("Outside Temperature (Selected)", selectedOutside, "°C");
-    setNumber("Power House – P_house", state.scenario === "cooling" ? 0 : houseModel, "W");
-    setNumber("Power House – P_req", state.scenario === "cooling" ? 0 : powerHouseRequested, "W");
+    setNumber("Power House – P_house", coolingScenario || summerIdleScenario ? 0 : houseModel, "W");
+    setNumber("Power House – P_req", coolingScenario || summerIdleScenario ? 0 : powerHouseRequested, "W");
     setNumber("Strategy requested power", strategyRequested, "W");
     setNumber("HP capacity (W)", capacity, "W");
     setNumber("HP deficit (W)", Math.max(0, strategyRequested - capacity), "W");
@@ -1088,34 +1310,34 @@
       ? Number(Math.max(0, (flowLph / 3600) * 4186 * boilerDelta).toFixed(1))
       : 0;
     const systemHeat = Math.max(0, Number((Number(totalHeat || 0) + boilerHeat).toFixed(0)));
-    const electricalDaily = state.scenario === "idle" ? 3.1 : state.scenario === "defrost" ? 6.4 : state.scenario === "cooling" ? (single ? 6.8 : 8.1) : single ? 7.2 : 8.6;
-    const heatpumpDaily = state.scenario === "idle" ? 9.4 : state.scenario === "defrost" ? 18.2 : state.scenario === "cooling" ? (single ? 24.6 : 31.8) : single ? 28.4 : 36.9;
-    const coolingElectricalDaily = state.scenario === "cooling" ? (single ? 1.8 : 2.4) : 0.0;
-    const coolingDaily = state.scenario === "cooling" ? (single ? 7.1 : 9.3) : 0.0;
+    const electricalDaily = state.scenario === "idle" || summerIdleScenario ? 3.1 : state.scenario === "defrost" ? 6.4 : coolingScenario ? (single ? 6.8 : 8.1) : single ? 7.2 : 8.6;
+    const heatpumpDaily = state.scenario === "idle" || summerIdleScenario ? 9.4 : state.scenario === "defrost" ? 18.2 : coolingScenario ? (single ? 24.6 : 31.8) : single ? 28.4 : 36.9;
+    const coolingElectricalDaily = coolingScenario ? (single ? 1.8 : 2.4) : 0.0;
+    const coolingDaily = coolingScenario ? (single ? 7.1 : 9.3) : 0.0;
     const boilerDaily = boilerActive ? 2.7 : 0.0;
     const systemDaily = Number((heatpumpDaily + boilerDaily).toFixed(1));
     const heatpumpCopDaily = electricalDaily > 0 ? Number((heatpumpDaily / electricalDaily).toFixed(2)) : 0;
     const heatpumpEerDaily = coolingElectricalDaily > 0 ? Number((coolingDaily / coolingElectricalDaily).toFixed(2)) : 0;
     const electricalCumulative = single ? 286.4 : 469.5;
     const heatpumpCumulative = single ? 1208.7 : 2048.6;
-    const coolingElectricalCumulative = state.scenario === "cooling" ? (single ? 28.6 : 41.9) : 0.0;
-    const coolingCumulative = state.scenario === "cooling" ? (single ? 109.4 : 163.7) : 0.0;
+    const coolingElectricalCumulative = coolingScenario ? (single ? 28.6 : 41.9) : 0.0;
+    const coolingCumulative = coolingScenario ? (single ? 109.4 : 163.7) : 0.0;
     const boilerCumulative = boilerActive ? 114.8 : 0.0;
     const systemCumulative = Number((heatpumpCumulative + boilerCumulative).toFixed(1));
     const heatpumpCopCumulative = electricalCumulative > 0 ? Number((heatpumpCumulative / electricalCumulative).toFixed(2)) : 0;
     const heatpumpEerCumulative = coolingElectricalCumulative > 0 ? Number((coolingCumulative / coolingElectricalCumulative).toFixed(2)) : 0;
     const heatingElectricalDaily = Math.max(0, Number((electricalDaily - coolingElectricalDaily).toFixed(1)));
     const heatingElectricalCumulative = Math.max(0, Number((electricalCumulative - coolingElectricalCumulative).toFixed(1)));
-    const totalCoolingPower = state.scenario === "cooling" ? Math.max(0, Number(totalHeat || 0)) : 0;
-    const totalEer = (state.scenario === "cooling" && coolingElectricalDaily > 0)
+    const totalCoolingPower = coolingScenario ? Math.max(0, Number(totalCooling || 0)) : 0;
+    const totalEer = (coolingScenario && coolingElectricalDaily > 0)
       ? Number((coolingDaily / coolingElectricalDaily).toFixed(2))
       : 0;
 
     setNumber("Boiler Heat Power", boilerHeat, "W");
     setBinary("Boiler active", boilerActive);
     setNumber("System Heat Power", systemHeat, "W");
-    setNumber("Heating Power Input", state.scenario === "cooling" ? 0 : (Number.isNaN(totalPower) ? 0 : totalPower), "W");
-    setNumber("Cooling Power Input", state.scenario === "cooling" ? (Number.isNaN(totalPower) ? 0 : totalPower) : 0, "W");
+    setNumber("Heating Power Input", coolingScenario ? 0 : (Number.isNaN(totalPower) ? 0 : totalPower), "W");
+    setNumber("Cooling Power Input", coolingScenario ? (Number.isNaN(totalPower) ? 0 : totalPower) : 0, "W");
     setNumber("Electrical Energy Daily", electricalDaily, "kWh");
     setNumber("Electrical Energy Cumulative", electricalCumulative, "kWh");
     setNumber("Heating Electrical Energy Daily", heatingElectricalDaily, "kWh");
@@ -1547,6 +1769,9 @@
       ["Cooling Supply Target", 18.0, "°C"],
       ["Cooling Supply Error", 0.9, "°C"],
       ["Cooling Demand (raw)", 2, ""],
+      ["Cooling limited demand", 2, ""],
+      ["Cooling limiter allowed max", 4, ""],
+      ["Cooling limiter reason code", "full", ""],
       ["HP1 - Power Input", 0, "W"],
       ["HP1 - Heat Power", 0, "W"],
       ["HP1 - Cooling Power", 0, "W"],
@@ -1768,22 +1993,24 @@
 
   function applyDiagnosticScenario() {
     const single = state.installation === "single";
+    const coolingScenario = isCoolingScenario();
+    const heatingEnabledScenario = isHeatingEnabledScenario();
     setBinary("Compressor cycling warning 2h", false);
     setBinary("Compressor cycling warning 72h", false);
     setBinary("Alternating compressor starts warning", false);
     setBinary("Lowflow fault active", false);
     setBinary("Flow mismatch (HP1 vs HP2)", false);
-    setBinary("OT - Thermostat CH Enable", state.scenario !== "idle");
-    setBinary("OT - Thermostat Cooling Enable", state.scenario === "cooling");
-    setBinary("CIC - CH enabled", state.scenario !== "idle");
+    setBinary("OT - Thermostat CH Enable", heatingEnabledScenario);
+    setBinary("OT - Thermostat Cooling Enable", coolingScenario);
+    setBinary("CIC - CH enabled", heatingEnabledScenario);
     setBinary("CIC - CH enable valid", true);
-    setBinary("CIC - Cooling enabled", state.scenario === "cooling");
+    setBinary("CIC - Cooling enabled", coolingScenario);
     setBinary("CIC - JSON Feed OK", true);
-    setBinary("HA - Heating Enable", state.scenario !== "idle");
-    setBinary("HA - Cooling Enable", state.scenario === "cooling");
-    setBinary("MQTT Heating Enable", state.scenario !== "idle");
+    setBinary("HA - Heating Enable", heatingEnabledScenario);
+    setBinary("HA - Cooling Enable", coolingScenario);
+    setBinary("MQTT Heating Enable", heatingEnabledScenario);
     setBinary("MQTT Heating Enable Valid", true);
-    setBinary("MQTT Cooling Enable", state.scenario === "cooling");
+    setBinary("MQTT Cooling Enable", coolingScenario);
     setBinary("MQTT Cooling Enable Valid", true);
     setBinary("CIC - Data stale", !isSwitchEnabled("CIC - Enable polling"));
     setBinary("OT - Link Problem", false);
@@ -1836,15 +2063,15 @@
     setBinary("Heating Enable (Selected)", heatingEnableSelected);
     setBinary("Cooling Enable Valid", coolingEnableValid);
     setBinary("Cooling Enable (Selected)", coolingEnableSelected);
-    setBinary("Heating blocked by thermostat", state.scenario !== "idle" && !heatingEnableSelected);
+    setBinary("Heating blocked by thermostat", heatingEnabledScenario && !heatingEnableSelected);
     setText("text_sensor", "Room Temperature Effective Source", String(getEntity("select", "Room Temperature Source")?.value || "Unknown"));
     setText("text_sensor", "Room Setpoint Effective Source", String(getEntity("select", "Room Setpoint Source")?.value || "Unknown"));
     setText("text_sensor", "Heating Enable Effective Source", heatingEnableSource === "Disabled" ? "None" : heatingEnableSource);
     setText("text_sensor", "Cooling Enable Effective Source", coolingEnableEffectiveSource);
-    setNumber("OT - Control Setpoint", state.scenario === "cooling" ? 18.0 : 30.0, "\u00B0C");
-    setNumber("OT - Room Setpoint", state.scenario === "cooling" ? 23.0 : 21.0, "\u00B0C");
+    setNumber("OT - Control Setpoint", coolingScenario ? 18.0 : 30.0, "\u00B0C");
+    setNumber("OT - Room Setpoint", coolingScenario ? 23.0 : 21.0, "\u00B0C");
     setNumber("OT - Room Temperature", Number(getEntity("sensor", "Room Temperature (Selected)")?.value || 20.6), "\u00B0C");
-    setNumber("CIC - Control setpoint", state.scenario === "cooling" ? 18.0 : 30.0, "\u00B0C");
+    setNumber("CIC - Control setpoint", coolingScenario ? 18.0 : 30.0, "\u00B0C");
     setNumber("CIC - Room setpoint", Number(getEntity("sensor", "Room Setpoint (Selected)")?.value || 21.0), "\u00B0C");
     setNumber("CIC - Room temperature", Number(getEntity("sensor", "Room Temperature (Selected)")?.value || 20.6), "\u00B0C");
     setNumber("CIC - Flowrate (filtered)", Number(getEntity("sensor", "Flow average (Selected)")?.value || 0), "L/h");
@@ -2332,9 +2559,12 @@
     if (!single) {
       setText("text_sensor", "HP2 - Active Failures List", "None");
     }
+    setNumber("Cooling limited demand", 0, "");
+    setNumber("Cooling limiter allowed max", 10, "");
+    setSensorText("Cooling limiter reason code", "inactive");
 
     if (name === "idle") {
-      setText("text_sensor", "Control Mode (Label)", "CM98");
+      setText("text_sensor", "Control Mode (Label)", "CM0 - Standby");
       setBinary("Cooling Enable (Selected)", false);
       setBinary("Cooling Request Active", false);
       setBinary("Cooling Permitted", false);
@@ -2390,7 +2620,142 @@
       return;
     }
 
-    if (name === "heating") {
+    if (name === "start_blocked") {
+      setText("text_sensor", "Control Mode (Label)", "CM2 - Heating - Heat Pump Only");
+      setBinary("Cooling Enable (Selected)", false);
+      setBinary("Cooling Request Active", false);
+      setBinary("Cooling Permitted", false);
+      setText("text_sensor", "Cooling Block Reason", "Ready");
+      setText("text_sensor", "Flow Mode", "Adaptive");
+      setNumber("Total Power Input", single ? wave(940, 24) : wave(980, 28), "W");
+      setNumber("Total Heat Power", single ? wave(3100, 80) : wave(3180, 90), "W");
+      setNumber("Total COP", 3.3);
+      setNumber("Flow average (Selected)", wave(760, 16), "L/h");
+      setNumber("Room Temperature (Selected)", wave(20.2, 0.05), "°C");
+      setNumber("Room Setpoint (Selected)", 21.0, "°C");
+      setNumber("Water Supply Temp (Selected)", wave(34.8, 0.2), "°C");
+      setNumber("HP1 - Power Input", wave(940, 24), "W");
+      setNumber("HP1 - Heat Power", wave(3100, 80), "W");
+      setNumber("HP1 - COP", 3.3);
+      setNumber("HP1 - Compressor frequency", waveInt(49, 2), "Hz");
+      setNumber("HP1 - Fan speed", waveInt(640, 16), "rpm");
+      setNumber("HP1 - Flow", wave(760, 16), "L/h");
+      setText("text_sensor", "HP1 - Working Mode Label", "Heating");
+      if (!single) {
+        setNumber("HP2 - Power Input", 5.4, "W");
+        setNumber("HP2 - Heat Power", 0, "W");
+        setNumber("HP2 - COP", 0);
+        setNumber("HP2 - Compressor frequency", 0, "Hz");
+        setNumber("HP2 - Fan speed", 0, "rpm");
+        setNumber("HP2 - Flow", 0, "L/h");
+        setText("text_sensor", "HP2 - Working Mode Label", "Standby");
+      }
+      applyRuntimeControlOverlay(single);
+      syncCommissioningEntities(single);
+      return;
+    }
+
+    if (name === "flow_hold") {
+      setText("text_sensor", "Control Mode (Label)", "CM1 - Voorloop/naloop");
+      setBinary("Cooling Enable (Selected)", false);
+      setBinary("Cooling Request Active", false);
+      setBinary("Cooling Permitted", false);
+      setText("text_sensor", "Cooling Block Reason", "Ready");
+      setText("text_sensor", "Flow Mode", "Voorloop");
+      setNumber("Total Power Input", single ? wave(54, 4) : wave(62, 5), "W");
+      setNumber("Total Heat Power", 0, "W");
+      setNumber("Total COP", 0);
+      setNumber("Flow average (Selected)", wave(520, 18), "L/h");
+      setNumber("Room Temperature (Selected)", wave(20.4, 0.04), "°C");
+      setNumber("Room Setpoint (Selected)", 21.0, "°C");
+      setNumber("Water Supply Temp (Selected)", wave(29.2, 0.12), "°C");
+      setNumber("HP1 - Power Input", wave(48, 3), "W");
+      setNumber("HP1 - Heat Power", 0, "W");
+      setNumber("HP1 - COP", 0);
+      setNumber("HP1 - Compressor frequency", 0, "Hz");
+      setNumber("HP1 - Fan speed", 0, "rpm");
+      setNumber("HP1 - Flow", wave(520, 18), "L/h");
+      setText("text_sensor", "HP1 - Working Mode Label", "Standby");
+      if (!single) {
+        setNumber("HP2 - Power Input", 5.2, "W");
+        setNumber("HP2 - Heat Power", 0, "W");
+        setNumber("HP2 - COP", 0);
+        setNumber("HP2 - Compressor frequency", 0, "Hz");
+        setNumber("HP2 - Fan speed", 0, "rpm");
+        setNumber("HP2 - Flow", 0, "L/h");
+        setText("text_sensor", "HP2 - Working Mode Label", "Standby");
+      }
+      applyRuntimeControlOverlay(single);
+      syncCommissioningEntities(single);
+      return;
+    }
+
+    if (name === "summer_idle") {
+      setText("text_sensor", "Control Mode (Label)", "CM0 - Pompbescherming");
+      setBinary("Sticky pump active", true);
+      setBinary("Cooling Enable (Selected)", false);
+      setBinary("Cooling Request Active", false);
+      setBinary("Cooling Permitted", false);
+      setText("text_sensor", "Cooling Block Reason", "Geen koelvraag");
+      setText("text_sensor", "Cooling Guard Mode", "Dew point");
+      setText("text_sensor", "Flow Mode", "Pompbescherming");
+      setNumber("Cooling Demand (raw)", 0, "");
+      setNumber("Cooling limited demand", 0, "");
+      setNumber("Cooling limiter allowed max", 10, "");
+      setSensorText("Cooling limiter reason code", "inactive");
+      setNumber("Total Power Input", single ? wave(38, 3) : wave(47, 4), "W");
+      setNumber("Total Heat Power", 0, "W");
+      setNumber("Total Cooling Power", 0, "W");
+      setNumber("Total COP", 0);
+      setNumber("Total EER", 0);
+      setNumber("Flow average (Selected)", wave(620, 22), "L/h");
+      setNumber("Room Temperature (Selected)", wave(23.1, 0.08), "°C");
+      setNumber("Room Setpoint (Selected)", 22.0, "°C");
+      setNumber("Water Supply Temp (Selected)", wave(25.6, 0.15), "°C");
+      setNumber("HP1 - Power Input", wave(36, 3), "W");
+      setNumber("HP1 - Heat Power", 0, "W");
+      setNumber("HP1 - Cooling Power", 0, "W");
+      setNumber("HP1 - COP", 0);
+      setNumber("HP1 - Compressor frequency", 0, "Hz");
+      setNumber("HP1 - Fan speed", 0, "rpm");
+      setNumber("HP1 - Flow", wave(620, 22), "L/h");
+      setNumber("HP1 - Evaporator coil temperature", wave(25.0, 0.2), "\u00B0C");
+      setNumber("HP1 - Inner coil temperature", wave(25.7, 0.2), "\u00B0C");
+      setNumber("HP1 - Outside temperature", wave(25.8, 0.25), "\u00B0C");
+      setNumber("HP1 - Condenser pressure", wave(8.0, 0.1), "bar");
+      setNumber("HP1 - Gas discharge temperature", wave(26.8, 0.2), "\u00B0C");
+      setNumber("HP1 - Evaporator pressure", wave(7.8, 0.1), "bar");
+      setNumber("HP1 - Gas return temperature", wave(25.3, 0.2), "\u00B0C");
+      setNumber("HP1 - EEV steps", 0, "p");
+      setNumber("HP1 - Water in temperature", wave(25.5, 0.1), "°C");
+      setNumber("HP1 - Water out temperature", wave(25.7, 0.1), "°C");
+      setText("text_sensor", "HP1 - Working Mode Label", "Standby");
+      if (!single) {
+        setNumber("HP2 - Power Input", 5.4, "W");
+        setNumber("HP2 - Heat Power", 0, "W");
+        setNumber("HP2 - Cooling Power", 0, "W");
+        setNumber("HP2 - COP", 0);
+        setNumber("HP2 - Compressor frequency", 0, "Hz");
+        setNumber("HP2 - Fan speed", 0, "rpm");
+        setNumber("HP2 - Flow", 0, "L/h");
+        setNumber("HP2 - Evaporator coil temperature", wave(25.0, 0.2, 0.4), "\u00B0C");
+        setNumber("HP2 - Inner coil temperature", wave(25.6, 0.2, 0.2), "\u00B0C");
+        setNumber("HP2 - Outside temperature", wave(25.6, 0.25, 0.2), "\u00B0C");
+        setNumber("HP2 - Condenser pressure", wave(8.0, 0.1, 0.3), "bar");
+        setNumber("HP2 - Gas discharge temperature", wave(26.4, 0.2, 0.3), "\u00B0C");
+        setNumber("HP2 - Evaporator pressure", wave(7.8, 0.1, 0.3), "bar");
+        setNumber("HP2 - Gas return temperature", wave(25.1, 0.2, 0.3), "\u00B0C");
+        setNumber("HP2 - EEV steps", 0, "p");
+        setNumber("HP2 - Water in temperature", wave(25.3, 0.1), "°C");
+        setNumber("HP2 - Water out temperature", wave(25.4, 0.1), "°C");
+        setText("text_sensor", "HP2 - Working Mode Label", "Standby");
+      }
+      applyRuntimeControlOverlay(single);
+      syncCommissioningEntities(single);
+      return;
+    }
+
+    if (name === "heating" || name === "heating_stop_reasons") {
       setText("text_sensor", "Control Mode (Label)", "CM2 - Heating - Heat Pump Only");
       setBinary("Cooling Enable (Selected)", false);
       setBinary("Cooling Request Active", false);
@@ -2445,23 +2810,47 @@
         setBinary("HP2 - Bottom plate heater", false);
         setBinary("HP2 - Crankcase heater", true);
       }
+      if (name === "heating_stop_reasons") {
+        setText("text_sensor", "Control Mode (Label)", "CM0 - Standby");
+        setText("text_sensor", "Flow Mode", "Standby");
+        setNumber("Total Power Input", single ? 5.2 : 10.3, "W");
+        setNumber("Total Heat Power", 0, "W");
+        setNumber("Total COP", 0);
+        setNumber("Flow average (Selected)", 0, "L/h");
+        setNumber("HP1 - Power Input", 5.2, "W");
+        setNumber("HP1 - Heat Power", 0, "W");
+        setNumber("HP1 - COP", 0);
+        setNumber("HP1 - Compressor frequency", 0, "Hz");
+        setNumber("HP1 - Fan speed", 0, "rpm");
+        setNumber("HP1 - Flow", 0, "L/h");
+        setText("text_sensor", "HP1 - Working Mode Label", "Standby");
+        if (!single) {
+          setNumber("HP2 - Power Input", 5.2, "W");
+          setNumber("HP2 - Heat Power", 0, "W");
+          setNumber("HP2 - COP", 0);
+          setNumber("HP2 - Compressor frequency", 0, "Hz");
+          setNumber("HP2 - Fan speed", 0, "rpm");
+          setNumber("HP2 - Flow", 0, "L/h");
+          setText("text_sensor", "HP2 - Working Mode Label", "Standby");
+        }
+      }
       applyRuntimeControlOverlay(single);
       syncCommissioningEntities(single);
       return;
     }
 
     if (name === "dual") {
-      setText("text_sensor", "Control Mode (Label)", "CM99");
+      setText("text_sensor", "Control Mode (Label)", "CM2 - Heating - Duo");
       setBinary("Cooling Enable (Selected)", false);
       setBinary("Cooling Request Active", false);
       setBinary("Cooling Permitted", false);
       setText("text_sensor", "Cooling Block Reason", "Ready");
-      setText("text_sensor", "Flow Mode", "Mixed test");
-      setBinary("Silent active", true);
-      setText("text_sensor", "HP2 - Active Failures List", "Compressor oil return");
-      setNumber("Total Power Input", wave(980, 60), "W");
-      setNumber("Total Heat Power", wave(2260, 180), "W");
-      setNumber("Total COP", Number((2.28 + Math.sin(t) * 0.12).toFixed(2)));
+      setText("text_sensor", "Flow Mode", "Adaptive");
+      setBinary("Silent active", false);
+      setText("text_sensor", "HP2 - Active Failures List", "None");
+      setNumber("Total Power Input", wave(910, 54), "W");
+      setNumber("Total Heat Power", wave(3980, 190), "W");
+      setNumber("Total COP", Number((4.35 + Math.sin(t) * 0.12).toFixed(2)));
       setNumber("Flow average (Selected)", wave(1220, 50), "L/h");
       setNumber("Room Temperature (Selected)", wave(19.8, 0.12), "°C");
       setNumber("Room Setpoint (Selected)", 21.0, "°C");
@@ -2483,24 +2872,24 @@
       setNumber("HP1 - Water in temperature", wave(25.2, 0.3), "°C");
       setNumber("HP1 - Water out temperature", wave(31.8, 0.5), "°C");
       setText("text_sensor", "HP1 - Working Mode Label", "Heating");
-      setNumber("HP2 - Power Input", wave(420, 18, 0.4), "W");
-      setNumber("HP2 - Heat Power", wave(-260, 40, 0.4), "W");
-      setNumber("HP2 - COP", Number((2.05 + Math.sin(t + 0.4) * 0.08).toFixed(2)));
+      setNumber("HP2 - Power Input", wave(440, 18, 0.4), "W");
+      setNumber("HP2 - Heat Power", wave(1900, 120, 0.4), "W");
+      setNumber("HP2 - COP", Number((4.32 + Math.sin(t + 0.4) * 0.1).toFixed(2)));
       setNumber("HP2 - Compressor frequency", waveInt(31, 2, 0.4), "Hz");
-      setNumber("HP2 - Fan speed", wave(185, 8, 0.4), "rpm");
+      setNumber("HP2 - Fan speed", wave(618, 12, 0.4), "rpm");
       setNumber("HP2 - Flow", wave(590, 18, 0.4), "L/h");
-      setNumber("HP2 - Evaporator coil temperature", wave(12.3, 0.5, 0.4), "\u00B0C");
-      setNumber("HP2 - Inner coil temperature", wave(8.7, 0.45, 0.15), "\u00B0C");
+      setNumber("HP2 - Evaporator coil temperature", wave(1.9, 0.6, 0.4), "\u00B0C");
+      setNumber("HP2 - Inner coil temperature", wave(6.4, 0.45, 0.15), "\u00B0C");
       setNumber("HP2 - Outside temperature", wave(5.0, 0.18, 0.2), "\u00B0C");
-      setNumber("HP2 - Condenser pressure", wave(18.6, 0.6, 0.4), "bar");
-      setNumber("HP2 - Gas discharge temperature", wave(58.1, 1.5, 0.4), "\u00B0C");
-      setNumber("HP2 - Evaporator pressure", wave(6.9, 0.2, 0.4), "bar");
-      setNumber("HP2 - Gas return temperature", wave(11.2, 0.4, 0.4), "\u00B0C");
-      setNumber("HP2 - EEV steps", waveInt(338, 18, 0.4), "p");
-      setNumber("HP2 - Water in temperature", wave(31.0, 0.4), "°C");
-      setNumber("HP2 - Water out temperature", wave(25.2, 0.3), "°C");
-      setText("text_sensor", "HP2 - Working Mode Label", "Cooling");
-      setBinary("HP2 - 4-Way valve", true);
+      setNumber("HP2 - Condenser pressure", wave(23.0, 0.7, 0.4), "bar");
+      setNumber("HP2 - Gas discharge temperature", wave(68.1, 1.5, 0.4), "\u00B0C");
+      setNumber("HP2 - Evaporator pressure", wave(7.9, 0.2, 0.4), "bar");
+      setNumber("HP2 - Gas return temperature", wave(8.8, 0.4, 0.4), "\u00B0C");
+      setNumber("HP2 - EEV steps", waveInt(296, 18, 0.4), "p");
+      setNumber("HP2 - Water in temperature", wave(25.1, 0.4), "°C");
+      setNumber("HP2 - Water out temperature", wave(31.0, 0.4), "°C");
+      setText("text_sensor", "HP2 - Working Mode Label", "Heating");
+      setBinary("HP2 - 4-Way valve", false);
       setBinary("HP2 - Bottom plate heater", true);
       setBinary("HP2 - Crankcase heater", true);
       applyRuntimeControlOverlay(single);
@@ -2514,8 +2903,8 @@
       setBinary("Cooling Request Active", false);
       setBinary("Cooling Permitted", false);
       setText("text_sensor", "Cooling Block Reason", "Ready");
-      setText("text_sensor", "Flow Mode", "Defrost recovery");
-      setBinary("Sticky pump active", true);
+      setText("text_sensor", "Flow Mode", "Ontdooien herstel");
+      setBinary("Sticky pump active", false);
       setBinary("HP1 - Defrost", true);
       setBinary("HP1 - 4-Way valve", true);
       const hp1Power = wave(520, 16);
@@ -2573,73 +2962,107 @@
       return;
     }
 
-    if (name === "cooling") {
+    if (isCoolingScenario(name)) {
+      const limited = name === "cooling_limited" || name === "cooling_limiter_log";
       setText("text_sensor", "Control Mode (Label)", "CM5 - Cooling");
       setText("text_sensor", "Flow Mode", "Adaptive");
       setBinary("Cooling Enable (Selected)", true);
       setBinary("Cooling Request Active", true);
       setBinary("Cooling Permitted", true);
       setText("text_sensor", "Cooling Block Reason", "Ready");
-      setNumber("HA - Cooling Dew Point", wave(15.9, 0.12, 0.2), "°C");
+      setNumber("HA - Cooling Dew Point", limited ? wave(18.4, 0.12, 0.2) : wave(15.9, 0.12, 0.2), "°C");
       setBinary("HA - Cooling Dew Point Valid", true);
-      setNumber("MQTT Cooling Dew Point", wave(16.2, 0.12), "°C");
+      setNumber("MQTT Cooling Dew Point", limited ? wave(18.1, 0.12) : wave(16.2, 0.12), "°C");
       setBinary("MQTT Cooling Dew Point Valid", true);
       applyCoolingDewPointSourceSelection();
-      setNumber("Cooling Minimum Safe Supply Temp", wave(18.0, 0.15), "°C");
-      setNumber("Cooling Effective Minimum Supply Temp", wave(18.0, 0.15), "°C");
+      setNumber("Cooling Minimum Safe Supply Temp", limited ? wave(20.0, 0.12) : wave(18.0, 0.15), "°C");
+      setNumber("Cooling Effective Minimum Supply Temp", limited ? wave(20.2, 0.12) : wave(18.0, 0.15), "°C");
       setNumber("Cooling Fallback Night Minimum Outdoor Temp", wave(15.4, 0.1), "°C");
       setNumber("Cooling Fallback Minimum Supply Temp", wave(19.0, 0.1), "°C");
-      setNumber("Cooling Supply Target", wave(18.0, 0.12), "°C");
-      setNumber("Cooling Supply Error", wave(1.0, 0.2), "°C");
-      setNumber("Cooling Demand (raw)", waveInt(2.2, 0.6), "");
-      setNumber("Cooling Power Input", wave(455, 18), "W");
-      setNumber("Total Power Input", wave(455, 18), "W");
+      setNumber("Cooling Supply Target", limited ? wave(20.5, 0.1) : wave(18.0, 0.12), "°C");
+      setNumber("Cooling Supply Error", limited ? wave(0.35, 0.1) : wave(1.0, 0.2), "°C");
+      setNumber("Cooling Demand (raw)", limited ? waveInt(7, 1) : waveInt(4, 1), "");
+      setNumber("Cooling limited demand", limited ? 3 : 4, "");
+      setNumber("Cooling limiter allowed max", limited ? 3 : 10, "");
+      setSensorText("Cooling limiter reason code", limited ? "capacity_cap" : "full");
+      setNumber("Cooling Power Input", limited ? wave(310, 14) : wave(455, 18), "W");
+      setNumber("Total Power Input", limited ? wave(310, 14) : wave(455, 18), "W");
       setNumber("Total Heat Power", 0, "W");
-      setNumber("Total Cooling Power", wave(1720, 90), "W");
+      setNumber("Total Cooling Power", limited ? wave(1040, 70) : wave(1720, 90), "W");
       setNumber("Total COP", 0);
-      setNumber("Total EER", Number((3.9 + Math.sin(t) * 0.08).toFixed(2)));
-      setNumber("Flow average (Selected)", wave(845, 26), "L/h");
-      setNumber("Room Temperature (Selected)", wave(24.2, 0.08), "°C");
+      setNumber("Total EER", Number(((limited ? 3.35 : 3.9) + Math.sin(t) * 0.08).toFixed(2)));
+      setNumber("Flow average (Selected)", limited ? wave(720, 24) : wave(845, 26), "L/h");
+      setNumber("Room Temperature (Selected)", limited ? wave(24.8, 0.08) : wave(24.2, 0.08), "°C");
       setNumber("Room Setpoint (Selected)", 23.0, "°C");
-      setNumber("Water Supply Temp (Selected)", wave(19.6, 0.2), "°C");
-      setNumber("HP1 - Power Input", 5.4, "W");
+      setNumber("Water Supply Temp (Selected)", limited ? wave(20.8, 0.18) : wave(19.6, 0.2), "°C");
+      setNumber("HP1 - Power Input", single ? (limited ? wave(305, 14) : wave(448, 18)) : 5.4, "W");
       setNumber("HP1 - Heat Power", 0, "W");
-      setNumber("HP1 - Cooling Power", 0, "W");
-      setNumber("HP1 - COP", 0);
-      setNumber("HP1 - Compressor frequency", 0, "Hz");
-      setNumber("HP1 - Fan speed", 0, "rpm");
-      setNumber("HP1 - Flow", 0, "L/h");
-      setNumber("HP1 - Evaporator coil temperature", wave(24.8, 0.2), "\u00B0C");
-      setNumber("HP1 - Inner coil temperature", wave(25.7, 0.2), "\u00B0C");
-      setNumber("HP1 - Outside temperature", wave(26.1, 0.2), "\u00B0C");
-      setNumber("HP1 - Condenser pressure", wave(8.0, 0.1), "bar");
-      setNumber("HP1 - Gas discharge temperature", wave(27.6, 0.2), "\u00B0C");
-      setNumber("HP1 - Evaporator pressure", wave(7.8, 0.1), "bar");
-      setNumber("HP1 - Gas return temperature", wave(25.3, 0.2), "\u00B0C");
-      setNumber("HP1 - EEV steps", 0, "p");
-      setNumber("HP1 - Water in temperature", wave(20.8, 0.2), "°C");
-      setNumber("HP1 - Water out temperature", wave(20.1, 0.2), "°C");
-      setText("text_sensor", "HP1 - Working Mode Label", "Standby");
+      setNumber("HP1 - Cooling Power", single ? (limited ? wave(1020, 70) : wave(1710, 90)) : 0, "W");
+      setNumber("HP1 - COP", single ? Number(((limited ? 3.3 : 3.82) + Math.sin(t + 0.3) * 0.08).toFixed(2)) : 0);
+      setNumber("HP1 - Compressor frequency", single ? (limited ? waveInt(25, 2, 0.3) : waveInt(33, 2, 0.3)) : 0, "Hz");
+      setNumber("HP1 - Fan speed", single ? (limited ? wave(520, 12, 0.3) : wave(602, 14, 0.3)) : 0, "rpm");
+      setNumber("HP1 - Flow", single ? (limited ? wave(720, 18, 0.3) : wave(842, 18, 0.3)) : 0, "L/h");
+      setNumber("HP1 - Evaporator coil temperature", single ? (limited ? wave(10.8, 0.25, 0.3) : wave(8.2, 0.3, 0.3)) : wave(24.8, 0.2), "\u00B0C");
+      setNumber("HP1 - Inner coil temperature", single ? (limited ? wave(14.0, 0.25, 0.2) : wave(12.0, 0.3, 0.2)) : wave(25.7, 0.2), "\u00B0C");
+      setNumber("HP1 - Outside temperature", wave(29.2, 0.25), "\u00B0C");
+      setNumber("HP1 - Condenser pressure", single ? (limited ? wave(15.8, 0.3, 0.3) : wave(17.8, 0.3, 0.3)) : wave(8.0, 0.1), "bar");
+      setNumber("HP1 - Gas discharge temperature", single ? (limited ? wave(42.0, 0.7, 0.3) : wave(47.0, 0.8, 0.3)) : wave(27.6, 0.2), "\u00B0C");
+      setNumber("HP1 - Evaporator pressure", single ? (limited ? wave(6.6, 0.15, 0.3) : wave(6.0, 0.15, 0.3)) : wave(7.8, 0.1), "bar");
+      setNumber("HP1 - Gas return temperature", single ? (limited ? wave(12.1, 0.2, 0.3) : wave(10.4, 0.2, 0.3)) : wave(25.3, 0.2), "\u00B0C");
+      setNumber("HP1 - EEV steps", single ? (limited ? waveInt(214, 10, 0.3) : waveInt(268, 12, 0.3)) : 0, "p");
+      setNumber("HP1 - Water in temperature", single ? (limited ? wave(21.5, 0.18, 0.3) : wave(21.0, 0.2, 0.3)) : wave(20.8, 0.2), "°C");
+      setNumber("HP1 - Water out temperature", single ? (limited ? wave(20.6, 0.18, 0.3) : wave(19.3, 0.2, 0.3)) : wave(20.1, 0.2), "°C");
+      setText("text_sensor", "HP1 - Working Mode Label", single ? "Cooling" : "Standby");
+      if (single) {
+        setBinary("HP1 - 4-Way valve", true);
+      }
       if (!single) {
-        setNumber("HP2 - Power Input", wave(448, 18, 0.3), "W");
+        setNumber("HP2 - Power Input", limited ? wave(305, 14, 0.3) : wave(448, 18, 0.3), "W");
         setNumber("HP2 - Heat Power", 0, "W");
-        setNumber("HP2 - Cooling Power", wave(1710, 90, 0.3), "W");
-        setNumber("HP2 - COP", Number((3.82 + Math.sin(t + 0.3) * 0.08).toFixed(2)));
-        setNumber("HP2 - Compressor frequency", waveInt(33, 2, 0.3), "Hz");
-        setNumber("HP2 - Fan speed", wave(602, 14, 0.3), "rpm");
-        setNumber("HP2 - Flow", wave(842, 18, 0.3), "L/h");
-        setNumber("HP2 - Evaporator coil temperature", wave(8.2, 0.3, 0.3), "\u00B0C");
-        setNumber("HP2 - Inner coil temperature", wave(12.0, 0.3, 0.2), "\u00B0C");
-        setNumber("HP2 - Outside temperature", wave(25.9, 0.2, 0.2), "\u00B0C");
-        setNumber("HP2 - Condenser pressure", wave(17.8, 0.3, 0.3), "bar");
-        setNumber("HP2 - Gas discharge temperature", wave(47.0, 0.8, 0.3), "\u00B0C");
-        setNumber("HP2 - Evaporator pressure", wave(6.0, 0.15, 0.3), "bar");
-        setNumber("HP2 - Gas return temperature", wave(10.4, 0.2, 0.3), "\u00B0C");
-        setNumber("HP2 - EEV steps", waveInt(268, 12, 0.3), "p");
-        setNumber("HP2 - Water in temperature", wave(21.0, 0.2, 0.3), "°C");
-        setNumber("HP2 - Water out temperature", wave(19.3, 0.2, 0.3), "°C");
+        setNumber("HP2 - Cooling Power", limited ? wave(1020, 70, 0.3) : wave(1710, 90, 0.3), "W");
+        setNumber("HP2 - COP", Number(((limited ? 3.3 : 3.82) + Math.sin(t + 0.3) * 0.08).toFixed(2)));
+        setNumber("HP2 - Compressor frequency", limited ? waveInt(25, 2, 0.3) : waveInt(33, 2, 0.3), "Hz");
+        setNumber("HP2 - Fan speed", limited ? wave(520, 12, 0.3) : wave(602, 14, 0.3), "rpm");
+        setNumber("HP2 - Flow", limited ? wave(720, 18, 0.3) : wave(842, 18, 0.3), "L/h");
+        setNumber("HP2 - Evaporator coil temperature", limited ? wave(10.8, 0.25, 0.3) : wave(8.2, 0.3, 0.3), "\u00B0C");
+        setNumber("HP2 - Inner coil temperature", limited ? wave(14.0, 0.25, 0.2) : wave(12.0, 0.3, 0.2), "\u00B0C");
+        setNumber("HP2 - Outside temperature", wave(29.0, 0.25, 0.2), "\u00B0C");
+        setNumber("HP2 - Condenser pressure", limited ? wave(15.8, 0.3, 0.3) : wave(17.8, 0.3, 0.3), "bar");
+        setNumber("HP2 - Gas discharge temperature", limited ? wave(42.0, 0.7, 0.3) : wave(47.0, 0.8, 0.3), "\u00B0C");
+        setNumber("HP2 - Evaporator pressure", limited ? wave(6.6, 0.15, 0.3) : wave(6.0, 0.15, 0.3), "bar");
+        setNumber("HP2 - Gas return temperature", limited ? wave(12.1, 0.2, 0.3) : wave(10.4, 0.2, 0.3), "\u00B0C");
+        setNumber("HP2 - EEV steps", limited ? waveInt(214, 10, 0.3) : waveInt(268, 12, 0.3), "p");
+        setNumber("HP2 - Water in temperature", limited ? wave(21.5, 0.18, 0.3) : wave(21.0, 0.2, 0.3), "°C");
+        setNumber("HP2 - Water out temperature", limited ? wave(20.6, 0.18, 0.3) : wave(19.3, 0.2, 0.3), "°C");
         setText("text_sensor", "HP2 - Working Mode Label", "Cooling");
         setBinary("HP2 - 4-Way valve", true);
+      }
+      if (name === "cooling_stop_reasons") {
+        setText("text_sensor", "Control Mode (Label)", "CM0 - Standby");
+        setBinary("Cooling Request Active", false);
+        setBinary("Cooling Permitted", false);
+        setText("text_sensor", "Cooling Block Reason", "Geen koelvraag");
+        setText("text_sensor", "Flow Mode", "Standby");
+        setNumber("Total Power Input", single ? 5.2 : 10.3, "W");
+        setNumber("Total Cooling Power", 0, "W");
+        setNumber("Total EER", 0);
+        setNumber("Flow average (Selected)", 0, "L/h");
+        setNumber("HP1 - Power Input", 5.2, "W");
+        setNumber("HP1 - Cooling Power", 0, "W");
+        setNumber("HP1 - Compressor frequency", 0, "Hz");
+        setNumber("HP1 - Fan speed", 0, "rpm");
+        setNumber("HP1 - Flow", 0, "L/h");
+        setText("text_sensor", "HP1 - Working Mode Label", "Standby");
+        setBinary("HP1 - 4-Way valve", false);
+        if (!single) {
+          setNumber("HP2 - Power Input", 5.2, "W");
+          setNumber("HP2 - Cooling Power", 0, "W");
+          setNumber("HP2 - Compressor frequency", 0, "Hz");
+          setNumber("HP2 - Fan speed", 0, "rpm");
+          setNumber("HP2 - Flow", 0, "L/h");
+          setText("text_sensor", "HP2 - Working Mode Label", "Standby");
+          setBinary("HP2 - 4-Way valve", false);
+        }
       }
       applyRuntimeControlOverlay(single);
       syncCommissioningEntities(single);
@@ -2728,7 +3151,7 @@
         setBinary("Cooling Request Active", true);
       }
       if (!currentCoolingBlockReason || currentCoolingBlockReason === "Ready" || waitingForRoomRequest) {
-        setText("text_sensor", "Cooling Block Reason", state.scenario === "cooling" || !coolingRoomRequestRequired ? "Ready" : "Koeling toegestaan, wacht op kamertemperatuur boven koel-setpoint");
+        setText("text_sensor", "Cooling Block Reason", isCoolingScenario() || !coolingRoomRequestRequired ? "Ready" : "Koeling toegestaan, wacht op kamertemperatuur boven koel-setpoint");
       }
     }
 
@@ -4049,6 +4472,9 @@
       if (url.pathname.endsWith("/openquatt/service/status") && method === "GET") {
         return handleServiceStatus();
       }
+      if (url.pathname.endsWith("/openquatt/decision-log") && method === "GET") {
+        return handleDecisionLog();
+      }
       if (url.pathname.endsWith("/openquatt/entities") && String(init?.method || "GET").toUpperCase() === "POST") {
         return handleBulkEntities(init || {});
       }
@@ -4138,11 +4564,18 @@
           <label class="oq-helper-hub-dev-row">
             <span class="oq-helper-hub-dev-label">Scenario</span>
             <select class="oq-helper-hub-dev-select" data-oq-dev-control="scenario">
-              <option value="idle">Idle</option>
-              <option value="heating">HP1 heating</option>
-              ${state.installation === "duo" ? '<option value="dual">HP1 heat + HP2 cool</option>' : ""}
-              ${state.installation === "duo" ? '<option value="cooling">HP1 standby + HP2 cooling</option>' : ""}
-              <option value="defrost">Defrost</option>
+              <option value="idle">Standby</option>
+              <option value="heating">Winter - 1 warmtepomp</option>
+              ${state.installation === "duo" ? '<option value="dual">Winter - duo-bedrijf</option>' : ""}
+              ${state.installation === "duo" ? '<option value="heating_stop_reasons">Winter - verwarmstops vergeleken</option>' : ""}
+              ${state.installation === "duo" ? '<option value="start_blocked">Winter - start wacht</option>' : ""}
+              <option value="flow_hold">Waterflow - voor/naloop</option>
+              <option value="summer_idle">Zomer - pompbescherming</option>
+              <option value="cooling">Zomer - koeling vrijgegeven</option>
+              <option value="cooling_limited">Zomer - koeling veilig begrensd</option>
+              <option value="cooling_stop_reasons">Zomer - koelstops vergeleken</option>
+              <option value="cooling_limiter_log">Zomer - limiter herhaalt</option>
+              <option value="defrost">Winter - ontdooien</option>
             </select>
           </label>
           <label class="oq-helper-hub-dev-row">

@@ -119,10 +119,12 @@ interval:
     then:
       - lambda: |-
           const int cm_code = id(oq_control_mode_code);
-          const bool commissioning_boiler =
+          const bool commissioning_boiler_task =
               (cm_code == 100) &&
               id(oq_commissioning_active) &&
-              (id(oq_commissioning_task_code) == oq_commissioning::TASK_BOILER_POWER_TEST) &&
+              (id(oq_commissioning_task_code) == oq_commissioning::TASK_BOILER_POWER_TEST);
+          const bool commissioning_boiler =
+              commissioning_boiler_task &&
               id(oq_commissioning_boiler_request);
           // Boiler follows Control Mode CM3, but the shared water-temperature model
           // may block it independently from CM ownership.
@@ -138,20 +140,40 @@ interval:
             boiler_block_reason = "water temperature boiler inhibit active";
           } else if (id(oq_water_temp_hard_trip_active)) {
             boiler_block_reason = "water temperature hard trip active";
-          } else if ((cm_code == 100) &&
-                     id(oq_commissioning_active) &&
-                     (id(oq_commissioning_task_code) == oq_commissioning::TASK_BOILER_POWER_TEST) &&
-                     !id(oq_commissioning_boiler_request)) {
+          } else if (commissioning_boiler_task && !id(oq_commissioning_boiler_request)) {
             boiler_block_reason = "CM100 boiler commissioning waiting for flow settle";
           } else if (!in_cm3 && !commissioning_boiler) {
             boiler_block_reason = "Control Mode is not CM3";
           }
           const bool boiler_allowed =
               boiler_block_reason.empty();
+          const bool boiler_requested = in_cm3 || commissioning_boiler_task;
+          auto boiler_log_reason = [&]()->uint8_t {
+            if (id(oq_water_temp_boiler_inhibit_active) || id(oq_water_temp_hard_trip_active)) {
+              return openquatt_decision_log::REASON_SOFT_GUARD;
+            }
+            if (!has_valid_supply_temp) {
+              return openquatt_decision_log::REASON_SENSOR_FALLBACK;
+            }
+            if (!id(oq_boiler_assist_enabled).state) {
+              return openquatt_decision_log::REASON_NO_CANDIDATE;
+            }
+            if (boiler_block_reason == "CM100 boiler commissioning waiting for flow settle") {
+              return openquatt_decision_log::REASON_FLOW_PREFLOW;
+            }
+            return openquatt_decision_log::REASON_LESS_POWER;
+          };
+          const uint8_t boiler_log_reason_code = boiler_log_reason();
+          const uint8_t boiler_log_severity =
+              boiler_log_reason_code == openquatt_decision_log::REASON_LESS_POWER
+                  ? openquatt_decision_log::SEVERITY_NORMAL
+                  : openquatt_decision_log::SEVERITY_LIMITED;
           static bool last_boiler_allowed = false;
+          static bool last_boiler_blocked = false;
           static std::string last_boiler_block_reason = "";
-          if (boiler_allowed != last_boiler_allowed || boiler_block_reason != last_boiler_block_reason) {
-          if (boiler_allowed) {
+          const bool boiler_block_reason_changed = boiler_block_reason != last_boiler_block_reason;
+          if (boiler_allowed != last_boiler_allowed || boiler_block_reason_changed) {
+            if (boiler_allowed) {
               if (commissioning_boiler) {
                 ESP_LOGI("quatt.boiler", "Boiler enabled: CM100 commissioning task and safety guards clear");
               } else {
@@ -168,8 +190,44 @@ interval:
             last_boiler_block_reason = boiler_block_reason;
           }
 
+          const bool boiler_blocked = boiler_requested && !boiler_allowed;
+          if (boiler_blocked && (!last_boiler_blocked || boiler_block_reason_changed)) {
+            id(oq_decision_log).emit(
+                openquatt_decision_log::EVENT_DECISION_BLOCKED,
+                openquatt_decision_log::SUBJECT_CV,
+                boiler_log_reason_code,
+                boiler_log_severity,
+                (uint8_t) cm_code,
+                openquatt_decision_log::STATE_STANDBY,
+                openquatt_decision_log::STATE_BLOCKED,
+                has_valid_supply_temp ? (int16_t) lroundf(supply_c * 10.0f) : 0);
+          }
+          last_boiler_blocked = boiler_blocked;
+
           if (boiler_allowed) {
-            if (!id(boiler_relay).state) id(boiler_relay).turn_on();
+            if (!id(boiler_relay).state) {
+              id(oq_decision_log).emit(
+                  openquatt_decision_log::EVENT_BOILER_ASSIST_START,
+                  openquatt_decision_log::SUBJECT_CV,
+                  openquatt_decision_log::REASON_BOILER_ASSIST,
+                  openquatt_decision_log::SEVERITY_NORMAL,
+                  (uint8_t) cm_code,
+                  openquatt_decision_log::STATE_STANDBY,
+                  openquatt_decision_log::STATE_ACTIVE,
+                  has_valid_supply_temp ? (int16_t) lroundf(supply_c * 10.0f) : 0);
+              id(boiler_relay).turn_on();
+            }
           } else {
-            if (id(boiler_relay).state) id(boiler_relay).turn_off();
+            if (id(boiler_relay).state) {
+              id(oq_decision_log).emit(
+                  openquatt_decision_log::EVENT_BOILER_ASSIST_STOP,
+                  openquatt_decision_log::SUBJECT_CV,
+                  boiler_log_reason_code,
+                  boiler_log_severity,
+                  (uint8_t) cm_code,
+                  openquatt_decision_log::STATE_ACTIVE,
+                  openquatt_decision_log::STATE_STANDBY,
+                  has_valid_supply_temp ? (int16_t) lroundf(supply_c * 10.0f) : 0);
+              id(boiler_relay).turn_off();
+            }
           }

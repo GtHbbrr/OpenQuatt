@@ -13,7 +13,7 @@ import { getHeaderRenderSignature, patchHeaderDom } from "./header-render-contro
 import { patchSettingsDom } from "./settings-render-controls.js";
 import { ENERGY_HISTORY_VIEW_KEYS, getSettingsStorageRefreshKeys, SETTINGS_STORAGE_KEYS, TREND_HISTORY_VIEW_KEYS } from "./storage-history-keys.js";
 import { refreshEnergyHistoryData, refreshSettingsStorageState, refreshTrendHistoryData, refreshTrendHistoryMetadata, shouldRefreshSettingsStorageForCurrentSurface } from "./storage-history-controls.js";
-import { patchDiagnosisDom, patchEnergyDom, patchOverviewDom, patchResultsDom } from "./view-patch-controls.js";
+import { patchControlReplayDom, patchDiagnosisDom, patchEnergyDom, patchOverviewDom, patchResultsDom } from "./view-patch-controls.js";
 import { clearWebServerLogOutput, closeWebServerLogStream, resetWebServerLogRecoveryState } from "./webserver-log-controls.js";
 import { getMqttSensorsModalRenderSignature, refreshMqttStatus, shouldRefreshMqttStatusForCurrentSurface } from "../features/mqtt-actions.js";
 import { getApiSecurityStatusSignature, refreshApiSecurityStatus, refreshAuthStatus, shouldRefreshApiSecurityStatusForCurrentSurface, shouldRefreshAuthStatusForCurrentSurface } from "../features/security-actions.js";
@@ -104,7 +104,7 @@ import { render } from "./render-scheduler.js";
       if (isInitialOverviewView()) {
         await hydrateOverviewMetadata();
       }
-      if (state.appView === "overview" || state.appView === "diagnosis") {
+      if (state.appView === "overview" || state.appView === "control" || state.appView === "diagnosis") {
         await refreshTrendHistoryData({ force: true });
       }
       if (state.appView === "results") {
@@ -480,6 +480,8 @@ import { render } from "./render-scheduler.js";
   export const BULK_ENTITY_REQUEST_BODY_MAX_CHARS = 900;
 
   export const SERVICE_STATUS_ENDPOINT = "/openquatt/service/status";
+  export const DECISION_LOG_ENDPOINT = "/openquatt/decision-log";
+  export const DECISION_LOG_REFRESH_INTERVAL_MS = 15000;
 
   export function getEntityRequestTimeoutMs() {
     return state.deviceReconnectMode || state.busyAction === "restartAction" || state.updateInstallBusy || state.updateInstallPhaseHint
@@ -559,6 +561,10 @@ import { render } from "./render-scheduler.js";
       state.trendHistorySignature = "";
       state.trendHistoryNowMs = Number.NaN;
       state.trendHistoryLastFetchAt = 0;
+      state.decisionLog = null;
+      state.decisionLogError = "";
+      state.decisionLogSignature = "";
+      state.decisionLogLastFetchAt = 0;
       if (typeof resetWebServerLogRecoveryState === "function") {
         resetWebServerLogRecoveryState();
       } else {
@@ -784,6 +790,106 @@ import { render } from "./render-scheduler.js";
     return response.json();
   }
 
+  export async function fetchDecisionLogPayload() {
+    const timeoutMs = getEntityRequestTimeoutMs();
+    const fetchOptions = { cache: "no-store", headers: { "Cache-Control": "no-store" } };
+
+    if (typeof AbortController === "function") {
+      const controller = new AbortController();
+      const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        const response = await fetch(DECISION_LOG_ENDPOINT, { ...fetchOptions, signal: controller.signal });
+        if (!response.ok) {
+          throw new Error(`decision log HTTP ${response.status}`);
+        }
+        return response.json();
+      } catch (error) {
+        if (controller.signal.aborted) {
+          throw new Error(`decision log request timed out after ${timeoutMs}ms`);
+        }
+        throw error;
+      } finally {
+        window.clearTimeout(timeoutId);
+      }
+    }
+
+    const response = await fetch(DECISION_LOG_ENDPOINT, fetchOptions);
+    if (!response.ok) {
+      throw new Error(`decision log HTTP ${response.status}`);
+    }
+    return response.json();
+  }
+
+  export function getDecisionLogSignature(payload = {}) {
+    const events = Array.isArray(payload.events) ? payload.events : [];
+    const buckets = Array.isArray(payload.buckets) ? payload.buckets : [];
+    const firstEvent = events[0] || {};
+    const lastEvent = events[events.length - 1] || {};
+    const lastBucket = buckets[buckets.length - 1] || {};
+    return [
+      payload?.meta?.event_count ?? events.length,
+      payload?.meta?.dropped_count ?? 0,
+      events.length,
+      firstEvent.seq ?? "",
+      lastEvent.seq ?? "",
+      lastEvent.uptime_s ?? "",
+      payload?.meta?.boot_epoch_s ?? "",
+      firstEvent.epoch_s ?? "",
+      lastEvent.epoch_s ?? "",
+      buckets.length,
+      lastBucket.hour_start_uptime_s ?? "",
+      lastBucket.attention_count ?? "",
+    ].join("|");
+  }
+
+  export async function refreshDecisionLogData(options = {}) {
+    if (state.appView !== "control") {
+      return false;
+    }
+    const force = options.force === true;
+    const now = Date.now();
+    if (!force && state.decisionLogFetchPromise) {
+      return state.decisionLogFetchPromise;
+    }
+    if (!force && (state.decisionLog || state.decisionLogError) &&
+        (now - Number(state.decisionLogLastFetchAt || 0)) < DECISION_LOG_REFRESH_INTERVAL_MS) {
+      return false;
+    }
+
+    state.decisionLogFetchPromise = (async () => {
+      const payload = await fetchDecisionLogPayload();
+      const events = Array.isArray(payload?.events) ? payload.events : [];
+      if (!payload?.ok || !Array.isArray(payload?.events)) {
+        throw new Error("decision log response mist events");
+      }
+      const signature = getDecisionLogSignature(payload);
+      const changed = state.decisionLogError !== "" || state.decisionLogSignature !== signature || !state.decisionLog;
+      state.decisionLog = {
+        ...payload,
+        events,
+        buckets: Array.isArray(payload.buckets) ? payload.buckets : [],
+      };
+      state.decisionLogError = "";
+      state.decisionLogSignature = signature;
+      state.decisionLogLastFetchAt = Date.now();
+      return changed;
+    })();
+
+    try {
+      return await state.decisionLogFetchPromise;
+    } catch (error) {
+      const nextError = error.message || String(error);
+      const changed = Boolean(state.decisionLog) || state.decisionLogError !== nextError;
+      state.decisionLog = null;
+      state.decisionLogError = nextError;
+      state.decisionLogSignature = "";
+      state.decisionLogLastFetchAt = Date.now();
+      return changed;
+    } finally {
+      state.decisionLogFetchPromise = null;
+    }
+  }
+
   export function mergeServiceStatusPayload(payload = {}) {
     const entities = payload?.entities && typeof payload.entities === "object" ? payload.entities : {};
     Object.entries(entities).forEach(([key, entity]) => {
@@ -959,7 +1065,7 @@ import { render } from "./render-scheduler.js";
     const initial = new Set(initialKeys);
     const fullKeys = state.appView === "settings"
       ? getSettingsGroupHydrationKeys()
-      : state.appView === "overview" || state.appView === "diagnosis"
+      : state.appView === "overview" || state.appView === "control" || state.appView === "diagnosis"
         ? [...new Set([...getOverviewLikeHydrationKeys(state.appView, { includeBulk: true }), ...FIRMWARE_ENTITY_KEYS])]
         : state.appView === "energy" || state.appView === "results"
         ? [...new Set([...getOverviewLikeHydrationKeys(state.appView, { forceFast: true }), ...FIRMWARE_ENTITY_KEYS])]
@@ -998,7 +1104,7 @@ import { render } from "./render-scheduler.js";
     const appView = state.appView;
     const isPrefetchOverview = options.prefetchView === "overview" && !options.forceBulk && appView === "settings";
     const syncView = isPrefetchOverview ? "overview" : appView;
-    const isOverviewLike = syncView === "overview" || syncView === "diagnosis" ||
+    const isOverviewLike = syncView === "overview" || syncView === "control" || syncView === "diagnosis" ||
       syncView === "energy" || syncView === "results";
     const forceFast = options.forceFast === true && !options.forceBulk;
     const isBulkDue = !forceFast && !isPrefetchOverview && isBulkEntitySyncDue(now, options);
@@ -1059,7 +1165,7 @@ import { render } from "./render-scheduler.js";
         concurrency: forceFast && isOverviewLike ? FAST_VIEW_ENTITY_REFRESH_CONCURRENCY : ENTITY_REFRESH_CONCURRENCY,
       });
       state.lastFastEntitySyncAt = Date.now();
-      if (isBulkDue && (syncView === "overview" || syncView === "diagnosis") && !isPrefetchOverview) {
+      if (isBulkDue && (syncView === "overview" || syncView === "control" || syncView === "diagnosis") && !isPrefetchOverview) {
         state.lastBulkEntitySyncAt = state.lastFastEntitySyncAt;
       }
       if (staticKeys.length) {
@@ -1075,7 +1181,7 @@ import { render } from "./render-scheduler.js";
       const shouldDeferSupplementary = forceFast && isOverviewLike;
       const trendChanged = shouldDeferSupplementary
         ? false
-        : syncView === "overview" || syncView === "diagnosis"
+        : syncView === "overview" || syncView === "control" || syncView === "diagnosis"
           ? await refreshTrendHistoryData()
           : false;
       const energyHistoryChanged = shouldDeferSupplementary
@@ -1083,6 +1189,9 @@ import { render } from "./render-scheduler.js";
         : state.appView === "results"
           ? await refreshEnergyHistoryData()
           : false;
+      const decisionLogChanged = syncView === "control"
+        ? await refreshDecisionLogData({ force: options.forceDecisionLog === true })
+        : false;
       const settingsStorageChanged = shouldDeferSupplementary
         ? false
         : shouldRefreshSettingsStorageForCurrentSurface()
@@ -1110,6 +1219,12 @@ import { render } from "./render-scheduler.js";
       }
       if (energyHistoryChanged && state.appView === "results" && !state.root?.querySelector(".oq-energy-history")) {
         render();
+        return;
+      }
+      if (decisionLogChanged && state.appView === "control") {
+        if (!patchControlReplayDom()) {
+          render();
+        }
         return;
       }
       if (settingsStorageChanged && state.appView === "settings") {
@@ -1181,6 +1296,12 @@ import { render } from "./render-scheduler.js";
         }
         return;
       }
+      if (state.appView === "control") {
+        if (!patchControlReplayDom()) {
+          render();
+        }
+        return;
+      }
       if (state.appView === "energy") {
         if (!patchEnergyDom()) {
           render();
@@ -1210,7 +1331,7 @@ import { render } from "./render-scheduler.js";
           void syncEntities(pendingOptions);
         }, 0);
       }
-      if (forceFast && (syncView === "overview" || syncView === "diagnosis") && !isPrefetchOverview && !state.nativeOpen && !pendingOptions && isBulkEntitySyncDue(Date.now())) {
+      if (forceFast && (syncView === "overview" || syncView === "control" || syncView === "diagnosis") && !isPrefetchOverview && !state.nativeOpen && !pendingOptions && isBulkEntitySyncDue(Date.now())) {
         window.setTimeout(() => {
           void syncEntities({ forceBulk: true });
         }, OVERVIEW_BULK_FOLLOWUP_DELAY_MS);

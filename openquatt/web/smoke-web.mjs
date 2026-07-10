@@ -15,8 +15,8 @@ const cssSources = resolveCssSources(webDir);
 const allowedBareImports = new Set(["virtual:embedded-assets"]);
 const bundleBudgetHeadroomBytes = 5 * 1024;
 const bundleGzipBaselines = new Map([
-  ["js/openquatt-app.js", 174413],
-  ["css/openquatt-app.css", 35238],
+  ["js/openquatt-app.js", 199828],
+  ["css/openquatt-app.css", 40717],
 ]);
 const boundaryAllowedEdges = new Set([
   "core/entity-actions.js -> features/debug-recording.js",

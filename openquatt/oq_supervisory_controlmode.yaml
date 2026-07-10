@@ -1076,11 +1076,15 @@ interval:
           // -------------------------------------------------
           const char* cur_cm = id(oq_control_mode).state.c_str();
           std::string cm_transition_reason = "control decision updated";
+          uint8_t cm1_event_reason = openquatt_decision_log::REASON_UNKNOWN;
           auto resolve_desired_cm = [&]() -> int {
             // Helper: start CM1 window
             auto start_cm1 = [&](int next_after)->void {
               id(oq_cm1_until_ms) = now_ms + prepost_ms;
               id(oq_cm1_next_after) = next_after; // 0=CM0, 2=CM2, 5=CM5, 98=CM98
+              cm1_event_reason = (next_after == 0)
+                  ? openquatt_decision_log::REASON_FLOW_POSTFLOW
+                  : openquatt_decision_log::REASON_FLOW_PREFLOW;
               cm_transition_reason =
                   (next_after == 2) ? "pre/postflow hold for heating" :
                   (next_after == 5) ? "pre/postflow hold for cooling" :
@@ -1229,6 +1233,7 @@ interval:
                     }
                   } else {
                     desired_local = 1; // flow interlock holding state
+                    cm1_event_reason = openquatt_decision_log::REASON_FLOW_TOO_LOW;
                     cm_transition_reason = "cooling request held by flow interlock";
                   }
                 } else if (heating_req) {
@@ -1245,6 +1250,7 @@ interval:
                     }
                   } else {
                     desired_local = 1; // flow interlock holding state
+                    cm1_event_reason = openquatt_decision_log::REASON_FLOW_TOO_LOW;
                     cm_transition_reason = "heating request held by flow interlock";
                   }
                 } else {
@@ -1346,6 +1352,84 @@ interval:
             id(oq_cm_last_change_ms) = now_ms;
             if (desired == 2) {
               id(oq_cm2_entered_ms) = now_ms;
+            }
+            auto is_cm1_log_reason = [](uint8_t reason)->bool {
+              return reason == openquatt_decision_log::REASON_FLOW_PREFLOW ||
+                     reason == openquatt_decision_log::REASON_FLOW_POSTFLOW ||
+                     reason == openquatt_decision_log::REASON_FLOW_TOO_LOW;
+            };
+            static uint32_t cm1_hold_started_ms = 0;
+            static uint8_t cm1_hold_reason = openquatt_decision_log::REASON_UNKNOWN;
+            const bool was_cm1 = (previous_cm == "CM1");
+            const bool is_cm1 = (desired == 1);
+            if (!was_cm1 && is_cm1 && is_cm1_log_reason(cm1_event_reason)) {
+              cm1_hold_started_ms = now_ms;
+              cm1_hold_reason = cm1_event_reason;
+              id(oq_decision_log).emit(
+                openquatt_decision_log::EVENT_FLOW_HOLD_START,
+                openquatt_decision_log::SUBJECT_SYSTEM,
+                cm1_hold_reason,
+                openquatt_decision_log::SEVERITY_LIMITED,
+                1,
+                openquatt_decision_log::STATE_STANDBY,
+                openquatt_decision_log::STATE_LIMITED,
+                (int16_t) id(oq_cm1_next_after));
+            } else if (was_cm1 && !is_cm1 && is_cm1_log_reason(cm1_hold_reason)) {
+              uint16_t duration_s = 0;
+              if (cm1_hold_started_ms != 0) {
+                const uint32_t elapsed_s = (now_ms - cm1_hold_started_ms) / 1000UL;
+                duration_s = elapsed_s > UINT16_MAX ? UINT16_MAX : (uint16_t) elapsed_s;
+              }
+              const uint8_t next_state = desired == 0
+                  ? openquatt_decision_log::STATE_STANDBY
+                  : openquatt_decision_log::STATE_ACTIVE;
+              id(oq_decision_log).emit(
+                openquatt_decision_log::EVENT_FLOW_HOLD_CLEAR,
+                openquatt_decision_log::SUBJECT_SYSTEM,
+                cm1_hold_reason,
+                openquatt_decision_log::SEVERITY_NORMAL,
+                1,
+                openquatt_decision_log::STATE_LIMITED,
+                next_state,
+                (int16_t) desired,
+                0,
+                0,
+                duration_s);
+              cm1_hold_started_ms = 0;
+              cm1_hold_reason = openquatt_decision_log::REASON_UNKNOWN;
+            }
+            static uint32_t cm98_started_ms = 0;
+            const bool was_cm98 = (previous_cm == "CM98");
+            const bool is_cm98 = (desired == 98);
+            if (!was_cm98 && is_cm98) {
+              cm98_started_ms = now_ms;
+              id(oq_decision_log).emit(
+                openquatt_decision_log::EVENT_FROST_PROTECTION_START,
+                openquatt_decision_log::SUBJECT_SYSTEM,
+                openquatt_decision_log::REASON_FROST_PROTECTION,
+                openquatt_decision_log::SEVERITY_LIMITED,
+                98,
+                openquatt_decision_log::STATE_STANDBY,
+                openquatt_decision_log::STATE_ACTIVE);
+            } else if (was_cm98 && !is_cm98) {
+              uint16_t duration_s = 0;
+              if (cm98_started_ms != 0) {
+                const uint32_t elapsed_s = (now_ms - cm98_started_ms) / 1000UL;
+                duration_s = elapsed_s > UINT16_MAX ? UINT16_MAX : (uint16_t) elapsed_s;
+              }
+              cm98_started_ms = 0;
+              id(oq_decision_log).emit(
+                openquatt_decision_log::EVENT_FROST_PROTECTION_CLEAR,
+                openquatt_decision_log::SUBJECT_SYSTEM,
+                openquatt_decision_log::REASON_FROST_PROTECTION,
+                openquatt_decision_log::SEVERITY_NORMAL,
+                98,
+                openquatt_decision_log::STATE_ACTIVE,
+                openquatt_decision_log::STATE_STANDBY,
+                0,
+                0,
+                0,
+                duration_s);
             }
           }
           static std::string last_control_mode_label;
@@ -1459,6 +1543,21 @@ interval:
                 if (dt >= sticky_wait_ms) {
                   id(oq_sticky_until_ms) = now_ms + sticky_run_ms;
                   sticky_active_local = true;
+                  const uint32_t sticky_duration_s_raw = sticky_run_ms / 1000UL;
+                  const uint16_t sticky_duration_s =
+                      sticky_duration_s_raw > UINT16_MAX ? UINT16_MAX : (uint16_t) sticky_duration_s_raw;
+                  id(oq_decision_log).emit(
+                      openquatt_decision_log::EVENT_STICKY_PUMP_RUN,
+                      openquatt_decision_log::SUBJECT_PUMP,
+                      openquatt_decision_log::REASON_STICKY_PROTECTION,
+                      openquatt_decision_log::SEVERITY_NORMAL,
+                      0,
+                      openquatt_decision_log::STATE_STANDBY,
+                      openquatt_decision_log::STATE_ACTIVE,
+                      0,
+                      0,
+                      0,
+                      sticky_duration_s);
                 }
               }
 

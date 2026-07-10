@@ -205,6 +205,7 @@ export { hasEntity } from "./entity-store.js";
           >
             ${renderOqIcon(view.icon, "oq-helper-app-tab-icon")}
             <span>${escapeHtml(view.label)}</span>
+            ${view.badge ? `<span class="oq-helper-app-tab-badge">${escapeHtml(view.badge)}</span>` : ""}
           </button>
         `).join("")}
       </div>

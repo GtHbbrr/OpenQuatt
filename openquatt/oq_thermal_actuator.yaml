@@ -154,6 +154,68 @@ interval:
             #endif
           };
 
+          auto hp_defrost_bit_active = [&](bool is_hp1)->bool {
+            if (is_hp1) return id(hp1_defrost).state;
+            #if OQ_TOPOLOGY_DUO
+            return id(${secondary_defrost_id}).state;
+            #else
+            return false;
+            #endif
+          };
+
+          auto publish_defrost_seen = [&](bool is_hp1, bool active)->void {
+            static bool last_hp1_defrost_seen = false;
+            static bool last_hp2_defrost_seen = false;
+            static uint32_t hp1_defrost_started_ms = 0;
+            static uint32_t hp2_defrost_started_ms = 0;
+            bool &last_seen = is_hp1 ? last_hp1_defrost_seen : last_hp2_defrost_seen;
+            uint32_t &started_ms = is_hp1 ? hp1_defrost_started_ms : hp2_defrost_started_ms;
+            if (active == last_seen) {
+              return;
+            }
+            uint16_t duration_s = 0;
+            if (active) {
+              started_ms = now_ms;
+            } else if (started_ms != 0) {
+              const uint32_t elapsed_s = (now_ms - started_ms) / 1000UL;
+              duration_s = elapsed_s > UINT16_MAX ? UINT16_MAX : (uint16_t) elapsed_s;
+            }
+            id(oq_decision_log).emit(
+                active
+                    ? openquatt_decision_log::EVENT_DEFROST_SEEN_START
+                    : openquatt_decision_log::EVENT_DEFROST_SEEN_CLEAR,
+                is_hp1 ? openquatt_decision_log::SUBJECT_HP1 : openquatt_decision_log::SUBJECT_HP2,
+                openquatt_decision_log::REASON_DEFROST_HOLD,
+                openquatt_decision_log::SEVERITY_NORMAL,
+                (uint8_t) id(oq_control_mode_code),
+                active ? openquatt_decision_log::STATE_IDLE : openquatt_decision_log::STATE_ACTIVE,
+                active ? openquatt_decision_log::STATE_ACTIVE : openquatt_decision_log::STATE_IDLE,
+                0,
+                0,
+                0,
+                duration_s);
+            if (!active) {
+              started_ms = 0;
+            }
+            last_seen = active;
+          };
+
+          auto real_defrost_seen = [&](bool is_hp1)->bool {
+            const bool cooling_active =
+                hp_mode_is_cooling(is_hp1) ||
+                hp_mode_target_is_cooling(is_hp1) ||
+                id(oq_control_mode_code) == 5;
+            // The defrost bit marks the outdoor-unit defrost process. The 4-way
+            // valve may switch a few minutes later and is also used during cooling,
+            // so it is not a reliable standalone source for the decision log.
+            return hp_defrost_bit_active(is_hp1) && !cooling_active;
+          };
+
+          publish_defrost_seen(true, real_defrost_seen(true));
+          #if OQ_TOPOLOGY_DUO
+          publish_defrost_seen(false, real_defrost_seen(false));
+          #endif
+
           auto defrost_stop_hold_level = [&](bool is_hp1)->int {
             // Only keep the last non-zero level during real defrost, i.e. once the
             // 4-way valve is active. The broader defrost bit can assert earlier and
@@ -215,6 +277,30 @@ interval:
             }
           };
 
+          auto publish_candidate_blocked = [&](bool is_hp1, uint8_t reason, int requested_level, uint16_t aux_s)->void {
+            static uint8_t last_hp1_candidate_reason = openquatt_decision_log::REASON_UNKNOWN;
+            static uint8_t last_hp2_candidate_reason = openquatt_decision_log::REASON_UNKNOWN;
+            uint8_t &last_reason = is_hp1 ? last_hp1_candidate_reason : last_hp2_candidate_reason;
+            if (reason == openquatt_decision_log::REASON_UNKNOWN) {
+              last_reason = openquatt_decision_log::REASON_UNKNOWN;
+              return;
+            }
+            if (reason == last_reason) {
+              return;
+            }
+            id(oq_decision_log).emit(
+                openquatt_decision_log::EVENT_CANDIDATE_BLOCKED,
+                is_hp1 ? openquatt_decision_log::SUBJECT_HP1 : openquatt_decision_log::SUBJECT_HP2,
+                reason,
+                openquatt_decision_log::SEVERITY_LIMITED,
+                (uint8_t) id(oq_control_mode_code),
+                openquatt_decision_log::STATE_STANDBY,
+                openquatt_decision_log::STATE_BLOCKED,
+                (int16_t) requested_level,
+                (int16_t) aux_s);
+            last_reason = reason;
+          };
+
           auto set_mode = [&](bool is_hp1, bool active) {
             int mode_code = (active && request_thermal_active) ? request_mode_code : 0;
             if (manual_hp_service_active && id(oq_manual_hp_mode_allowed)) {
@@ -262,6 +348,8 @@ interval:
           const char* lvl_opts[11] = {"0","1","2","3","4","5","6","7","8","9","10"};
           std::string hp1_service_guard = "Vrijgegeven";
           std::string hp2_service_guard = "Vrijgegeven";
+          static bool last_hp1_defrost_hold = false;
+          static bool last_hp2_defrost_hold = false;
 
           auto apply_level = [&](bool is_hp1, int req_level)->int {
             req_level = std::max(min_level, std::min(max_level, req_level));
@@ -269,6 +357,23 @@ interval:
             const int prev_applied = is_hp1 ? id(hp1_last_applied_level) : id(${secondary_last_applied_level_id});
             const int retained_level = defrost_stop_hold_level(is_hp1);
             std::string block_reason;
+            uint8_t candidate_block_reason = openquatt_decision_log::REASON_UNKNOWN;
+            uint16_t candidate_block_aux_s = 0;
+            bool &last_defrost_hold = is_hp1 ? last_hp1_defrost_hold : last_hp2_defrost_hold;
+            const bool defrost_hold_active = (req_level == 0 && retained_level > 0);
+            if (defrost_hold_active && !last_defrost_hold) {
+              id(oq_decision_log).emit(
+                  openquatt_decision_log::EVENT_DECISION_HOLD,
+                  is_hp1 ? openquatt_decision_log::SUBJECT_HP1 : openquatt_decision_log::SUBJECT_HP2,
+                  openquatt_decision_log::REASON_DEFROST_HOLD,
+                  openquatt_decision_log::SEVERITY_LIMITED,
+                  (uint8_t) id(oq_control_mode_code),
+                  openquatt_decision_log::STATE_ACTIVE,
+                  openquatt_decision_log::STATE_ACTIVE,
+                  (int16_t) retained_level,
+                  (int16_t) requested_level);
+            }
+            last_defrost_hold = defrost_hold_active;
 
             if (req_level == 0 && retained_level > 0) {
               char reason_buf[96];
@@ -299,6 +404,8 @@ interval:
                            "minimum off-time remaining %u s after stop (requested %d)",
                            (unsigned int) remaining_s, requested_level);
                   block_reason = reason_buf;
+                  candidate_block_reason = openquatt_decision_log::REASON_CANDIDATE_IN_REST;
+                  candidate_block_aux_s = remaining_s > UINT16_MAX ? UINT16_MAX : (uint16_t) remaining_s;
                   (is_hp1 ? hp1_service_guard : hp2_service_guard) =
                       "minimale uit-tijd: nog " + std::to_string(remaining_s) + " s";
                   log_hp_block_change(is_hp1, reason_buf);
@@ -329,6 +436,7 @@ interval:
             if (req_level > 0 && !mode_is_active_thermal(is_hp1) && !mode_target_is_active_thermal(is_hp1)) {
               applied = 0;
               block_reason = "waiting for thermal mode confirmation";
+              candidate_block_reason = openquatt_decision_log::REASON_FLOW_PREFLOW;
               (is_hp1 ? hp1_service_guard : hp2_service_guard) = "wachten op bevestiging werkmodus";
               log_hp_block_change(is_hp1, "waiting for thermal mode confirmation");
             }
@@ -338,19 +446,29 @@ interval:
                 char reason_buf[128];
                 snprintf(reason_buf, sizeof(reason_buf), "silent/day cap limited request to 0 (cap=%d, requested=%d)", cap, requested_level);
                 block_reason = reason_buf;
+                candidate_block_reason = openquatt_decision_log::REASON_NO_CANDIDATE;
                 log_hp_block_change(is_hp1, reason_buf);
               } else if (block_reason.empty() && !oq_request::level_allowed_for_excluded_levels(excluded_levels(is_hp1), requested_level)) {
                 char reason_buf[128];
                 snprintf(reason_buf, sizeof(reason_buf), "excluded compressor levels blocked request %d", requested_level);
                 block_reason = reason_buf;
+                candidate_block_reason = openquatt_decision_log::REASON_CANDIDATE_UNAVAILABLE;
                 log_hp_block_change(is_hp1, reason_buf);
               } else if (block_reason.empty() && retained_level == 0) {
                 block_reason = "actuator gating held request at 0";
+                candidate_block_reason = openquatt_decision_log::REASON_NO_CANDIDATE;
                 (is_hp1 ? hp1_service_guard : hp2_service_guard) = "technische bewaking houdt verzoek tegen";
                 log_hp_block_change(is_hp1, "actuator gating held request at 0");
               }
             } else if (block_reason.empty()) {
               log_hp_block_change(is_hp1, "");
+            }
+
+            if (requested_level > 0 && prev_applied == 0 && applied == 0 &&
+                candidate_block_reason != openquatt_decision_log::REASON_UNKNOWN) {
+              publish_candidate_blocked(is_hp1, candidate_block_reason, requested_level, candidate_block_aux_s);
+            } else {
+              publish_candidate_blocked(is_hp1, openquatt_decision_log::REASON_UNKNOWN, 0, 0);
             }
 
             if (applied == 0 && retained_level > 0) {
@@ -383,11 +501,100 @@ interval:
           const int hp1_req = id(oq_actuator_hp1_req);
           const int hp2_req = id(oq_actuator_hp2_req);
           const int hp1_applied = apply_level(true, hp1_req);
+          auto heating_transition_reason = [&]()->uint8_t {
+            if (id(oq_control_mode_code) == 98) {
+              return openquatt_decision_log::REASON_FROST_PROTECTION;
+            }
+            if (!id(oq_strategy_heat_request_active)) {
+              return openquatt_decision_log::REASON_HEATING_REQUEST_CLEARED;
+            }
+            if (id(oq_heat_mode_code) == 1) {
+              #if OQ_TOPOLOGY_DUO
+              return id(oq_curve_capacity_mode_code) == 2
+                  ? openquatt_decision_log::REASON_BETTER_HEAT
+                  : openquatt_decision_log::REASON_RUNTIME_LEAD;
+              #else
+              return openquatt_decision_log::REASON_RUNTIME_LEAD;
+              #endif
+            }
+            return (uint8_t) id(oq_ph_request_reason_code);
+          };
+          auto source_stop_reason = [&]()->uint8_t {
+            bool cooling_context =
+                id(oq_control_mode_code) == 5 ||
+                request_mode_code == 1 ||
+                hp_mode_is_cooling(true) ||
+                hp_mode_target_is_cooling(true);
+            #if OQ_TOPOLOGY_DUO
+            cooling_context = cooling_context ||
+                hp_mode_is_cooling(false) ||
+                hp_mode_target_is_cooling(false);
+            #endif
+            if (!cooling_context) {
+              return heating_transition_reason();
+            }
+            const int stop_reason_code = id(oq_cooling_stop_reason_code);
+            if (stop_reason_code == 2) {
+              return openquatt_decision_log::REASON_DEW_STOP;
+            }
+            if (stop_reason_code == 3) {
+              return openquatt_decision_log::REASON_SENSOR_FALLBACK;
+            }
+            if (stop_reason_code == 6) {
+              return openquatt_decision_log::REASON_FLOW_TOO_LOW;
+            }
+            if (stop_reason_code == 7) {
+              return openquatt_decision_log::REASON_SENSOR_FALLBACK;
+            }
+            if (stop_reason_code == 1 || stop_reason_code == 4) {
+              return openquatt_decision_log::REASON_COOLING_LIMITER;
+            }
+            const bool cooling_request_cleared =
+                stop_reason_code == 5 ||
+                (id(cooling_request_active).has_state() && !id(cooling_request_active).state);
+            if (cooling_request_cleared) {
+              return openquatt_decision_log::REASON_COOLING_REQUEST_CLEARED;
+            }
+            return openquatt_decision_log::REASON_KEEP_CURRENT;
+          };
+          auto transition_reason = [&](bool starting)->uint8_t {
+            if (id(oq_control_mode_code) == 5) {
+              return starting
+                  ? openquatt_decision_log::REASON_RUNTIME_LEAD
+                  : source_stop_reason();
+            }
+            if (!starting) {
+              return source_stop_reason();
+            }
+            return heating_transition_reason();
+          };
           #if OQ_TOPOLOGY_DUO
           const int hp2_applied = apply_level(false, hp2_req);
           const int prev_topology_count =
               (id(hp1_last_applied_level) > 0 ? 1 : 0) + (id(${secondary_last_applied_level_id}) > 0 ? 1 : 0);
           const int new_topology_count = (hp1_applied > 0 ? 1 : 0) + (hp2_applied > 0 ? 1 : 0);
+          auto topology_state = [](int count)->uint8_t {
+            if (count >= 2) return openquatt_decision_log::STATE_DUO;
+            if (count == 1) return openquatt_decision_log::STATE_SINGLE;
+            return openquatt_decision_log::STATE_IDLE;
+          };
+          if (prev_topology_count != new_topology_count) {
+            const uint8_t subject =
+                new_topology_count >= 2 ? openquatt_decision_log::SUBJECT_BOTH :
+                hp1_applied > 0 ? openquatt_decision_log::SUBJECT_HP1 :
+                hp2_applied > 0 ? openquatt_decision_log::SUBJECT_HP2 :
+                openquatt_decision_log::SUBJECT_SYSTEM;
+            id(oq_decision_log).emit(
+                openquatt_decision_log::EVENT_TOPOLOGY_CHANGE,
+                subject,
+                transition_reason(new_topology_count > prev_topology_count),
+                openquatt_decision_log::SEVERITY_NORMAL,
+                (uint8_t) id(oq_control_mode_code),
+                topology_state(prev_topology_count),
+                topology_state(new_topology_count),
+                (int16_t) hp1_applied,
+                (int16_t) hp2_applied);
+          }
           if (prev_topology_count > 0 && new_topology_count > 0 && prev_topology_count != new_topology_count) {
             id(oq_duo_request_hold_until_ms) = now_ms + 180000UL;
           }
@@ -476,9 +683,31 @@ interval:
             if (prev == 0 && new_lvl > 0) {
               if (is_hp1) id(hp1_last_start_ms) = now_ms;
               else id(${secondary_last_start_ms_id}) = now_ms;
+              id(oq_decision_log).emit(
+                  openquatt_decision_log::EVENT_SOURCE_START,
+                  is_hp1 ? openquatt_decision_log::SUBJECT_HP1 : openquatt_decision_log::SUBJECT_HP2,
+                  transition_reason(true),
+                  openquatt_decision_log::SEVERITY_NORMAL,
+                  (uint8_t) id(oq_control_mode_code),
+                  openquatt_decision_log::STATE_IDLE,
+                  openquatt_decision_log::STATE_ACTIVE,
+                  (int16_t) new_lvl,
+                  0,
+                  0);
             } else if (prev > 0 && new_lvl == 0) {
               if (is_hp1) id(hp1_last_stop_ms) = now_ms;
               else id(${secondary_last_stop_ms_id}) = now_ms;
+              id(oq_decision_log).emit(
+                  openquatt_decision_log::EVENT_SOURCE_STOP,
+                  is_hp1 ? openquatt_decision_log::SUBJECT_HP1 : openquatt_decision_log::SUBJECT_HP2,
+                  transition_reason(false),
+                  openquatt_decision_log::SEVERITY_NORMAL,
+                  (uint8_t) id(oq_control_mode_code),
+                  openquatt_decision_log::STATE_ACTIVE,
+                  openquatt_decision_log::STATE_IDLE,
+                  (int16_t) prev,
+                  0,
+                  0);
             }
 
             // Runtime counting: only count when the specific unit is measured in an active thermal mode.

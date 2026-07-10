@@ -20,6 +20,10 @@ export function patchOverviewDom() {
   return viewPatchControls.patchOverviewDom ? viewPatchControls.patchOverviewDom() : false;
 }
 
+export function patchControlReplayDom() {
+  return viewPatchControls.patchControlReplayDom ? viewPatchControls.patchControlReplayDom() : false;
+}
+
 export function patchDiagnosisDom() {
   return viewPatchControls.patchDiagnosisDom ? viewPatchControls.patchDiagnosisDom() : false;
 }

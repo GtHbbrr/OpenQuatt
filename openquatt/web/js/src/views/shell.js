@@ -13,7 +13,7 @@ import { captureQuickStartScrollState, queueQuickStartScrollRestore, renderQuick
 import { captureCm100CommissioningScrollState, captureHistoryStorageModalScrollState, captureServiceTaskModalScrollState, captureWebServerLogScrollState, queueCm100CommissioningScrollRestore, queueHistoryStorageModalScrollRestore, queueServiceTaskModalScrollRestore, queueWebServerLogScrollRestore, syncWebServerLogStream } from "../features/webserver-logs.js";
 import { renderSettingsGroupContent, renderSettingsGroupNav } from "../settings/core.js";
 import { renderEnergyView, renderResultsView } from "./energy.js";
-import { renderOverviewView, syncTechTooltipLayers } from "./heatpump.js";
+import { renderControlReplayView, renderOverviewView, syncTechTooltipLayers } from "./heatpump.js";
 import { renderDiagnosisView, syncOverviewTrendInteractions } from "./overview.js";
 
 export function renderSettingsView() {
@@ -54,6 +54,8 @@ export function renderSettingsView() {
   export function renderCurrentAppView() {
     return state.appView === "overview"
       ? renderOverviewView()
+      : state.appView === "control"
+      ? renderControlReplayView()
       : state.appView === "energy"
       ? renderEnergyView()
       : state.appView === "diagnosis"
@@ -220,7 +222,7 @@ export function renderSettingsView() {
     const mainContent = state.loadingEntities
       ? `${currentViewContent}${renderInitialLoadingView()}`
       : currentViewContent;
-    const wideFlushCard = state.appView === "overview" || state.appView === "energy" ||
+    const wideFlushCard = state.appView === "overview" || state.appView === "control" || state.appView === "energy" ||
       state.appView === "diagnosis" || state.appView === "results";
 
     state.root.innerHTML = `

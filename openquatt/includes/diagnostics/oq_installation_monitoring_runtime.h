@@ -75,6 +75,30 @@ inline void capture_compressor_cycling_alert() {
   const auto now = id(oq_time).now();
   const uint32_t now_epoch = now.is_valid() ? static_cast<uint32_t>(now.timestamp) : 0U;
   const bool first_occurrence = !id(oq_compressor_cycling_alert_latched);
+  if (first_occurrence) {
+    const bool use_short_window = short_active || alternating;
+    const int hp1_value = use_short_window ? hp1_short_starts : hp1_long_starts;
+    const int hp2_value = use_short_window ? hp2_short_starts : hp2_long_starts;
+    const int threshold = static_cast<int>(use_short_window ? short_warning_limit : long_warning_limit);
+    const bool hp1_triggered = hp1_value > threshold;
+    const bool hp2_triggered = hp2_value > threshold;
+    const uint8_t subject =
+        alternating || hp1_triggered == hp2_triggered
+            ? openquatt_decision_log::SUBJECT_BOTH
+            : (hp1_triggered ? openquatt_decision_log::SUBJECT_HP1
+                             : openquatt_decision_log::SUBJECT_HP2);
+    id(oq_decision_log).emit(
+        openquatt_decision_log::EVENT_ATTENTION_PATTERN,
+        subject,
+        openquatt_decision_log::REASON_START_STOP_RATE_HIGH,
+        openquatt_decision_log::SEVERITY_ATTENTION,
+        (uint8_t) id(oq_control_mode_code),
+        openquatt_decision_log::STATE_ACTIVE,
+        openquatt_decision_log::STATE_ACTIVE,
+        (int16_t) hp1_value,
+        (int16_t) hp2_value,
+        (int16_t) threshold);
+  }
   id(oq_compressor_cycling_alert_latched) = true;
   if (first_occurrence) {
     id(oq_compressor_cycling_alert_first_seen_epoch) = now_epoch;

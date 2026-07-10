@@ -256,6 +256,13 @@ esp-app.oq-native-app.oq-native-app--collapsed {
   .oq-overview-top,
   .oq-overview-main,
   .oq-overview-trends-grid,
+  .oq-control-replay-head,
+  .oq-control-replay-day-summary,
+  .oq-control-replay-filterbar,
+  .oq-control-replay-metrics,
+  .oq-control-replay-interactive,
+  .oq-control-replay-selected-body,
+  .oq-control-replay-transition,
   .oq-overview-hp-grid,
   .oq-overview-hp-stats,
   .oq-overview-hp-meta {
@@ -320,6 +327,23 @@ esp-app.oq-native-app.oq-native-app--collapsed {
 
   .oq-overview-trendcard-latest {
     justify-content: flex-start;
+  }
+
+  .oq-control-replay-timeline-head,
+  .oq-control-replay-lane {
+    grid-template-columns: 1fr;
+  }
+
+  .oq-control-replay-axis {
+    margin-left: 0;
+  }
+
+  .oq-control-replay-episode-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .oq-control-replay-episode-list-head {
+    grid-column: 1 / -1;
   }
 
   .oq-hp-schematic-topbar,
@@ -524,6 +548,52 @@ esp-app.oq-native-app.oq-native-app--collapsed {
   .oq-overview-summary-shell {
     padding: 12px;
     border-radius: 22px;
+  }
+
+  .oq-control-replay {
+    padding: 12px;
+    border-radius: 14px;
+  }
+
+  .oq-control-replay-metric,
+  .oq-control-replay-timeline,
+  .oq-control-replay-state-card {
+    padding: 10px;
+  }
+
+  .oq-control-replay-axis {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .oq-control-replay-axis span:nth-child(2),
+  .oq-control-replay-axis span:nth-child(4) {
+    display: none;
+  }
+
+  .oq-control-replay-marker span {
+    max-width: 92px;
+    white-space: normal;
+  }
+
+  .oq-control-replay-counter-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .oq-control-replay-filterbar,
+  .oq-control-replay-episode-list {
+    grid-template-columns: 1fr;
+  }
+
+  .oq-control-replay-day-actions {
+    justify-items: stretch;
+  }
+
+  .oq-control-replay-episode-list::before {
+    display: none;
+  }
+
+  .oq-control-replay-selected-head {
+    grid-template-columns: 1fr;
   }
 
   .oq-helper-head {
@@ -917,6 +987,174 @@ esp-app.oq-native-app.oq-native-app--collapsed {
   .oq-helper-hub-switches,
   .oq-helper-hub-actions {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 980px) {
+  .oq-working-head,
+  .oq-working-now,
+  .oq-working-split,
+  .oq-working-graphs,
+  .oq-working-status-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .oq-working-head {
+    gap: 14px;
+  }
+
+  .oq-working-tabs {
+    width: 100%;
+  }
+
+  .oq-working-head-actions {
+    width: 100%;
+    justify-items: stretch;
+  }
+
+  .oq-working-tab {
+    justify-content: center;
+  }
+
+  .oq-working-source-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .oq-working-chart-control {
+    left: 130px;
+  }
+}
+
+@media (max-width: 680px) {
+  .oq-working {
+    gap: 14px;
+  }
+
+  .oq-working-head {
+    padding-bottom: 14px;
+  }
+
+  .oq-working-head h2 {
+    font-size: 1.45rem;
+  }
+
+  .oq-working-now h2 {
+    font-size: 1.55rem;
+  }
+
+  .oq-working-tabs {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .oq-working-window-choices {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .oq-working-window-choice {
+    justify-content: center;
+  }
+
+  .oq-working-window-controls {
+    display: block;
+  }
+
+  .oq-working-period-menu {
+    margin-top: 6px;
+  }
+
+  .oq-working-period-menu-toggle {
+    width: 100%;
+  }
+
+  .oq-working-period-popover {
+    position: static;
+    width: auto;
+    margin-top: 6px;
+  }
+
+  .oq-working-period-custom-fields {
+    grid-template-columns: 1fr;
+  }
+
+  .oq-working-period-custom-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .oq-working-period-apply {
+    width: 100%;
+  }
+
+  .oq-working-tab {
+    min-height: 38px;
+    padding: 0 8px;
+    font-size: 0.9rem;
+  }
+
+  .oq-working-tab-icon {
+    display: none;
+  }
+
+  .oq-working-now,
+  .oq-working-detail,
+  .oq-working-status-main,
+  .oq-working-guard-panel,
+  .oq-working-telemetry,
+  .oq-working-chart-panel {
+    padding: 14px;
+  }
+
+  .oq-working-list {
+    padding: 10px;
+  }
+
+  .oq-working-list-head,
+  .oq-working-chart-head {
+    display: grid;
+    align-items: start;
+  }
+
+  .oq-working-entry {
+    grid-template-columns: 64px 24px minmax(0, 1fr);
+    gap: 8px;
+    padding-right: 8px;
+  }
+
+  .oq-working-timeline {
+    --oq-working-rail-offset: 84px;
+  }
+
+  .oq-working-entry-status {
+    grid-column: 3;
+    justify-self: start;
+  }
+
+  .oq-working-entry-rail {
+    left: auto;
+  }
+
+  .oq-working-optimizer-option {
+    grid-template-columns: 1fr;
+    align-items: start;
+  }
+
+  .oq-working-chart-lane {
+    grid-template-columns: 82px minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .oq-working-chart-axis {
+    margin-left: 90px;
+  }
+
+  .oq-working-chart-axis span:nth-child(2),
+  .oq-working-chart-axis span:nth-child(4) {
+    display: none;
+  }
+
+  .oq-working-chart-control {
+    left: 90px;
   }
 }
 

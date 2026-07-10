@@ -3,7 +3,7 @@ import { setEntityPollingControls } from "./entity-polling-controls.js";
 import { getPrefersReducedMotion, getReducedMotionMedia, getStoredHpLayoutMode, getStoredHpVisualMode, getStoredOverviewTheme, getStoredSurface, getStoredTrendWindowHours, state } from "./state.js";
 export { DEFAULT_TREND_WINDOW_HOURS, TREND_WINDOW_HOURS_OPTIONS, state } from "./state.js";
 import { handleChange, handleClick, handleFocusChange, handleInput, handleKeyDown, handlePointerDown, handlePointerMove, handlePointerUp, handleSettingsInteractionEnd, handleSettingsInteractionStart, handleWheel } from "./event-handlers.js";
-import { getDefaultAppView, getUrlAppView, getUrlSettingsGroup, setAppView, syncUrlAppView } from "./navigation.js";
+import { getDefaultAppView, getUrlAppView, getUrlControlReplayCustomRange, getUrlControlReplayTab, getUrlControlReplayWindow, getUrlSettingsGroup, setAppView, syncUrlAppView } from "./navigation.js";
 import { primeEntities, syncEntities } from "./entity-sync.js";
 import { refreshDebugRecordingDeviceStatus } from "../features/debug-recording.js";
 import { isFirmwareOtaQuietActive } from "./firmware-quiet.js";
@@ -174,11 +174,32 @@ import { render } from "./render-scheduler.js";
   export function handlePopState() {
     const nextView = getUrlAppView() || getDefaultAppView();
     const nextSettingsGroup = nextView === "settings" ? (getUrlSettingsGroup() || state.settingsGroup) : "";
-    if (nextView === state.appView && (nextView !== "settings" || nextSettingsGroup === state.settingsGroup)) {
+    const nextControlReplayTab = nextView === "control" ? (getUrlControlReplayTab() || "status") : state.controlReplayTab;
+    const nextControlReplayWindow = nextView === "control" ? (getUrlControlReplayWindow() || "last24") : state.controlReplayWindow;
+    const nextControlReplayCustomRange = nextView === "control" ? getUrlControlReplayCustomRange() : null;
+    if (nextView === state.appView &&
+        (nextView !== "settings" || nextSettingsGroup === state.settingsGroup) &&
+        (nextView !== "control" || (
+          nextControlReplayTab === state.controlReplayTab &&
+          nextControlReplayWindow === state.controlReplayWindow &&
+          (!nextControlReplayCustomRange || (
+            nextControlReplayCustomRange.start === state.controlReplayCustomStart &&
+            nextControlReplayCustomRange.end === state.controlReplayCustomEnd
+          ))
+        ))) {
       return;
     }
 
     state.appView = nextView;
+    if (nextView === "control") {
+      state.controlReplayTab = nextControlReplayTab;
+      state.controlReplayWindow = nextControlReplayWindow;
+      state.controlReplayCustomStart = nextControlReplayCustomRange?.start || "";
+      state.controlReplayCustomEnd = nextControlReplayCustomRange?.end || "";
+      state.controlReplayPeriodMenuOpen = false;
+      state.controlReplayCustomPeriodOpen = false;
+      state.controlReplayCustomPeriodError = "";
+    }
     if (nextView === "settings" && nextSettingsGroup) {
       state.settingsGroup = nextSettingsGroup;
       try {
@@ -219,7 +240,7 @@ import { render } from "./render-scheduler.js";
     if (!state.mounted) {
       return;
     }
-    void syncEntities();
+    void syncEntities({ forceDecisionLog: true });
   }
 
   export function handleDevControlsChanged() {
@@ -289,8 +310,19 @@ import { render } from "./render-scheduler.js";
     bindReducedMotionPreference();
     const initialUrlView = getUrlAppView() || getDefaultAppView();
     const initialUrlSettingsGroup = initialUrlView === "settings" ? getUrlSettingsGroup() : "";
+    const initialUrlControlReplayTab = initialUrlView === "control" ? getUrlControlReplayTab() : "";
+    const initialUrlControlReplayWindow = initialUrlView === "control" ? getUrlControlReplayWindow() : "";
+    const initialUrlControlReplayCustomRange = initialUrlView === "control" ? getUrlControlReplayCustomRange() : null;
     if (initialUrlSettingsGroup) {
       setSettingsGroup(initialUrlSettingsGroup, { syncUrl: false });
+    }
+    if (initialUrlControlReplayTab) {
+      state.controlReplayTab = initialUrlControlReplayTab;
+    }
+    if (initialUrlControlReplayWindow) {
+      state.controlReplayWindow = initialUrlControlReplayWindow;
+      state.controlReplayCustomStart = initialUrlControlReplayCustomRange?.start || "";
+      state.controlReplayCustomEnd = initialUrlControlReplayCustomRange?.end || "";
     }
     setAppView(initialUrlView, { syncMode: "replace", forceSync: true });
     clearLegacyMotionVariables();
