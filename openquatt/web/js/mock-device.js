@@ -125,6 +125,14 @@
         heating_enable: false,
         cooling_enable: true,
       },
+      inputAcceptRetained: {
+        cooling_dew_point: false,
+        outside_temperature: false,
+        room_temperature: false,
+        room_setpoint: true,
+        heating_enable: true,
+        cooling_enable: true,
+      },
       lastDewPointAt: Date.now() - 42000,
       lastOutsideTemperatureAt: Date.now() - 120000,
       lastRoomTemperatureAt: Date.now() - 36000,
@@ -1153,6 +1161,14 @@
       heating_enable: Boolean(state.mqtt.inputRetained?.heating_enable),
       cooling_enable: Boolean(state.mqtt.inputRetained?.cooling_enable),
     };
+    const inputAcceptRetained = {
+      cooling_dew_point: false,
+      outside_temperature: false,
+      room_temperature: false,
+      room_setpoint: state.mqtt.inputAcceptRetained?.room_setpoint !== false,
+      heating_enable: state.mqtt.inputAcceptRetained?.heating_enable !== false,
+      cooling_enable: state.mqtt.inputAcceptRetained?.cooling_enable !== false,
+    };
     return {
       enabled: Boolean(state.mqtt.enabled),
       connected: Boolean(state.mqtt.enabled && state.mqtt.connected && broker),
@@ -1164,6 +1180,8 @@
       input_topics: inputTopics,
       input_enabled: inputEnabled,
       input_retained: inputRetained,
+      input_accept_retained: inputAcceptRetained,
+      non_retained_stateful_timeout_s: 1800,
       source: String(state.mqtt.source || ""),
       csrf_token: String(state.mqtt.csrfToken || ""),
     };
@@ -1232,6 +1250,33 @@
     return makeAuthResponse(200, {
       ok: true,
       enabled: state.mqtt.inputEnabled[input],
+      connected: Boolean(state.mqtt.enabled && state.mqtt.connected),
+    });
+  }
+
+  function handleMqttInputRetainedSave(init) {
+    const params = parseAuthFormBody(init);
+    const status = getMqttStatusPayload();
+    if (params.get("csrf_token") !== status.csrf_token) {
+      return makeAuthResponse(403, { ok: false, error: "forbidden" });
+    }
+
+    const input = String(params.get("input") || "");
+    if (!["room_setpoint", "heating_enable", "cooling_enable"].includes(input)) {
+      return makeAuthResponse(400, { ok: false, error: "invalid_input" });
+    }
+
+    const acceptRetained = String(params.get("accept_retained") || "") === "true";
+    state.mqtt.inputAcceptRetained[input] = acceptRetained;
+    if (!acceptRetained) {
+      state.mqtt.inputRetained[input] = false;
+    }
+    state.mqtt.source = state.mqtt.enabled ? "runtime-enabled" : "runtime-disabled";
+    refreshMqttToken();
+
+    return makeAuthResponse(200, {
+      ok: true,
+      accept_retained: acceptRetained,
       connected: Boolean(state.mqtt.enabled && state.mqtt.connected),
     });
   }
@@ -4441,6 +4486,9 @@
       }
       if (url.pathname === "/mqtt/input/save" && method === "POST") {
         return handleMqttInputSave(init || {});
+      }
+      if (url.pathname === "/mqtt/input/retained/save" && method === "POST") {
+        return handleMqttInputRetainedSave(init || {});
       }
       if (url.pathname.endsWith("/openquatt/logs/recent") && String(init?.method || "GET").toUpperCase() === "GET") {
         return mockResponse(200, {

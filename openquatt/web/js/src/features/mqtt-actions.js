@@ -16,6 +16,9 @@ import { render } from "../core/render-scheduler.js";
     const inputRetained = status.input_retained && typeof status.input_retained === "object"
       ? status.input_retained
       : {};
+    const inputAcceptRetained = status.input_accept_retained && typeof status.input_accept_retained === "object"
+      ? status.input_accept_retained
+      : {};
     return [
       status.enabled ? "on" : "off",
       status.connected ? "connected" : "idle",
@@ -27,6 +30,8 @@ import { render } from "../core/render-scheduler.js";
       JSON.stringify(inputTopics),
       JSON.stringify(inputEnabled),
       JSON.stringify(inputRetained),
+      JSON.stringify(inputAcceptRetained),
+      String(status.non_retained_stateful_timeout_s || ""),
       String(status.source || ""),
       String(status.csrf_token || ""),
     ].join(":");
@@ -38,6 +43,7 @@ import { render } from "../core/render-scheduler.js";
       state.mqttExpandedTopicKey || "",
       state.mqttCopiedTopicKey || "",
       state.mqttInputToggleBusyKey || "",
+      state.mqttRetainedToggleBusyKey || "",
       state.mqttError || "",
       getMqttStatusSignature(),
       getEntitySignatureFragment("mqttCoolingDewPoint"),
@@ -145,6 +151,20 @@ import { render } from "../core/render-scheduler.js";
       Object.entries(rawInputRetained).forEach(([key, value]) => {
         inputRetained[String(key)] = value === true || String(value).toLowerCase() === "true";
       });
+      const rawInputAcceptRetained = payload.input_accept_retained && typeof payload.input_accept_retained === "object"
+        ? payload.input_accept_retained
+        : {};
+      const inputAcceptRetained = {
+        cooling_dew_point: false,
+        outside_temperature: false,
+        room_temperature: false,
+        room_setpoint: true,
+        heating_enable: true,
+        cooling_enable: true,
+      };
+      Object.entries(rawInputAcceptRetained).forEach(([key, value]) => {
+        inputAcceptRetained[String(key)] = value === true || String(value).toLowerCase() === "true";
+      });
       const coolingDewPointTopic = String(inputTopics.cooling_dew_point || payload.dew_point_topic || "");
       inputTopics.cooling_dew_point = coolingDewPointTopic;
       const nextStatus = {
@@ -158,6 +178,8 @@ import { render } from "../core/render-scheduler.js";
         input_topics: inputTopics,
         input_enabled: inputEnabled,
         input_retained: inputRetained,
+        input_accept_retained: inputAcceptRetained,
+        non_retained_stateful_timeout_s: Number(payload.non_retained_stateful_timeout_s || 1800),
         source: String(payload.source || ""),
         csrf_token: String(payload.csrf_token || ""),
       };
@@ -247,6 +269,48 @@ import { render } from "../core/render-scheduler.js";
     } finally {
       if (state.mqttInputToggleBusyKey === topicKey) {
         state.mqttInputToggleBusyKey = "";
+      }
+      render();
+    }
+  }
+
+  export async function commitMqttInputAcceptRetained(topicKey, acceptRetained) {
+    const status = state.mqttStatus || {};
+    if (!status.csrf_token) {
+      state.mqttError = "MQTT-status wordt nog geladen. Probeer het zo opnieuw.";
+      render();
+      return;
+    }
+
+    state.mqttRetainedToggleBusyKey = topicKey;
+    state.mqttNotice = "";
+    state.mqttError = "";
+    render();
+
+    try {
+      const params = new URLSearchParams();
+      params.set("csrf_token", status.csrf_token);
+      params.set("input", topicKey);
+      params.set("accept_retained", acceptRetained ? "true" : "false");
+
+      const response = await fetch("/mqtt/input/retained/save", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: params,
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || payload?.ok === false) {
+        throw new Error(payload?.error || `HTTP ${response.status}`);
+      }
+      state.lastMqttStatusRefreshAt = 0;
+      await refreshMqttStatus({ force: true });
+    } catch (error) {
+      state.mqttError = `Retained-instelling kon niet worden opgeslagen. ${error.message}`;
+    } finally {
+      if (state.mqttRetainedToggleBusyKey === topicKey) {
+        state.mqttRetainedToggleBusyKey = "";
       }
       render();
     }

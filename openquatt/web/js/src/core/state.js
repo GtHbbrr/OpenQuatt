@@ -218,6 +218,7 @@ export const state = {
   mqttCopiedTopicTimer: null,
   mqttExpandedTopicKey: "",
   mqttInputToggleBusyKey: "",
+  mqttRetainedToggleBusyKey: "",
   mqttSensorsModalRenderSignature: "",
   updateCheckBusy: false,
   updateInstallBusy: false,

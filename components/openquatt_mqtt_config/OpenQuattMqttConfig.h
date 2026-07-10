@@ -1,8 +1,9 @@
 #pragma once
 
-#include <cstdint>
 #include <atomic>
 #include <array>
+#include <cstddef>
+#include <cstdint>
 #include <string>
 
 #include "esphome/components/binary_sensor/binary_sensor.h"
@@ -153,6 +154,8 @@ class OpenQuattMqttConfig : public Component {
     std::array<bool, BINARY_INPUT_COUNT> binary_input_enabled;
     std::array<bool, NUMERIC_INPUT_COUNT> input_retained;
     std::array<bool, BINARY_INPUT_COUNT> binary_input_retained;
+    std::array<bool, NUMERIC_INPUT_COUNT> input_accept_retained;
+    std::array<bool, BINARY_INPUT_COUNT> binary_input_accept_retained;
     std::string config_source;
     std::string csrf_token;
   };
@@ -161,6 +164,7 @@ class OpenQuattMqttConfig : public Component {
   bool set_runtime_config(const std::string &broker, uint16_t port, const std::string &username,
                           const std::string &password, bool clear_password, bool enabled);
   bool set_input_enabled(const std::string &key, bool enabled);
+  bool set_input_accept_retained(const std::string &key, bool accept_retained);
 
  protected:
   static constexpr uint32_t STORAGE_MAGIC = 0x4F514D49;
@@ -170,6 +174,10 @@ class OpenQuattMqttConfig : public Component {
   static constexpr size_t PASSWORD_MAX_LEN = 128;
   static constexpr uint8_t INPUT_MASK_ALL =
       static_cast<uint8_t>((1U << (NUMERIC_INPUT_COUNT + BINARY_INPUT_COUNT)) - 1U);
+  static constexpr uint8_t STATEFUL_INPUT_MASK =
+      static_cast<uint8_t>((1U << static_cast<uint8_t>(NumericInputKind::ROOM_SETPOINT)) |
+                           (1U << (NUMERIC_INPUT_COUNT + static_cast<uint8_t>(BinaryInputKind::HEATING_ENABLE))) |
+                           (1U << (NUMERIC_INPUT_COUNT + static_cast<uint8_t>(BinaryInputKind::COOLING_ENABLE))));
 
   struct Storage {
     uint32_t magic;
@@ -180,13 +188,19 @@ class OpenQuattMqttConfig : public Component {
     char broker[BROKER_MAX_LEN + 1];
     char username[USERNAME_MAX_LEN + 1];
     char password[PASSWORD_MAX_LEN + 1];
+    uint8_t retained_disabled_mask;
   };
+
+  static_assert(sizeof(Storage) == 272, "Storage layout must remain compatible with version 1 preferences");
+  static_assert(offsetof(Storage, retained_disabled_mask) == 269,
+                "Retained policy must use the existing version 1 padding byte");
 
   bool load_storage_(Storage *storage);
   bool save_storage_(const Storage &storage);
   bool apply_storage_(const Storage &storage, const char *source);
   bool build_storage_(const std::string &broker, uint16_t port, const std::string &username,
-                      const std::string &password, bool enabled, uint8_t input_disabled_mask, Storage *storage);
+                      const std::string &password, bool enabled, uint8_t input_disabled_mask,
+                      uint8_t retained_disabled_mask, Storage *storage);
   bool is_valid_storage_(const Storage &storage) const;
   bool register_http_handlers_();
   void rotate_csrf_token_();
@@ -208,6 +222,7 @@ class OpenQuattMqttConfig : public Component {
     bool pending_payload_ready{false};
     bool pending_invalid_payload_ready{false};
     bool pending_retained{false};
+    uint32_t pending_session_generation{0};
     float last_valid_value{NAN};
     uint32_t last_valid_ms{0};
     bool last_valid_retained{false};
@@ -225,6 +240,7 @@ class OpenQuattMqttConfig : public Component {
     bool pending_payload_ready{false};
     bool pending_invalid_payload_ready{false};
     bool pending_retained{false};
+    uint32_t pending_session_generation{0};
     bool last_valid_value{false};
     uint32_t last_valid_ms{0};
     bool last_valid_retained{false};
@@ -248,9 +264,13 @@ class OpenQuattMqttConfig : public Component {
   static uint8_t binary_input_mask_(BinaryInputKind kind);
   bool is_numeric_input_enabled_(size_t input_index) const;
   bool is_binary_input_enabled_(size_t input_index) const;
+  bool is_numeric_input_accept_retained_(size_t input_index) const;
+  bool is_binary_input_accept_retained_(size_t input_index) const;
   bool input_mask_for_key_(const std::string &key, uint8_t *mask) const;
   void clear_all_inputs_();
   void clear_disabled_inputs_();
+  void clear_input_(uint8_t input_mask);
+  void clear_session_scoped_inputs_();
   void process_pending_input_subscriptions_();
   void subscribe_inputs_(esp_mqtt_client_handle_t client);
   int find_numeric_input_index_by_topic_(const char *topic, int topic_len) const;
@@ -274,6 +294,7 @@ class OpenQuattMqttConfig : public Component {
   static void copy_string_field_(char *destination, size_t max_len, const std::string &value);
 
   static constexpr uint32_t SENSOR_PUBLISH_INTERVAL_MS = 10000;
+  static constexpr uint32_t NON_RETAINED_STATEFUL_STALE_MS = 30UL * 60UL * 1000UL;
   static constexpr int MQTT_TASK_STACK_SIZE = 8192;
 
   esp_mqtt_client_handle_t mqtt_client_{nullptr};
@@ -282,7 +303,10 @@ class OpenQuattMqttConfig : public Component {
   std::atomic<bool> connected_{false};
   std::atomic<bool> force_publish_{true};
   std::atomic<bool> resubscribe_inputs_{false};
+  std::atomic<bool> clear_session_scoped_inputs_pending_{false};
+  std::atomic<uint32_t> mqtt_session_generation_{0};
   std::atomic<uint8_t> input_disabled_mask_{0};
+  std::atomic<uint8_t> retained_disabled_mask_{0};
   portMUX_TYPE pending_lock_ = portMUX_INITIALIZER_UNLOCKED;
 
   std::string bootstrap_broker_;

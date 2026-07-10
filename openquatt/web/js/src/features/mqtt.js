@@ -129,6 +129,15 @@ import { escapeHtml } from "../core/html.js";
     return Boolean(inputRetained && typeof inputRetained === "object" && inputRetained[key]);
   }
 
+  export function isMqttInputAcceptRetained(key) {
+    const inputAcceptRetained = state.mqttStatus?.input_accept_retained;
+    return Boolean(
+      inputAcceptRetained &&
+      typeof inputAcceptRetained === "object" &&
+      inputAcceptRetained[key]
+    );
+  }
+
   export function getMqttInputSensors() {
     return [
       {
@@ -170,7 +179,7 @@ import { escapeHtml } from "../core/html.js";
         staleCopy: "nieuw bericht",
         stateful: true,
         payloadInfoTitle: "Temperatuurpayload",
-        payloadInfo: 'Publiceer een setpoint in °C. Voorbeelden: 21.0, 21,0, 21.0 °C of {"value":21.0}. Geldig bereik: 5..35 °C. Retained berichten worden geaccepteerd; de waarde blijft gelden tot een nieuw setpoint, uitschakelen of herstart.',
+        payloadInfo: 'Publiceer een setpoint in °C. Voorbeelden: 21.0, 21,0, 21.0 °C of {"value":21.0}. Geldig bereik: 5..35 °C.',
       },
       {
         topicKey: "heating_enable",
@@ -182,7 +191,7 @@ import { escapeHtml } from "../core/html.js";
         kind: "binary",
         stateful: true,
         payloadInfoTitle: "Booleanpayload",
-        payloadInfo: 'Publiceer warmtetoestemming als boolean. Geaccepteerd: true/false, 1/0, on/off, yes/no of {"value":true}. Retained berichten worden geaccepteerd; de waarde blijft gelden tot een nieuwe payload, uitschakelen of herstart.',
+        payloadInfo: 'Publiceer warmtetoestemming als boolean. Geaccepteerd: true/false, 1/0, on/off, yes/no of {"value":true}.',
       },
       {
         topicKey: "cooling_enable",
@@ -194,7 +203,7 @@ import { escapeHtml } from "../core/html.js";
         kind: "binary",
         stateful: true,
         payloadInfoTitle: "Booleanpayload",
-        payloadInfo: 'Publiceer koeltoestemming als boolean. Geaccepteerd: true/false, 1/0, on/off, yes/no of {"value":true}. Retained berichten worden geaccepteerd; de waarde blijft gelden tot een nieuwe payload, uitschakelen of herstart.',
+        payloadInfo: 'Publiceer koeltoestemming als boolean. Geaccepteerd: true/false, 1/0, on/off, yes/no of {"value":true}.',
       },
     ];
   }
@@ -326,6 +335,10 @@ import { escapeHtml } from "../core/html.js";
 
   export function renderMqttSensorsModal() {
     const sensors = getMqttInputSensors();
+    const nonRetainedTimeoutMinutes = Math.max(
+      1,
+      Math.round(Number(state.mqttStatus?.non_retained_stateful_timeout_s || 1800) / 60)
+    );
     const expandedTopicKey = sensors.some((sensor) => sensor.topicKey === state.mqttExpandedTopicKey)
       ? state.mqttExpandedTopicKey
       : "";
@@ -337,16 +350,20 @@ import { escapeHtml } from "../core/html.js";
       const inputEnabled = isMqttInputEnabled(sensor.topicKey);
       const valid = isEntityActive(sensor.validKey);
       const retained = inputEnabled && valid && isMqttInputRetained(sensor.topicKey);
+      const acceptRetained = sensor.stateful && isMqttInputAcceptRetained(sensor.topicKey);
       const copied = state.mqttCopiedTopicKey === sensor.topicKey;
       const expanded = expandedTopicKey === sensor.topicKey;
-      const busy = state.mqttInputToggleBusyKey === sensor.topicKey;
+      const busy = state.mqttInputToggleBusyKey === sensor.topicKey ||
+        state.mqttRetainedToggleBusyKey === sensor.topicKey;
       const statusTone = inputEnabled ? (valid ? "valid" : "invalid") : "disabled";
       const statusLabel = inputEnabled ? (valid ? "geldig" : "ongeldig") : "uit";
       const validityTitle = inputEnabled ? getMqttValidityLabel(sensor.validKey) : "Uitgeschakeld";
       const statusTitle = inputEnabled
         ? valid
           ? sensor.stateful
-            ? `Laatste MQTT-publicatie ${age === "—" ? "onbekend" : `${age} geleden`}. De waarde blijft geldig tot een nieuwe payload, uitschakelen of herstart.`
+            ? acceptRetained
+              ? `Laatste MQTT-publicatie ${age === "—" ? "onbekend" : `${age} geleden`}. De waarde blijft geldig tot een nieuwe payload, uitschakelen of herstart.`
+              : `Laatste live MQTT-publicatie ${age === "—" ? "onbekend" : `${age} geleden`}. De waarde blijft maximaal ${nonRetainedTimeoutMinutes} minuten geldig en vervalt bij een MQTT-disconnect.`
             : `Laatste MQTT-publicatie ${age === "—" ? "onbekend" : `${age} geleden`}. Zonder nieuwe MQTT-publicatie wordt de waarde na ${sensor.staleCopy} ongeldig.`
           : age === "—"
             ? "Nog geen geldige MQTT-publicatie ontvangen."
@@ -354,6 +371,14 @@ import { escapeHtml } from "../core/html.js";
         : "Dit topic wordt niet gebruikt. OpenQuatt subscribed er niet op.";
       const toggleTitle = inputEnabled ? "Topic uitschakelen" : "Topic gebruiken";
       const retainedTitle = "Retained MQTT-waarde: ontvangen bij verbinden met de broker.";
+      const retainedBehavior = acceptRetained
+        ? "Brokerwaarde wordt na reconnect of herstart opnieuw gebruikt."
+        : `Alleen live waarden; maximaal ${nonRetainedTimeoutMinutes} minuten geldig en direct ongeldig bij disconnect.`;
+      const payloadInfo = sensor.stateful
+        ? `${sensor.payloadInfo} ${acceptRetained
+            ? "Retained berichten worden geaccepteerd."
+            : `Retained berichten worden genegeerd; live waarden verlopen na ${nonRetainedTimeoutMinutes} minuten.`}`
+        : sensor.payloadInfo;
       return `
         <article class="oq-settings-mqtt-sensor-row${expanded ? " is-open" : ""}${inputEnabled ? "" : " is-disabled"}">
           <div
@@ -390,6 +415,26 @@ import { escapeHtml } from "../core/html.js";
           </div>
           ${expanded ? `
             <div class="oq-settings-mqtt-sensor-topic">
+              ${sensor.stateful ? `
+                <div class="oq-settings-mqtt-retained-setting">
+                  <span class="oq-settings-mqtt-retained-setting-copy">
+                    <strong>Retained waarde gebruiken</strong>
+                    <small>${escapeHtml(retainedBehavior)}</small>
+                  </span>
+                  <button
+                    class="oq-settings-toggle-switch oq-settings-mqtt-retained-toggle${acceptRetained ? " is-on" : ""}"
+                    type="button"
+                    data-oq-action="toggle-mqtt-retained"
+                    data-oq-mqtt-topic-key="${escapeHtml(sensor.topicKey)}"
+                    aria-pressed="${acceptRetained ? "true" : "false"}"
+                    aria-label="${escapeHtml(`${sensor.label}: retained waarde ${acceptRetained ? "uitschakelen" : "gebruiken"}`)}"
+                    title="${acceptRetained ? "Retained waarde negeren" : "Retained waarde gebruiken"}"
+                    ${busy || !state.mqttStatus?.csrf_token ? "disabled" : ""}
+                  >
+                    <span class="oq-settings-toggle-switch-track"><span class="oq-settings-toggle-switch-knob"></span></span>
+                  </button>
+                </div>
+              ` : ""}
               <div class="oq-settings-mqtt-sensor-topic-head">
                 <span class="oq-settings-mqtt-sensor-topic-label">Subscribe-topic</span>
               </div>
@@ -412,7 +457,7 @@ import { escapeHtml } from "../core/html.js";
                   <summary aria-label="${escapeHtml(`Payloadinformatie voor ${sensor.label}`)}">i</summary>
                   <div class="oq-settings-mqtt-topic-info-popover">
                     <strong>${escapeHtml(sensor.payloadInfoTitle || "Payload")}</strong>
-                    <p>${escapeHtml(sensor.payloadInfo || "")}</p>
+                    <p>${escapeHtml(payloadInfo || "")}</p>
                   </div>
                 </details>
               </div>

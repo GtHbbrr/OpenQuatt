@@ -368,6 +368,47 @@
   padding: 0 24px 18px;
 }
 
+.oq-settings-mqtt-retained-setting {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  min-height: 42px;
+  padding: 0 0 5px;
+}
+
+.oq-settings-mqtt-retained-setting-copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.oq-settings-mqtt-retained-setting-copy strong {
+  color: var(--oq-helper-ink);
+  font-size: 0.82rem;
+  font-weight: 850;
+  line-height: 1.2;
+}
+
+.oq-settings-mqtt-retained-setting-copy small {
+  color: var(--oq-helper-soft);
+  font-size: 0.7rem;
+  font-weight: 650;
+  line-height: 1.35;
+}
+
+.oq-helper-modal-backdrop--dark .oq-settings-mqtt-retained-setting-copy strong {
+  color: #f8fafc;
+}
+
+.oq-helper-modal-backdrop--dark .oq-settings-mqtt-retained-setting-copy small {
+  color: #cbd5e1;
+}
+
+.oq-settings-mqtt-retained-toggle {
+  flex: 0 0 auto;
+}
+
 .oq-settings-mqtt-sensor-topic-head {
   display: flex;
   align-items: baseline;

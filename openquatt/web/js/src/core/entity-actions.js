@@ -11,8 +11,8 @@ import { setTrendWindowHours } from "./trend-window.js";
 import { clearDebugRecordingDevicePollTimer, copyDebugRecordingBundle, downloadDebugRecordingBundle, freezeDebugRecording, refreshDebugRecordingDeviceStatus, scheduleDebugRecordingDeviceStatusPoll, setDebugRecordingSelectedMinutes, startDebugRecording, startRollingDebugRecording, stopDebugRecording } from "../features/debug-recording.js";
 import { hydrateFirmwareUpdateModal, installFirmwareConnectionSwitch, installFirmwareTestUpdate, installFirmwareTopologySwitch, installFirmwareUpdate, triggerFirmwareUpdateCheck, uploadFirmwareUpdate } from "../features/firmware-actions.js";
 import { getFirmwareTestAssetUrls, getFirmwareTestPrNumber, getFirmwareTestTargetModel, resetFirmwareManualUploadSelection, resetFirmwareTestSelection } from "../features/firmware-update.js";
-import { commitMqttConfig, commitMqttInputEnabled, copyMqttTopic, refreshMqttStatus, syncMqttDraftFromInput, syncMqttDraftsFromStatus } from "../features/mqtt-actions.js";
-import { isMqttInputEnabled } from "../features/mqtt.js";
+import { commitMqttConfig, commitMqttInputAcceptRetained, commitMqttInputEnabled, copyMqttTopic, refreshMqttStatus, syncMqttDraftFromInput, syncMqttDraftsFromStatus } from "../features/mqtt-actions.js";
+import { isMqttInputAcceptRetained, isMqttInputEnabled } from "../features/mqtt.js";
 import { abortQuickStartFlowTest, applyQuickStartFlowSourceConfiguration, applyQuickStartThermostatSourceConfiguration, refreshQuickStartFlowSignal, refreshQuickStartStepHydration, startQuickStartFlowTest } from "../features/quickstart-actions.js";
 import { selectQuickStepByOffset } from "../features/quickstart.js";
 import { commitDisableApiSecurity, commitDisableWebAuth, commitEnableApiSecurity, commitRotateApiSecurity, commitWebAuthChanges, copyApiSecurityKey, refreshApiSecurityStatus, refreshLoginModalAuthStatus, restartForApiSecurityChange, stopLoginAuthStatusPolling, syncAuthDraftsFromStatus } from "../features/security-actions.js";
@@ -566,6 +566,7 @@ import { render } from "./render-scheduler.js";
       state.mqttCopiedTopicKey = "";
       state.mqttExpandedTopicKey = "";
       state.mqttInputToggleBusyKey = "";
+      state.mqttRetainedToggleBusyKey = "";
       render();
       void refreshMqttStatus({ force: true }).then((changed) => {
         if (changed && state.systemModal === "mqtt-sensors") {
@@ -586,6 +587,14 @@ import { render } from "./render-scheduler.js";
     if (action === "toggle-mqtt-input") {
       const topicKey = button.dataset?.oqMqttTopicKey || "cooling_dew_point";
       void commitMqttInputEnabled(topicKey, !isMqttInputEnabled(topicKey));
+      return;
+    }
+
+    if (action === "toggle-mqtt-retained") {
+      const topicKey = button.dataset?.oqMqttTopicKey || "";
+      if (topicKey) {
+        void commitMqttInputAcceptRetained(topicKey, !isMqttInputAcceptRetained(topicKey));
+      }
       return;
     }
 
