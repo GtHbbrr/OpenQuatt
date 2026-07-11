@@ -993,6 +993,14 @@
   padding: 18px;
 }
 
+.oq-working-status-main--wide {
+  grid-column: 1 / -1;
+}
+
+.oq-working-status-main--wide > p {
+  max-width: 760px;
+}
+
 .oq-working-optimizer-panel {
   border: 1px solid var(--oq-overview-row-border);
   border-radius: 8px;
@@ -1285,4 +1293,147 @@
   color: #fff;
   font-size: 0.78rem;
   white-space: nowrap;
+}
+
+/* Dark mode keeps the decision log layered without introducing bright light-mode islands. */
+.oq-overview-board:not(.oq-overview-board--light) .oq-working-beta {
+  background: rgba(59, 130, 246, 0.18);
+  color: #93c5fd;
+}
+
+.oq-overview-board:not(.oq-overview-board--light) .oq-working-window-choice:hover,
+.oq-overview-board:not(.oq-overview-board--light) .oq-working-window-choice.is-active,
+.oq-overview-board:not(.oq-overview-board--light) .oq-working-period-menu-toggle:hover,
+.oq-overview-board:not(.oq-overview-board--light) .oq-working-period-menu-toggle.is-active,
+.oq-overview-board:not(.oq-overview-board--light) .oq-working-period-option:hover,
+.oq-overview-board:not(.oq-overview-board--light) .oq-working-period-option.is-active,
+.oq-overview-board:not(.oq-overview-board--light) .oq-working-period-custom-toggle:hover,
+.oq-overview-board:not(.oq-overview-board--light) .oq-working-period-custom-toggle.is-active {
+  border-color: rgba(96, 165, 250, 0.34);
+  background: rgba(59, 130, 246, 0.16);
+  color: #bfdbfe;
+}
+
+.oq-overview-board:not(.oq-overview-board--light) .oq-working-period-popover {
+  box-shadow: 0 18px 38px rgba(2, 6, 23, 0.34);
+}
+
+.oq-overview-board:not(.oq-overview-board--light) .oq-working-period-error {
+  color: #fca5a5;
+}
+
+.oq-overview-board:not(.oq-overview-board--light) .oq-working-tab:hover,
+.oq-overview-board:not(.oq-overview-board--light) .oq-working-tab.is-active {
+  background: rgba(148, 163, 184, 0.16);
+  color: #f8fafc;
+  box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.12);
+}
+
+.oq-overview-board:not(.oq-overview-board--light) .oq-working-now {
+  box-shadow: 0 16px 38px rgba(2, 6, 23, 0.18);
+}
+
+.oq-overview-board:not(.oq-overview-board--light) .oq-working-now-next,
+.oq-overview-board:not(.oq-overview-board--light) .oq-working-detail-block {
+  border-color: rgba(148, 163, 184, 0.14);
+  background: rgba(15, 23, 42, 0.3);
+}
+
+.oq-overview-board:not(.oq-overview-board--light) .oq-working-source-strip span,
+.oq-overview-board:not(.oq-overview-board--light) .oq-working-pill {
+  border-color: rgba(148, 163, 184, 0.2);
+  background: rgba(15, 23, 42, 0.24);
+}
+
+.oq-overview-board:not(.oq-overview-board--light) .oq-working-pill--normal,
+.oq-overview-board:not(.oq-overview-board--light) .oq-working-entry-status {
+  border-color: rgba(74, 222, 128, 0.32);
+  background: rgba(34, 197, 94, 0.15);
+  color: #86efac;
+}
+
+.oq-overview-board:not(.oq-overview-board--light) .oq-working-pill--limited,
+.oq-overview-board:not(.oq-overview-board--light) .oq-working-entry--limited .oq-working-entry-status {
+  border-color: rgba(251, 191, 36, 0.32);
+  background: rgba(245, 158, 11, 0.16);
+  color: #fcd34d;
+}
+
+.oq-overview-board:not(.oq-overview-board--light) .oq-working-pill--attention,
+.oq-overview-board:not(.oq-overview-board--light) .oq-working-pill--fault,
+.oq-overview-board:not(.oq-overview-board--light) .oq-working-entry--attention .oq-working-entry-status,
+.oq-overview-board:not(.oq-overview-board--light) .oq-working-entry--fault .oq-working-entry-status {
+  border-color: rgba(248, 113, 113, 0.3);
+  background: rgba(239, 68, 68, 0.15);
+  color: #fca5a5;
+}
+
+.oq-overview-board:not(.oq-overview-board--light) .oq-working-pill--info,
+.oq-overview-board:not(.oq-overview-board--light) .oq-working-entry-title em {
+  border-color: rgba(96, 165, 250, 0.28);
+  background: rgba(59, 130, 246, 0.16);
+  color: #bfdbfe;
+}
+
+.oq-overview-board:not(.oq-overview-board--light) .oq-working-mode-badge {
+  border-color: rgba(148, 163, 184, 0.24);
+  background: rgba(148, 163, 184, 0.14);
+  color: #cbd5e1;
+}
+
+.oq-overview-board:not(.oq-overview-board--light) .oq-working-entry:hover,
+.oq-overview-board:not(.oq-overview-board--light) .oq-working-entry.is-active {
+  background: rgba(148, 163, 184, 0.08);
+}
+
+.oq-overview-board:not(.oq-overview-board--light) .oq-working-entry.is-active .oq-working-entry-rail::after {
+  background: var(--oq-overview-surface);
+  box-shadow: 0 0 0 4px rgba(96, 165, 250, 0.16);
+}
+
+.oq-overview-board:not(.oq-overview-board--light) .oq-working-optimizer {
+  border-color: rgba(96, 165, 250, 0.2);
+  background: rgba(37, 99, 235, 0.09);
+}
+
+.oq-overview-board:not(.oq-overview-board--light) .oq-working-optimizer-option,
+.oq-overview-board:not(.oq-overview-board--light) .oq-working-source-card {
+  border-color: rgba(148, 163, 184, 0.16);
+  background: rgba(15, 23, 42, 0.26);
+}
+
+.oq-overview-board:not(.oq-overview-board--light) .oq-working-optimizer-option strong {
+  background: rgba(148, 163, 184, 0.14);
+  color: #cbd5e1;
+}
+
+.oq-overview-board:not(.oq-overview-board--light) .oq-working-optimizer-option--selected,
+.oq-overview-board:not(.oq-overview-board--light) .oq-working-source-card.is-active {
+  border-color: rgba(74, 222, 128, 0.34);
+  background: rgba(34, 197, 94, 0.12);
+}
+
+.oq-overview-board:not(.oq-overview-board--light) .oq-working-optimizer-option--selected strong {
+  background: rgba(34, 197, 94, 0.17);
+  color: #86efac;
+}
+
+.oq-overview-board:not(.oq-overview-board--light) .oq-working-optimizer-option--limited {
+  border-color: rgba(251, 191, 36, 0.3);
+  background: rgba(245, 158, 11, 0.12);
+}
+
+.oq-overview-board:not(.oq-overview-board--light) .oq-working-optimizer-option--limited strong {
+  background: rgba(245, 158, 11, 0.18);
+  color: #fcd34d;
+}
+
+.oq-overview-board:not(.oq-overview-board--light) .oq-working-chart-track {
+  background:
+    linear-gradient(90deg, transparent 0 24%, rgba(148, 163, 184, 0.14) 24% 24.4%, transparent 24.4% 49%, rgba(148, 163, 184, 0.14) 49% 49.4%, transparent 49.4% 74%, rgba(148, 163, 184, 0.14) 74% 74.4%, transparent 74.4%),
+    rgba(15, 23, 42, 0.28);
+}
+
+.oq-overview-board:not(.oq-overview-board--light) .oq-working-chart-segment--standby {
+  background: #64748b;
 }

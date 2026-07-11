@@ -2733,7 +2733,7 @@ import { replaceOuterHtmlIfSignatureChanged } from "../views/view-utils.js";
       <div class="oq-working-status">
         ${renderControlWorkingNowCard(current)}
         <div class="oq-working-status-grid">
-          <section class="oq-working-status-main">
+          <section class="oq-working-status-main${optimizer ? "" : " oq-working-status-main--wide"}">
             <span class="oq-working-eyebrow">Waarom deze keuze?</span>
             <h3>${escapeHtml(reason.label)}</h3>
             <p>${escapeHtml(reason.summary)}</p>
@@ -2741,9 +2741,11 @@ import { replaceOuterHtmlIfSignatureChanged } from "../views/view-utils.js";
               ${reason.checks.map((check) => `<span>${renderOqIcon("target", "oq-working-reason-icon")} ${escapeHtml(check)}</span>`).join("")}
             </div>
           </section>
-          <section class="oq-working-optimizer-panel">
-            ${renderControlWorkingOptimizer(optimizer)}
-          </section>
+          ${optimizer ? `
+            <section class="oq-working-optimizer-panel">
+              ${renderControlWorkingOptimizer(optimizer)}
+            </section>
+          ` : ""}
           <section class="oq-working-source-grid" aria-label="Bronnen">
             ${renderControlWorkingSourceCard("HP1", current.hp1Status, current.hp1Starts, current.hp1Hours, current.hp1Running)}
             ${renderControlWorkingSourceCard("HP2", current.hp2Status, current.hp2Starts, current.hp2Hours, current.hp2Running)}

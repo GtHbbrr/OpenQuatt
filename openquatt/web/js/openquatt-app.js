@@ -3944,7 +3944,7 @@ Kenmerken: Flowmeter in de buitenunit ge\xEFntegreerd. Onder CV-ketel enkel een 
       <div class="oq-working-status">
         ${kk(e)}
         <div class="oq-working-status-grid">
-          <section class="oq-working-status-main">
+          <section class="oq-working-status-main${r?"":" oq-working-status-main--wide"}">
             <span class="oq-working-eyebrow">Waarom deze keuze?</span>
             <h3>${s(t.label)}</h3>
             <p>${s(t.summary)}</p>
@@ -3952,9 +3952,11 @@ Kenmerken: Flowmeter in de buitenunit ge\xEFntegreerd. Onder CV-ketel enkel een 
               ${t.checks.map(w=>`<span>${Re("target","oq-working-reason-icon")} ${s(w)}</span>`).join("")}
             </div>
           </section>
-          <section class="oq-working-optimizer-panel">
-            ${Rf(r)}
-          </section>
+          ${r?`
+            <section class="oq-working-optimizer-panel">
+              ${Rf(r)}
+            </section>
+          `:""}
           <section class="oq-working-source-grid" aria-label="Bronnen">
             ${Bc("HP1",e.hp1Status,e.hp1Starts,e.hp1Hours,e.hp1Running)}
             ${Bc("HP2",e.hp2Status,e.hp2Starts,e.hp2Hours,e.hp2Running)}
