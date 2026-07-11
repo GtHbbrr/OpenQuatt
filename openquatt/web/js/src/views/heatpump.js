@@ -2784,8 +2784,8 @@ import { replaceOuterHtmlIfSignatureChanged, setInnerHtmlIfChanged } from "./vie
         checks: ["Metingen gecontroleerd", "Veilige keuze voorrang", "Herstel zodra data stabiel is"],
       },
       restart_wait: {
-        label: "Herstart wacht op veilige marge",
-        summary: "Na een korte pauze wacht het systeem tot de marge veilig en stabiel genoeg is.",
+        label: "Koeling wacht op veilige herstart",
+        summary: "De koelvraag is nog aanwezig. Na de koelstop wacht het systeem tot de veilige marge voldoende is hersteld.",
         checks: ["Herstart wacht bewust", "Marge moet stabiel blijven", "Daarna opnieuw beoordelen"],
       },
       level1_hold: {
@@ -3093,9 +3093,16 @@ import { replaceOuterHtmlIfSignatureChanged, setInnerHtmlIfChanged } from "./vie
       sinceLabel = "Dagelijkse run";
     } else if (coolingProtection) {
       const limiterReason = coolingContext.reasonCode && coolingContext.reasonCode !== "inactive" ? coolingContext.reasonCode : "soft_guard";
-      title = coolingContext.permitted ? "Koeling tijdelijk beperkt" : "Koeling tijdelijk gepauzeerd";
-      copy = `Er is koelvraag, maar het systeem koelt nu maximaal op niveau ${coolingContext.allowedMax} om condens te voorkomen.`;
-      expectation = "Koeling neemt stap voor stap toe zodra de dauwpuntmarge veilig en stabiel is.";
+      const waitingForRestart = limiterReason === "restart_wait";
+      title = waitingForRestart
+        ? "Koeling wacht op veilige herstart"
+        : coolingContext.permitted ? "Koeling tijdelijk beperkt" : "Koeling tijdelijk gepauzeerd";
+      copy = waitingForRestart
+        ? "De koelvraag is nog aanwezig. Na de koelstop wacht het systeem tot de veilige marge voldoende is hersteld."
+        : `Er is koelvraag, maar het systeem koelt nu maximaal op niveau ${coolingContext.allowedMax} om condens te voorkomen.`;
+      expectation = waitingForRestart
+        ? "De warmtepomp start automatisch opnieuw zodra de veilige marge voldoende en stabiel is."
+        : "Koeling neemt stap voor stap toe zodra de dauwpuntmarge veilig en stabiel is.";
       severity = "limited";
       primaryReason = limiterReason;
       sinceLabel = "Koelvraag actief";
@@ -3613,14 +3620,20 @@ import { replaceOuterHtmlIfSignatureChanged, setInnerHtmlIfChanged } from "./vie
       cooling_limited: {
         title: reasonCode === "dew_stop"
           ? "Koeling gestopt door dauwpunt"
+          : reasonCode === "restart_wait"
+          ? "Koeling wacht op veilige herstart"
           : coolingProtectionReason ? "Koeling tijdelijk beperkt" : "Koeling op ingesteld maximum",
         summary: reasonCode === "dew_stop"
           ? `${activeCoolingSource} stopt omdat verder koelen te dicht bij het dauwpunt komt.`
+          : reasonCode === "restart_wait"
+          ? "De koelvraag is nog aanwezig. Het systeem wacht met opnieuw starten tot de veilige marge voldoende is hersteld."
           : coolingProtectionReason
           ? "Er is koelvraag, maar het systeem houdt het koelvermogen tijdelijk lager."
           : "Er is koelvraag. Het systeem koelt binnen het actuele softwaremaximum.",
         detail: reason.summary,
-        next: coolingProtectionReason
+        next: reasonCode === "restart_wait"
+          ? "De warmtepomp start automatisch opnieuw zodra de veilige marge voldoende en stabiel is."
+          : coolingProtectionReason
           ? "Koeling wordt vrijgegeven zodra de veilige marge stabiel genoeg is."
           : "Koeling blijft binnen dit maximum zolang de instelling en koelvraag gelijk blijven.",
       },
@@ -4912,16 +4925,19 @@ import { replaceOuterHtmlIfSignatureChanged, setInnerHtmlIfChanged } from "./vie
     });
     const isCoolingGuard = Boolean(current.coolingProtection);
     const isCoolingCap = Boolean(current.coolingCapped);
+    const isCoolingRestartWait = current.primaryReason === "restart_wait";
     const isSticky = current.primaryReason === "sticky_protection";
     const guardTitle = isCoolingGuard
-      ? "Koeling tijdelijk beperkt"
+      ? isCoolingRestartWait ? "Wacht op veilige herstart" : "Koeling tijdelijk beperkt"
       : isCoolingCap
       ? "Koeling met ingesteld maximum"
       : isSticky
       ? "Geen comfortvraag actief"
       : "Geen beperking actief";
     const guardCopy = isCoolingGuard
-      ? "De aanvoer blijft boven de veilige grens. Daarom koelt het systeem tijdelijk minder hard."
+      ? isCoolingRestartWait
+        ? "De koelvraag blijft aanwezig. De warmtepomp start opnieuw zodra de veilige marge voldoende is hersteld."
+        : "De aanvoer blijft boven de veilige grens. Daarom koelt het systeem tijdelijk minder hard."
       : isCoolingCap
       ? "Dit is normale koeling binnen de ingestelde softwaregrens. Dauwpunt en waterflow blijven wel gewoon bewaakt."
       : isSticky
