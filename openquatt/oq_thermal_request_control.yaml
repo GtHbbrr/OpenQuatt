@@ -223,6 +223,22 @@ globals:
     type: bool
     restore_value: false
     initial_value: 'false'
+  - id: oq_boot_startup_inhibit_event_active
+    type: bool
+    restore_value: false
+    initial_value: 'false'
+  - id: oq_boot_startup_inhibit_event_started_ms
+    type: uint32_t
+    restore_value: false
+    initial_value: '0'
+  - id: oq_boot_startup_inhibit_event_subject
+    type: uint8_t
+    restore_value: false
+    initial_value: '0'
+  - id: oq_boot_startup_inhibit_event_mode
+    type: uint8_t
+    restore_value: false
+    initial_value: '0'
 
 # ----------------------------
 # TUNING INPUTS
@@ -835,6 +851,58 @@ interval:
             }
           };
 
+          auto update_startup_inhibit_event = [&](int target_mode_code, int desired_hp1, int desired_hp2)->void {
+            const bool has_request = desired_hp1 > 0 || desired_hp2 > 0;
+            const bool blocks_request = startup_inhibit_active && has_request;
+            if (blocks_request && !id(oq_boot_startup_inhibit_event_active)) {
+              const uint8_t subject = desired_hp1 > 0 && desired_hp2 > 0
+                  ? openquatt_decision_log::SUBJECT_BOTH
+                  : desired_hp1 > 0
+                  ? openquatt_decision_log::SUBJECT_HP1
+                  : openquatt_decision_log::SUBJECT_HP2;
+              const uint32_t remaining_s = id(oq_boot_startup_inhibit_until_ms) > now_ms
+                  ? (id(oq_boot_startup_inhibit_until_ms) - now_ms + 999UL) / 1000UL
+                  : 0;
+              id(oq_boot_startup_inhibit_event_active) = true;
+              id(oq_boot_startup_inhibit_event_started_ms) = now_ms;
+              id(oq_boot_startup_inhibit_event_subject) = subject;
+              id(oq_boot_startup_inhibit_event_mode) = (uint8_t) std::max(0, std::min(255, target_mode_code));
+              id(oq_decision_log).emit(
+                  openquatt_decision_log::EVENT_STARTUP_INHIBIT_START,
+                  subject,
+                  openquatt_decision_log::REASON_STARTUP_INHIBIT,
+                  openquatt_decision_log::SEVERITY_NORMAL,
+                  (uint8_t) std::max(0, std::min(255, cm_code)),
+                  openquatt_decision_log::STATE_STANDBY,
+                  openquatt_decision_log::STATE_BLOCKED,
+                  (int16_t) target_mode_code,
+                  (int16_t) std::min<uint32_t>(remaining_s, INT16_MAX),
+                  (int16_t) std::min<uint32_t>((uint32_t) ${oq_hp_min_off_s}, INT16_MAX));
+            } else if (!blocks_request && id(oq_boot_startup_inhibit_event_active)) {
+              uint16_t duration_s = 0;
+              if (id(oq_boot_startup_inhibit_event_started_ms) > 0) {
+                const uint32_t elapsed_s = (now_ms - id(oq_boot_startup_inhibit_event_started_ms)) / 1000UL;
+                duration_s = elapsed_s > UINT16_MAX ? UINT16_MAX : (uint16_t) elapsed_s;
+              }
+              id(oq_decision_log).emit(
+                  openquatt_decision_log::EVENT_STARTUP_INHIBIT_CLEAR,
+                  id(oq_boot_startup_inhibit_event_subject),
+                  openquatt_decision_log::REASON_STARTUP_INHIBIT,
+                  openquatt_decision_log::SEVERITY_NORMAL,
+                  (uint8_t) std::max(0, std::min(255, cm_code)),
+                  openquatt_decision_log::STATE_BLOCKED,
+                  has_request ? openquatt_decision_log::STATE_ACTIVE : openquatt_decision_log::STATE_STANDBY,
+                  (int16_t) id(oq_boot_startup_inhibit_event_mode),
+                  0,
+                  (int16_t) std::min<uint32_t>((uint32_t) ${oq_hp_min_off_s}, INT16_MAX),
+                  duration_s);
+              id(oq_boot_startup_inhibit_event_active) = false;
+              id(oq_boot_startup_inhibit_event_started_ms) = 0;
+              id(oq_boot_startup_inhibit_event_subject) = openquatt_decision_log::SUBJECT_UNKNOWN;
+              id(oq_boot_startup_inhibit_event_mode) = 0;
+            }
+          };
+
           auto hp_selected_level = [&](bool is_hp1)->int {
             if (is_hp1) {
               if (!id(hp1_compressor_level).has_state()) return -1;
@@ -969,6 +1037,10 @@ interval:
               hp2_req = 0;
               #endif
             }
+            update_startup_inhibit_event(
+                hp1_mode_code > 0 ? hp1_mode_code : hp2_mode_code,
+                (!controlled_stop && !safety_stop && !manual_mode_conflict) ? hp1_req : 0,
+                (!controlled_stop && !safety_stop && !manual_mode_conflict) ? hp2_req : 0);
             if (safety_stop || startup_inhibit_active || manual_mode_conflict) {
               hp1_req = 0;
               hp2_req = 0;
@@ -1041,6 +1113,7 @@ interval:
             publish_optimizer_reason(hp1_hold_level > 0 ? "keep_current" : "inactive");
             #endif
             const int hold_mode_code = hold_request_mode_code(hp1_hold_level, hp2_hold_level);
+            update_startup_inhibit_event(0, 0, 0);
             publish_request(
               any_hold ? hold_mode_code : 0,
               hp1_hold_level,
@@ -1334,6 +1407,8 @@ interval:
             hp2_req = 0;
             #endif
           }
+
+          update_startup_inhibit_event(active_thermal_mode_code, hp1_req, hp2_req);
 
           // Absolute boot-time startup inhibit: after a controller reboot, keep compressors
           // at level 0 until the configured compressor minimum off-time has elapsed.

@@ -495,6 +495,11 @@ import { replaceOuterHtmlIfSignatureChanged } from "../views/view-utils.js";
         summary: "De normale voorlooptijd is verstreken, maar de waterflow is nog niet voldoende voor een veilige start.",
         checks: ["Voorlooptijd verstreken", "Start blijft geblokkeerd", "Flow wordt opnieuw beoordeeld"],
       },
+      startup_inhibit: {
+        label: "Wachttijd na herstart",
+        summary: "Na een herstart blijft de compressor kort uit om een te snelle herstart te voorkomen.",
+        checks: ["Comfortvraag is aanwezig", "Compressor wacht nog", "Start volgt automatisch"],
+      },
       capacity_cap: {
         label: "Ingesteld koelmaximum",
         summary: "Er is koelvraag. Het systeem blijft binnen het maximale koelniveau dat in de software is ingesteld.",
@@ -843,6 +848,30 @@ import { replaceOuterHtmlIfSignatureChanged } from "../views/view-utils.js";
     `;
   }
 
+  function getControlWorkingActiveStartupInhibit(nowMs = Date.now()) {
+    const events = getDecisionLogEvents()
+      .filter((event) => ["startup_inhibit_start", "startup_inhibit_clear"].includes(String(event?.event_type || "")))
+      .sort((left, right) => Number(left?.uptime_s ?? left?.seq ?? 0) - Number(right?.uptime_s ?? right?.seq ?? 0));
+    const latest = events[events.length - 1];
+    if (!latest || String(latest.event_type) !== "startup_inhibit_start") {
+      return null;
+    }
+    const startedEpochMs = getDecisionEventEpochMs(latest);
+    const initialRemainingS = Math.max(0, Number(latest?.value_b) || 0);
+    const elapsedS = Number.isFinite(startedEpochMs) ? Math.max(0, (nowMs - startedEpochMs) / 1000) : 0;
+    const remainingS = Math.max(0, Math.ceil(initialRemainingS - elapsedS));
+    if (initialRemainingS > 0 && remainingS <= 0) {
+      return null;
+    }
+    return {
+      event: latest,
+      subject: String(latest?.subject || "SYSTEM").toUpperCase(),
+      targetMode: Number(latest?.value_a) || 0,
+      remainingS,
+      remainingLabel: remainingS > 0 ? `Nog ${Math.max(1, Math.ceil(remainingS / 60))} min` : "Wachttijd actief",
+    };
+  }
+
   function getControlWorkingCurrent(heatPumpPanels) {
     const modeModel = getControlReplayModeModel(heatPumpPanels);
     const rawControlModeLabel = getEntityStateText("controlModeLabel", "—");
@@ -860,6 +889,7 @@ import { replaceOuterHtmlIfSignatureChanged } from "../views/view-utils.js";
     const coolingActive = modeModel.coolingMode || modeModel.coolingRequest;
     const stickyActive = hasEntity("stickyActive") && isEntityActive("stickyActive");
     const boilerActive = modeModel.boilerActive;
+    const startupInhibit = getControlWorkingActiveStartupInhibit();
 
     let title = "Eén warmtepomp actief";
     let copy = "De actuele vraag past binnen één warmtepomp. De andere warmtepomp blijft beschikbaar als extra capaciteit nodig is.";
@@ -881,6 +911,17 @@ import { replaceOuterHtmlIfSignatureChanged } from "../views/view-utils.js";
       expectation = "Na ongeveer 1 minuut stopt de pomp en blijft het systeem standby tot er comfortvraag of bescherming nodig is.";
       primaryReason = "sticky_protection";
       sinceLabel = "Dagelijkse run";
+    } else if (startupInhibit) {
+      const coolingWait = startupInhibit.targetMode === 1;
+      title = coolingWait ? "Koeling wacht na herstart" : "Verwarming wacht na herstart";
+      copy = coolingWait
+        ? "Er is koelvraag, maar de compressor blijft na de herstart nog kort uit om een te snelle herstart te voorkomen."
+        : "Er is warmtevraag, maar de compressor blijft na de herstart nog kort uit om een te snelle herstart te voorkomen.";
+      expectation = coolingWait
+        ? "De warmtepomp start automatisch met koelen zodra de wachttijd voorbij is."
+        : "De warmtepomp start automatisch met verwarmen zodra de wachttijd voorbij is.";
+      primaryReason = "startup_inhibit";
+      sinceLabel = startupInhibit.remainingLabel || "Wachttijd actief";
     } else if (coolingContext.reasonCode === "buffer_stop") {
       title = "Koeling wacht: water al koud genoeg";
       copy = "Er is koelvraag, maar het water is al koud genoeg. De warmtepomp hoeft daarom nu niet te starten.";
@@ -948,6 +989,8 @@ import { replaceOuterHtmlIfSignatureChanged } from "../views/view-utils.js";
       sinceLabel = "Stand-by";
     }
 
+    const hp1Waiting = startupInhibit && ["HP1", "BOTH"].includes(startupInhibit.subject);
+    const hp2Waiting = startupInhibit && ["HP2", "BOTH"].includes(startupInhibit.subject);
     return {
       title,
       copy,
@@ -961,8 +1004,8 @@ import { replaceOuterHtmlIfSignatureChanged } from "../views/view-utils.js";
       hp1Running,
       hp2Running,
       hp2Available: Boolean(hp2Panel),
-      hp1Status: hp1Running ? "Actief" : "Beschikbaar",
-      hp2Status: hp2Panel ? (hp2Running ? "Actief" : "Beschikbaar") : "Niet aanwezig",
+      hp1Status: hp1Running ? "Actief" : hp1Waiting ? "Wacht" : "Beschikbaar",
+      hp2Status: hp2Panel ? (hp2Running ? "Actief" : hp2Waiting ? "Wacht" : "Beschikbaar") : "Niet aanwezig",
       cvStatus: boilerActive ? "Actief" : "Uit",
       outsideTemp: formatControlReplayNumber("outsideTempSelected", 1, "°C", "—"),
       supplyTemp: formatControlReplayNumber("waterSupplyTempSelected", 1, "°C", "—"),
@@ -973,6 +1016,7 @@ import { replaceOuterHtmlIfSignatureChanged } from "../views/view-utils.js";
       hp2Hours: hp2Panel ? formatControlReplayRuntimeHours("hp2Minutes", "—") : "n.v.t.",
       cooling: coolingContext,
       coolingProtection,
+      startupInhibit,
       coolingCapped,
     };
   }
@@ -1434,6 +1478,28 @@ import { replaceOuterHtmlIfSignatureChanged } from "../views/view-utils.js";
           ? ["Waterflow hersteld", "Startblokkade opgeheven", "Regeling gaat verder"]
           : ["Waterflow voldoende", "Warmtepomp vrijgegeven", "Regeling gaat verder"],
       },
+      startup_inhibit_start: {
+        title: Number(event?.value_a) === 1 ? "Koeling wacht na herstart" : "Verwarming wacht na herstart",
+        reasonLabel: "Wachttijd na herstart",
+        reasonSummary: "De compressor blijft na een herstart kort uit om een te snelle herstart te voorkomen.",
+        summary: Number(event?.value_a) === 1
+          ? "Er is koelvraag, maar de warmtepomp wacht nog kort na de herstart."
+          : "Er is warmtevraag, maar de warmtepomp wacht nog kort na de herstart.",
+        detail: "De controller kent na een reboot de voorgaande stoptijd niet meer. Daarom houdt hij eenmaal de ingestelde minimale uit-tijd aan voordat een compressor mag starten.",
+        next: Number(event?.value_a) === 1
+          ? "De warmtepomp start automatisch met koelen zodra de wachttijd voorbij is."
+          : "De warmtepomp start automatisch met verwarmen zodra de wachttijd voorbij is.",
+        checks: ["Comfortvraag aanwezig", "Compressor blijft nog uit", "Start volgt automatisch"],
+      },
+      startup_inhibit_clear: {
+        title: "Wachttijd na herstart voorbij",
+        reasonLabel: "Wachttijd afgerond",
+        reasonSummary: "De compressor mag weer starten als de vraag nog aanwezig is.",
+        summary: "De wachttijd na de herstart is verstreken.",
+        detail: "De minimale uit-tijd na de reboot is afgerond. Alle normale startvoorwaarden blijven van toepassing.",
+        next: "Bij aanhoudende vraag gaat de controller automatisch verder met de gekozen warmtepomp.",
+        checks: ["Wachttijd verstreken", "Start weer toegestaan", "Regeling gaat verder"],
+      },
       defrost_seen_start: {
         title: `Ontdooien gestart (${subject})`,
         summary: `${subject} ontdooit kort. Dat is normaal bij koud en vochtig weer.`,
@@ -1630,7 +1696,8 @@ import { replaceOuterHtmlIfSignatureChanged } from "../views/view-utils.js";
       rawDecisionEvent: event,
       checks: Array.isArray(copy.checks) ? copy.checks : null,
       timelineHidden: ((eventType === "source_start" || eventType === "topology_change") && contextCm === 5) ||
-        (eventType === "source_stop" && (event?._oq_cooling_stop_reason === "dew_stop" || reasonCode === "dew_stop")),
+        (eventType === "source_stop" && (event?._oq_cooling_stop_reason === "dew_stop" || reasonCode === "dew_stop")) ||
+        eventType === "startup_inhibit_start" || eventType === "startup_inhibit_clear",
     };
   }
 
@@ -1687,8 +1754,8 @@ import { replaceOuterHtmlIfSignatureChanged } from "../views/view-utils.js";
 
   function buildControlWorkingDerivedItems(events, selectedWindow, nowMs) {
     const windowBounds = getControlWorkingWindowBounds(selectedWindow, nowMs);
-    const intervals = { HP1: [], HP2: [], cooling: [], boiler: [], frost: [] };
-    const open = { HP1: null, HP2: null, cooling: null, boiler: null, frost: null };
+    const intervals = { HP1: [], HP2: [], cooling: [], boiler: [], frost: [], startupInhibit: [] };
+    const open = { HP1: null, HP2: null, cooling: null, boiler: null, frost: null, startupInhibit: null };
     const sourceKeys = (subject) => {
       const normalized = String(subject || "").toUpperCase();
       if (normalized === "BOTH") {
@@ -1764,6 +1831,10 @@ import { replaceOuterHtmlIfSignatureChanged } from "../views/view-utils.js";
           openInterval("frost", event);
         } else if (eventType === "frost_protection_clear") {
           closeInterval("frost", event);
+        } else if (eventType === "startup_inhibit_start") {
+          openInterval("startupInhibit", event);
+        } else if (eventType === "startup_inhibit_clear") {
+          closeInterval("startupInhibit", event);
         } else if (eventType === "flow_hold_clear" && event.reason === "flow_postflow") {
           closeInterval("cooling", event);
         }
@@ -1799,6 +1870,35 @@ import { replaceOuterHtmlIfSignatureChanged } from "../views/view-utils.js";
       }
       return getDecisionModeSubjectLabel(coolingInterval.startEvent?.subject, 5);
     };
+
+    intervals.startupInhibit.forEach((interval, index) => {
+      const targetMode = Number(interval.startEvent?.value_a) || 0;
+      const coolingWait = targetMode === 1;
+      addItem(createControlWorkingDerivedSpan({
+        id: `fw-span-startup-inhibit-${index}-${interval.startEvent?.seq || interval.startEpochMs}`,
+        startEpochMs: interval.startEpochMs,
+        endEpochMs: interval.endEpochMs,
+        isOpen: Boolean(interval.isOpen),
+        startEvent: interval.startEvent,
+        severity: "normal",
+        title: interval.isOpen ? "Warmtepomp wacht na herstart" : "Warmtepomp wachtte na herstart",
+        summary: coolingWait
+          ? "Er was koelvraag, maar de compressor bleef na de herstart nog kort uit."
+          : "Er was warmtevraag, maar de compressor bleef na de herstart nog kort uit.",
+        detail: "Na een reboot houdt de controller eenmaal de minimale uit-tijd aan. Zo kan een compressor niet te snel opnieuw starten wanneer de vorige stoptijd onbekend is.",
+        next: interval.isOpen
+          ? coolingWait
+            ? "De warmtepomp start automatisch met koelen zodra de wachttijd voorbij is."
+            : "De warmtepomp start automatisch met verwarmen zodra de wachttijd voorbij is."
+          : "Na deze periode ging de normale regeling automatisch verder.",
+        source: getDecisionModeSubjectLabel(interval.startEvent?.subject, coolingWait ? 5 : 2),
+        reasonCode: "startup_inhibit",
+        reasonLabel: "Wachttijd na herstart",
+        reasonSummary: "De compressor werd bewust nog niet gestart.",
+        modeLabel: coolingWait ? "CM5" : "CM2",
+        minDurationS: 1,
+      }, selectedWindow, nowMs));
+    });
 
     intervals.boiler.forEach((interval, index) => {
       addItem(createControlWorkingDerivedSpan({
@@ -2761,9 +2861,12 @@ import { replaceOuterHtmlIfSignatureChanged } from "../views/view-utils.js";
     const isCoolingCap = Boolean(current.coolingCapped);
     const isCoolingRestartWait = current.primaryReason === "restart_wait";
     const isCoolingWaterSatisfied = current.primaryReason === "buffer_stop";
+    const isStartupInhibit = current.primaryReason === "startup_inhibit";
     const isSticky = current.primaryReason === "sticky_protection";
-    const guardEyebrow = isCoolingWaterSatisfied ? "Koelregeling" : "Bescherming";
-    const guardTitle = isCoolingWaterSatisfied
+    const guardEyebrow = isStartupInhibit ? "Startvoorwaarde" : isCoolingWaterSatisfied ? "Koelregeling" : "Bescherming";
+    const guardTitle = isStartupInhibit
+      ? "Wacht na herstart"
+      : isCoolingWaterSatisfied
       ? "Water al koud genoeg"
       : isCoolingGuard
       ? isCoolingRestartWait ? "Wacht op veilige herstart" : "Koeling tijdelijk beperkt"
@@ -2772,7 +2875,9 @@ import { replaceOuterHtmlIfSignatureChanged } from "../views/view-utils.js";
       : isSticky
       ? "Geen comfortvraag actief"
       : "Geen beperking actief";
-    const guardCopy = isCoolingWaterSatisfied
+    const guardCopy = isStartupInhibit
+      ? "Na een reboot blijft de compressor eenmaal de minimale uit-tijd uit. Bij aanhoudende vraag start de gekozen warmtepomp daarna automatisch."
+      : isCoolingWaterSatisfied
       ? "Dit is normale regeling. De koelvraag blijft actief, maar de warmtepomp hoeft nu geen extra koude aan het water toe te voegen."
       : isCoolingGuard
       ? isCoolingRestartWait
@@ -2783,7 +2888,13 @@ import { replaceOuterHtmlIfSignatureChanged } from "../views/view-utils.js";
       : isSticky
       ? "Alleen de pomp draait kort. De warmtepompen blijven uit en er worden geen compressorstarts geteld."
       : "Ontdooien, minimum rusttijd, dauwpunt en waterflow blijven bewaakt. Ze verschijnen hier zodra ze gedrag begrenzen.";
-    const guardPills = isCoolingWaterSatisfied
+    const guardPills = isStartupInhibit
+      ? [
+        ["Vraag actief", "info", "activity"],
+        [current.startupInhibit?.remainingLabel || "Wachttijd actief", "normal", "clock"],
+        ["Automatische start", "context", "play"],
+      ]
+      : isCoolingWaterSatisfied
       ? [
         ["Koelvraag actief", "info", "snowflake"],
         ["Water koud genoeg", "normal", "droplet"],

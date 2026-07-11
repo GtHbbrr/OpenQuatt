@@ -182,7 +182,7 @@
   };
 
   function isCoolingScenario(name = state.scenario) {
-    return name === "cooling" || name === "cooling_limited" || name === "cooling_buffer_stop" || name === "cooling_stop_reasons" || name === "cooling_limiter_log";
+    return name === "cooling" || name === "cooling_startup_wait" || name === "cooling_limited" || name === "cooling_buffer_stop" || name === "cooling_stop_reasons" || name === "cooling_limiter_log";
   }
 
   function isSummerIdleScenario(name = state.scenario) {
@@ -793,9 +793,13 @@
     } else if (isFlowHoldScenario()) {
       pushEvent(16, "flow_hold_start", "SYSTEM", "flow_preflow", "normal", 1, "standby", "limited", 2);
       pushEvent(15, "decision_blocked", "SYSTEM", "flow_too_low", "limited", 1, "limited", "blocked", 180, 0, 250);
-      pushEvent(9, "flow_hold_clear", "SYSTEM", "flow_preflow", "normal", 1, "limited", "active", 2, 0, 0, 420);
+      pushEvent(9, "flow_hold_clear", "SYSTEM", "flow_too_low", "normal", 1, "limited", "active", 2, 0, 0, 420);
       pushEvent(6, "source_start", "HP1", "runtime_lead", "normal", 2, "standby", "active", 3);
       pushEvent(2, "flow_hold_start", "SYSTEM", "flow_postflow", "limited", 1, "active", "limited", 0);
+    } else if (state.scenario === "cooling_startup_wait") {
+      pushEvent(4, "flow_hold_start", "SYSTEM", "flow_preflow", "normal", 1, "standby", "limited", 5);
+      pushEvent(3.25, "flow_hold_clear", "SYSTEM", "flow_preflow", "normal", 1, "limited", "active", 5, 0, 0, 45);
+      pushEvent(3, "startup_inhibit_start", "HP1", "startup_inhibit", "normal", 5, "standby", "blocked", 1, 180, 240);
     } else if (state.scenario === "cooling_stop_reasons") {
       // Two complete cooling runs: one is stopped by dew-point protection, the other ends normally.
       pushEvent(96, "flow_hold_start", "SYSTEM", "flow_preflow", "normal", 1, "standby", "limited");
@@ -2937,6 +2941,7 @@
     if (isCoolingScenario(name)) {
       const limited = name === "cooling_limited" || name === "cooling_limiter_log";
       const waterAlreadyCold = name === "cooling_buffer_stop";
+      const startupWait = name === "cooling_startup_wait";
       setText("text_sensor", "Control Mode (Label)", "CM5 - Cooling");
       setText("text_sensor", "Flow Mode", "Adaptive");
       setBinary("Cooling Enable (Selected)", true);
@@ -3058,6 +3063,26 @@
           setNumber("HP2 - Compressor frequency", 0, "Hz");
           setNumber("HP2 - Fan speed", 0, "rpm");
           setText("text_sensor", "HP2 - Working Mode Label", "Standby");
+        }
+      }
+      if (startupWait) {
+        setNumber("Cooling Power Input", 0, "W");
+        setNumber("Total Power Input", single ? 46 : 58, "W");
+        setNumber("Total Cooling Power", 0, "W");
+        setNumber("Total EER", 0);
+        setNumber("HP1 - Power Input", 5.2, "W");
+        setNumber("HP1 - Cooling Power", 0, "W");
+        setNumber("HP1 - Compressor frequency", 0, "Hz");
+        setNumber("HP1 - Fan speed", 0, "rpm");
+        setText("text_sensor", "HP1 - Working Mode Label", "Standby");
+        setBinary("HP1 - 4-Way valve", false);
+        if (!single) {
+          setNumber("HP2 - Power Input", 5.2, "W");
+          setNumber("HP2 - Cooling Power", 0, "W");
+          setNumber("HP2 - Compressor frequency", 0, "Hz");
+          setNumber("HP2 - Fan speed", 0, "rpm");
+          setText("text_sensor", "HP2 - Working Mode Label", "Standby");
+          setBinary("HP2 - 4-Way valve", false);
         }
       }
       applyRuntimeControlOverlay(single);

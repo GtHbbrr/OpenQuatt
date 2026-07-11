@@ -35,6 +35,8 @@ enum EventType : uint8_t {
   EVENT_CANDIDATE_BLOCKED = 17,
   EVENT_FLOW_HOLD_START = 18,
   EVENT_FLOW_HOLD_CLEAR = 19,
+  EVENT_STARTUP_INHIBIT_START = 20,
+  EVENT_STARTUP_INHIBIT_CLEAR = 21,
 };
 
 enum Subject : uint8_t {
@@ -87,6 +89,7 @@ enum ReasonCode : uint8_t {
   REASON_LEVEL1_HOLD = 52,
   REASON_OIL_RETURN_RECOVERY = 53,
   REASON_CAPACITY_CAP = 54,
+  REASON_STARTUP_INHIBIT = 55,
 };
 
 enum Severity : uint8_t {

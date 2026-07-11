@@ -1369,6 +1369,16 @@ interval:
           // -------------------------------------------------
           // 5) Publish CM (writes-only-on-change)
           // -------------------------------------------------
+          static uint32_t cm1_hold_started_ms = 0;
+          static uint8_t cm1_hold_reason = openquatt_decision_log::REASON_UNKNOWN;
+          // A normal preflow can turn into a real low-flow block while CM1 remains
+          // active. Preserve that promotion so the eventual clear event explains
+          // that a start blockade was lifted instead of reporting a normal preflow.
+          if (id(oq_control_mode).state == "CM1" &&
+              id(oq_lowflow_fault_active) &&
+              cm1_hold_reason == openquatt_decision_log::REASON_FLOW_PREFLOW) {
+            cm1_hold_reason = openquatt_decision_log::REASON_FLOW_TOO_LOW;
+          }
           if (id(oq_control_mode).state != desired_cm) {
             const std::string previous_cm = id(oq_control_mode).state;
             id(oq_control_mode).publish_state(desired_cm);
@@ -1386,8 +1396,6 @@ interval:
                      reason == openquatt_decision_log::REASON_FLOW_POSTFLOW ||
                      reason == openquatt_decision_log::REASON_FLOW_TOO_LOW;
             };
-            static uint32_t cm1_hold_started_ms = 0;
-            static uint8_t cm1_hold_reason = openquatt_decision_log::REASON_UNKNOWN;
             const bool was_cm1 = (previous_cm == "CM1");
             const bool is_cm1 = (desired == 1);
             if (!was_cm1 && is_cm1 && is_cm1_log_reason(cm1_event_reason)) {

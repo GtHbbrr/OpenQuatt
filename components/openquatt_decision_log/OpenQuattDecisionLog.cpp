@@ -457,6 +457,8 @@ const char *OpenQuattDecisionLog::event_type_to_string_(uint8_t value) {
     case EVENT_CANDIDATE_BLOCKED: return "candidate_blocked";
     case EVENT_FLOW_HOLD_START: return "flow_hold_start";
     case EVENT_FLOW_HOLD_CLEAR: return "flow_hold_clear";
+    case EVENT_STARTUP_INHIBIT_START: return "startup_inhibit_start";
+    case EVENT_STARTUP_INHIBIT_CLEAR: return "startup_inhibit_clear";
     default: return "unknown";
   }
 }
@@ -513,6 +515,7 @@ const char *OpenQuattDecisionLog::reason_to_string_(uint8_t value) {
     case REASON_LEVEL1_HOLD: return "level1_hold";
     case REASON_OIL_RETURN_RECOVERY: return "oil_return_recovery";
     case REASON_CAPACITY_CAP: return "capacity_cap";
+    case REASON_STARTUP_INHIBIT: return "startup_inhibit";
     default: return "unknown";
   }
 }
