@@ -9,6 +9,7 @@
     { value: "summer_idle", label: "Zomer - pompbescherming" },
     { value: "cooling", label: "Zomer - koeling vrijgegeven" },
     { value: "cooling_limited", label: "Zomer - koeling veilig begrensd" },
+    { value: "cooling_buffer_stop", label: "Zomer - water al koud genoeg" },
     { value: "cooling_stop_reasons", label: "Zomer - koelstops vergeleken" },
     { value: "cooling_limiter_log", label: "Zomer - limiter herhaalt" },
     { value: "defrost", label: "Winter - ontdooien" },

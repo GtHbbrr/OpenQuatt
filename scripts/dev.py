@@ -486,6 +486,8 @@ def build_pages_site(site_dir: Path, factory_dir: Path, helper_python: Sequence[
     root_dir = repo_root()
     available_factory_files = ensure_factory_dir(factory_dir)
 
+    run_command(["npm", "run", "build:web:preview"], cwd=root_dir)
+
     if site_dir.exists():
         shutil.rmtree(site_dir)
 
@@ -504,9 +506,15 @@ def build_pages_site(site_dir: Path, factory_dir: Path, helper_python: Sequence[
         cwd=root_dir,
     )
 
-    shutil.copy2(root_dir / "openquatt" / "web" / "css" / "openquatt-app.css", site_dir / "css" / "openquatt-app.css")
-    shutil.copy2(root_dir / "openquatt" / "web" / "js" / "mock-device.js", site_dir / "js" / "mock-device.js")
-    shutil.copy2(root_dir / "openquatt" / "web" / "js" / "openquatt-app.js", site_dir / "js" / "openquatt-app.js")
+    for relative_path in (
+        "css/openquatt-preview.css",
+        "js/mock-scenarios.js",
+        "js/mock-entity-defs.js",
+        "js/mock-fixtures.js",
+        "js/mock-device.js",
+        "js/openquatt-preview.js",
+    ):
+        shutil.copy2(root_dir / "openquatt" / "web" / relative_path, site_dir / relative_path)
 
     demo_html = (root_dir / "openquatt" / "web" / "dev.html").read_text(encoding="utf-8")
     demo_html = demo_html.replace("<title>OpenQuatt UI Preview</title>", "<title>OpenQuatt web-app demo</title>")

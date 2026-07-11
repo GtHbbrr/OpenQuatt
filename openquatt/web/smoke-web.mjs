@@ -424,6 +424,23 @@ async function checkPreviewAssetsAvailable() {
   }
 }
 
+async function checkPagesDemoContracts() {
+  const devScript = await readFile(path.join(repoDir, "scripts", "dev.py"), "utf8");
+  const pagesWorkflow = await readFile(path.join(repoDir, ".github", "workflows", "pages-deploy.yml"), "utf8");
+  assertContains(devScript, '["npm", "run", "build:web:preview"]', "Pages preview build");
+  for (const relativePath of [
+    "css/openquatt-preview.css",
+    "js/mock-scenarios.js",
+    "js/mock-entity-defs.js",
+    "js/mock-fixtures.js",
+    "js/mock-device.js",
+    "js/openquatt-preview.js",
+  ]) {
+    assertContains(devScript, `"${relativePath}"`, `Pages demo asset ${relativePath}`);
+  }
+  assertContains(pagesWorkflow, "run: npm ci", "Pages web build dependency install");
+}
+
 async function checkEmbeddedAssetContracts() {
   const logoMarkup = await readFile(path.join(webDir, "assets/openquatt-logo.svg"), "utf8");
   const configSource = await readFile(path.join(jsSourceDir, "core/config.js"), "utf8");
@@ -694,6 +711,7 @@ globalThis.createScrollKeeper = createScrollKeeper;`,
 async function main() {
   await stat(path.join(webDir, "dev.html"));
   await checkPreviewAssetsAvailable();
+  await checkPagesDemoContracts();
   await checkSourceImports();
   await checkImportCycles();
   await checkImportBoundaries();

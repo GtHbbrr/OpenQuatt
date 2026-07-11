@@ -491,9 +491,9 @@ import { replaceOuterHtmlIfSignatureChanged } from "../views/view-utils.js";
         checks: ["Warmtepomp stopt", "Pomp draait kort door", "Daarna standby"],
       },
       flow_too_low: {
-        label: "Flowcontrole actief",
-        summary: "De pomp draait en de regelaar wacht tot de flow vrijgegeven is voor de volgende stap.",
-        checks: ["Flow wordt bevestigd", "Warmtepomp wacht kort", "Start volgt automatisch"],
+        label: "Waterflow blijft te laag",
+        summary: "De normale voorlooptijd is verstreken, maar de waterflow is nog niet voldoende voor een veilige start.",
+        checks: ["Voorlooptijd verstreken", "Start blijft geblokkeerd", "Flow wordt opnieuw beoordeeld"],
       },
       capacity_cap: {
         label: "Ingesteld koelmaximum",
@@ -516,9 +516,9 @@ import { replaceOuterHtmlIfSignatureChanged } from "../views/view-utils.js";
         checks: ["Lage koelvraag", "Geen abrupte stop", "Rustige regeling"],
       },
       buffer_stop: {
-        label: "Koeling wacht op veilige watermarge",
-        summary: "De watermarge is te klein voor verder koelen. Het systeem wacht tot deze weer veilig is.",
-        checks: ["Watermarge bewaakt", "Koeling tijdelijk gepauzeerd", "Automatisch opnieuw beoordelen"],
+        label: "Water al koud genoeg",
+        summary: "Er is koelvraag, maar het water is al koud genoeg. De warmtepomp hoeft daarom nu niet te starten.",
+        checks: ["Koelvraag blijft actief", "Water is al koud genoeg", "Start volgt automatisch"],
       },
       dew_stop: {
         label: "Dauwpuntstop",
@@ -714,14 +714,32 @@ import { replaceOuterHtmlIfSignatureChanged } from "../views/view-utils.js";
       };
     }
     if (["flow_preflow", "flow_postflow", "flow_too_low"].includes(reasonCode)) {
+      const eventType = target?.realEventType || target?.rawDecisionEvent?.event_type || "";
+      const flowCleared = eventType === "flow_hold_clear";
+      const postflow = reasonCode === "flow_postflow";
+      if (flowCleared) {
+        return {
+          title: postflow ? "Waterflow afronden" : "Waterflow bevestigd",
+          verdict: postflow ? "Naloop klaar" : "Start vrijgegeven",
+          summary: postflow
+            ? "De pompnaloop is afgerond. Het systeem kan terug naar standby."
+            : "De waterflow is voldoende. De regelaar kan doorgaan met de volgende stap.",
+          rows: [
+            { option: "Waterflow", result: "Voldoende", code: reasonCode, detail: "De gemeten circulatie is vrijgegeven voor de volgende stap.", tone: "selected" },
+            { option: "Warmtepomp", result: postflow ? "Gestopt" : "Vrijgegeven", code: reasonCode, detail: postflow ? "De warmtepomp is gestopt; de naloop is nu ook klaar." : "De compressor mag nu volgens de normale regeling starten.", tone: "selected" },
+            { option: "Regelaar", result: "Gaat verder", code: "keep_current", detail: "De controller vervolgt automatisch de normale regeling.", tone: "muted" },
+          ],
+        };
+      }
+      const lowFlowFault = reasonCode === "flow_too_low";
       return {
         title: "Waterflow eerst",
-        verdict: reasonCode === "flow_postflow" ? "Naloop actief" : "Start wacht",
+        verdict: postflow ? "Naloop actief" : lowFlowFault ? "Start geblokkeerd" : "Voorloop actief",
         summary: getControlWorkingReasonMeta(reasonCode).summary,
         rows: [
-          { option: "Waterflow", result: reasonCode === "flow_too_low" ? "Nog te laag" : "Wordt bewaakt", code: reasonCode, detail: "De pomp zorgt voor veilige circulatie voordat de volgende stap vrij is.", tone: "selected" },
-          { option: "Warmtepomp", result: reasonCode === "flow_postflow" ? "Gestopt" : "Wacht nog", code: reasonCode, detail: "De compressor start pas als de flowconditie veilig is.", tone: "limited" },
-          { option: "Regelaar", result: "Probeert opnieuw", code: "keep_current", detail: "De controller beoordeelt dit automatisch opnieuw.", tone: "muted" },
+          { option: "Waterflow", result: lowFlowFault ? "Blijft te laag" : postflow ? "Wordt afgerond" : "Wordt opgebouwd", code: reasonCode, detail: "De pomp zorgt voor circulatie voordat de volgende stap vrij is.", tone: lowFlowFault ? "limited" : "selected" },
+          { option: "Warmtepomp", result: postflow ? "Gestopt" : lowFlowFault ? "Start geblokkeerd" : "Wacht op voorloop", code: reasonCode, detail: "De compressor start pas als de flowconditie veilig is.", tone: lowFlowFault ? "limited" : "muted" },
+          { option: "Regelaar", result: lowFlowFault ? "Blijft controleren" : "Controleert automatisch", code: "keep_current", detail: "De controller beoordeelt de waterflow automatisch opnieuw.", tone: "muted" },
         ],
       };
     }
@@ -770,6 +788,18 @@ import { replaceOuterHtmlIfSignatureChanged } from "../views/view-utils.js";
           { option: "Gevraagd koelniveau", result: cooling.rawDemand, code: "coolingDemandRaw", detail: "Wat de kamer vraagt voordat het ingestelde maximum meetelt.", tone: "muted" },
           { option: "Ingesteld maximum", result: cooling.allowedMax, code: reasonCode, detail: "Het hoogste niveau dat de software nu toestaat.", tone: "selected" },
           { option: "Uitgestuurd niveau", result: cooling.limitedDemand, code: "coolingLimitedDemand", detail: "Het niveau dat de warmtepomp op dit moment krijgt.", tone: "normal" },
+        ],
+      };
+    }
+    if (reasonCode === "buffer_stop") {
+      return {
+        title: "Koelregeling",
+        verdict: "Water al koud genoeg",
+        summary: "Er is koelvraag, maar de actuele watertemperatuur vraagt nu geen extra koeling.",
+        rows: [
+          { option: "Koelvraag", result: "Blijft actief", code: "coolingDemandRaw", detail: "De kamer blijft om koeling vragen.", tone: "muted" },
+          { option: "Watertemperatuur", result: "Koud genoeg", code: "buffer_stop", detail: "De aanvoer is al koud genoeg voor dit moment.", tone: "selected" },
+          { option: "Warmtepomp", result: "Wacht", code: "keep_current", detail: "De warmtepomp start automatisch zodra opnieuw actieve koeling nodig is.", tone: "muted" },
         ],
       };
     }
@@ -851,6 +881,12 @@ import { replaceOuterHtmlIfSignatureChanged } from "../views/view-utils.js";
       expectation = "Na ongeveer 1 minuut stopt de pomp en blijft het systeem standby tot er comfortvraag of bescherming nodig is.";
       primaryReason = "sticky_protection";
       sinceLabel = "Dagelijkse run";
+    } else if (coolingContext.reasonCode === "buffer_stop") {
+      title = "Koeling wacht: water al koud genoeg";
+      copy = "Er is koelvraag, maar het water is al koud genoeg. De warmtepomp hoeft daarom nu niet te starten.";
+      expectation = "De warmtepomp start automatisch zodra opnieuw actieve koeling nodig is.";
+      primaryReason = "buffer_stop";
+      sinceLabel = "Koelvraag actief";
     } else if (coolingProtection) {
       const limiterReason = coolingContext.reasonCode && coolingContext.reasonCode !== "inactive" ? coolingContext.reasonCode : "soft_guard";
       const waitingForRestart = limiterReason === "restart_wait";
@@ -1127,7 +1163,8 @@ import { replaceOuterHtmlIfSignatureChanged } from "../views/view-utils.js";
     const coolingProtectionReason = isControlWorkingCoolingProtectionReason(reasonCode);
     const boilerStopBlocked = ["soft_guard", "sensor_fallback", "no_candidate", "flow_preflow"].includes(reasonCode);
     const reason = getControlWorkingReasonMeta(reasonCode);
-    const isFlowPreStart = reasonCode === "flow_preflow" || reasonCode === "flow_too_low";
+    const isFlowPreStart = reasonCode === "flow_preflow";
+    const isFlowFault = reasonCode === "flow_too_low";
     const fallback = {
       title: "Keuze van het systeem",
       summary: "De regelaar heeft een keuze vastgelegd.",
@@ -1278,12 +1315,27 @@ import { replaceOuterHtmlIfSignatureChanged } from "../views/view-utils.js";
         next: "Na de wachttijd beoordeelt het systeem opnieuw wat de rustigste keuze is.",
       },
       decision_blocked: {
-        title: subject === "CV-ketel" ? "CV-ketel niet vrijgegeven" : "Actie geblokkeerd",
-        summary: subject === "CV-ketel"
+        title: reasonCode === "flow_too_low"
+          ? "Start geblokkeerd: waterflow te laag"
+          : subject === "CV-ketel" ? "CV-ketel niet vrijgegeven" : "Actie geblokkeerd",
+        reasonLabel: reasonCode === "flow_too_low" ? "Waterflow blijft te laag" : "",
+        reasonSummary: reasonCode === "flow_too_low"
+          ? "De normale voorlooptijd is verstreken. De warmtepomp blijft veilig uit totdat voldoende water circuleert."
+          : "",
+        summary: reasonCode === "flow_too_low"
+          ? "De pomp draait, maar na de normale voorlooptijd is nog niet genoeg waterflow gemeten."
+          : subject === "CV-ketel"
           ? "Er was een mogelijke hulpvraag, maar de CV-ketel was niet vrijgegeven."
           : "De gevraagde actie is tijdelijk niet toegestaan door een voorwaarde of bescherming.",
-        detail: reason.summary,
-        next: "De regelaar probeert opnieuw zodra de voorwaarden vrij zijn.",
+        detail: reasonCode === "flow_too_low"
+          ? "Dit is pas een blokkade nadat de normale opbouwtijd is verstreken; een korte lage flow direct na het starten hoort hier niet bij."
+          : reason.summary,
+        next: reasonCode === "flow_too_low"
+          ? "De regelaar blijft de waterflow volgen en geeft de start automatisch vrij zodra de circulatie voldoende en stabiel is."
+          : "De regelaar probeert opnieuw zodra de voorwaarden vrij zijn.",
+        checks: reasonCode === "flow_too_low"
+          ? ["Voorlooptijd verstreken", "Warmtepomp blijft veilig uit", "Waterflow wordt opnieuw beoordeeld"]
+          : null,
       },
       candidate_blocked: {
         title: `${subject} wacht nog`,
@@ -1296,9 +1348,11 @@ import { replaceOuterHtmlIfSignatureChanged } from "../views/view-utils.js";
       flow_hold_start: {
         title: reasonCode === "flow_postflow"
           ? coolingRuntimeHold ? "Koeling loopt nog kort door" : heatingRuntimeHold ? "Verwarming loopt nog kort door" : isCoolingModeEvent ? "Naloop na koelen actief" : "Naloop actief"
+          : isFlowFault ? "Start wacht op voldoende waterflow"
           : isCoolingModeEvent ? "Voorloop voor koelen" : "Voorloop voor start",
         reasonLabel: reasonCode === "flow_postflow"
           ? coolingRuntimeHold || heatingRuntimeHold ? "Minimale looptijd" : isCoolingModeEvent ? "Naloop na koelen" : "Naloop actief"
+          : isFlowFault ? "Waterflow blijft te laag"
           : isCoolingModeEvent ? "Voorloop voor koelen" : "Voorloop actief",
         reasonSummary: isCoolingModeEvent
           ? reasonCode === "flow_postflow"
@@ -1314,7 +1368,11 @@ import { replaceOuterHtmlIfSignatureChanged } from "../views/view-utils.js";
             ? coolingRuntimeHold
               ? `${activeCoolingSource} koelt nog kort door door minimale looptijd; het systeem zit al in naloop.`
               : "De pomp draait kort na zodat het koelbedrijf netjes wordt afgerond."
+            : isFlowFault
+            ? "De voorlooptijd is verstreken, maar de waterflow is nog niet voldoende om veilig met koelen te starten."
             : "De pomp draait eerst kort voor. Daarna mag de warmtepomp met koelen starten."
+          : isFlowFault
+          ? "De voorlooptijd is verstreken, maar de waterflow is nog niet voldoende om de warmtepomp veilig te starten."
           : isFlowPreStart
             ? "De pomp draait eerst kort voor zodat de flow stabiel is voordat de warmtepomp start."
           : heatingRuntimeHold
@@ -1340,15 +1398,19 @@ import { replaceOuterHtmlIfSignatureChanged } from "../views/view-utils.js";
       flow_hold_clear: {
         title: reasonCode === "flow_postflow"
           ? isCoolingModeEvent ? "Naloop na koelen klaar" : "Naloop klaar"
+          : isFlowFault ? "Waterflow hersteld"
           : isCoolingModeEvent ? "Voorloop voor koelen klaar" : "Voorloop klaar",
         reasonLabel: reasonCode === "flow_postflow"
           ? isCoolingModeEvent ? "Naloop na koelen" : "Naloop actief"
+          : isFlowFault ? "Waterflow hersteld"
           : isCoolingModeEvent ? "Koelen vrijgegeven" : "Voorloop klaar",
-        reasonSummary: isCoolingModeEvent
-          ? reasonCode === "flow_postflow"
-            ? "De korte pompnaloop na koelen is afgerond."
-            : "De waterflow is voldoende; de warmtepomp kan met koelen verder."
-          : "",
+        reasonSummary: reasonCode === "flow_postflow"
+          ? isCoolingModeEvent ? "De korte pompnaloop na koelen is afgerond." : "De korte pompnaloop is afgerond."
+          : isFlowFault
+          ? "De waterflow is hersteld en de tijdelijke startblokkade is opgeheven."
+          : isCoolingModeEvent
+          ? "De waterflow is voldoende; de warmtepomp kan met koelen verder."
+          : "De waterflow is voldoende; de warmtepomp is vrijgegeven voor de volgende stap.",
         summary: isCoolingModeEvent
           ? reasonCode === "flow_postflow"
             ? "De pomp heeft kort nagedraaid; het koelbedrijf is afgerond."
@@ -1358,12 +1420,19 @@ import { replaceOuterHtmlIfSignatureChanged } from "../views/view-utils.js";
           : "De waterflowfase is afgerond; de normale regeling kan verder.",
         detail: isCoolingModeEvent
           ? "De flowfase hoort bij het koeltraject. Dit is normaal gedrag rond starten of stoppen van koeling."
-          : reason.summary,
+          : reasonCode === "flow_postflow"
+          ? "De warmtepomp is gestopt en de pomp heeft de korte naloop afgerond."
+          : "De pomp heeft voldoende circulatie opgebouwd. De startvoorwaarde voor waterflow is nu vrij.",
         next: isCoolingModeEvent
           ? reasonCode === "flow_postflow"
             ? "Het systeem blijft standby totdat er opnieuw koelvraag of bescherming nodig is."
             : "De controller vervolgt met koelen en blijft dauwpunt en aanvoer bewaken."
           : "De controller vervolgt met verwarmen, koelen, vorstbescherming of standby.",
+        checks: reasonCode === "flow_postflow"
+          ? ["Naloop afgerond", "Warmtepomp gestopt", "Regeling gaat naar standby"]
+          : isFlowFault
+          ? ["Waterflow hersteld", "Startblokkade opgeheven", "Regeling gaat verder"]
+          : ["Waterflow voldoende", "Warmtepomp vrijgegeven", "Regeling gaat verder"],
       },
       defrost_seen_start: {
         title: `Ontdooien gestart (${subject})`,
@@ -1382,17 +1451,23 @@ import { replaceOuterHtmlIfSignatureChanged } from "../views/view-utils.js";
           ? "Koeling gestopt door dauwpunt"
           : reasonCode === "restart_wait"
           ? "Koeling wacht op veilige herstart"
+          : reasonCode === "buffer_stop"
+          ? "Koeling wacht: water al koud genoeg"
           : coolingProtectionReason ? "Koeling tijdelijk beperkt" : "Koeling op ingesteld maximum",
         summary: reasonCode === "dew_stop"
           ? `${activeCoolingSource} stopt omdat verder koelen te dicht bij het dauwpunt komt.`
           : reasonCode === "restart_wait"
           ? "De koelvraag is nog aanwezig. Het systeem wacht met opnieuw starten tot de veilige marge voldoende is hersteld."
+          : reasonCode === "buffer_stop"
+          ? "Er is koelvraag, maar het water is al koud genoeg. De warmtepomp hoeft daarom nu niet te starten."
           : coolingProtectionReason
           ? "Er is koelvraag, maar het systeem houdt het koelvermogen tijdelijk lager."
           : "Er is koelvraag. Het systeem koelt binnen het actuele softwaremaximum.",
         detail: reason.summary,
         next: reasonCode === "restart_wait"
           ? "De warmtepomp start automatisch opnieuw zodra de veilige marge voldoende en stabiel is."
+          : reasonCode === "buffer_stop"
+          ? "De warmtepomp start automatisch zodra opnieuw actieve koeling nodig is."
           : coolingProtectionReason
           ? "Koeling wordt vrijgegeven zodra de veilige marge stabiel genoeg is."
           : "Koeling blijft binnen dit maximum zolang de instelling en koelvraag gelijk blijven.",
@@ -1479,6 +1554,9 @@ import { replaceOuterHtmlIfSignatureChanged } from "../views/view-utils.js";
     if (isDecisionCoolingAdjustmentEvent(event)) {
       return "normal";
     }
+    if (reason === "buffer_stop") {
+      return "normal";
+    }
     if (isControlWorkingCoolingProtectionReason(reason)) {
       return "limited";
     }
@@ -1487,8 +1565,7 @@ import { replaceOuterHtmlIfSignatureChanged } from "../views/view-utils.js";
         return "normal";
       }
       if (reason === "flow_too_low") {
-        const durationS = Number(event?.duration_s);
-        return Number.isFinite(durationS) && durationS > 90 ? "limited" : "normal";
+        return eventType === "flow_hold_start" ? "limited" : "normal";
       }
     }
     return String(event?.severity || "normal");
@@ -1551,6 +1628,7 @@ import { replaceOuterHtmlIfSignatureChanged } from "../views/view-utils.js";
       graphEnd: getDecisionEventGraphEndMinute(graphStart, event, selectedWindow),
       realEventType: eventType,
       rawDecisionEvent: event,
+      checks: Array.isArray(copy.checks) ? copy.checks : null,
       timelineHidden: ((eventType === "source_start" || eventType === "topology_change") && contextCm === 5) ||
         (eventType === "source_stop" && (event?._oq_cooling_stop_reason === "dew_stop" || reasonCode === "dew_stop")),
     };
@@ -1758,7 +1836,9 @@ import { replaceOuterHtmlIfSignatureChanged } from "../views/view-utils.js";
         reasonLabel: "Koeling gestart",
         reasonSummary: "De koelrun is gestart en liep binnen de normale regeling.",
         modeLabel: "CM5",
-        minDurationS: 120,
+        // An active run must be visible immediately; only completed micro-runs
+        // are suppressed to keep historical timelines calm.
+        minDurationS: interval.isOpen ? 1 : 120,
       }, selectedWindow, nowMs));
     });
 
@@ -2555,6 +2635,7 @@ import { replaceOuterHtmlIfSignatureChanged } from "../views/view-utils.js";
     const reasonSummary = item.reasonSummary || reason.summary;
     const optimizer = getControlWorkingOptimizerModel(item);
     const modeMetaLabel = getControlWorkingModeMetaLabel(item);
+    const checks = Array.isArray(item.checks) ? item.checks : reason.checks;
     return `
       <aside class="oq-working-detail oq-working-detail--${escapeHtml(status.tone)}">
         <div>
@@ -2575,9 +2656,9 @@ import { replaceOuterHtmlIfSignatureChanged } from "../views/view-utils.js";
           <span>${escapeHtml(item.next)}</span>
         </div>
         ${renderControlWorkingOptimizer(optimizer)}
-        ${reason.checks.length ? `
+        ${checks.length ? `
           <div class="oq-working-checks" aria-label="Beslisfactoren">
-            ${reason.checks.map((check) => `<span>${renderOqIcon("shield", "oq-working-reason-icon")} ${escapeHtml(check)}</span>`).join("")}
+            ${checks.map((check) => `<span>${renderOqIcon("shield", "oq-working-reason-icon")} ${escapeHtml(check)}</span>`).join("")}
           </div>
         ` : ""}
         <div class="oq-working-pill-row">
@@ -2679,15 +2760,21 @@ import { replaceOuterHtmlIfSignatureChanged } from "../views/view-utils.js";
     const isCoolingGuard = Boolean(current.coolingProtection);
     const isCoolingCap = Boolean(current.coolingCapped);
     const isCoolingRestartWait = current.primaryReason === "restart_wait";
+    const isCoolingWaterSatisfied = current.primaryReason === "buffer_stop";
     const isSticky = current.primaryReason === "sticky_protection";
-    const guardTitle = isCoolingGuard
+    const guardEyebrow = isCoolingWaterSatisfied ? "Koelregeling" : "Bescherming";
+    const guardTitle = isCoolingWaterSatisfied
+      ? "Water al koud genoeg"
+      : isCoolingGuard
       ? isCoolingRestartWait ? "Wacht op veilige herstart" : "Koeling tijdelijk beperkt"
       : isCoolingCap
       ? "Koeling met ingesteld maximum"
       : isSticky
       ? "Geen comfortvraag actief"
       : "Geen beperking actief";
-    const guardCopy = isCoolingGuard
+    const guardCopy = isCoolingWaterSatisfied
+      ? "Dit is normale regeling. De koelvraag blijft actief, maar de warmtepomp hoeft nu geen extra koude aan het water toe te voegen."
+      : isCoolingGuard
       ? isCoolingRestartWait
         ? "De koelvraag blijft aanwezig. De warmtepomp start opnieuw zodra de veilige marge voldoende is hersteld."
         : "De aanvoer blijft boven de veilige grens. Daarom koelt het systeem tijdelijk minder hard."
@@ -2696,7 +2783,13 @@ import { replaceOuterHtmlIfSignatureChanged } from "../views/view-utils.js";
       : isSticky
       ? "Alleen de pomp draait kort. De warmtepompen blijven uit en er worden geen compressorstarts geteld."
       : "Ontdooien, minimum rusttijd, dauwpunt en waterflow blijven bewaakt. Ze verschijnen hier zodra ze gedrag begrenzen.";
-    const guardPills = isCoolingGuard
+    const guardPills = isCoolingWaterSatisfied
+      ? [
+        ["Koelvraag actief", "info", "snowflake"],
+        ["Water koud genoeg", "normal", "droplet"],
+        ["Automatische herstart", "context", "activity"],
+      ]
+      : isCoolingGuard
       ? [
         ["Dauwpunt bewaakt", "limited", "droplet"],
         [`Max. niveau ${current.cooling.allowedMax}`, "info", "target"],
@@ -2752,7 +2845,7 @@ import { replaceOuterHtmlIfSignatureChanged } from "../views/view-utils.js";
             ${renderControlWorkingSourceCard("CV", current.cvStatus, "—", "—", current.cvStatus === "Actief")}
           </section>
           <section class="oq-working-guard-panel">
-            <span class="oq-working-eyebrow">Bescherming</span>
+            <span class="oq-working-eyebrow">${escapeHtml(guardEyebrow)}</span>
             <h3>${escapeHtml(guardTitle)}</h3>
             <p>${escapeHtml(guardCopy)}</p>
             <div class="oq-working-pill-row">

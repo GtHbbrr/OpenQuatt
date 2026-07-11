@@ -992,6 +992,7 @@ interval:
           const float flow = id(flow_rate_selected).state;
           const bool flow_valid = !isnan(flow);
           const bool flow_low = (!flow_valid) || (flow < min_flow_lph);
+          const bool lowflow_fault_was_active = id(oq_lowflow_fault_active);
 
           if (!thermal_req) {
             // No active thermal request: reset flow interlock state
@@ -1021,6 +1022,27 @@ interval:
                 id(oq_flow_recover_since_ms) = 0;
               }
             }
+          }
+
+          // Normal pump startup may begin below the flow threshold. Only log a
+          // blocked start when that condition survives the configured fault delay.
+          if (!lowflow_fault_was_active && id(oq_lowflow_fault_active)) {
+            const int16_t measured_flow_lph = flow_valid
+                ? (int16_t) std::max(-32768L, std::min(32767L, lroundf(flow)))
+                : 0;
+            const int16_t required_flow_lph =
+                (int16_t) std::max(-32768L, std::min(32767L, lroundf(min_flow_lph)));
+            id(oq_decision_log).emit(
+              openquatt_decision_log::EVENT_DECISION_BLOCKED,
+              openquatt_decision_log::SUBJECT_SYSTEM,
+              openquatt_decision_log::REASON_FLOW_TOO_LOW,
+              openquatt_decision_log::SEVERITY_LIMITED,
+              1,
+              openquatt_decision_log::STATE_LIMITED,
+              openquatt_decision_log::STATE_BLOCKED,
+              measured_flow_lph,
+              0,
+              required_flow_lph);
           }
 
           // Flow OK definition for diagnostics: NaN is NOT OK.
@@ -1233,7 +1255,11 @@ interval:
                     }
                   } else {
                     desired_local = 1; // flow interlock holding state
-                    cm1_event_reason = openquatt_decision_log::REASON_FLOW_TOO_LOW;
+                    // Raw flow is normally still building when the pump first starts.
+                    // Only call it low flow after the configured fault delay has elapsed.
+                    cm1_event_reason = id(oq_lowflow_fault_active)
+                        ? openquatt_decision_log::REASON_FLOW_TOO_LOW
+                        : openquatt_decision_log::REASON_FLOW_PREFLOW;
                     cm_transition_reason = "cooling request held by flow interlock";
                   }
                 } else if (heating_req) {
@@ -1250,7 +1276,9 @@ interval:
                     }
                   } else {
                     desired_local = 1; // flow interlock holding state
-                    cm1_event_reason = openquatt_decision_log::REASON_FLOW_TOO_LOW;
+                    cm1_event_reason = id(oq_lowflow_fault_active)
+                        ? openquatt_decision_log::REASON_FLOW_TOO_LOW
+                        : openquatt_decision_log::REASON_FLOW_PREFLOW;
                     cm_transition_reason = "heating request held by flow interlock";
                   }
                 } else {
@@ -1365,11 +1393,14 @@ interval:
             if (!was_cm1 && is_cm1 && is_cm1_log_reason(cm1_event_reason)) {
               cm1_hold_started_ms = now_ms;
               cm1_hold_reason = cm1_event_reason;
+              const uint8_t hold_severity = cm1_hold_reason == openquatt_decision_log::REASON_FLOW_TOO_LOW
+                  ? openquatt_decision_log::SEVERITY_LIMITED
+                  : openquatt_decision_log::SEVERITY_NORMAL;
               id(oq_decision_log).emit(
                 openquatt_decision_log::EVENT_FLOW_HOLD_START,
                 openquatt_decision_log::SUBJECT_SYSTEM,
                 cm1_hold_reason,
-                openquatt_decision_log::SEVERITY_LIMITED,
+                hold_severity,
                 1,
                 openquatt_decision_log::STATE_STANDBY,
                 openquatt_decision_log::STATE_LIMITED,
