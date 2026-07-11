@@ -1,9 +1,11 @@
 import { copyTextToClipboard } from "../core/browser-utils.js";
+import { invokeActionMap } from "../core/action-router.js";
+import { updateMqttState } from "../core/feature-state.js";
 import { getEntitySignatureFragment } from "../core/render-signatures.js";
 import { state } from "../core/state.js";
 import { shouldRefreshSupplementaryStatus } from "../core/supplementary-refresh.js";
 import { isIntegrationsSettingsGroupActive } from "../core/surface-state.js";
-import { getMqttInputTopic } from "./mqtt.js";
+import { getMqttInputTopic, isMqttInputAcceptRetained, isMqttInputEnabled } from "./mqtt.js";
 import { render } from "../core/render-scheduler.js";
 
   export function getMqttStatusSignature(status = state.mqttStatus || {}) {
@@ -69,13 +71,15 @@ import { render } from "../core/render-scheduler.js";
 
   export function syncMqttDraftsFromStatus() {
     const status = state.mqttStatus || {};
-    state.mqttDraftEnabled = status.enabled === true;
-    state.mqttDraftBroker = String(status.broker || "");
-    state.mqttDraftPort = String(status.port || 1883);
-    state.mqttDraftUsername = String(status.username || "");
-    state.mqttDraftPassword = "";
-    state.mqttDraftClearPassword = false;
-    state.mqttDraftDirty = false;
+    updateMqttState({
+      mqttDraftEnabled: status.enabled === true,
+      mqttDraftBroker: String(status.broker || ""),
+      mqttDraftPort: String(status.port || 1883),
+      mqttDraftUsername: String(status.username || ""),
+      mqttDraftPassword: "",
+      mqttDraftClearPassword: false,
+      mqttDraftDirty: false,
+    });
   }
 
   export function syncMqttDraftFromInput(input) {
@@ -84,9 +88,7 @@ import { render } from "../core/render-scheduler.js";
       return false;
     }
 
-    state.mqttNotice = "";
-    state.mqttError = "";
-    state.mqttDraftDirty = true;
+    updateMqttState({ mqttNotice: "", mqttError: "", mqttDraftDirty: true });
     if (mqttField === "enabled") {
       state.mqttDraftEnabled = Boolean(input.checked);
     } else if (mqttField === "broker") {
@@ -379,4 +381,54 @@ import { render } from "../core/render-scheduler.js";
       state.mqttBusy = false;
       render();
     }
+  }
+
+  const mqttActionHandlers = {
+    "open-mqtt-modal": () => {
+      state.systemModal = "mqtt";
+      syncMqttDraftsFromStatus();
+      state.mqttDraftDirty = false;
+      state.mqttNotice = "";
+      state.mqttError = "";
+      render();
+      return refreshMqttStatus({ force: true });
+    },
+    "open-mqtt-sensors-modal": () => {
+      state.systemModal = "mqtt-sensors";
+      state.mqttNotice = "";
+      state.mqttError = "";
+      state.mqttCopiedTopicKey = "";
+      state.mqttExpandedTopicKey = "";
+      state.mqttInputToggleBusyKey = "";
+      state.mqttRetainedToggleBusyKey = "";
+      render();
+      return refreshMqttStatus({ force: true }).then((changed) => {
+        if (changed && state.systemModal === "mqtt-sensors") {
+          render();
+        }
+      });
+    },
+    "toggle-mqtt-sensor-topic": (button) => {
+      const topicKey = button.dataset?.oqMqttTopicKey || "cooling_dew_point";
+      state.mqttExpandedTopicKey = state.mqttExpandedTopicKey === topicKey ? "" : topicKey;
+      state.mqttError = "";
+      render();
+    },
+    "toggle-mqtt-input": (button) => {
+      const topicKey = button.dataset?.oqMqttTopicKey || "cooling_dew_point";
+      return commitMqttInputEnabled(topicKey, !isMqttInputEnabled(topicKey));
+    },
+    "toggle-mqtt-retained": (button) => {
+      const topicKey = button.dataset?.oqMqttTopicKey || "";
+      if (topicKey) {
+        return commitMqttInputAcceptRetained(topicKey, !isMqttInputAcceptRetained(topicKey));
+      }
+    },
+    "copy-mqtt-topic": (button) => copyMqttTopic(button.dataset?.oqMqttTopicKey || "cooling_dew_point"),
+    "copy-mqtt-dew-topic": (button) => copyMqttTopic(button.dataset?.oqMqttTopicKey || "cooling_dew_point"),
+    "save-mqtt-config": () => commitMqttConfig(),
+  };
+
+  export function handleMqttAction(action, button) {
+    return invokeActionMap(mqttActionHandlers, action, button);
   }

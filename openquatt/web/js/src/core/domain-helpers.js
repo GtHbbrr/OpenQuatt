@@ -14,6 +14,3 @@ import { getBasePath } from "./url-path.js";
     return String(value || "").toLowerCase().includes("manual");
   }
 
-  export function isCustomPowerHouseProfile(value = getEntityValue("phResponseProfile")) {
-    return String(value || "").toLowerCase().includes("custom");
-  }

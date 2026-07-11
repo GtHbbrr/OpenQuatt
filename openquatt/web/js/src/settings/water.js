@@ -1,5 +1,6 @@
 import { getEntityNumericValue, hasEntity } from "../core/app-shared.js";
-import { getInputDraftValue, getNumberMeta, parseLooseNumber } from "../core/entity-store.js";
+import { getInputDraftValue } from "../core/control-drafts.js";
+import { getNumberMeta, parseLooseNumber } from "../core/entity-store.js";
 import { renderNumberInputControl } from "../core/number-controls.js";
 import { formatSettingsNumberValue, getSettingsTemperatureValue, renderSettingsNumberField, renderSettingsSection } from "./controls.js";
 import { escapeHtml } from "../core/html.js";

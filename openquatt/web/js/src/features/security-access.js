@@ -1,5 +1,6 @@
 import { state } from "../core/state.js";
 import { escapeHtml } from "../core/html.js";
+import { renderModalShell } from "../core/modal-shell.js";
 
   export function getWebAuthStatusLabel() {
     const authStatus = state.authStatus;
@@ -172,17 +173,16 @@ import { escapeHtml } from "../core/html.js";
       ? `<div class="oq-helper-modal-note oq-helper-modal-note--error" aria-live="assertive">${escapeHtml(state.apiSecurityError)}</div>`
       : "";
 
-    return `
-      <div class="oq-helper-modal-backdrop${state.overviewTheme === "dark" ? " oq-helper-modal-backdrop--dark" : ""}" data-oq-modal="system">
-        <section class="oq-helper-modal oq-helper-modal--wide" role="dialog" aria-modal="true" aria-labelledby="oq-api-security-modal-title">
-          <div class="oq-helper-modal-head">
-            <div>
-              <p class="oq-helper-modal-kicker">Toegang</p>
-              <h2 class="oq-helper-modal-title" id="oq-api-security-modal-title">${escapeHtml(getApiSecurityModalTitle())}</h2>
-            </div>
-            <button class="oq-helper-modal-close" type="button" data-oq-action="close-system-modal" aria-label="Sluit API-beveiliging popup">×</button>
-          </div>
-          <p class="oq-helper-modal-copy">${escapeHtml(getApiSecurityModalCopy())}</p>
+    return renderModalShell({
+      id: "system",
+      titleId: "oq-api-security-modal-title",
+      kicker: "Toegang",
+      title: getApiSecurityModalTitle(),
+      copy: getApiSecurityModalCopy(),
+      className: "oq-helper-modal--wide",
+      closeAction: "close-system-modal",
+      closeLabel: "Sluit API-beveiliging popup",
+      body: `
           ${modalNotice ? `<div class="oq-helper-modal-success oq-helper-modal-success--compact" aria-live="polite"><strong>Status</strong><span>${escapeHtml(modalNotice)}</span></div>` : ""}
           ${errorMarkup}
           <div class="oq-settings-api-security-shell oq-settings-api-security-shell--modal">
@@ -240,9 +240,9 @@ import { escapeHtml } from "../core/html.js";
                 : ""}
             </div>
             ` : ""}
-          </div>
-          <div class="oq-helper-modal-actions">
-            ${restartPending ? `
+          </div>`,
+      actions: `
+        ${restartPending ? `
               <button
                 class="oq-helper-button oq-helper-button--primary"
                 type="button"
@@ -251,12 +251,10 @@ import { escapeHtml } from "../core/html.js";
               >
                 Opslaan en herstarten
               </button>
-            ` : ""}
-            <button class="oq-helper-button oq-helper-button--ghost" type="button" data-oq-action="close-system-modal" ${state.apiSecurityBusy ? "disabled" : ""}>Gereed</button>
-          </div>
-        </section>
-      </div>
-    `;
+        ` : ""}
+        <button class="oq-helper-button oq-helper-button--ghost" type="button" data-oq-action="close-system-modal" ${state.apiSecurityBusy ? "disabled" : ""}>Gereed</button>
+      `,
+    });
   }
 
   export function renderLoginModal() {
@@ -338,34 +336,29 @@ import { escapeHtml } from "../core/html.js";
         </div>
       `;
 
-    return `
-      <div class="oq-helper-modal-backdrop${state.overviewTheme === "dark" ? " oq-helper-modal-backdrop--dark" : ""}" data-oq-modal="system">
-        <section class="oq-helper-modal" role="dialog" aria-modal="true" aria-labelledby="oq-login-modal-title">
-          <div class="oq-helper-modal-head">
-            <div>
-              <p class="oq-helper-modal-kicker">Systeem</p>
-              <h2 class="oq-helper-modal-title" id="oq-login-modal-title">${escapeHtml(getWebAuthModalTitle())}</h2>
-            </div>
-            <button class="oq-helper-modal-close" type="button" data-oq-action="close-system-modal" aria-label="Sluit login-popup">×</button>
-          </div>
-          <p class="oq-helper-modal-copy">${escapeHtml(getWebAuthModalCopy())}</p>
+    return renderModalShell({
+      id: "system",
+      titleId: "oq-login-modal-title",
+      kicker: "Systeem",
+      title: getWebAuthModalTitle(),
+      copy: getWebAuthModalCopy(),
+      closeAction: "close-system-modal",
+      closeLabel: "Sluit login-popup",
+      body: `
           ${noticeMarkup}
           ${errorMarkup}
           <div class="oq-helper-modal-grid">
             ${renderLoginStatusRow("Beveiligingsstatus", getWebAuthStatusLabel(), getWebAuthStatusDetail())}
             ${renderLoginStatusRow("Gebruiker", authEnabled ? (usernameValue || "Geen naam") : "Geen login", authEnabled ? "Deze naam gebruik je om in te loggen." : "Er staat nog geen login op het device.")}
           </div>
-          ${authFormMarkup}
-          <div class="oq-helper-modal-actions">
-            <button class="oq-helper-button oq-helper-button--ghost" type="button" data-oq-action="close-system-modal" ${state.authBusy ? "disabled" : ""}>Gereed</button>
-            ${authEnabled
+          ${authFormMarkup}`,
+      actions: `
+        <button class="oq-helper-button oq-helper-button--ghost" type="button" data-oq-action="close-system-modal" ${state.authBusy ? "disabled" : ""}>Gereed</button>
+        ${authEnabled
               ? `<button class="oq-helper-button oq-helper-button--ghost" type="button" data-oq-action="disable-web-auth" ${state.authBusy ? "disabled" : ""}>Uitzetten</button>`
               : ""}
-            ${canEdit
+        ${canEdit
               ? `<button class="oq-helper-button oq-helper-button--primary" type="button" data-oq-action="save-web-auth" ${state.authBusy ? "disabled" : ""}>${authEnabled ? "Opslaan" : "Login opslaan"}</button>`
-              : ""}
-          </div>
-        </section>
-      </div>
-    `;
+              : ""}`,
+    });
   }

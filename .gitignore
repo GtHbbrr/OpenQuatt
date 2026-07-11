@@ -11,6 +11,9 @@ __pycache__/
 node_modules/
 tmp/
 .tmp/
+openquatt/web/css/openquatt-preview.css
+openquatt/web/js/openquatt-preview.js
+openquatt/web/js/mock-entity-defs.js
 .cache/
 .venv/
 # Lokale referentiedocumenten die bewust niet in GitHub horen

@@ -1,127 +1,14 @@
 import { hasEntity, isEntityActive } from "../core/app-shared.js";
 import { ENTITY_DEFS, SETTINGS_BACKUP_KEYS, SETTINGS_BACKUP_SECTIONS } from "../core/config.js";
+import { parseEnergyHistoryDateKey, parseEnergyHistoryMetadata } from "../core/energy-history-domain.js";
 import { getEntityValue } from "../core/entity-store.js";
 import { state } from "../core/state.js";
 import { getInstallationLabel, getInstallationTopology } from "../features/device-context.js";
 import { getFirmwareCurrentVersion } from "../features/firmware-update.js";
 import { ENERGY_HISTORY_EXPORT_MODES, getSettingsBackupSelectionSummary, normalizeEnergyHistoryExportMode } from "../features/storage-history.js";
 import { formatSettingsOptionLabel, getSettingsStatValue, renderSettingsCompactSwitchControl, renderSettingsFieldCard, renderSettingsSection, renderSettingsSwitchCopy } from "./controls.js";
-import { getEnergyHistoryMetadataFromRaw, parseEnergyHistoryDateKey } from "../views/energy.js";
 import { escapeHtml } from "../core/html.js";
-
-  export function renderSettingsTrendStatsField() {
-    if (!isEntityActive("trendHistoryEnabled")) {
-      return "";
-    }
-
-    const detailStats = [
-      { key: "trendHistoryFlashOldest", label: "Eerste meting", value: getSettingsStorageStatOrFallback("trendHistoryFlashOldest", "Geen data") },
-      { key: "trendHistoryFlashNewest", label: "Laatste meting", value: getSettingsStorageStatOrFallback("trendHistoryFlashNewest", "Geen data") },
-      { key: "trendHistoryFlashLastFlush", label: "Laatst opgeslagen", value: getSettingsStorageStatOrFallback("trendHistoryFlashLastFlush", "Geen data") },
-    ];
-    const availableValue = getSettingsStorageStatOrFallback("trendHistoryFlashAvailable", "Alleen live");
-    const newestValue = getSettingsStorageStatOrFallback("trendHistoryFlashNewest", "Geen data");
-    const storageValue = getSettingsStorageStatOrFallback("trendHistoryFlashSize");
-    const writesValue = getSettingsStorageStatOrFallback("trendHistoryFlashWrites", "0");
-
-    const controlMarkup = `
-        <div class="oq-settings-trend-stats-shell">
-        <div class="oq-settings-trend-stats-summary">
-          <div class="oq-settings-trend-stats-summary-copy">
-            <span class="oq-settings-trend-stats-summary-label">Diagnosegeschiedenis</span>
-            <strong class="oq-settings-trend-stats-summary-value">${escapeHtml(availableValue)}</strong>
-            <p class="oq-settings-trend-stats-summary-note">Laatste meting in permanent geheugen: ${escapeHtml(newestValue)}.</p>
-          </div>
-          <div class="oq-settings-trend-stats-badges" aria-label="Diagnosegeschiedenis statistieken">
-            <div class="oq-settings-trend-stats-badge">
-              <span class="oq-settings-trend-stats-badge-label">Opslagruimte</span>
-              <strong class="oq-settings-trend-stats-badge-value">${escapeHtml(storageValue)}</strong>
-            </div>
-            <div class="oq-settings-trend-stats-badge">
-              <span class="oq-settings-trend-stats-badge-label">Opslagacties</span>
-              <strong class="oq-settings-trend-stats-badge-value">${escapeHtml(writesValue)}</strong>
-            </div>
-          </div>
-        </div>
-        <div class="oq-settings-trend-stats-grid">
-          ${detailStats.map((stat) => `
-            <div class="oq-settings-trend-stat">
-              <span class="oq-settings-trend-stat-label">${escapeHtml(stat.label)}</span>
-              <strong class="oq-settings-trend-stat-value">${escapeHtml(stat.value)}</strong>
-            </div>
-          `).join("")}
-        </div>
-      </div>
-    `;
-
-    return renderSettingsFieldCard(
-      "trendHistoryFlashStats",
-      "Diagnosegeschiedenis",
-      "Overzicht van wat er nu in permanent geheugen is opgeslagen.",
-      controlMarkup,
-      "oq-settings-field--span-2",
-      isEntityActive("trendHistoryFlashEnabled")
-        ? `<p class="oq-settings-action-note">Wordt ongeveer elk uur opgeslagen en ook bij herstart of update.</p>`
-        : `<p class="oq-settings-action-note">Nieuwe opslag staat uit; bestaande diagnosegeschiedenis blijft beschikbaar.</p>`,
-    );
-  }
-
-  export function renderSettingsEnergyHistoryStatsField() {
-    if (!hasEntity("lifetimeEnergyHistoryEnabled")) {
-      return "";
-    }
-
-    const detailStats = [
-      { key: "lifetimeEnergyHistoryOldest", label: "Eerste dag", value: getSettingsStorageStatOrFallback("lifetimeEnergyHistoryOldest", "Geen data") },
-      { key: "lifetimeEnergyHistoryNewest", label: "Laatste dag", value: getSettingsStorageStatOrFallback("lifetimeEnergyHistoryNewest", "Geen data") },
-      { key: "lifetimeEnergyHistoryLastWrite", label: "Laatst opgeslagen", value: getSettingsStorageStatOrFallback("lifetimeEnergyHistoryLastWrite", "Geen data") },
-    ];
-    const availableValue = getSettingsStorageStatOrFallback("lifetimeEnergyHistoryAvailable", "Geen data");
-    const newestValue = getSettingsStorageStatOrFallback("lifetimeEnergyHistoryNewest", "Geen data");
-    const storageValue = getSettingsStorageStatOrFallback("lifetimeEnergyHistorySize");
-    const writesValue = getSettingsStorageStatOrFallback("lifetimeEnergyHistoryWrites", "0");
-
-    const controlMarkup = `
-      <div class="oq-settings-trend-stats-shell">
-        <div class="oq-settings-trend-stats-summary">
-          <div class="oq-settings-trend-stats-summary-copy">
-            <span class="oq-settings-trend-stats-summary-label">Energiehistorie</span>
-            <strong class="oq-settings-trend-stats-summary-value">${escapeHtml(formatSettingsStoredDaysLabel(availableValue))}</strong>
-            <p class="oq-settings-trend-stats-summary-note">Laatste dag in permanent geheugen: ${escapeHtml(newestValue)}.</p>
-          </div>
-          <div class="oq-settings-trend-stats-badges" aria-label="Energiehistorie statistieken">
-            <div class="oq-settings-trend-stats-badge">
-              <span class="oq-settings-trend-stats-badge-label">Opslagruimte</span>
-              <strong class="oq-settings-trend-stats-badge-value">${escapeHtml(storageValue)}</strong>
-            </div>
-            <div class="oq-settings-trend-stats-badge">
-              <span class="oq-settings-trend-stats-badge-label">Opslagacties</span>
-              <strong class="oq-settings-trend-stats-badge-value">${escapeHtml(writesValue)}</strong>
-            </div>
-          </div>
-        </div>
-        <div class="oq-settings-trend-stats-grid">
-          ${detailStats.map((stat) => `
-            <div class="oq-settings-trend-stat">
-              <span class="oq-settings-trend-stat-label">${escapeHtml(stat.label)}</span>
-              <strong class="oq-settings-trend-stat-value">${escapeHtml(stat.value)}</strong>
-            </div>
-          `).join("")}
-        </div>
-      </div>
-    `;
-
-    return renderSettingsFieldCard(
-      "lifetimeEnergyHistoryStats",
-      "Energiehistorie",
-      "Dagtotalen voor langere energiegrafieken in de lokale web-app.",
-      controlMarkup,
-      "oq-settings-field--span-2",
-      isEntityActive("lifetimeEnergyHistoryEnabled")
-        ? `<p class="oq-settings-action-note">Wordt alleen bij dagwissel en normale afsluiting opgeslagen; geen continue opslag.</p>`
-        : `<p class="oq-settings-action-note">Nieuwe dagtotalen worden niet bewaard; bestaande historie blijft beschikbaar.</p>`,
-    );
-  }
+import { renderModalShell } from "../core/modal-shell.js";
 
   export function renderSettingsStorageSummaryMetric(label, value, meta = "", enabled = false) {
     return `
@@ -217,28 +104,6 @@ import { escapeHtml } from "../core/html.js";
       >
         ${escapeHtml(busy ? (options.busyLabel || buttonLabel) : buttonLabel)}
       </button>
-    `;
-  }
-
-  export function renderSettingsStorageStatGrid(stats) {
-    const visibleStats = stats.filter((stat) => stat.value || hasEntity(stat.key));
-    if (!visibleStats.length) {
-      return "";
-    }
-
-    return `
-      <div class="oq-settings-storage-stat-grid">
-        ${visibleStats.map((stat) => {
-          const value = stat.value || getSettingsStatValue(stat.key);
-          return `
-            <div>
-              <span>${escapeHtml(stat.label)}</span>
-              <strong>${escapeHtml(value)}</strong>
-              ${stat.note ? `<em>${escapeHtml(stat.note)}</em>` : ""}
-            </div>
-          `;
-        }).join("")}
-      </div>
     `;
   }
 
@@ -377,7 +242,7 @@ import { escapeHtml } from "../core/html.js";
   }
 
   export function formatSettingsStorageDateKey(dateKey) {
-    const parsed = typeof parseEnergyHistoryDateKey === "function" ? parseEnergyHistoryDateKey(dateKey) : null;
+    const parsed = parseEnergyHistoryDateKey(dateKey);
     if (!parsed) {
       return "Geen data";
     }
@@ -396,10 +261,7 @@ import { escapeHtml } from "../core/html.js";
   }
 
   export function getSettingsEnergyHistoryMetadata() {
-    if (typeof getEnergyHistoryMetadataFromRaw !== "function") {
-      return {};
-    }
-    return getEnergyHistoryMetadataFromRaw();
+    return parseEnergyHistoryMetadata(state.energyHistoryRaw);
   }
 
   export function renderSettingsStorageTechnicalRow(row) {
@@ -673,17 +535,17 @@ import { escapeHtml } from "../core/html.js";
       } : null,
     ];
 
-    return `
-      <div class="oq-helper-modal-backdrop${state.overviewTheme === "dark" ? " oq-helper-modal-backdrop--dark" : ""}" data-oq-modal="system">
-        <section class="oq-helper-modal oq-helper-modal--wide oq-helper-modal--scrollable oq-settings-storage-modal" data-oq-history-storage-scroller role="dialog" aria-modal="true" aria-labelledby="oq-history-storage-modal-title">
-          <div class="oq-helper-modal-head">
-            <div>
-              <p class="oq-helper-modal-kicker">Gegevens</p>
-              <h2 class="oq-helper-modal-title" id="oq-history-storage-modal-title">Gegevens bewaren</h2>
-            </div>
-            <button class="oq-helper-modal-close" type="button" data-oq-action="close-system-modal" aria-label="Sluit gegevens bewaren">×</button>
-          </div>
-          <p class="oq-helper-modal-copy">Bepaal welke gegevens OpenQuatt bewaart voor grafieken, resultaten en hulp bij problemen. Dit scherm verandert niets aan de werking of aansturing van je warmtepomp.</p>
+    return renderModalShell({
+      id: "system",
+      titleId: "oq-history-storage-modal-title",
+      kicker: "Gegevens",
+      title: "Gegevens bewaren",
+      copy: "Bepaal welke gegevens OpenQuatt bewaart voor grafieken, resultaten en hulp bij problemen. Dit scherm verandert niets aan de werking of aansturing van je warmtepomp.",
+      className: "oq-helper-modal--wide oq-helper-modal--scrollable oq-settings-storage-modal",
+      sectionAttributes: "data-oq-history-storage-scroller",
+      closeAction: "close-system-modal",
+      closeLabel: "Sluit gegevens bewaren",
+      body: `
           <div class="oq-settings-storage-domain-grid">
             <section class="oq-settings-storage-domain oq-settings-storage-domain--trend">
               <div class="oq-settings-storage-domain-head">
@@ -793,13 +655,9 @@ import { escapeHtml } from "../core/html.js";
             </section>
           </div>
           ${renderSettingsStorageTechnicalDetails(storageDetails)}
-          <p class="oq-settings-storage-footnote"><strong>Goed om te weten:</strong> OpenQuatt schrijft deze gegevens niet continu weg, maar alleen op vaste momenten. Zo blijft duidelijk wat er wordt bewaard en hoeveel geheugen daarvoor wordt gebruikt.</p>
-          <div class="oq-helper-modal-actions">
-            <button class="oq-helper-button oq-helper-button--primary" type="button" data-oq-action="close-system-modal">Gereed</button>
-          </div>
-        </section>
-      </div>
-    `;
+          <p class="oq-settings-storage-footnote"><strong>Goed om te weten:</strong> OpenQuatt schrijft deze gegevens niet continu weg, maar alleen op vaste momenten. Zo blijft duidelijk wat er wordt bewaard en hoeveel geheugen daarvoor wordt gebruikt.</p>`,
+      actions: '<button class="oq-helper-button oq-helper-button--primary" type="button" data-oq-action="close-system-modal">Gereed</button>',
+    });
   }
 
   export function renderSettingsBackupSection() {
@@ -850,17 +708,16 @@ import { escapeHtml } from "../core/html.js";
 
   export function renderSettingsBackupImportModal() {
     const busy = state.settingsBackupBusy;
-    return `
-      <div class="oq-helper-modal-backdrop${state.overviewTheme === "dark" ? " oq-helper-modal-backdrop--dark" : ""}" data-oq-modal="system">
-        <section class="oq-helper-modal oq-helper-modal--wide" role="dialog" aria-modal="true" aria-labelledby="oq-backup-import-modal-title">
-          <div class="oq-helper-modal-head">
-            <div>
-              <p class="oq-helper-modal-kicker">Beheer</p>
-              <h2 class="oq-helper-modal-title" id="oq-backup-import-modal-title">Backup herstellen</h2>
-            </div>
-            <button class="oq-helper-modal-close" type="button" data-oq-action="close-system-modal" aria-label="Sluit backup import popup">×</button>
-          </div>
-          <p class="oq-helper-modal-copy">Kies een JSON-backup om de instellingen te vergelijken en daarna gericht terug te zetten.</p>
+    return renderModalShell({
+      id: "system",
+      titleId: "oq-backup-import-modal-title",
+      kicker: "Beheer",
+      title: "Backup herstellen",
+      copy: "Kies een JSON-backup om de instellingen te vergelijken en daarna gericht terug te zetten.",
+      className: "oq-helper-modal--wide",
+      closeAction: "close-system-modal",
+      closeLabel: "Sluit backup import popup",
+      body: `
           <div class="oq-helper-modal-row">
             <span class="oq-helper-modal-label">Backupbestand</span>
             <input
@@ -872,13 +729,9 @@ import { escapeHtml } from "../core/html.js";
             >
             <span class="oq-helper-modal-subvalue">Na selectie openen we automatisch het vergelijkingsoverzicht.</span>
           </div>
-          ${state.settingsBackupError ? `<p class="oq-settings-backup-error">${escapeHtml(state.settingsBackupError)}</p>` : ""}
-          <div class="oq-helper-modal-actions">
-            <button class="oq-helper-button oq-helper-button--ghost" type="button" data-oq-action="close-system-modal" ${busy ? "disabled" : ""}>Annuleren</button>
-          </div>
-        </section>
-      </div>
-    `;
+          ${state.settingsBackupError ? `<p class="oq-settings-backup-error">${escapeHtml(state.settingsBackupError)}</p>` : ""}`,
+      actions: `<button class="oq-helper-button oq-helper-button--ghost" type="button" data-oq-action="close-system-modal" ${busy ? "disabled" : ""}>Annuleren</button>`,
+    });
   }
 
   export function renderSettingsBackupRestoreModal() {
@@ -905,17 +758,16 @@ import { escapeHtml } from "../core/html.js";
         ? "Ontbrekende velden houden hun firmware-default."
         : "Velden zonder waarde worden overgeslagen.";
 
-    return `
-      <div class="oq-helper-modal-backdrop${state.overviewTheme === "dark" ? " oq-helper-modal-backdrop--dark" : ""}" data-oq-modal="system">
-        <section class="oq-helper-modal oq-helper-modal--wide oq-helper-modal--scrollable" role="dialog" aria-modal="true" aria-labelledby="oq-backup-modal-title">
-          <div class="oq-helper-modal-head">
-            <div>
-              <p class="oq-helper-modal-kicker">Beheer</p>
-              <h2 class="oq-helper-modal-title" id="oq-backup-modal-title">Backup herstellen</h2>
-            </div>
-            <button class="oq-helper-modal-close" type="button" data-oq-action="close-system-modal" aria-label="Sluit backup-popup">×</button>
-          </div>
-          <p class="oq-helper-modal-copy">Deze backup zet alleen de instellingen terug die OpenQuatt in de web-app beheert. Klap een sectie open om backup- en huidige waarden naast elkaar te vergelijken.</p>
+    return renderModalShell({
+      id: "system",
+      titleId: "oq-backup-modal-title",
+      kicker: "Beheer",
+      title: "Backup herstellen",
+      copy: "Deze backup zet alleen de instellingen terug die OpenQuatt in de web-app beheert. Klap een sectie open om backup- en huidige waarden naast elkaar te vergelijken.",
+      className: "oq-helper-modal--wide oq-helper-modal--scrollable",
+      closeAction: "close-system-modal",
+      closeLabel: "Sluit backup-popup",
+      body: `
           <div class="oq-helper-modal-grid oq-settings-backup-modal-grid">
             <div class="oq-helper-modal-row">
               <span class="oq-helper-modal-label">Backup van</span>
@@ -974,12 +826,10 @@ import { escapeHtml } from "../core/html.js";
             `).join("")}
           </div>
           <p class="oq-settings-action-note${summary.unknown || summary.requiredMissing || installationMismatch ? " oq-settings-action-note--warning" : ""}">${escapeHtml(warningText)}</p>
-          ${state.settingsBackupError ? `<p class="oq-settings-backup-error">${escapeHtml(state.settingsBackupError)}</p>` : ""}
-          <div class="oq-helper-modal-actions">
-            <button class="oq-helper-button oq-helper-button--ghost" type="button" data-oq-action="close-system-modal" ${state.settingsBackupBusy ? "disabled" : ""}>Annuleren</button>
-            <button class="oq-helper-button oq-helper-button--primary" type="button" data-oq-action="confirm-settings-backup-restore" ${state.settingsBackupBusy ? "disabled" : ""}>${state.settingsBackupBusy ? "Herstellen..." : "Herstellen"}</button>
-          </div>
-        </section>
-      </div>
-    `;
+          ${state.settingsBackupError ? `<p class="oq-settings-backup-error">${escapeHtml(state.settingsBackupError)}</p>` : ""}`,
+      actions: `
+        <button class="oq-helper-button oq-helper-button--ghost" type="button" data-oq-action="close-system-modal" ${state.settingsBackupBusy ? "disabled" : ""}>Annuleren</button>
+        <button class="oq-helper-button oq-helper-button--primary" type="button" data-oq-action="confirm-settings-backup-restore" ${state.settingsBackupBusy ? "disabled" : ""}>${state.settingsBackupBusy ? "Herstellen..." : "Herstellen"}</button>
+      `,
+    });
   }

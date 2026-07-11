@@ -1,6 +1,7 @@
 import { getEntityNumericValue, hasEntity } from "../core/app-shared.js";
 import { renderOqIcon, SENSOR_SELECTION_KEYS } from "../core/config.js";
-import { getEntityValue, getInputDraftValue } from "../core/entity-store.js";
+import { getInputDraftValue } from "../core/control-drafts.js";
+import { getEntityValue } from "../core/entity-store.js";
 import { isInstallationMonitoringBinaryActive, isInstallationMonitoringIntegrationEnabled } from "../core/installation-monitoring.js";
 import { state } from "../core/state.js";
 import { formatMqttSensorValiditySummary, getMqttStatusDetail, getMqttStatusLabel, getMqttValidityLabel } from "../features/mqtt.js";

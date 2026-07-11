@@ -44,6 +44,9 @@ import { render } from "./render-scheduler.js";
   }
 
   export function setDevPanelOpen(open) {
+    if (!__OQ_PREVIEW__) {
+      return;
+    }
     state.devPanelOpen = open === true;
     try {
       window.localStorage.setItem("oq-dev-panel-open", state.devPanelOpen ? "true" : "false");
@@ -231,20 +234,22 @@ import { render } from "./render-scheduler.js";
     window.addEventListener("pointermove", handlePointerMove);
     window.addEventListener("pointerup", handlePointerUp);
     window.addEventListener("popstate", handlePopState);
-    window.addEventListener("oq-mock-updated", handleMockUpdated);
-    window.addEventListener("oq-dev-controls-changed", handleDevControlsChanged);
+    if (__OQ_PREVIEW__) {
+      window.addEventListener("oq-mock-updated", handleMockUpdated);
+      window.addEventListener("oq-dev-controls-changed", handleDevControlsChanged);
+    }
     document.addEventListener("visibilitychange", handleVisibilityChange);
   }
 
   export function handleMockUpdated() {
-    if (!state.mounted) {
+    if (!__OQ_PREVIEW__ || !state.mounted) {
       return;
     }
     void syncEntities({ forceDecisionLog: true });
   }
 
   export function handleDevControlsChanged() {
-    if (!state.mounted) {
+    if (!__OQ_PREVIEW__ || !state.mounted) {
       return;
     }
     render();
@@ -387,7 +392,7 @@ import { render } from "./render-scheduler.js";
   }
 
   export function bindHeaderDevControls() {
-    if (!state.root) {
+    if (!__OQ_PREVIEW__ || !state.root) {
       return;
     }
     const controls = typeof window !== "undefined" ? window.__OQ_DEV_CONTROLS__ : null;

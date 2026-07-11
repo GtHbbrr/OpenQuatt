@@ -1,5 +1,6 @@
 import { state } from "./state.js";
 import { render } from "./render-scheduler.js";
+import { updateFirmwareState } from "./feature-state.js";
 
 export const DEVICE_RECONNECT_RECOVERY_CLEAR_DELAY_MS = 1500;
 
@@ -65,7 +66,7 @@ export function beginDeviceReconnect(mode = "reconnect", error = "") {
   state.deviceReconnectRecoveryStartedAt = 0;
   state.deviceReconnectLastError = error ? String(error) : state.deviceReconnectLastError;
   state.systemModal = "";
-  state.updateModalOpen = false;
+  updateFirmwareState({ updateModalOpen: false });
   state.controlError = "";
 }
 

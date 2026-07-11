@@ -1,14 +1,17 @@
 import { hasEntity, isEntityActive } from "../core/app-shared.js";
+import { invokeActionMap } from "../core/action-router.js";
 import { copyTextToClipboard, downloadTextFile } from "../core/browser-utils.js";
 import { DEBUG_RECORDING_BUSY_RETRY_MS, DEBUG_RECORDING_DURATION_OPTIONS, DEBUG_RECORDING_EVENT_LIMIT, DEBUG_RECORDING_KEYS, DEBUG_RECORDING_LOG_LIMIT, DEBUG_RECORDING_SAMPLE_INTERVAL_MS, ENTITY_DEFS, FAST_VIEW_ENTITY_REFRESH_CONCURRENCY } from "../core/config.js";
 import { getEntityValue, parseLooseNumber } from "../core/entity-store.js";
 import { buildBulkEntityChunks, refreshEntities } from "../core/entity-sync.js";
+import { updateDebugRecordingState } from "../core/feature-state.js";
 import { state } from "../core/state.js";
 import { getBasePath } from "../core/url-path.js";
 import { getFirmwareDeviceLabel, getInstallationLabel, getInstallationTopology } from "./device-context.js";
 import { getFirmwareCurrentVersion } from "./firmware-update.js";
 import { escapeHtml } from "../core/html.js";
 import { render } from "../core/render-scheduler.js";
+import { renderModalShell } from "../core/modal-shell.js";
 
 export function getDebugRecordingSampleCount() {
   if (state.debugRecordingDeviceStatus) {
@@ -122,9 +125,11 @@ export function setDebugRecordingSelectedMinutes(minutes) {
   if (state.debugRecordingActive) {
     return;
   }
-  state.debugRecordingSelectedMinutes = Math.max(1, Number(minutes) || 15);
-  state.debugRecordingNotice = "";
-  state.debugRecordingError = "";
+  updateDebugRecordingState({
+    debugRecordingSelectedMinutes: Math.max(1, Number(minutes) || 15),
+    debugRecordingNotice: "",
+    debugRecordingError: "",
+  });
   render();
 }
 
@@ -597,16 +602,18 @@ export async function startDebugRecording(durationMinutes) {
   const minutes = Math.max(1, Number(durationMinutes) || 15);
   clearDebugRecordingTimer();
   clearDebugRecordingDevicePollTimer();
-  state.debugRecordingBusy = true;
-  state.debugRecordingError = "";
-  state.debugRecordingNotice = "";
-  state.debugRecordingSamples = [];
-  state.debugRecordingEvents = [];
-  state.debugRecordingInitialValues = null;
-  state.debugRecordingLastValues = null;
-  state.debugRecordingDeviceBundle = null;
-  state.debugRecordingLastSampleAt = 0;
-  state.debugRecordingSequence = 0;
+  updateDebugRecordingState({
+    debugRecordingBusy: true,
+    debugRecordingError: "",
+    debugRecordingNotice: "",
+    debugRecordingSamples: [],
+    debugRecordingEvents: [],
+    debugRecordingInitialValues: null,
+    debugRecordingLastValues: null,
+    debugRecordingDeviceBundle: null,
+    debugRecordingLastSampleAt: 0,
+    debugRecordingSequence: 0,
+  });
   render();
   try {
     await configureDebugRecordingDevice();
@@ -633,16 +640,18 @@ export async function startDebugRecording(durationMinutes) {
 export async function startRollingDebugRecording() {
   clearDebugRecordingTimer();
   clearDebugRecordingDevicePollTimer();
-  state.debugRecordingBusy = true;
-  state.debugRecordingError = "";
-  state.debugRecordingNotice = "";
-  state.debugRecordingSamples = [];
-  state.debugRecordingEvents = [];
-  state.debugRecordingInitialValues = null;
-  state.debugRecordingLastValues = null;
-  state.debugRecordingDeviceBundle = null;
-  state.debugRecordingLastSampleAt = 0;
-  state.debugRecordingSequence = 0;
+  updateDebugRecordingState({
+    debugRecordingBusy: true,
+    debugRecordingError: "",
+    debugRecordingNotice: "",
+    debugRecordingSamples: [],
+    debugRecordingEvents: [],
+    debugRecordingInitialValues: null,
+    debugRecordingLastValues: null,
+    debugRecordingDeviceBundle: null,
+    debugRecordingLastSampleAt: 0,
+    debugRecordingSequence: 0,
+  });
   render();
   try {
     await configureDebugRecordingDevice();
@@ -723,59 +732,6 @@ export async function stopDebugRecording(options = {}) {
   }
 }
 
-export function trimDebugRecordingLogs(payload) {
-  const entries = Array.isArray(payload?.entries) ? payload.entries : [];
-  const enabled = typeof payload?.enabled === "boolean" ? payload.enabled : null;
-  return {
-    available: payload?.available === true,
-    enabled,
-    limit: DEBUG_RECORDING_LOG_LIMIT,
-    truncated: entries.length > DEBUG_RECORDING_LOG_LIMIT,
-    entries: entries.slice(-DEBUG_RECORDING_LOG_LIMIT),
-    ...(payload?.error ? { error: payload.error } : {}),
-  };
-}
-
-export async function fetchDebugRecordingLogs() {
-  if (typeof window.fetch !== "function") {
-    return { available: false, entries: [], error: "fetch unavailable" };
-  }
-  try {
-    await refreshEntities(["webServerLogHistoryEnabled"], "all", { concurrency: FAST_VIEW_ENTITY_REFRESH_CONCURRENCY });
-  } catch (_error) {
-    // Log history is optional; the recording itself should still export cleanly.
-  }
-  if (hasEntity("webServerLogHistoryEnabled") && !isEntityActive("webServerLogHistoryEnabled")) {
-    return trimDebugRecordingLogs({
-      available: false,
-      enabled: false,
-      entries: [],
-    });
-  }
-  try {
-    const response = await window.fetch(`${getBasePath()}/openquatt/logs/recent`, {
-      cache: "no-store",
-      headers: { "Cache-Control": "no-store" },
-    });
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
-    }
-    const payload = await response.json();
-    return trimDebugRecordingLogs({
-      available: true,
-      enabled: payload?.enabled !== false,
-      entries: Array.isArray(payload?.entries) ? payload.entries : [],
-    });
-  } catch (error) {
-    return trimDebugRecordingLogs({
-      available: false,
-      enabled: null,
-      entries: [],
-      error: error.message || String(error),
-    });
-  }
-}
-
 export function buildDebugRecordingCorePayload(extra = {}) {
   const endedAt = state.debugRecordingActive ? Date.now() : Number(state.debugRecordingLastSampleAt || Date.now());
   return {
@@ -804,16 +760,6 @@ export function buildDebugRecordingCorePayload(extra = {}) {
   };
 }
 
-export async function buildDebugRecordingBundle() {
-  if (state.debugRecordingDeviceBundle) {
-    return state.debugRecordingDeviceBundle;
-  }
-  const logs = await fetchDebugRecordingLogs();
-  const source = getDebugRecordingSourceMeta();
-
-  return buildDebugRecordingCorePayload({ source, logs });
-}
-
 export function getDebugRecordingCompactJson(payload) {
   return JSON.stringify(payload);
 }
@@ -828,19 +774,6 @@ export function getDebugRecordingEstimatedBytes() {
   } catch (_error) {
     return getDebugRecordingCompactJson(buildDebugRecordingCorePayload()).length;
   }
-}
-
-export function getDebugRecordingSourceMeta() {
-  const releaseChannel = String(getEntityValue("releaseChannelText") || "").trim();
-  const updateChannel = String(getEntityValue("firmwareUpdateChannel") || "").trim();
-  return {
-    device: getFirmwareDeviceLabel(),
-    installation: getInstallationLabel(),
-    topology: typeof getInstallationTopology === "function" ? getInstallationTopology() : "",
-    firmware_version: getFirmwareCurrentVersion(),
-    firmware_channel: releaseChannel || updateChannel,
-    firmware_update_channel: updateChannel || releaseChannel,
-  };
 }
 
 export function formatDebugRecordingBytes(bytes) {
@@ -929,6 +862,27 @@ export async function copyDebugRecordingBundle() {
   }
 }
 
+const debugRecordingActionHandlers = {
+  "open-debug-recording-modal": () => {
+    state.systemModal = "debug-recording";
+    state.debugRecordingError = "";
+    state.debugRecordingNotice = "";
+    render();
+    return refreshDebugRecordingDeviceStatus();
+  },
+  "start-debug-recording": (button) => startDebugRecording(button.dataset.debugMinutes || 15),
+  "start-rolling-debug-recording": () => startRollingDebugRecording(),
+  "select-debug-recording-duration": (button) => setDebugRecordingSelectedMinutes(button.dataset.debugMinutes || 15),
+  "stop-debug-recording": () => stopDebugRecording(),
+  "freeze-debug-recording": () => freezeDebugRecording(),
+  "download-debug-recording": () => downloadDebugRecordingBundle(),
+  "copy-debug-recording": () => copyDebugRecordingBundle(),
+};
+
+export function handleDebugRecordingAction(action, button) {
+  return invokeActionMap(debugRecordingActionHandlers, action, button);
+}
+
 export function renderDebugRecordingModal() {
   const active = state.debugRecordingActive;
   const rolling = isDebugRecordingRolling();
@@ -958,17 +912,16 @@ export function renderDebugRecordingModal() {
     : state.debugRecordingNotice
       ? { kind: "success", icon: "check", text: state.debugRecordingNotice }
       : null;
-  return `
-    <div class="oq-helper-modal-backdrop${state.overviewTheme === "dark" ? " oq-helper-modal-backdrop--dark" : ""}" data-oq-modal="system">
-      <section class="oq-helper-modal oq-debug-recording-modal" role="dialog" aria-modal="true" aria-labelledby="oq-debug-recording-modal-title">
-        <div class="oq-helper-modal-head">
-          <div>
-            <p class="oq-helper-modal-kicker">Diagnostiek</p>
-            <h2 class="oq-helper-modal-title" id="oq-debug-recording-modal-title">Debugopname</h2>
-          </div>
-          <button class="oq-helper-modal-close" type="button" data-oq-action="close-system-modal" aria-label="Sluit debugopname">×</button>
-        </div>
-        <p class="oq-helper-modal-copy">${escapeHtml(getDebugRecordingStatusCopy())}</p>
+  return renderModalShell({
+    id: "system",
+    titleId: "oq-debug-recording-modal-title",
+    kicker: "Diagnostiek",
+    title: "Debugopname",
+    copy: getDebugRecordingStatusCopy(),
+    className: "oq-debug-recording-modal",
+    closeAction: "close-system-modal",
+    closeLabel: "Sluit debugopname",
+    body: `
         <section class="oq-debug-recording-card" aria-label="Opname">
           <div class="oq-debug-recording-card-head">
             <span class="oq-debug-recording-heading-icon" aria-hidden="true">${renderDebugRecordingSvgIcon("activity")}</span>
@@ -1041,8 +994,6 @@ export function renderDebugRecordingModal() {
               <span>${escapeHtml(feedback.text)}</span>
             </p>
           ` : ""}
-        </div>
-      </section>
-    </div>
-  `;
+        </div>`,
+  });
 }

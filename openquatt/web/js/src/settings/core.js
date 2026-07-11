@@ -1,7 +1,8 @@
 import { getEntityStateText, hasEntity, isEntityActive } from "../core/app-shared.js";
 import { renderOqIcon, SETTINGS_GROUP_IDS, SETTINGS_GROUPS } from "../core/config.js";
 import { isCurveMode } from "../core/domain-helpers.js";
-import { formatValue, getEntityValue, getInputDraftValue, getNumberMeta, normalizeNumber, parseLooseNumber } from "../core/entity-store.js";
+import { getInputDraftValue } from "../core/control-drafts.js";
+import { formatValue, getEntityValue, getNumberMeta, normalizeNumber, parseLooseNumber } from "../core/entity-store.js";
 import { state } from "../core/state.js";
 import { setSettingsRenderControls } from "../core/settings-render-controls.js";
 import { formatDiagnosticsDateTime, formatUptimeFromMeta, getDeviceIpAddress, getInstallationLabel } from "../features/device-context.js";

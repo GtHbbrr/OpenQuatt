@@ -3,6 +3,7 @@ import { renderOqIcon } from "../core/config.js";
 import { formatOpenQuattResumeDateTime, getEntityValue, getOpenQuattPauseDraftValue, hasOpenQuattResumeSchedule } from "../core/entity-store.js";
 import { isDeviceReconnectRecovering } from "../core/device-reconnect.js";
 import { setHeaderRenderControls } from "../core/header-render-controls.js";
+import { renderModalShell } from "../core/modal-shell.js";
 import { getEntitySignatureFragment } from "../core/render-signatures.js";
 import { state } from "../core/state.js";
 import { getDebugRecordingHubStatusLabel, renderDebugRecordingHeaderStatus, renderDebugRecordingModal } from "./debug-recording.js";
@@ -230,6 +231,9 @@ import { render } from "../core/render-scheduler.js";
   }
 
   export function renderHeaderDevControls() {
+    if (!__OQ_PREVIEW__) {
+      return "";
+    }
     const controls = typeof window !== "undefined" ? window.__OQ_DEV_CONTROLS__ : null;
     if (!controls || typeof controls.render !== "function") {
       return "";
@@ -238,6 +242,9 @@ import { render } from "../core/render-scheduler.js";
   }
 
   export function renderDevPanel() {
+    if (!__OQ_PREVIEW__) {
+      return "";
+    }
     const controlsMarkup = renderHeaderDevControls();
     if (!controlsMarkup) {
       return "";
@@ -398,31 +405,28 @@ import { render } from "../core/render-scheduler.js";
 
     if (state.systemModal === "connectivity") {
       const rows = getConnectivityModalRows();
-      return `
-        <div class="oq-helper-modal-backdrop${state.overviewTheme === "dark" ? " oq-helper-modal-backdrop--dark" : ""}" data-oq-modal="system">
-          <section class="oq-helper-modal" role="dialog" aria-modal="true" aria-labelledby="oq-system-modal-title">
-            <div class="oq-helper-modal-head">
-              <div>
-                <p class="oq-helper-modal-kicker">Systeem</p>
-                <h2 class="oq-helper-modal-title" id="oq-system-modal-title">Connectiviteit</h2>
+      return renderModalShell({
+        modalId: "system",
+        titleId: "oq-system-modal-title",
+        kicker: "Systeem",
+        title: "Connectiviteit",
+        closeAction: "close-system-modal",
+        closeLabel: "Sluit systeem-popup",
+        bodyMarkup: `
+          <p class="oq-helper-modal-copy">Status en details van de actieve netwerkverbinding van OpenQuatt.</p>
+          <div class="oq-helper-modal-grid">
+            ${rows.map(([label, value]) => `
+              <div class="oq-helper-modal-row">
+                <span class="oq-helper-modal-label">${escapeHtml(label)}</span>
+                <strong class="oq-helper-modal-value">${escapeHtml(value)}</strong>
               </div>
-              <button class="oq-helper-modal-close" type="button" data-oq-action="close-system-modal" aria-label="Sluit systeem-popup">×</button>
-            </div>
-            <p class="oq-helper-modal-copy">Status en details van de actieve netwerkverbinding van OpenQuatt.</p>
-            <div class="oq-helper-modal-grid">
-              ${rows.map(([label, value]) => `
-                <div class="oq-helper-modal-row">
-                  <span class="oq-helper-modal-label">${escapeHtml(label)}</span>
-                  <strong class="oq-helper-modal-value">${escapeHtml(value)}</strong>
-                </div>
-              `).join("")}
-            </div>
-            <div class="oq-helper-modal-actions">
-              <button class="oq-helper-button oq-helper-button--primary" type="button" data-oq-action="close-system-modal">Gereed</button>
-            </div>
-          </section>
-        </div>
-      `;
+            `).join("")}
+          </div>
+          <div class="oq-helper-modal-actions">
+            <button class="oq-helper-button oq-helper-button--primary" type="button" data-oq-action="close-system-modal">Gereed</button>
+          </div>
+        `,
+      });
     }
 
     if (state.systemModal === "settings-backup-restore") {
@@ -443,69 +447,61 @@ import { render } from "../core/render-scheduler.js";
 
     if (state.systemModal === "settings-backup-success") {
       const notice = state.controlNotice || "Backup hersteld.";
-      return `
-        <div class="oq-helper-modal-backdrop${state.overviewTheme === "dark" ? " oq-helper-modal-backdrop--dark" : ""}" data-oq-modal="system">
-          <section class="oq-helper-modal" role="dialog" aria-modal="true" aria-labelledby="oq-backup-success-modal-title">
-            <div class="oq-helper-modal-head">
-              <div>
-                <p class="oq-helper-modal-kicker">Beheer</p>
-                <h2 class="oq-helper-modal-title" id="oq-backup-success-modal-title">Backup hersteld</h2>
-              </div>
-              <button class="oq-helper-modal-close" type="button" data-oq-action="close-system-modal" aria-label="Sluit bevestiging">×</button>
-            </div>
-            <p class="oq-helper-modal-copy">${escapeHtml(notice)}</p>
-            <p class="oq-helper-modal-copy">Je kunt nu terug naar het overzicht of OpenQuatt gewoon verder gebruiken.</p>
-            <div class="oq-helper-modal-actions">
-              <button class="oq-helper-button oq-helper-button--primary" type="button" data-oq-action="close-system-modal">Gereed</button>
-            </div>
-          </section>
-        </div>
-      `;
+      return renderModalShell({
+        modalId: "system",
+        titleId: "oq-backup-success-modal-title",
+        kicker: "Beheer",
+        title: "Backup hersteld",
+        closeAction: "close-system-modal",
+        closeLabel: "Sluit bevestiging",
+        bodyMarkup: `
+          <p class="oq-helper-modal-copy">${escapeHtml(notice)}</p>
+          <p class="oq-helper-modal-copy">Je kunt nu terug naar het overzicht of OpenQuatt gewoon verder gebruiken.</p>
+          <div class="oq-helper-modal-actions">
+            <button class="oq-helper-button oq-helper-button--primary" type="button" data-oq-action="close-system-modal">Gereed</button>
+          </div>
+        `,
+      });
     }
 
     if (state.systemModal === "restart-confirm") {
       const busy = state.busyAction === "restartAction";
-      return `
-        <div class="oq-helper-modal-backdrop${state.overviewTheme === "dark" ? " oq-helper-modal-backdrop--dark" : ""}" data-oq-modal="system">
-          <section class="oq-helper-modal" role="dialog" aria-modal="true" aria-labelledby="oq-restart-modal-title">
-            <div class="oq-helper-modal-head">
-              <div>
-                <p class="oq-helper-modal-kicker">Systeem</p>
-                <h2 class="oq-helper-modal-title" id="oq-restart-modal-title">OpenQuatt herstarten?</h2>
-              </div>
-              <button class="oq-helper-modal-close" type="button" data-oq-action="close-system-modal" aria-label="Sluit herstart-popup">×</button>
-            </div>
-            <p class="oq-helper-modal-copy">De webinterface en regeling zijn tijdens de herstart kort niet bereikbaar. Daarna komt OpenQuatt vanzelf terug.</p>
-            <div class="oq-helper-modal-actions">
-              <button class="oq-helper-button oq-helper-button--ghost" type="button" data-oq-action="close-system-modal" ${busy ? "disabled" : ""}>Annuleren</button>
-              <button class="oq-helper-button oq-helper-button--primary" type="button" data-oq-action="confirm-restart" ${busy ? "disabled" : ""}>${busy ? "Herstarten..." : "Herstarten"}</button>
-            </div>
-          </section>
-        </div>
-      `;
+      return renderModalShell({
+        modalId: "system",
+        titleId: "oq-restart-modal-title",
+        kicker: "Systeem",
+        title: "OpenQuatt herstarten?",
+        closeAction: "close-system-modal",
+        closeLabel: "Sluit herstart-popup",
+        bodyMarkup: `
+          <p class="oq-helper-modal-copy">De webinterface en regeling zijn tijdens de herstart kort niet bereikbaar. Daarna komt OpenQuatt vanzelf terug.</p>
+          <div class="oq-helper-modal-actions">
+            <button class="oq-helper-button oq-helper-button--ghost" type="button" data-oq-action="close-system-modal" ${busy ? "disabled" : ""}>Annuleren</button>
+            <button class="oq-helper-button oq-helper-button--primary" type="button" data-oq-action="confirm-restart" ${busy ? "disabled" : ""}>${busy ? "Herstarten..." : "Herstarten"}</button>
+          </div>
+        `,
+      });
     }
 
     if (state.systemModal === "silent-settings") {
-      return `
-        <div class="oq-helper-modal-backdrop${state.overviewTheme === "dark" ? " oq-helper-modal-backdrop--dark" : ""}" data-oq-modal="system">
-          <section class="oq-helper-modal oq-helper-modal--wide" role="dialog" aria-modal="true" aria-labelledby="oq-silent-settings-modal-title">
-            <div class="oq-helper-modal-head">
-              <div>
-                <p class="oq-helper-modal-kicker">Stille uren</p>
-                <h2 class="oq-helper-modal-title" id="oq-silent-settings-modal-title">Stille uren instellen</h2>
-              </div>
-              <button class="oq-helper-modal-close" type="button" data-oq-action="close-system-modal" aria-label="Sluit stille-uren-popup">×</button>
-            </div>
-            <p class="oq-helper-modal-copy">Kies wanneer het systeem stiller moet werken, en hoe ver het dan nog mag opschalen. Wijzigingen worden direct toegepast.</p>
-            <div class="oq-helper-modal-body">
-              ${renderSilentSettingsFields()}
-            </div>
-            <div class="oq-helper-modal-actions">
-              <button class="oq-helper-button oq-helper-button--primary" type="button" data-oq-action="close-system-modal">Gereed</button>
-            </div>
-          </section>
-        </div>
-      `;
+      return renderModalShell({
+        modalId: "system",
+        titleId: "oq-silent-settings-modal-title",
+        kicker: "Stille uren",
+        title: "Stille uren instellen",
+        modalClass: "oq-helper-modal--wide",
+        closeAction: "close-system-modal",
+        closeLabel: "Sluit stille-uren-popup",
+        bodyMarkup: `
+          <p class="oq-helper-modal-copy">Kies wanneer het systeem stiller moet werken, en hoe ver het dan nog mag opschalen. Wijzigingen worden direct toegepast.</p>
+          <div class="oq-helper-modal-body">
+            ${renderSilentSettingsFields()}
+          </div>
+          <div class="oq-helper-modal-actions">
+            <button class="oq-helper-button oq-helper-button--primary" type="button" data-oq-action="close-system-modal">Gereed</button>
+          </div>
+        `,
+      });
     }
 
     if (state.systemModal === "webserver-logs") {
@@ -525,74 +521,72 @@ import { render } from "../core/render-scheduler.js";
       const resumeScheduled = hasOpenQuattResumeSchedule();
       const resumeLabel = formatOpenQuattResumeDateTime(getEntityValue("openquattResumeAt"));
       const draftValue = getOpenQuattPauseDraftValue();
-      return `
-        <div class="oq-helper-modal-backdrop${state.overviewTheme === "dark" ? " oq-helper-modal-backdrop--dark" : ""}" data-oq-modal="system">
-          <section class="oq-helper-modal oq-helper-modal--wide" role="dialog" aria-modal="true" aria-labelledby="oq-openquatt-pause-modal-title">
-            <div class="oq-helper-modal-head">
-              <div>
-                <p class="oq-helper-modal-kicker">Bediening</p>
-                <h2 class="oq-helper-modal-title" id="oq-openquatt-pause-modal-title">Openquatt regeling</h2>
-              </div>
-              <button class="oq-helper-modal-close" type="button" data-oq-action="close-system-modal" aria-label="Sluit regeling-popup">×</button>
-            </div>
-            <p class="oq-helper-modal-copy">${enabled
+      return renderModalShell({
+        modalId: "system",
+        titleId: "oq-openquatt-pause-modal-title",
+        kicker: "Bediening",
+        title: "Openquatt regeling",
+        modalClass: "oq-helper-modal--wide",
+        closeAction: "close-system-modal",
+        closeLabel: "Sluit regeling-popup",
+        bodyMarkup: `
+          <p class="oq-helper-modal-copy">${enabled
               ? "Kies hoe lang de regeling uit moet blijven. Verwarmen en koelen stoppen dan, maar beveiligingen blijven actief."
               : "De regeling staat nu tijdelijk uit. Je kunt meteen weer inschakelen of een nieuw hervatmoment plannen."
-            }</p>
-            ${resumeScheduled
-              ? `<div class="oq-helper-modal-success oq-helper-modal-success--compact">
-                  <strong>Hervat nu automatisch</strong>
-                  <span>${escapeHtml(resumeLabel)}</span>
-                </div>`
+          }</p>
+          ${resumeScheduled
+            ? `<div class="oq-helper-modal-success oq-helper-modal-success--compact">
+                <strong>Hervat nu automatisch</strong>
+                <span>${escapeHtml(resumeLabel)}</span>
+              </div>`
+            : ""
+          }
+          ${!resumeEntityReady
+            ? `<p class="oq-helper-modal-note" aria-live="polite">Hervatopties laden...</p>`
+            : hasResumeEntity
+            ? `
+              <div class="oq-helper-modal-presets">
+                <button class="oq-helper-button" type="button" data-oq-action="apply-openquatt-preset" data-pause-preset="2h" ${busy ? "disabled" : ""}>2 uur</button>
+                <button class="oq-helper-button" type="button" data-oq-action="apply-openquatt-preset" data-pause-preset="8h" ${busy ? "disabled" : ""}>8 uur</button>
+                <button class="oq-helper-button" type="button" data-oq-action="apply-openquatt-preset" data-pause-preset="tomorrow-morning" ${busy ? "disabled" : ""}>Tot morgenochtend</button>
+              </div>
+              <div class="oq-helper-modal-channel oq-helper-modal-channel--datetime">
+                <span class="oq-helper-modal-label">Hervatten op</span>
+                <div class="oq-helper-modal-inline">
+                  <label class="oq-settings-control oq-settings-control--datetime">
+                    <input
+                      class="oq-helper-input"
+                      type="datetime-local"
+                      step="60"
+                      lang="nl-NL"
+                      data-oq-field="openquattPauseDraft"
+                      data-oq-pause-draft="resume"
+                      value="${escapeHtml(draftValue)}"
+                      ${busy ? "disabled" : ""}
+                    >
+                    <span class="oq-settings-time-icon" aria-hidden="true">
+                      <svg viewBox="0 0 20 20" focusable="false">
+                        <rect x="3.2" y="4.2" width="13.6" height="12.6" rx="2.4" fill="none" stroke="currentColor" stroke-width="1.5" />
+                        <path d="M6.2 2.9V5.4M13.8 2.9V5.4M3.8 8.1H16.2M10 10.3V13.1L12.3 14.4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                      </svg>
+                    </span>
+                  </label>
+                  <button class="oq-helper-button oq-helper-button--primary" type="button" data-oq-action="apply-openquatt-custom-pause" ${busy ? "disabled" : ""}>Plan moment</button>
+                </div>
+              </div>
+            `
+            : `<p class="oq-helper-modal-note">Automatisch hervatten is nog niet beschikbaar op deze firmware. Je kunt de regeling wel zonder eindtijd uitschakelen.</p>`
+          }
+          <div class="oq-helper-modal-actions">
+            <button class="oq-helper-button oq-helper-button--ghost" type="button" data-oq-action="close-system-modal" ${busy ? "disabled" : ""}>Annuleren</button>
+            ${!enabled
+              ? `<button class="oq-helper-button" type="button" data-oq-action="enable-openquatt-now" ${busy ? "disabled" : ""}>Nu inschakelen</button>`
               : ""
             }
-            ${!resumeEntityReady
-              ? `<p class="oq-helper-modal-note" aria-live="polite">Hervatopties laden...</p>`
-              : hasResumeEntity
-              ? `
-                <div class="oq-helper-modal-presets">
-                  <button class="oq-helper-button" type="button" data-oq-action="apply-openquatt-preset" data-pause-preset="2h" ${busy ? "disabled" : ""}>2 uur</button>
-                  <button class="oq-helper-button" type="button" data-oq-action="apply-openquatt-preset" data-pause-preset="8h" ${busy ? "disabled" : ""}>8 uur</button>
-                  <button class="oq-helper-button" type="button" data-oq-action="apply-openquatt-preset" data-pause-preset="tomorrow-morning" ${busy ? "disabled" : ""}>Tot morgenochtend</button>
-                </div>
-                <div class="oq-helper-modal-channel oq-helper-modal-channel--datetime">
-                  <span class="oq-helper-modal-label">Hervatten op</span>
-                  <div class="oq-helper-modal-inline">
-                    <label class="oq-settings-control oq-settings-control--datetime">
-                      <input
-                        class="oq-helper-input"
-                        type="datetime-local"
-                        step="60"
-                        lang="nl-NL"
-                        data-oq-field="openquattPauseDraft"
-                        data-oq-pause-draft="resume"
-                        value="${escapeHtml(draftValue)}"
-                        ${busy ? "disabled" : ""}
-                      >
-                      <span class="oq-settings-time-icon" aria-hidden="true">
-                        <svg viewBox="0 0 20 20" focusable="false">
-                          <rect x="3.2" y="4.2" width="13.6" height="12.6" rx="2.4" fill="none" stroke="currentColor" stroke-width="1.5" />
-                          <path d="M6.2 2.9V5.4M13.8 2.9V5.4M3.8 8.1H16.2M10 10.3V13.1L12.3 14.4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
-                        </svg>
-                      </span>
-                    </label>
-                    <button class="oq-helper-button oq-helper-button--primary" type="button" data-oq-action="apply-openquatt-custom-pause" ${busy ? "disabled" : ""}>Plan moment</button>
-                  </div>
-                </div>
-              `
-              : `<p class="oq-helper-modal-note">Automatisch hervatten is nog niet beschikbaar op deze firmware. Je kunt de regeling wel zonder eindtijd uitschakelen.</p>`
-            }
-            <div class="oq-helper-modal-actions">
-              <button class="oq-helper-button oq-helper-button--ghost" type="button" data-oq-action="close-system-modal" ${busy ? "disabled" : ""}>Annuleren</button>
-              ${!enabled
-                ? `<button class="oq-helper-button" type="button" data-oq-action="enable-openquatt-now" ${busy ? "disabled" : ""}>Nu inschakelen</button>`
-                : ""
-              }
-              <button class="oq-helper-button" type="button" data-oq-action="apply-openquatt-indefinite" ${busy ? "disabled" : ""}>${enabled ? "Zonder eindtijd uitschakelen" : "Zonder eindtijd"}</button>
-            </div>
-          </section>
-        </div>
-      `;
+            <button class="oq-helper-button" type="button" data-oq-action="apply-openquatt-indefinite" ${busy ? "disabled" : ""}>${enabled ? "Zonder eindtijd uitschakelen" : "Zonder eindtijd"}</button>
+          </div>
+        `,
+      });
     }
 
     return "";

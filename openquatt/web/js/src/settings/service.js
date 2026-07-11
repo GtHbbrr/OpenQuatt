@@ -5,6 +5,7 @@ import { state } from "../core/state.js";
 import { formatSettingsNumberValue, getCommissioningStatusValue, getSettingsStatValue, getSettingsTemperatureValue, getSettingsTextStatValue, getStatusTextValue, renderNamedActionButton, renderNamedToggleActionButton, renderSettingsCheckboxSwitchField, renderSettingsSection, renderSettingsSelectField, renderSettingsSliderField, renderSettingsStaticField, renderSettingsSystemRow } from "./controls.js";
 import { getHpWaterRawValue } from "./water.js";
 import { escapeHtml } from "../core/html.js";
+import { renderModalShell } from "../core/modal-shell.js";
 
   export function getManualHpActualValue(levelKey, frequencyKey) {
     const level = getEntityNumericValue(levelKey);
@@ -907,25 +908,17 @@ import { escapeHtml } from "../core/html.js";
       return "";
     }
 
-    return `
-      <div class="oq-helper-modal-backdrop${state.overviewTheme === "dark" ? " oq-helper-modal-backdrop--dark" : ""}" data-oq-modal="system">
-        <section class="oq-helper-modal oq-helper-modal--wide oq-helper-modal--scrollable oq-helper-modal--service-task" data-oq-service-task-scroller role="dialog" aria-modal="true" aria-labelledby="oq-service-task-modal-title">
-          <div class="oq-helper-modal-head">
-            <div>
-              <p class="oq-helper-modal-kicker">Service</p>
-              <h2 class="oq-helper-modal-title" id="oq-service-task-modal-title">${escapeHtml(task.title)}</h2>
-            </div>
-            <button class="oq-helper-modal-close" type="button" data-oq-action="close-system-modal" aria-label="Sluit ${escapeHtml(task.title)}">×</button>
-          </div>
-          <p class="oq-helper-modal-copy">${escapeHtml(task.summary)}</p>
-          <div class="oq-settings-service-task-modal-body">
-            ${task.cardMarkup}
-          </div>
-          <div class="oq-helper-modal-actions">
-            ${task.modalActions || ""}
-            <button class="oq-helper-button oq-helper-button--ghost" type="button" data-oq-action="close-system-modal">Sluiten</button>
-          </div>
-        </section>
-      </div>
-    `;
+    return renderModalShell({
+      id: "system",
+      titleId: "oq-service-task-modal-title",
+      kicker: "Service",
+      title: task.title,
+      copy: task.summary,
+      className: "oq-helper-modal--wide oq-helper-modal--scrollable oq-helper-modal--service-task",
+      sectionAttributes: "data-oq-service-task-scroller",
+      closeAction: "close-system-modal",
+      closeLabel: `Sluit ${task.title}`,
+      body: `<div class="oq-settings-service-task-modal-body">${task.cardMarkup}</div>`,
+      actions: `${task.modalActions || ""}<button class="oq-helper-button oq-helper-button--ghost" type="button" data-oq-action="close-system-modal">Sluiten</button>`,
+    });
   }

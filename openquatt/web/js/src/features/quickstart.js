@@ -2,9 +2,10 @@ import { getEntityNumericValue, getEntityStateText, hasEntity, isEntityActive } 
 import { QUICK_STEPS } from "../core/config.js";
 import { isCurveMode } from "../core/domain-helpers.js";
 import { formatValue, getEntityValue, toTimeInputValue } from "../core/entity-store.js";
+import { createScrollKeeper } from "../core/scroll-keeper.js";
+import { renderModalShell } from "../core/modal-shell.js";
 import { state } from "../core/state.js";
 import { getDeviceMeta, getInstallationTopology } from "./device-context.js";
-import { isWebServerLogScrollerNearBottom } from "./webserver-logs.js";
 import { formatSettingsOptionLabel, renderSettingsFieldCard, renderSettingsInfoToggle } from "../settings/controls.js";
 import { renderCurveGraph, renderFlowSettingsFields, renderHeatingCurveProfileField, renderHeatingStrategyExplainCards, renderPowerHouseAdvancedField, renderPowerHouseBaseFields, renderSettingsCurveInputs, renderStrategySelectionFields } from "../settings/heating.js";
 import { renderBoilerCvFields, renderHpGenerationField } from "../settings/installation.js";
@@ -73,7 +74,7 @@ import { escapeHtml } from "../core/html.js";
 
   export function renderQuickStartCicFeedUrlField(model, busy) {
     return `
-      <article class="oq-settings-field oq-settings-field--span-2" data-oq-settings-field="quickStartCicFeedUrl">
+      <article class="oq-helper-surface oq-settings-field oq-settings-field--span-2" data-oq-settings-field="quickStartCicFeedUrl">
         <div class="oq-settings-field-head">
           <h3>CiC JSON-feed</h3>
           ${renderSettingsInfoToggle("quickStartCicFeedUrl", "CiC JSON-feed", "Vul een IP-adres, hostname of volledige URL in. Bij alleen een adres gebruikt OpenQuatt automatisch poort 8080 en /beta/feed/data.json.")}
@@ -384,7 +385,7 @@ import { escapeHtml } from "../core/html.js";
     const busy = state.busyAction === "quickstart-thermostat-source";
     const statusClass = model.status === "Geldig" ? " is-active" : "";
     const sourceSelector = model.isRemoteProfile ? `
-      <article class="oq-settings-field oq-settings-field--span-2" data-oq-settings-field="quickStartThermostatSource">
+      <article class="oq-helper-surface oq-settings-field oq-settings-field--span-2" data-oq-settings-field="quickStartThermostatSource">
         <div class="oq-settings-field-head">
           <h3>Gegevensbron</h3>
           ${renderSettingsInfoToggle("quickStartThermostatSource", "Gegevensbron", "Kamertemperatuur en kamer-setpoint worden bewust als gekoppeld paar ingesteld.")}
@@ -402,7 +403,7 @@ import { escapeHtml } from "../core/html.js";
     ` : "";
     const cicField = model.selectedSource === "CIC" ? renderQuickStartCicFeedUrlField(model, busy) : "";
     const haNote = model.selectedSource === "HA input" ? `
-      <article class="oq-settings-field oq-settings-field--span-2">
+      <article class="oq-helper-surface oq-settings-field oq-settings-field--span-2">
         <div class="oq-settings-field-head"><h3>Home Assistant-contract</h3></div>
         <div class="oq-settings-field-control">
           <p class="oq-settings-action-note">Verwacht <strong>sensor.openquatt_ext_room_temperature</strong> en <strong>sensor.openquatt_ext_room_setpoint</strong>, plus de bijbehorende <strong>_valid</strong> binary sensors.</p>
@@ -462,41 +463,36 @@ import { escapeHtml } from "../core/html.js";
     }
 
     if (state.quickStartModalMode === "generation") {
-      return `
-        <div class="oq-helper-modal-backdrop oq-helper-modal-backdrop--quickstart" data-oq-modal="quickstart-forced">
-          <section class="oq-helper-modal oq-helper-modal--wide oq-helper-modal--quickstart oq-helper-modal--generation" data-oq-quickstart-scroller data-oq-quickstart-step="generation" role="dialog" aria-modal="true" aria-labelledby="oq-generation-modal-title">
-            <div class="oq-helper-modal-head">
-              <div>
-                <p class="oq-helper-modal-kicker">Installatie</p>
-                <h2 class="oq-helper-modal-title" id="oq-generation-modal-title">Quatt Hybrid-versie aanpassen</h2>
-                <p class="oq-helper-modal-copy">Kies de versie die bij jouw Quatt hoort. Deze keuze bepaalt de basis van de regeling.</p>
-              </div>
-              <button class="oq-helper-modal-close" type="button" data-oq-action="close-quickstart-modal" aria-label="Sluit versie-popup">×</button>
-            </div>
-            ${renderGenerationWorkspace("picker")}
-          </section>
-        </div>
-      `;
+      return renderModalShell({
+        id: "quickstart-forced",
+        titleId: "oq-generation-modal-title",
+        kicker: "Installatie",
+        title: "Quatt Hybrid-versie aanpassen",
+        copy: "Kies de versie die bij jouw Quatt hoort. Deze keuze bepaalt de basis van de regeling.",
+        copyInHeader: true,
+        backdropClass: "oq-helper-modal-backdrop--quickstart",
+        className: "oq-helper-modal--wide oq-helper-modal--quickstart oq-helper-modal--generation",
+        sectionAttributes: 'data-oq-quickstart-scroller data-oq-quickstart-step="generation"',
+        closeAction: "close-quickstart-modal",
+        closeLabel: "Sluit versie-popup",
+        body: renderGenerationWorkspace("picker"),
+      });
     }
 
-    return `
-      <div class="oq-helper-modal-backdrop oq-helper-modal-backdrop--quickstart" data-oq-modal="quickstart-forced">
-        <section class="oq-helper-modal oq-helper-modal--wide oq-helper-modal--quickstart" data-oq-quickstart-scroller data-oq-quickstart-step="${escapeHtml(getCurrentQuickStep().id)}" role="dialog" aria-modal="true" aria-labelledby="oq-quickstart-modal-title">
-          <div class="oq-helper-modal-head">
-            <div>
-              <p class="oq-helper-modal-kicker">Quick Start</p>
-              <h2 class="oq-helper-modal-title" id="oq-quickstart-modal-title">Rond eerst de Quick Start af</h2>
-              <p class="oq-helper-modal-copy">Kies eerst de Quatt Hybrid en loop daarna stap voor stap door de basisinstellingen.</p>
-            </div>
-            <button class="oq-helper-modal-close" type="button" data-oq-action="close-quickstart-modal" aria-label="Sluit Quick Start-popup">×</button>
-          </div>
-          <div class="oq-helper-grid oq-helper-grid--quickstart oq-helper-grid--quickstart-modal">
-            ${renderActiveStep()}
-            ${renderQuickStartSidebar()}
-          </div>
-        </section>
-      </div>
-    `;
+    return renderModalShell({
+      id: "quickstart-forced",
+      titleId: "oq-quickstart-modal-title",
+      kicker: "Quick Start",
+      title: "Rond eerst de Quick Start af",
+      copy: "Kies eerst de Quatt Hybrid en loop daarna stap voor stap door de basisinstellingen.",
+      copyInHeader: true,
+      backdropClass: "oq-helper-modal-backdrop--quickstart",
+      className: "oq-helper-modal--wide oq-helper-modal--quickstart",
+      sectionAttributes: `data-oq-quickstart-scroller data-oq-quickstart-step="${escapeHtml(getCurrentQuickStep().id)}"`,
+      closeAction: "close-quickstart-modal",
+      closeLabel: "Sluit Quick Start-popup",
+      body: `<div class="oq-helper-grid oq-helper-grid--quickstart oq-helper-grid--quickstart-modal">${renderActiveStep()}${renderQuickStartSidebar()}</div>`,
+    });
   }
 
   export function getQuickStartModalScrollerElement() {
@@ -506,60 +502,18 @@ import { escapeHtml } from "../core/html.js";
     return state.root.querySelector("[data-oq-quickstart-scroller]");
   }
 
-  export function captureQuickStartScrollState() {
-    const scroller = getQuickStartModalScrollerElement();
-    if (!scroller) {
-      return null;
-    }
+  const quickStartScrollKeeper = createScrollKeeper({
+    getScroller: getQuickStartModalScrollerElement,
+    getToken: () => state.quickStartScrollRestoreToken,
+    setToken: (token) => { state.quickStartScrollRestoreToken = token; },
+    isActive: () => state.quickStartModalOpen,
+    getIdentity: (scroller) => String(scroller.dataset.oqQuickstartStep || ""),
+    preserveGrowth: true,
+    stickToBottom: true,
+  });
 
-    return {
-      stepId: String(scroller.dataset.oqQuickstartStep || ""),
-      scrollHeight: scroller.scrollHeight,
-      scrollTop: scroller.scrollTop,
-      stickToBottom: isWebServerLogScrollerNearBottom(scroller),
-    };
-  }
-
-  export function restoreQuickStartScrollState(scrollState) {
-    if (!scrollState) {
-      return;
-    }
-
-    const scroller = getQuickStartModalScrollerElement();
-    if (!scroller || String(scroller.dataset.oqQuickstartStep || "") !== scrollState.stepId) {
-      return;
-    }
-
-    if (scrollState.stickToBottom) {
-      scroller.scrollTop = scroller.scrollHeight;
-      return;
-    }
-
-    const restoredScrollTop = scrollState.scrollTop + (scroller.scrollHeight - scrollState.scrollHeight);
-    scroller.scrollTop = Math.max(0, restoredScrollTop);
-  }
-
-  export function queueQuickStartScrollRestore(scrollState, defer = true) {
-    if (!scrollState) {
-      return;
-    }
-
-    const restoreToken = Number(state.quickStartScrollRestoreToken || 0) + 1;
-    state.quickStartScrollRestoreToken = restoreToken;
-    const applyScrollState = () => {
-      if (state.quickStartScrollRestoreToken !== restoreToken || !state.quickStartModalOpen) {
-        return;
-      }
-      restoreQuickStartScrollState(scrollState);
-    };
-
-    if (defer) {
-      window.requestAnimationFrame(applyScrollState);
-      return;
-    }
-
-    applyScrollState();
-  }
+  export const captureQuickStartScrollState = quickStartScrollKeeper.capture;
+  export const queueQuickStartScrollRestore = quickStartScrollKeeper.queue;
 
   export function renderStrategyWorkspace() {
     return `

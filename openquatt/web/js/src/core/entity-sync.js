@@ -3,6 +3,7 @@ import { BULK_POLL_INTERVAL_MS, CIC_COMPATIBILITY_KEYS, CIC_POLLING_DIAGNOSTIC_K
 import { buildEntityPath, isCurveMode } from "./domain-helpers.js";
 import { getEntityValue, parseLooseNumber } from "./entity-store.js";
 import { state } from "./state.js";
+import { updateWebServerLogState } from "./feature-state.js";
 import { getDefaultAppView, getUrlAppView, setAppView } from "./navigation.js";
 import { isFirmwareOtaQuietActive } from "./firmware-quiet.js";
 import { getInstallationMonitoringModel, syncInstallationMonitoringDetailsState } from "./installation-monitoring.js";
@@ -18,6 +19,7 @@ import { clearWebServerLogOutput, closeWebServerLogStream, resetWebServerLogReco
 import { getMqttSensorsModalRenderSignature, refreshMqttStatus, shouldRefreshMqttStatusForCurrentSurface } from "../features/mqtt-actions.js";
 import { getApiSecurityStatusSignature, refreshApiSecurityStatus, refreshAuthStatus, shouldRefreshApiSecurityStatusForCurrentSurface, shouldRefreshAuthStatusForCurrentSurface } from "../features/security-actions.js";
 import { render } from "./render-scheduler.js";
+import { fetchWithTimeout } from "./browser-utils.js";
 
   export function scheduleOverviewPrefetch() {
     if (state.nativeOpen || state.appView !== "settings") {
@@ -256,7 +258,7 @@ import { render } from "./render-scheduler.js";
   }
 
   export function getDevInitialLoadDelayMs() {
-    const raw = typeof window !== "undefined" ? Number(window.__OQ_DEV_LOAD_DELAY_MS || 0) : 0;
+    const raw = __OQ_PREVIEW__ && typeof window !== "undefined" ? Number(window.__OQ_DEV_LOAD_DELAY_MS || 0) : 0;
     return Number.isFinite(raw) && raw > 0 ? raw : 0;
   }
 
@@ -489,37 +491,6 @@ import { render } from "./render-scheduler.js";
       : ENTITY_REQUEST_TIMEOUT_MS;
   }
 
-  export async function fetchEntityPayload(key, detail = "state") {
-    const entity = ENTITY_DEFS[key];
-    const url = `${buildEntityPath(entity.domain, entity.name)}${detail === "all" ? "?detail=all" : ""}`;
-    const timeoutMs = getEntityRequestTimeoutMs();
-
-    if (typeof AbortController === "function") {
-      const controller = new AbortController();
-      const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
-      try {
-        const response = await fetch(url, { signal: controller.signal });
-        if (!response.ok) {
-          throw new Error(`${entity.name} HTTP ${response.status}`);
-        }
-        return response.json();
-      } catch (error) {
-        if (controller.signal.aborted) {
-          throw new Error(`${entity.name} request timed out after ${timeoutMs}ms`);
-        }
-        throw error;
-      } finally {
-        window.clearTimeout(timeoutId);
-      }
-    }
-
-    const response = await fetch(url);
-    if (!response.ok) {
-      throw new Error(`${entity.name} HTTP ${response.status}`);
-    }
-    return response.json();
-  }
-
   export function isLikelyDeviceConnectionError(message) {
     const normalized = String(message || "").toLowerCase();
     return normalized.includes("failed to fetch")
@@ -570,8 +541,7 @@ import { render } from "./render-scheduler.js";
       } else {
         closeWebServerLogStream();
         clearWebServerLogOutput();
-        state.webServerLogEnabled = null;
-        state.webServerLogConnected = false;
+        updateWebServerLogState({ webServerLogEnabled: null, webServerLogConnected: false });
       }
       clearOptionalMissingEntities();
     }
@@ -630,30 +600,13 @@ import { render } from "./render-scheduler.js";
     const timeoutMs = state.deviceReconnectMode ? RECONNECT_ENTITY_REQUEST_TIMEOUT_MS : CONNECTIVITY_PROBE_TIMEOUT_MS;
     const url = buildEntityPath(entity.domain, entity.name);
 
-    if (typeof AbortController === "function") {
-      const controller = new AbortController();
-      const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
-      try {
-        const response = await fetch(url, { cache: "no-store", signal: controller.signal });
-        state.lastEntityResponseAt = Date.now();
-        return {
-          ok: response.ok || response.status === 404,
-          message: response.ok || response.status === 404 ? "" : `${entity.name} HTTP ${response.status}`,
-        };
-      } catch (error) {
-        return {
-          ok: false,
-          message: controller.signal.aborted
-            ? `${entity.name} request timed out after ${timeoutMs}ms`
-            : error.message || String(error),
-        };
-      } finally {
-        window.clearTimeout(timeoutId);
-      }
-    }
-
     try {
-      const response = await fetch(url, { cache: "no-store" });
+      const response = await fetchWithTimeout(
+        url,
+        { cache: "no-store" },
+        timeoutMs,
+        `${entity.name} request timed out after ${timeoutMs}ms`,
+      );
       state.lastEntityResponseAt = Date.now();
       return {
         ok: response.ok || response.status === 404,
@@ -734,26 +687,12 @@ import { render } from "./render-scheduler.js";
       body: chunk.body,
     };
 
-    if (typeof AbortController === "function") {
-      const controller = new AbortController();
-      const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
-      try {
-        const response = await fetch(BULK_ENTITY_ENDPOINT, { ...fetchOptions, signal: controller.signal });
-        if (!response.ok) {
-          throw new Error(`bulk entities HTTP ${response.status}`);
-        }
-        return response.json();
-      } catch (error) {
-        if (controller.signal.aborted) {
-          throw new Error(`bulk entities request timed out after ${timeoutMs}ms`);
-        }
-        throw error;
-      } finally {
-        window.clearTimeout(timeoutId);
-      }
-    }
-
-    const response = await fetch(BULK_ENTITY_ENDPOINT, fetchOptions);
+    const response = await fetchWithTimeout(
+      BULK_ENTITY_ENDPOINT,
+      fetchOptions,
+      timeoutMs,
+      `bulk entities request timed out after ${timeoutMs}ms`,
+    );
     if (!response.ok) {
       throw new Error(`bulk entities HTTP ${response.status}`);
     }
@@ -764,26 +703,12 @@ import { render } from "./render-scheduler.js";
     const timeoutMs = getEntityRequestTimeoutMs();
     const fetchOptions = { cache: "no-store", headers: { "Cache-Control": "no-store" } };
 
-    if (typeof AbortController === "function") {
-      const controller = new AbortController();
-      const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
-      try {
-        const response = await fetch(SERVICE_STATUS_ENDPOINT, { ...fetchOptions, signal: controller.signal });
-        if (!response.ok) {
-          throw new Error(`service status HTTP ${response.status}`);
-        }
-        return response.json();
-      } catch (error) {
-        if (controller.signal.aborted) {
-          throw new Error(`service status request timed out after ${timeoutMs}ms`);
-        }
-        throw error;
-      } finally {
-        window.clearTimeout(timeoutId);
-      }
-    }
-
-    const response = await fetch(SERVICE_STATUS_ENDPOINT, fetchOptions);
+    const response = await fetchWithTimeout(
+      SERVICE_STATUS_ENDPOINT,
+      fetchOptions,
+      timeoutMs,
+      `service status request timed out after ${timeoutMs}ms`,
+    );
     if (!response.ok) {
       throw new Error(`service status HTTP ${response.status}`);
     }
@@ -794,26 +719,12 @@ import { render } from "./render-scheduler.js";
     const timeoutMs = getEntityRequestTimeoutMs();
     const fetchOptions = { cache: "no-store", headers: { "Cache-Control": "no-store" } };
 
-    if (typeof AbortController === "function") {
-      const controller = new AbortController();
-      const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
-      try {
-        const response = await fetch(DECISION_LOG_ENDPOINT, { ...fetchOptions, signal: controller.signal });
-        if (!response.ok) {
-          throw new Error(`decision log HTTP ${response.status}`);
-        }
-        return response.json();
-      } catch (error) {
-        if (controller.signal.aborted) {
-          throw new Error(`decision log request timed out after ${timeoutMs}ms`);
-        }
-        throw error;
-      } finally {
-        window.clearTimeout(timeoutId);
-      }
-    }
-
-    const response = await fetch(DECISION_LOG_ENDPOINT, fetchOptions);
+    const response = await fetchWithTimeout(
+      DECISION_LOG_ENDPOINT,
+      fetchOptions,
+      timeoutMs,
+      `decision log request timed out after ${timeoutMs}ms`,
+    );
     if (!response.ok) {
       throw new Error(`decision log HTTP ${response.status}`);
     }

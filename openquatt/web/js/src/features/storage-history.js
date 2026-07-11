@@ -1,8 +1,11 @@
 import { getSetupCompleteState, hasEntity, isEntityActive, isTrendHistoryEnabled } from "../core/app-shared.js";
+import { invokeActionMap } from "../core/action-router.js";
 import { downloadBlobFile, downloadJsonFile } from "../core/browser-utils.js";
 import { ENTITY_DEFS, FAST_VIEW_ENTITY_REFRESH_CONCURRENCY, SETTINGS_BACKUP_KEY_SET, SETTINGS_BACKUP_KEYS, SETTINGS_BACKUP_SCHEMA_VERSION, SETTINGS_BACKUP_SECTIONS, TREND_HISTORY_REFRESH_INTERVAL_MS } from "../core/config.js";
 import { buildEntityPath } from "../core/domain-helpers.js";
 import { getEnergyHistoryRequestQuery } from "../core/energy-history-query.js";
+import { getEnergyHistoryDateKeyFromDate, parseEnergyHistoryDateKey } from "../core/energy-history-domain.js";
+import { updateEnergyHistoryState } from "../core/feature-state.js";
 import { setEntityBackupValue } from "../core/entity-backup.js";
 import { formatValue, getEntityValue, normalizeDateTimeValue, normalizeTimeValue, parseLooseNumber } from "../core/entity-store.js";
 import { refreshEntities, syncEntities } from "../core/entity-sync.js";
@@ -247,10 +250,12 @@ import { render } from "../core/render-scheduler.js";
 
     const mode = normalizeEnergyHistoryExportMode(state.energyHistoryExportMode);
     const meta = getEnergyHistoryExportModeMeta(mode);
-    state.energyHistoryExportMode = mode;
-    state.energyHistoryExportBusy = true;
-    state.energyHistoryExportError = "";
-    state.energyHistoryExportNotice = "";
+    updateEnergyHistoryState({
+      energyHistoryExportMode: mode,
+      energyHistoryExportBusy: true,
+      energyHistoryExportError: "",
+      energyHistoryExportNotice: "",
+    });
     render();
 
     if (isDevPreviewEnvironmentForFetches()) {
@@ -280,19 +285,21 @@ import { render } from "../core/render-scheduler.js";
 
   export function resetEnergyHistoryImportState(keepNotice = false) {
     const notice = keepNotice ? state.energyHistoryImportNotice : "";
-    state.energyHistoryImportFileName = "";
-    state.energyHistoryImportSource = "";
-    state.energyHistoryImportRange = "";
-    state.energyHistoryImportRecords = [];
-    state.energyHistoryImportHourRecords = [];
-    state.energyHistoryImportDuplicateCount = 0;
-    state.energyHistoryImportSkippedCount = 0;
-    state.energyHistoryImportInvalidCount = 0;
-    state.energyHistoryImportUnsupportedCount = 0;
-    state.energyHistoryImportBusy = false;
-    state.energyHistoryImportProgressPercent = 0;
-    state.energyHistoryImportError = "";
-    state.energyHistoryImportNotice = notice;
+    updateEnergyHistoryState({
+      energyHistoryImportFileName: "",
+      energyHistoryImportSource: "",
+      energyHistoryImportRange: "",
+      energyHistoryImportRecords: [],
+      energyHistoryImportHourRecords: [],
+      energyHistoryImportDuplicateCount: 0,
+      energyHistoryImportSkippedCount: 0,
+      energyHistoryImportInvalidCount: 0,
+      energyHistoryImportUnsupportedCount: 0,
+      energyHistoryImportBusy: false,
+      energyHistoryImportProgressPercent: 0,
+      energyHistoryImportError: "",
+      energyHistoryImportNotice: notice,
+    });
   }
 
   export function parseEnergyHistoryImportDateKey(value) {
@@ -300,39 +307,18 @@ import { render } from "../core/render-scheduler.js";
       return 0;
     }
     const text = String(value).trim();
-    let year = 0;
-    let month = 0;
-    let day = 0;
-    const compactMatch = text.match(/^(\d{4})(\d{2})(\d{2})$/);
     const timestampParts = parseEnergyHistoryImportTimestampParts(text);
-    const dashedMatch = text.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-    if (compactMatch) {
-      year = Number(compactMatch[1]);
-      month = Number(compactMatch[2]);
-      day = Number(compactMatch[3]);
-    } else if (timestampParts) {
+    if (timestampParts) {
       return timestampParts.dateKey;
-    } else if (dashedMatch) {
-      year = Number(dashedMatch[1]);
-      month = Number(dashedMatch[2]);
-      day = Number(dashedMatch[3]);
-    } else {
-      const parsedDate = new Date(text);
-      if (Number.isNaN(parsedDate.getTime())) {
-        return 0;
-      }
-      year = parsedDate.getFullYear();
-      month = parsedDate.getMonth() + 1;
-      day = parsedDate.getDate();
     }
-    if (year < 2020 || year > 2099 || month < 1 || month > 12 || day < 1 || day > 31) {
-      return 0;
+    const compact = text.match(/^\d{8}$/)?.[0]
+      || text.match(/^(\d{4})-(\d{2})-(\d{2})$/)?.slice(1).join("");
+    let parsed = compact ? parseEnergyHistoryDateKey(compact) : null;
+    if (!parsed) {
+      const date = new Date(text);
+      parsed = Number.isNaN(date.getTime()) ? null : parseEnergyHistoryDateKey(getEnergyHistoryDateKeyFromDate(date));
     }
-    const check = new Date(Date.UTC(year, month - 1, day));
-    if (check.getUTCFullYear() !== year || check.getUTCMonth() !== month - 1 || check.getUTCDate() !== day) {
-      return 0;
-    }
-    return (year * 10000) + (month * 100) + day;
+    return parsed && parsed.year <= 2099 ? parsed.key : 0;
   }
 
   export function formatEnergyHistoryImportDateKey(dateKey) {
@@ -851,15 +837,17 @@ import { render } from "../core/render-scheduler.js";
       return;
     }
 
-    state.energyHistoryImportFileName = file.name || "exportbestand";
+    updateEnergyHistoryState({ energyHistoryImportFileName: file.name || "exportbestand" });
     try {
       const parsed = parseEnergyHistoryImportPayload(file.name || "", await file.text());
-      state.energyHistoryImportRecords = parsed.records;
-      state.energyHistoryImportHourRecords = parsed.hourRecords;
-      state.energyHistoryImportSource = parsed.source;
-      state.energyHistoryImportRange = parsed.range;
-      state.energyHistoryImportDuplicateCount = parsed.duplicates;
-      state.energyHistoryImportInvalidCount = parsed.invalid;
+      updateEnergyHistoryState({
+        energyHistoryImportRecords: parsed.records,
+        energyHistoryImportHourRecords: parsed.hourRecords,
+        energyHistoryImportSource: parsed.source,
+        energyHistoryImportRange: parsed.range,
+        energyHistoryImportDuplicateCount: parsed.duplicates,
+        energyHistoryImportInvalidCount: parsed.invalid,
+      });
     } catch (error) {
       state.energyHistoryImportError = `Bestand kon niet worden gelezen. ${error.message}`;
     }
@@ -1265,17 +1253,6 @@ import { render } from "../core/render-scheduler.js";
     }
   }
 
-  export function openSettingsBackupImportPicker() {
-    if (!state.root || state.settingsBackupBusy) {
-      return;
-    }
-
-    const input = state.root.querySelector('[data-oq-backup-file-input]');
-    if (input) {
-      input.click();
-    }
-  }
-
   export async function handleSettingsBackupFileSelection(file) {
     if (!file || state.settingsBackupBusy) {
       return;
@@ -1388,8 +1365,8 @@ import { render } from "../core/render-scheduler.js";
 
   export function isDevPreviewEnvironmentForFetches() {
     return Boolean(
-      (typeof window !== "undefined" && window.__OQ_DEV_CONTROLS__)
-      || (typeof window !== "undefined" && window.__OQ_DEV_META)
+      (__OQ_PREVIEW__ && typeof window !== "undefined" && window.__OQ_DEV_CONTROLS__)
+      || (__OQ_PREVIEW__ && typeof window !== "undefined" && window.__OQ_DEV_META)
     );
   }
 
@@ -1566,3 +1543,79 @@ import { render } from "../core/render-scheduler.js";
     refreshTrendHistoryMetadata,
     shouldRefreshSettingsStorageForCurrentSurface,
   });
+
+  const storageHistoryActionHandlers = {
+    "flush-trend-history": ({ triggerNamedButton }) => {
+      return triggerNamedButton("trendHistoryFlush", {
+        successNotice: "Diagnosegeschiedenis is opgeslagen.",
+        errorPrefix: "Diagnosegeschiedenis kon niet worden opgeslagen",
+        refreshKeys: getSettingsStorageRefreshKeys(),
+        refreshDelayMs: 500,
+      }).then(() => {
+        refreshSettingsStorageStateSoon(undefined, { forceTrendHistory: true });
+      });
+    },
+    "save-lifetime-energy-history": ({ triggerNamedButton }) => {
+      return triggerNamedButton("lifetimeEnergyHistoryCapture", {
+        successNotice: "Energiehistorie is opgeslagen.",
+        errorPrefix: "Energiehistorie kon niet worden opgeslagen",
+        refreshKeys: getSettingsStorageRefreshKeys(),
+        refreshDelayMs: 500,
+      }).then(() => {
+        state.energyHistoryRaw = "";
+        state.energyHistorySignature = "";
+        state.energyHistoryLastFetchAt = 0;
+        refreshSettingsStorageStateSoon();
+        if (state.appView === "results") {
+          void refreshEnergyHistoryData({ force: true }).then(() => render());
+        }
+      });
+    },
+    "clear-lifetime-energy-history": ({ triggerNamedButton }) => {
+      if (!window.confirm("Energiehistorie wissen?\n\nAlle bewaarde dagtotalen worden verwijderd. Dit heeft geen invloed op de werking van je warmtepomp.")) {
+        return;
+      }
+      return triggerNamedButton("lifetimeEnergyHistoryClear", {
+        successNotice: "Energiehistorie is gewist.",
+        errorPrefix: "Energiehistorie kon niet worden gewist",
+        refreshKeys: getSettingsStorageRefreshKeys(),
+        refreshDelayMs: 500,
+      }).then(() => {
+        state.energyHistoryRaw = "";
+        state.energyHistorySignature = "";
+        state.energyHistoryLastFetchAt = 0;
+        refreshSettingsStorageStateSoon();
+        if (state.appView === "results") {
+          void refreshEnergyHistoryData({ force: true }).then(() => render());
+        }
+      });
+    },
+    "select-energy-history-import-file": () => openEnergyHistoryImportFilePicker(),
+    "clear-energy-history-import-file": () => {
+      resetEnergyHistoryImportState();
+      render();
+    },
+    "import-energy-history-file": () => importEnergyHistoryRecords(),
+    "export-energy-history": () => exportEnergyHistoryRecords(),
+    "open-history-storage-modal": () => {
+      state.systemModal = "history-storage";
+      render();
+      const refreshPromise = refreshSettingsStorageState({ forceMissing: true, forceTrendHistory: true, forceEnergyHistory: true }).finally(() => {
+        if (state.systemModal === "history-storage") {
+          render();
+        }
+      });
+      refreshSettingsStorageStateSoon([1000, 3000, 7000]);
+      return refreshPromise;
+    },
+    "download-settings-backup": () => exportSettingsBackup(),
+    "open-settings-backup-import": () => {
+      state.systemModal = "settings-backup-import";
+      render();
+    },
+    "confirm-settings-backup-restore": () => restoreSettingsBackup(),
+  };
+
+  export function handleStorageHistoryAction(action, dependencies) {
+    return invokeActionMap(storageHistoryActionHandlers, action, dependencies);
+  }

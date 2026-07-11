@@ -7,12 +7,7 @@
   padding: 16px 18px;
   border-radius: var(--oq-helper-radius-lg);
   border: 1px solid var(--oq-helper-line);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(249, 250, 251, 0.98));
-}
-
-.oq-helper-shell--dark .oq-settings-installation-summary,
-.oq-helper-shell--dark .oq-settings-system-row {
-  background: linear-gradient(180deg, rgba(66, 32, 14, 0.26), rgba(22, 33, 49, 0.94));
+  background: var(--oq-theme-surface-rezb, linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(249, 250, 251, 0.98)));
 }
 
 .oq-settings-installation-summary-copy,
@@ -46,11 +41,7 @@
   padding: 14px 16px;
   border-radius: 18px;
   border: 1px solid var(--oq-helper-line);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(249, 250, 251, 0.98));
-}
-
-.oq-helper-shell--dark .oq-settings-backup-stat {
-  background: linear-gradient(180deg, rgba(66, 32, 14, 0.24), rgba(22, 33, 49, 0.94));
+  background: var(--oq-theme-surface-15zu, linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(249, 250, 251, 0.98)));
 }
 
 .oq-settings-backup-stat-label {
@@ -89,23 +80,15 @@
   padding: 12px;
   border-radius: 14px;
   border: 1px dashed var(--oq-helper-line);
-  background: rgba(255, 255, 255, 0.7);
+  background: var(--oq-theme-surface-w8xo, rgba(255, 255, 255, 0.7));
   color: var(--oq-helper-faint);
-}
-
-.oq-helper-shell--dark .oq-settings-backup-import-input {
-  background: rgba(13, 18, 28, 0.72);
 }
 
 .oq-settings-backup-error {
   margin: 0;
-  color: #b45309;
+  color: var(--oq-theme-color-11rp, #b45309);
   font-weight: 600;
   line-height: 1.55;
-}
-
-.oq-helper-shell--dark .oq-settings-backup-error {
-  color: #fdba74;
 }
 
 .oq-settings-installation-summary-label,
@@ -176,12 +159,8 @@
   padding: 12px 14px;
   border: 1px solid var(--oq-helper-line);
   border-radius: 18px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(249, 250, 251, 0.98));
+  background: var(--oq-theme-surface-vwg0, linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(249, 250, 251, 0.98)));
   overflow-anchor: none;
-}
-
-.oq-helper-shell--dark .oq-webserver-log-panel {
-  background: linear-gradient(180deg, rgba(18, 27, 41, 0.9), rgba(13, 19, 31, 0.96));
 }
 
 .oq-webserver-log-output {
@@ -197,7 +176,7 @@
 
 .oq-webserver-log-empty {
   margin: 0;
-  color: var(--oq-helper-soft);
+  color: var(--oq-theme-color-d7d8, var(--oq-helper-soft));
   line-height: 1.55;
 }
 
@@ -214,7 +193,7 @@
 
 .oq-webserver-log-entry-time {
   display: block;
-  color: var(--oq-helper-faint);
+  color: var(--oq-theme-color-1xsj, var(--oq-helper-faint));
   font-size: 0.82rem;
   line-height: 1.55;
   font-variant-numeric: tabular-nums;
@@ -235,58 +214,29 @@
 }
 
 .oq-webserver-log-entry--plain {
-  color: var(--oq-helper-soft);
+  color: var(--oq-theme-color-d7d8, var(--oq-helper-soft));
 }
 
 .oq-webserver-log-entry--error {
-  color: #b91c1c;
+  color: var(--oq-theme-color-cfj0, #b91c1c);
   font-weight: 700;
 }
 
 .oq-webserver-log-entry--warning {
-  color: #b45309;
+  color: var(--oq-theme-color-11rp, #b45309);
   font-weight: 600;
 }
 
 .oq-webserver-log-entry--info {
-  color: #0f766e;
+  color: var(--oq-theme-color-1lvs, #0f766e);
 }
 
 .oq-webserver-log-entry--debug {
-  color: #1d4ed8;
+  color: var(--oq-theme-color-7hmo, #1d4ed8);
 }
 
 .oq-webserver-log-entry--verbose {
-  color: var(--oq-helper-faint);
-}
-
-.oq-helper-shell--dark .oq-webserver-log-empty,
-.oq-helper-shell--dark .oq-webserver-log-entry--plain {
-  color: #cbd5e1;
-}
-
-.oq-helper-shell--dark .oq-webserver-log-entry-time {
-  color: #94a3b8;
-}
-
-.oq-helper-shell--dark .oq-webserver-log-entry--error {
-  color: #fca5a5;
-}
-
-.oq-helper-shell--dark .oq-webserver-log-entry--warning {
-  color: #fdba74;
-}
-
-.oq-helper-shell--dark .oq-webserver-log-entry--info {
-  color: #5eead4;
-}
-
-.oq-helper-shell--dark .oq-webserver-log-entry--debug {
-  color: #93c5fd;
-}
-
-.oq-helper-shell--dark .oq-webserver-log-entry--verbose {
-  color: #94a3b8;
+  color: var(--oq-theme-color-1xsj, var(--oq-helper-faint));
 }
 
 .oq-settings-action-field {
@@ -308,9 +258,6 @@
 }
 
 .oq-settings-action-note--warning {
-  color: var(--oq-helper-accent-deep);
+  color: var(--oq-theme-color-11rp, var(--oq-helper-accent-deep));
 }
 
-.oq-helper-shell--dark .oq-settings-action-note--warning {
-  color: #fdba74;
-}

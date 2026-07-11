@@ -5,6 +5,7 @@ import vm from "node:vm";
 import { gzipSync } from "node:zlib";
 import { build, transform } from "esbuild";
 import { resolveCssSources } from "./css-source-list.mjs";
+import { WEB_BUNDLE_BUDGETS } from "./web-budgets.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const webDir = path.dirname(__filename);
@@ -13,21 +14,18 @@ const jsSourceDir = path.join(webDir, "js", "src");
 const cssSources = resolveCssSources(webDir);
 
 const allowedBareImports = new Set(["virtual:embedded-assets"]);
-const bundleBudgetHeadroomBytes = 5 * 1024;
-const bundleGzipBaselines = new Map([
-  ["js/openquatt-app.js", 199828],
-  ["css/openquatt-app.css", 40717],
-]);
 const boundaryAllowedEdges = new Set([
   "core/entity-actions.js -> features/debug-recording.js",
+  "core/entity-actions.js -> features/control-replay-actions.js",
   "core/entity-actions.js -> features/firmware-actions.js",
   "core/entity-actions.js -> features/firmware-update.js",
   "core/entity-actions.js -> features/mqtt-actions.js",
-  "core/entity-actions.js -> features/mqtt.js",
-  "core/entity-actions.js -> features/quickstart-actions.js",
-  "core/entity-actions.js -> features/quickstart.js",
+  "core/entity-actions.js -> features/quickstart-ui-actions.js",
   "core/entity-actions.js -> features/security-actions.js",
+  "core/entity-actions.js -> features/shell-actions.js",
   "core/entity-actions.js -> features/storage-history.js",
+  "core/entity-actions.js -> features/system-actions.js",
+  "core/entity-actions.js -> features/view-actions.js",
   "core/entity-actions.js -> features/webserver-logs.js",
   "core/entity-actions.js -> settings/installation.js",
   "core/entity-actions.js -> views/energy.js",
@@ -39,7 +37,6 @@ const boundaryAllowedEdges = new Set([
   "core/entity-write-actions.js -> features/webserver-logs.js",
   "core/render-signatures.js -> features/security-actions.js",
   "core/runtime.js -> features/debug-recording.js",
-  "settings/storage.js -> views/energy.js",
   "views/overview.js -> settings/cooling.js",
   "views/shell.js -> settings/core.js",
 ]);
@@ -220,6 +217,8 @@ async function buildEmbeddedAssetModule() {
     const bytes = await readFile(assetPath);
     lines.push(`export const ${name} = "data:image/webp;base64,${bytes.toString("base64")}";`);
   }
+  const logoMarkup = await readFile(path.join(webDir, "assets", "openquatt-logo.svg"), "utf8");
+  lines.push(`export const LOGO_MARKUP = ${JSON.stringify(logoMarkup.trim())};`);
   return lines.join("\n");
 }
 
@@ -248,6 +247,7 @@ async function checkJavaScriptBundleFresh() {
     legalComments: "none",
     minify: true,
     target: "es2020",
+    define: { __OQ_PREVIEW__: "false" },
     write: false,
     plugins: [embeddedAssetsPlugin()],
   });
@@ -279,12 +279,11 @@ async function checkCssBundleFresh() {
 
 async function checkBundleGzipBudgets() {
   const errors = [];
-  for (const [relativePath, baselineBytes] of bundleGzipBaselines.entries()) {
-    const maxBytes = baselineBytes + bundleBudgetHeadroomBytes;
-    const bytes = await readFile(path.join(webDir, relativePath));
+  for (const budget of WEB_BUNDLE_BUDGETS) {
+    const bytes = await readFile(path.join(webDir, budget.file));
     const gzipBytes = gzipSync(bytes).length;
-    if (gzipBytes > maxBytes) {
-      errors.push(`${relativePath} gzip ${gzipBytes} B exceeds budget ${maxBytes} B`);
+    if (gzipBytes > budget.gzip) {
+      errors.push(`${budget.file} gzip ${gzipBytes} B exceeds budget ${budget.gzip} B`);
     }
   }
   if (errors.length) {
@@ -309,10 +308,12 @@ async function checkWriteActionContracts() {
 
   const entityActions = await source("js/src/core/entity-actions.js");
   const entityWriteActions = await source("js/src/core/entity-write-actions.js");
+  const namedButtonActions = await source("js/src/core/named-button-actions.js");
   const securityActions = await source("js/src/features/security-actions.js");
   const mqttActions = await source("js/src/features/mqtt-actions.js");
   const firmwareActions = await source("js/src/features/firmware-actions.js");
   const debugRecording = await source("js/src/features/debug-recording.js");
+  const systemActions = await source("js/src/features/system-actions.js");
 
   assertContains(securityActions, 'fetch("/api-security/enable"', "API security enable");
   assertContains(securityActions, 'fetch("/api-security/rotate"', "API security rotate");
@@ -323,17 +324,178 @@ async function checkWriteActionContracts() {
   assertContains(debugRecording, 'getDebugRecordingEndpoint(`start?duration_s=${encodeURIComponent(minutes * 60)}`)', "Debug recording start");
   assertContains(debugRecording, 'getDebugRecordingEndpoint("stop")', "Debug recording stop");
   assertContains(debugRecording, 'getDebugRecordingEndpoint("download")', "Debug recording download");
-  assertContains(entityActions, 'triggerNamedButton("restartAction"', "Restart confirm");
+  assertContains(systemActions, 'triggerNamedButton("restartAction"', "Restart confirm");
   assertContains(entityWriteActions, "export async function commitOpenQuattRegulationPause", "OpenQuatt pause write helper");
   assertContains(entityWriteActions, "export async function commitOpenQuattRegulationResumeNow", "OpenQuatt resume write helper");
-  assertContains(entityActions, 'ODU_RUNTIME_FREQUENCY_BUTTON_KEYS.has(buttonKey)', "ODU runtime named buttons");
+  assertContains(namedButtonActions, 'ODU_RUNTIME_FREQUENCY_BUTTON_KEYS.has(buttonKey)', "ODU runtime named buttons");
   assertContains(entityWriteActions, "ODU_RUNTIME_FREQUENCY_BUTTON_KEYS.has(key)", "ODU runtime named button write helper");
+}
+
+async function checkStateSliceContracts() {
+  const source = await readFile(path.join(jsSourceDir, "core/state-slices.js"), "utf8");
+  const transformed = await transform(source, { format: "cjs", loader: "js", target: "es2020" });
+  const context = { module: { exports: {} }, exports: {} };
+  context.exports = context.module.exports;
+  vm.runInNewContext(transformed.code, context, { filename: "state-slices.js" });
+  const slices = context.module.exports;
+  const groups = [
+    slices.createHistoryState(24),
+    slices.createDiagnosticsState("recording-id"),
+    slices.createSettingsState(),
+    slices.createSecurityState(),
+    slices.createFirmwareState(),
+    slices.createMotionState(true),
+  ];
+  const seenKeys = new Set();
+  groups.forEach((group) => {
+    Object.keys(group).forEach((key) => {
+      if (seenKeys.has(key)) {
+        throw new Error(`State slice key is duplicated: ${key}`);
+      }
+      seenKeys.add(key);
+    });
+  });
+  if (groups[0].trendWindowHours !== 24 || groups[1].debugRecordingAcknowledgedId !== "recording-id" || groups[5].reducedMotion !== true) {
+    throw new Error("State slice input values are not preserved");
+  }
+
+  const featureState = await readFile(path.join(jsSourceDir, "core/feature-state.js"), "utf8");
+  assertContains(featureState, "foreignKey", "Feature-state ownership guard");
+  for (const action of [
+    "updateDebugRecordingState",
+    "updateEnergyHistoryState",
+    "updateFirmwareState",
+    "updateMqttState",
+    "updateWebServerLogState",
+  ]) {
+    assertContains(featureState, action, `${action} action`);
+  }
+}
+
+async function checkMockFixtureContracts() {
+  const scenarioSource = await readFile(path.join(webDir, "js/mock-scenarios.js"), "utf8");
+  const fixtureSource = await readFile(path.join(webDir, "js/mock-fixtures.js"), "utf8");
+  const mockSource = await readFile(path.join(webDir, "js/mock-device.js"), "utf8");
+  const buildSource = await readFile(path.join(webDir, "build-assets.mjs"), "utf8");
+  const configSource = await readFile(path.join(jsSourceDir, "core/config.js"), "utf8");
+  const configModule = await import(`data:text/javascript;base64,${Buffer.from(configSource).toString("base64")}`);
+  const devHtml = await readFile(path.join(webDir, "dev.html"), "utf8");
+  const entityDefinitions = Object.values(configModule.ENTITY_DEFS).map(({ domain, name }) => [domain, name]);
+  const context = { window: { __OQ_MOCK_ENTITY_DEFS__: Object.freeze(entityDefinitions) } };
+  vm.runInNewContext(scenarioSource, context, { filename: "mock-scenarios.js" });
+  vm.runInNewContext(fixtureSource, context, { filename: "mock-fixtures.js" });
+  const fixtures = context.window.__OQ_MOCK_FIXTURES__;
+  if (!entityDefinitions || entityDefinitions.length < 300) {
+    throw new Error("Generated mock entity definitions are incomplete");
+  }
+  if (!fixtures || fixtures.hp2Entities.length < 30 || fixtures.devControlOptions.scenario.length < 10) {
+    throw new Error("Mock fixtures are incomplete");
+  }
+  assertContains(buildSource, "ENTITY_DEFS", "Canonical mock entity source");
+  assertContains(mockSource, "__OQ_MOCK_ENTITY_DEFS__", "Generated mock entity definitions");
+  assertContains(mockSource, "mockFixtures.hp2Entities", "HP2 mock fixtures");
+  assertContains(mockSource, 'renderDevControlOptions("scenario")', "Scenario control fixtures");
+  const scriptOrder = [
+    "mock-scenarios.js",
+    "mock-entity-defs.js",
+    "mock-fixtures.js",
+    "mock-device.js",
+    "openquatt-preview.js",
+  ].map((script) => devHtml.indexOf(script));
+  if (scriptOrder.some((position) => position < 0) || scriptOrder.some((position, index) => index > 0 && position <= scriptOrder[index - 1])) {
+    throw new Error("Preview scripts must load in dependency order");
+  }
+}
+
+async function checkPreviewAssetsAvailable() {
+  for (const relativePath of [
+    "js/mock-entity-defs.js",
+    "js/openquatt-preview.js",
+    "css/openquatt-preview.css",
+  ]) {
+    try {
+      await stat(path.join(webDir, ...relativePath.split("/")));
+    } catch (error) {
+      if (error.code === "ENOENT") {
+        throw new Error(`Missing preview asset ${relativePath}. Run: rtk npm run build:web:preview`);
+      }
+      throw error;
+    }
+  }
+}
+
+async function checkEmbeddedAssetContracts() {
+  const logoMarkup = await readFile(path.join(webDir, "assets/openquatt-logo.svg"), "utf8");
+  const configSource = await readFile(path.join(jsSourceDir, "core/config.js"), "utf8");
+  const embeddedAssets = await readFile(path.join(jsSourceDir, "core/embedded-assets.js"), "utf8");
+  if (!logoMarkup.includes("<svg") || !logoMarkup.includes("OpenQuatt logo")) {
+    throw new Error("OpenQuatt logo asset is invalid");
+  }
+  if (configSource.includes("LOGO_MARKUP")) {
+    throw new Error("OpenQuatt logo markup must not live in core/config.js");
+  }
+  assertContains(embeddedAssets, "LOGO_MARKUP", "Embedded OpenQuatt logo export");
+}
+
+async function checkBrowserSmokeMatrix() {
+  const matrix = await readFile(path.join(webDir, "BROWSER_SMOKE_MATRIX.md"), "utf8");
+  for (const requiredText of [
+    "Overview",
+    "Energy",
+    "Settings",
+    "Firmware modals",
+    "History import/export",
+    "Desktop light",
+    "Desktop dark",
+    "Mobile light",
+    "Mobile dark",
+  ]) {
+    assertContains(matrix, requiredText, `Browser smoke matrix: ${requiredText}`);
+  }
+}
+
+async function checkResponsiveCssOwnership() {
+  const source = await readFile(path.join(webDir, "css/src/90-responsive.css"), "utf8");
+  let depth = 0;
+  const invalidTopLevel = [];
+  source.split(/\r?\n/).forEach((line, index) => {
+    const trimmed = line.trim();
+    if (depth === 0 && trimmed && !trimmed.startsWith("/*") && !trimmed.startsWith("@media")) {
+      invalidTopLevel.push(`${index + 1}: ${trimmed}`);
+    }
+    depth += (line.match(/\{/g) || []).length;
+    depth -= (line.match(/\}/g) || []).length;
+  });
+  if (depth !== 0 || invalidTopLevel.length) {
+    throw new Error(`90-responsive.css contains non-responsive top-level rules:\n${invalidTopLevel.join("\n")}`);
+  }
+}
+
+async function checkProductionInterfaceCssContracts() {
+  const relativeSources = cssSources.map((filePath) => toBundlePath(path.relative(webDir, filePath)));
+  if (relativeSources.includes("css/src/02-devtools.css")) {
+    throw new Error("Production CSS includes preview-only devtools styles");
+  }
+  if (!relativeSources.includes("css/src/02-interface-panel.css")) {
+    throw new Error("Production CSS is missing interface panel styles");
+  }
+
+  const productionCss = (await Promise.all(cssSources.map((filePath) => readFile(filePath, "utf8")))).join("\n");
+  for (const [needle, label] of [
+    [".oq-helper-hub {", "interface panel"],
+    [".oq-helper-hub-toggle {", "interface panel toggle"],
+    [".oq-helper-status-grid {", "interface status grid"],
+    ["esp-app.oq-native-app {", "ESPHome fallback surface"],
+  ]) {
+    assertContains(productionCss, needle, `Production CSS: ${label}`);
+  }
 }
 
 async function checkSharedBrowserUtilityContracts() {
   const utilityRelativePath = "core/browser-utils.js";
   const utilitySource = await readFile(path.join(jsSourceDir, utilityRelativePath), "utf8");
   for (const [needle, label] of [
+    ["export async function fetchWithTimeout", "fetch timeout helper"],
     ["export async function copyTextToClipboard", "clipboard helper"],
     ["export function downloadBlobFile", "blob download helper"],
     ["export function downloadJsonFile", "JSON download helper"],
@@ -345,6 +507,8 @@ async function checkSharedBrowserUtilityContracts() {
 
   const sourceFiles = await collectFiles(jsSourceDir, (filePath) => filePath.endsWith(".js"));
   const sharedOnlyPatterns = [
+    { pattern: "new AbortController", label: "fetch timeout controllers" },
+    { pattern: "controller.abort()", label: "fetch timeout aborts" },
     { pattern: "clipboard.writeText", label: "clipboard writes" },
     { pattern: 'document.createElement("textarea")', label: "clipboard textarea fallback" },
     { pattern: 'document.execCommand("copy")', label: "clipboard execCommand fallback" },
@@ -463,13 +627,85 @@ globalThis.normalizeBasePath = normalizeBasePath;`,
   }
 }
 
+async function checkScrollKeeperContracts() {
+  const source = await readFile(path.join(jsSourceDir, "core", "scroll-keeper.js"), "utf8");
+  const sandbox = {};
+  vm.runInNewContext(
+    `${source.replace(/\bexport\s+/g, "")}
+globalThis.createScrollKeeper = createScrollKeeper;`,
+    sandbox,
+    { filename: "core/scroll-keeper.js" },
+  );
+  const { createScrollKeeper } = sandbox;
+  const scroller = {
+    clientHeight: 100,
+    dataset: { step: "one" },
+    scrollHeight: 300,
+    scrollTop: 100,
+  };
+  let active = true;
+  let token = 0;
+  const keeper = createScrollKeeper({
+    getScroller: () => scroller,
+    getToken: () => token,
+    setToken: (value) => { token = value; },
+    isActive: () => active,
+    getIdentity: (element) => element.dataset.step,
+    preserveGrowth: true,
+    stickToBottom: true,
+  });
+
+  const growthState = keeper.capture();
+  scroller.scrollHeight = 350;
+  scroller.scrollTop = 0;
+  keeper.restore(growthState);
+  if (scroller.scrollTop !== 150) {
+    throw new Error(`Scroll keeper growth restore failed: ${scroller.scrollTop}`);
+  }
+
+  scroller.scrollHeight = 300;
+  scroller.scrollTop = 155;
+  const bottomState = keeper.capture();
+  scroller.scrollHeight = 400;
+  scroller.scrollTop = 0;
+  keeper.restore(bottomState);
+  if (scroller.scrollTop !== 400) {
+    throw new Error(`Scroll keeper bottom restore failed: ${scroller.scrollTop}`);
+  }
+
+  scroller.scrollHeight = 300;
+  scroller.scrollTop = 80;
+  const identityState = keeper.capture();
+  scroller.dataset.step = "two";
+  scroller.scrollTop = 12;
+  keeper.restore(identityState);
+  if (scroller.scrollTop !== 12) {
+    throw new Error("Scroll keeper restored a different modal identity");
+  }
+
+  scroller.dataset.step = "one";
+  active = false;
+  keeper.queue(identityState, false);
+  if (scroller.scrollTop !== 12) {
+    throw new Error("Scroll keeper restored while inactive");
+  }
+}
+
 async function main() {
   await stat(path.join(webDir, "dev.html"));
+  await checkPreviewAssetsAvailable();
   await checkSourceImports();
   await checkImportCycles();
   await checkImportBoundaries();
   await checkBasePathNormalization();
+  await checkScrollKeeperContracts();
   await checkWriteActionContracts();
+  await checkStateSliceContracts();
+  await checkMockFixtureContracts();
+  await checkEmbeddedAssetContracts();
+  await checkBrowserSmokeMatrix();
+  await checkResponsiveCssOwnership();
+  await checkProductionInterfaceCssContracts();
   await checkSharedBrowserUtilityContracts();
   await checkSharedCoreUtilityContracts();
   await checkRuntimeBoundaryContracts();

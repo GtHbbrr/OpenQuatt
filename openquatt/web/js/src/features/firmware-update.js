@@ -5,6 +5,8 @@ import { refreshEntities } from "../core/entity-sync.js";
 import { beginDeviceReconnect, getDeviceReconnectCopy, getDeviceReconnectStatusCopy, getDeviceReconnectStatusLabel, getDeviceReconnectTitle } from "../core/device-reconnect.js";
 import { startEntityPolling, stopEntityPolling } from "../core/entity-polling-controls.js";
 import { isFirmwareOtaQuietActive } from "../core/firmware-quiet.js";
+import { updateFirmwareState } from "../core/feature-state.js";
+import { renderModalShell } from "../core/modal-shell.js";
 import { state } from "../core/state.js";
 import { getDeviceMeta, getFirmwareAlternateConnection, getFirmwareAlternateTopology, getFirmwareBuildConnection, getFirmwareBuildLabelFor, getFirmwareConnectionLabel, getFirmwareDeviceLabel, getFirmwareHardwareProfile, getFirmwareTopologyLabel, getInstallationTopology, normalizeFirmwareConnection, normalizeInstallationTopologyLabel } from "./device-context.js";
 import { closeWebServerLogStream } from "./webserver-logs.js";
@@ -251,29 +253,33 @@ import { render } from "../core/render-scheduler.js";
   }
 
   export function resetFirmwareInstallUiState() {
-    state.updateInstallBusy = false;
-    state.updateInstallTargetVersion = "";
-    state.updateInstallPhaseHint = "";
-    state.updateInstallProgressHint = Number.NaN;
-    state.updateInstallMode = "";
-    state.updateInstallTargetConnection = "";
-    state.updateInstallTargetTopology = "";
+    updateFirmwareState({
+      updateInstallBusy: false,
+      updateInstallTargetVersion: "",
+      updateInstallPhaseHint: "",
+      updateInstallProgressHint: Number.NaN,
+      updateInstallMode: "",
+      updateInstallTargetConnection: "",
+      updateInstallTargetTopology: "",
+    });
     clearFirmwareOtaQuietWindow();
   }
 
   export function resetFirmwareManualUploadSelection() {
-    state.updateManualUploadFile = null;
-    state.updateManualUploadFileName = "";
-    state.updateManualUploadError = "";
+    updateFirmwareState({
+      updateManualUploadFile: null,
+      updateManualUploadFileName: "",
+      updateManualUploadError: "",
+    });
   }
 
   export function resetFirmwareTestSelection(options = {}) {
-    if (options.clearPr) {
-      state.updateTestFirmwarePr = "";
-    }
-    state.updateTestFirmwareConfirmed = false;
-    state.updateTestFirmwareError = "";
-    state.updateTestFirmwareBuild = null;
+    updateFirmwareState({
+      ...(options.clearPr ? { updateTestFirmwarePr: "" } : {}),
+      updateTestFirmwareConfirmed: false,
+      updateTestFirmwareError: "",
+      updateTestFirmwareBuild: null,
+    });
   }
 
   export function syncFirmwareInstallHints() {
@@ -654,26 +660,25 @@ import { render } from "../core/render-scheduler.js";
     if (!state.deviceReconnectMode) {
       return "";
     }
-    return `
-      <div class="oq-helper-modal-backdrop${state.overviewTheme === "dark" ? " oq-helper-modal-backdrop--dark" : ""}" data-oq-modal="reconnect">
-        <section class="oq-helper-modal oq-helper-modal--reconnect" role="status" aria-live="polite" aria-labelledby="oq-reconnect-modal-title">
-          <div class="oq-helper-modal-head">
-            <div>
-              <p class="oq-helper-modal-kicker">Systeem</p>
-              <h2 class="oq-helper-modal-title" id="oq-reconnect-modal-title">${escapeHtml(getDeviceReconnectTitle())}</h2>
-            </div>
+    return renderModalShell({
+      modalId: "reconnect",
+      titleId: "oq-reconnect-modal-title",
+      kicker: "Systeem",
+      title: getDeviceReconnectTitle(),
+      modalClass: "oq-helper-modal--reconnect",
+      role: "status",
+      ariaLive: "polite",
+      bodyMarkup: `
+        <p class="oq-helper-modal-copy">${escapeHtml(getDeviceReconnectCopy())}</p>
+        <div class="oq-helper-reconnect-status">
+          <span class="oq-helper-reconnect-spinner" aria-hidden="true"></span>
+          <div>
+            <strong>${escapeHtml(getDeviceReconnectStatusLabel())}</strong>
+            <span>${escapeHtml(getDeviceReconnectStatusCopy())}</span>
           </div>
-          <p class="oq-helper-modal-copy">${escapeHtml(getDeviceReconnectCopy())}</p>
-          <div class="oq-helper-reconnect-status">
-            <span class="oq-helper-reconnect-spinner" aria-hidden="true"></span>
-            <div>
-              <strong>${escapeHtml(getDeviceReconnectStatusLabel())}</strong>
-              <span>${escapeHtml(getDeviceReconnectStatusCopy())}</span>
-            </div>
-          </div>
-        </section>
-      </div>
-    `;
+        </div>
+      `,
+    });
   }
 
   export function primeFirmwareUpdateState(channel = getFirmwareChannelLabel()) {
@@ -1105,17 +1110,17 @@ import { render } from "../core/render-scheduler.js";
     const showConnectionSwitchAction = Boolean(connectionSwitchModel && !justCompleted);
     const showTopologySwitchAction = Boolean(topologySwitchModel && !justCompleted);
 
-    return `
-      <div class="oq-helper-modal-backdrop${checking || installing || progress ? " is-busy" : ""}${state.overviewTheme === "dark" ? " oq-helper-modal-backdrop--dark" : ""}" data-oq-modal="firmware-update">
-        <section class="oq-helper-modal oq-helper-modal--firmware oq-helper-modal--scrollable" role="dialog" aria-modal="true" aria-labelledby="oq-update-modal-title">
-          <div class="oq-helper-modal-head">
-            <div>
-              <p class="oq-helper-modal-kicker">OTA-update</p>
-              <h2 class="oq-helper-modal-title" id="oq-update-modal-title">${escapeHtml(title)}</h2>
-            </div>
-            <button class="oq-helper-modal-close" type="button" data-oq-action="close-update-modal" aria-label="Sluit update-popup">×</button>
-          </div>
-          <p class="oq-helper-modal-copy">${escapeHtml(summary)}</p>
+    return renderModalShell({
+      id: "firmware-update",
+      titleId: "oq-update-modal-title",
+      kicker: "OTA-update",
+      title,
+      copy: summary,
+      backdropClass: checking || installing || progress ? "is-busy" : "",
+      className: "oq-helper-modal--firmware oq-helper-modal--scrollable",
+      closeAction: "close-update-modal",
+      closeLabel: "Sluit update-popup",
+      body: `
           ${justCompleted ? `
             <div class="oq-helper-modal-success" aria-live="polite">
               <strong>Bijgewerkt</strong>
@@ -1178,8 +1183,6 @@ import { render } from "../core/render-scheduler.js";
               </button>
             `}
           </div>
-          ${renderFirmwareAdvancedSection(showConnectionSwitchAction, connectionSwitchModel, showTopologySwitchAction, topologySwitchModel)}
-        </section>
-      </div>
-    `;
+          ${renderFirmwareAdvancedSection(showConnectionSwitchAction, connectionSwitchModel, showTopologySwitchAction, topologySwitchModel)}`,
+    });
   }

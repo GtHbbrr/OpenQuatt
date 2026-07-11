@@ -1,6 +1,7 @@
 import { hasEntity, isEntityActive } from "../core/app-shared.js";
 import { STRATEGY_OPTION_CURVE, STRATEGY_OPTION_POWER_HOUSE } from "../core/config.js";
-import { formatValue, getEntityValue, getInputDraftValue, getNumberMeta, normalizeNumber, toTimeInputValue } from "../core/entity-store.js";
+import { getInputDraftValue } from "../core/control-drafts.js";
+import { formatValue, getEntityValue, getNumberMeta, normalizeNumber, toTimeInputValue } from "../core/entity-store.js";
 import { escapeHtml } from "../core/html.js";
 import { renderNumberInputControl } from "../core/number-controls.js";
 import { state } from "../core/state.js";
@@ -28,7 +29,7 @@ export function renderSettingsInfoToggle(infoId, title, copy) {
 }
 
 export function renderSettingsFieldCard(fieldKey, title, copy, controlMarkup, className = "", footerMarkup = "") {
-  return `<article class="oq-settings-field${className ? ` ${className}` : ""}" data-oq-settings-field="${escapeHtml(fieldKey)}"><div class="oq-settings-field-head"><h3>${escapeHtml(title)}</h3>${renderSettingsInfoToggle(fieldKey, title, copy)}</div><div class="oq-settings-field-control">${controlMarkup}</div>${footerMarkup}</article>`;
+  return `<article class="oq-helper-surface oq-settings-field${className ? ` ${className}` : ""}" data-oq-settings-field="${escapeHtml(fieldKey)}"><div class="oq-settings-field-head"><h3>${escapeHtml(title)}</h3>${renderSettingsInfoToggle(fieldKey, title, copy)}</div><div class="oq-settings-field-control">${controlMarkup}</div>${footerMarkup}</article>`;
 }
 
 export function renderSettingsStaticField(fieldKey, title, copy, value, className = "") {
@@ -194,7 +195,7 @@ export function renderSettingsChoiceOption({ key, option, currentValue, busy, co
   const active = option === currentValue;
   const cardBody = `
     <button
-      class="oq-settings-choice-card${active ? " is-active" : ""}${image ? " oq-settings-choice-card--with-image" : ""}${infoCopy ? " oq-settings-choice-card--has-info" : ""}"
+      class="oq-helper-surface oq-settings-choice-card${active ? " is-active" : ""}${image ? " oq-settings-choice-card--with-image" : ""}${infoCopy ? " oq-settings-choice-card--has-info" : ""}"
       type="button"
       data-oq-action="select-settings-option"
       data-select-key="${escapeHtml(key)}"
@@ -342,48 +343,6 @@ export function renderSettingsIntegrationSwitchCard(key, title, copy) {
       ${renderSettingsCompactSwitchControl(key, title, enabled, busy)}
     </article>
   `;
-}
-
-export function renderSettingsButtonField(key, title, copy, buttonLabel, action, className = "", options = {}) {
-  const busy = state.loadingEntities || state.busyAction === key;
-  const disabled = options.disabled === true;
-  const buttonClass = options.buttonClass || "oq-helper-button oq-helper-button--ghost";
-  const note = options.note || "";
-  return renderSettingsFieldCard(
-    key,
-    title,
-    copy,
-    `
-      <div class="oq-settings-action-field">
-        <button
-          class="${buttonClass}"
-          type="button"
-          data-oq-action="${escapeHtml(action)}"
-          ${options.buttonKey ? `data-oq-button-key="${escapeHtml(options.buttonKey)}"` : ""}
-          ${busy || disabled ? "disabled" : ""}
-        >
-          ${escapeHtml(buttonLabel)}
-        </button>
-        ${note ? `<p class="oq-settings-action-note">${escapeHtml(note)}</p>` : ""}
-      </div>
-    `,
-    className,
-  );
-}
-
-export function renderSettingsNamedButtonField(key, title, copy, buttonLabel, className = "", options = {}) {
-  return renderSettingsButtonField(
-    key,
-    title,
-    copy,
-    buttonLabel,
-    "press-named-button",
-    className,
-    {
-      ...options,
-      buttonKey: options.buttonKey || key,
-    },
-  );
 }
 
 export function renderNamedActionButton(buttonKey, label, buttonClass = "oq-helper-button oq-helper-button--ghost", disabled = false) {

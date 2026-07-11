@@ -24,6 +24,9 @@ jobs:
       - name: Check generated web bundles
         run: npm run check:web
 
+      - name: Run web smoke checks
+        run: npm run smoke:web
+
   validate-and-compile:
     needs: validate-web-settings-backup
     uses: ./.github/workflows/esphome-build.yml

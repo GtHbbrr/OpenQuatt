@@ -8,10 +8,14 @@ import { resolveCssSources } from "./css-source-list.mjs";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const checkOnly = process.argv.includes("--check");
+const previewOnly = process.argv.includes("--preview");
 
-const unsupportedArguments = process.argv.slice(2).filter((argument) => argument !== "--check");
+const unsupportedArguments = process.argv.slice(2).filter((argument) => !["--check", "--preview"].includes(argument));
 if (unsupportedArguments.length) {
   throw new Error(`Unsupported arguments: ${unsupportedArguments.join(", ")}`);
+}
+if (checkOnly && previewOnly) {
+  throw new Error("--check and --preview cannot be combined");
 }
 
 const bundles = [
@@ -19,11 +23,27 @@ const bundles = [
     label: "JS",
     output: path.join(__dirname, "js", "openquatt-app.js"),
     entryPoint: path.join(__dirname, "js", "src", "app.js"),
+    preview: false,
   },
   {
     label: "CSS",
     output: path.join(__dirname, "css", "openquatt-app.css"),
     sources: resolveCssSources(__dirname),
+    preview: false,
+  },
+  {
+    label: "Preview JS",
+    output: path.join(__dirname, "js", "openquatt-preview.js"),
+    entryPoint: path.join(__dirname, "js", "src", "app.js"),
+    preview: true,
+    transient: true,
+  },
+  {
+    label: "Preview CSS",
+    output: path.join(__dirname, "css", "openquatt-preview.css"),
+    sources: resolveCssSources(__dirname, { preview: true }),
+    preview: true,
+    transient: true,
   },
 ];
 
@@ -39,6 +59,9 @@ async function buildEmbeddedAssetModule() {
     const bytes = await readFile(assetPath);
     lines.push(`export const ${name} = "data:image/webp;base64,${bytes.toString("base64")}";`);
   }
+
+  const logoMarkup = await readFile(path.join(__dirname, "assets", "openquatt-logo.svg"), "utf8");
+  lines.push(`export const LOGO_MARKUP = ${JSON.stringify(logoMarkup.trim())};`);
 
   return lines.join("\n");
 }
@@ -89,6 +112,7 @@ async function renderJavaScriptBundle(bundle) {
     legalComments: "none",
     minify: true,
     target: "es2020",
+    define: { __OQ_PREVIEW__: String(bundle.preview === true) },
     write: false,
     plugins: [embeddedAssetsPlugin()],
   });
@@ -112,10 +136,16 @@ async function bundleIsCurrent(bundle, expected) {
 }
 
 async function buildBundle(bundle) {
-  const output = bundle.label === "JS"
+  if (previewOnly && !bundle.transient) {
+    return null;
+  }
+  const output = bundle.entryPoint
     ? await renderJavaScriptBundle(bundle)
     : await renderCssBundle(bundle);
   if (checkOnly) {
+    if (bundle.transient) {
+      return null;
+    }
     return await bundleIsCurrent(bundle, output) ? null : path.relative(process.cwd(), bundle.output);
   }
 
@@ -125,7 +155,20 @@ async function buildBundle(bundle) {
   return null;
 }
 
+async function buildMockEntityDefinitions() {
+  if (checkOnly) {
+    return;
+  }
+  const configSource = await readFile(path.join(__dirname, "js", "src", "core", "config.js"), "utf8");
+  const configModule = await import(`data:text/javascript;base64,${Buffer.from(configSource).toString("base64")}`);
+  const definitions = Object.values(configModule.ENTITY_DEFS).map(({ domain, name }) => [domain, name]);
+  const output = `(function(){window.__OQ_MOCK_ENTITY_DEFS__=Object.freeze(${JSON.stringify(definitions)});})();\n`;
+  await writeFile(path.join(__dirname, "js", "mock-entity-defs.js"), output, "utf8");
+  console.log("Mock entity definitions rebuilt: js/mock-entity-defs.js");
+}
+
 await checkSettingsBackupConfig();
+await buildMockEntityDefinitions();
 const staleBundles = (await Promise.all(bundles.map(buildBundle))).filter(Boolean);
 
 if (checkOnly) {

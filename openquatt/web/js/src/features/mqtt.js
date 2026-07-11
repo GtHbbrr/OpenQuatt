@@ -2,6 +2,7 @@ import { getEntityNumericValue, hasEntity, isEntityActive } from "../core/app-sh
 import { renderOqIcon } from "../core/config.js";
 import { state } from "../core/state.js";
 import { escapeHtml } from "../core/html.js";
+import { renderModalShell } from "../core/modal-shell.js";
 
   export function getMqttStatusLabel() {
     const status = state.mqttStatus;
@@ -40,14 +41,6 @@ import { escapeHtml } from "../core/html.js";
       return `Broker ${endpoint} is opgeslagen, maar MQTT inputbronnen staan uit.`;
     }
     return "MQTT inputbronnen staan uit. Stel een broker in om externe bronwaarden te ontvangen.";
-  }
-
-  export function formatMqttNumericValue(key, decimals = 2) {
-    const value = getEntityNumericValue(key);
-    if (!Number.isFinite(value)) {
-      return "Geen meting";
-    }
-    return `${value.toFixed(decimals)} °C`;
   }
 
   export function renderMqttNumericValue(key, decimals = 2) {
@@ -96,10 +89,6 @@ import { escapeHtml } from "../core/html.js";
       return "Nog geen status";
     }
     return isEntityActive(validKey) ? "Geldig" : "Ontbreekt of verouderd";
-  }
-
-  export function getMqttDewPointValidityLabel() {
-    return getMqttValidityLabel("mqttCoolingDewPointValid");
   }
 
   export function getMqttInputTopic(key) {
@@ -238,17 +227,15 @@ import { escapeHtml } from "../core/html.js";
       ? `<div class="oq-helper-modal-note oq-helper-modal-note--error" aria-live="assertive">${escapeHtml(state.mqttError)}</div>`
       : "";
 
-    return `
-      <div class="oq-helper-modal-backdrop${state.overviewTheme === "dark" ? " oq-helper-modal-backdrop--dark" : ""}" data-oq-modal="system">
-        <section class="oq-helper-modal" role="dialog" aria-modal="true" aria-labelledby="oq-mqtt-modal-title">
-          <div class="oq-helper-modal-head">
-            <div>
-              <p class="oq-helper-modal-kicker">Integratie</p>
-              <h2 class="oq-helper-modal-title" id="oq-mqtt-modal-title">MQTT brokerconfiguratie</h2>
-            </div>
-            <button class="oq-helper-modal-close" type="button" data-oq-action="close-system-modal" aria-label="Sluit MQTT brokerconfiguratie">×</button>
-          </div>
-          <p class="oq-helper-modal-copy">Stel de broker in waarop OpenQuatt MQTT-inputs beluistert.</p>
+    return renderModalShell({
+      id: "system",
+      titleId: "oq-mqtt-modal-title",
+      kicker: "Integratie",
+      title: "MQTT brokerconfiguratie",
+      copy: "Stel de broker in waarop OpenQuatt MQTT-inputs beluistert.",
+      closeAction: "close-system-modal",
+      closeLabel: "Sluit MQTT brokerconfiguratie",
+      body: `
           ${noticeMarkup}
           ${errorMarkup}
           <div class="oq-settings-mqtt-form-grid">
@@ -321,16 +308,12 @@ import { escapeHtml } from "../core/html.js";
                 <span>Opgeslagen wachtwoord wissen</span>
               </label>
             ` : ""}
-          </div>
-          <div class="oq-helper-modal-actions">
-            <button class="oq-helper-button oq-helper-button--ghost" type="button" data-oq-action="close-system-modal" ${state.mqttBusy ? "disabled" : ""}>Gereed</button>
-            <button class="oq-helper-button oq-helper-button--primary" type="button" data-oq-action="save-mqtt-config" ${state.mqttBusy || !status.csrf_token ? "disabled" : ""}>
-              ${state.mqttBusy ? "Opslaan..." : "Opslaan"}
-            </button>
-          </div>
-        </section>
-      </div>
-    `;
+          </div>`,
+      actions: `
+        <button class="oq-helper-button oq-helper-button--ghost" type="button" data-oq-action="close-system-modal" ${state.mqttBusy ? "disabled" : ""}>Gereed</button>
+        <button class="oq-helper-button oq-helper-button--primary" type="button" data-oq-action="save-mqtt-config" ${state.mqttBusy || !status.csrf_token ? "disabled" : ""}>${state.mqttBusy ? "Opslaan..." : "Opslaan"}</button>
+      `,
+    });
   }
 
   export function renderMqttSensorsModal() {
@@ -470,17 +453,21 @@ import { escapeHtml } from "../core/html.js";
       ? `<div class="oq-helper-modal-note oq-helper-modal-note--error" aria-live="assertive">${escapeHtml(state.mqttError)}</div>`
       : "";
 
-    return `
-      <div class="oq-helper-modal-backdrop${state.overviewTheme === "dark" ? " oq-helper-modal-backdrop--dark" : ""}" data-oq-modal="system">
-        <section class="oq-helper-modal oq-helper-modal--mqtt-sensors" role="dialog" aria-modal="true" aria-labelledby="oq-mqtt-sensors-modal-title">
-          <div class="oq-settings-mqtt-modal-head">
+    return renderModalShell({
+      id: "system",
+      titleId: "oq-mqtt-sensors-modal-title",
+      kicker: "Integratie",
+      title: "MQTT sensoren",
+      className: "oq-helper-modal--mqtt-sensors",
+      headerMarkup: `<div class="oq-settings-mqtt-modal-head">
             <span class="oq-settings-mqtt-modal-icon">${renderMqttLogoIcon("oq-settings-mqtt-modal-logo")}</span>
             <div>
               <p class="oq-helper-modal-kicker">Integratie</p>
               <h2 class="oq-helper-modal-title" id="oq-mqtt-sensors-modal-title">MQTT sensoren</h2>
             </div>
             <button class="oq-helper-modal-close" type="button" data-oq-action="close-system-modal" aria-label="Sluit MQTT sensoren">×</button>
-          </div>
+          </div>`,
+      body: `
           ${errorMarkup}
           <div class="oq-settings-mqtt-sensor-table">
             <div class="oq-settings-mqtt-sensor-table-head" aria-hidden="true">
@@ -495,10 +482,8 @@ import { escapeHtml } from "../core/html.js";
           <div class="oq-settings-mqtt-sensor-footer">
             <span>${escapeHtml(sensorValiditySummary)}</span>
             <button class="oq-helper-button oq-helper-button--primary" type="button" data-oq-action="close-system-modal">Gereed</button>
-          </div>
-        </section>
-      </div>
-    `;
+          </div>`,
+    });
   }
 
   export function renderMqttLogoIcon(className = "") {

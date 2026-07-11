@@ -1,7 +1,8 @@
 import { getEntityNumericValue, getEntityStateText, hasEntity, isEntityActive } from "../core/app-shared.js";
 import { getOduRuntimeFrequencyControlKey, getOduRuntimeFrequencyValueKey, ODU_RUNTIME_FREQUENCY_HP_IDS, ODU_RUNTIME_FREQUENCY_LEVELS, ODU_RUNTIME_FREQUENCY_MODES } from "../core/config.js";
 import { HP_GENERATION_IMAGE_V1, HP_GENERATION_IMAGE_V2 } from "../core/embedded-assets.js";
-import { getEntityValue, getInputDraftValue, getNumberMeta, parseLooseNumber } from "../core/entity-store.js";
+import { getInputDraftValue } from "../core/control-drafts.js";
+import { getEntityValue, getNumberMeta, parseLooseNumber } from "../core/entity-store.js";
 import { getInstallationMonitoringFailureText, getInstallationMonitoringModel, isInstallationMonitoringBinaryActive, isInstallationMonitoringFailureActive, isInstallationMonitoringIntegrationEnabled, syncInstallationMonitoringDetailsState } from "../core/installation-monitoring.js";
 import { renderNumberInputControl } from "../core/number-controls.js";
 import { state } from "../core/state.js";

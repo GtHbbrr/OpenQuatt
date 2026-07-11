@@ -8,6 +8,7 @@ import { setAppView } from "./navigation.js";
 import { render } from "./render-scheduler.js";
 import { state } from "./state.js";
 import { pollFirmwareUpdateState, primeFirmwareUpdateState } from "../features/firmware-update.js";
+import { updateFirmwareState } from "./feature-state.js";
 import { stopLoginAuthStatusPolling } from "../features/security-actions.js";
 import { refreshSettingsStorageStateSoon, SETTINGS_STORAGE_KEYS } from "../features/storage-history.js";
 import { clearWebServerLogOutput, refreshWebServerLogHistory } from "../features/webserver-logs.js";
@@ -36,8 +37,7 @@ export async function commitSelect(key, option) {
     delete state.inputDrafts[key];
     state.controlNotice = `${entity.name} bijgewerkt.`;
     if (key === "firmwareUpdateChannel") {
-      state.updateInstallCompleted = false;
-      state.updateInstallCompletedVersion = "";
+      updateFirmwareState({ updateInstallCompleted: false, updateInstallCompletedVersion: "" });
       state.entities.firmwareUpdateChannel = {
         ...(state.entities.firmwareUpdateChannel || {}),
         state: option,

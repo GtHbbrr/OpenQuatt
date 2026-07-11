@@ -7,11 +7,7 @@
   padding: 16px 18px;
   border-radius: var(--oq-helper-radius-lg);
   border: 1px solid var(--oq-helper-line);
-  background: rgba(248, 250, 252, 0.74);
-}
-
-.oq-helper-shell--dark .oq-settings-storage-summary {
-  background: rgba(15, 23, 42, 0.18);
+  background: var(--oq-theme-surface-8g96, rgba(248, 250, 252, 0.74));
 }
 
 .oq-settings-storage-summary-copy {
@@ -22,7 +18,7 @@
 
 .oq-settings-storage-summary-copy h3 {
   margin: 0;
-  color: var(--oq-helper-ink);
+  color: var(--oq-theme-color-1w4r, var(--oq-helper-ink));
   font-size: 1.04rem;
   line-height: 1.25;
 }
@@ -53,8 +49,8 @@
   min-height: 66px;
   padding: 10px 12px;
   border-radius: 14px;
-  border: 1px solid rgba(226, 232, 240, 0.88);
-  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid var(--oq-settings-storage-summary-border, rgba(226, 232, 240, 0.88));
+  background: var(--oq-theme-surface-1src, rgba(255, 255, 255, 0.72));
 }
 
 .oq-settings-storage-summary-metric span {
@@ -81,7 +77,7 @@
 }
 
 .oq-settings-storage-summary-metric strong {
-  color: var(--oq-helper-ink);
+  color: var(--oq-theme-color-1w4r, var(--oq-helper-ink));
   font-size: 0.98rem;
   line-height: 1.2;
   overflow-wrap: anywhere;
@@ -97,12 +93,6 @@
 
 .oq-settings-storage-summary-metric.is-on span::before {
   background: #16a34a;
-}
-
-.oq-helper-shell--dark .oq-settings-storage-summary-metric,
-.oq-helper-modal-backdrop--dark .oq-settings-storage-summary-metric {
-  border-color: rgba(71, 85, 105, 0.45);
-  background: rgba(15, 23, 42, 0.24);
 }
 
 @media (max-width: 1120px) {
@@ -136,11 +126,7 @@
   overflow: hidden;
   border: 1px solid var(--oq-helper-line);
   border-radius: 18px;
-  background: rgba(255, 255, 255, 0.76);
-}
-
-.oq-helper-modal-backdrop--dark .oq-settings-storage-domain-grid {
-  background: rgba(15, 23, 42, 0.22);
+  background: var(--oq-theme-surface-1hci, rgba(255, 255, 255, 0.76));
 }
 
 .oq-settings-storage-domain {
@@ -167,7 +153,7 @@
 
 .oq-settings-storage-domain-head h3 {
   margin: 0;
-  color: var(--oq-helper-ink);
+  color: var(--oq-theme-color-1w4r, var(--oq-helper-ink));
   font-size: 1.18rem;
   line-height: 1.2;
 }
@@ -187,7 +173,6 @@
   border-top: 1px solid var(--oq-helper-line);
 }
 
-.oq-settings-storage-stat-grid span,
 .oq-settings-storage-row-title span {
   color: var(--oq-helper-faint);
   font-size: 0.74rem;
@@ -238,7 +223,7 @@
 .oq-settings-storage-row-copy h4,
 .oq-settings-storage-inline-action h4 {
   margin: 0;
-  color: var(--oq-helper-ink);
+  color: var(--oq-theme-color-1w4r, var(--oq-helper-ink));
   font-size: 1rem;
   line-height: 1.25;
 }
@@ -251,7 +236,7 @@
 }
 
 .oq-settings-storage-row-copy p[data-oq-switch-copy] {
-  color: var(--oq-helper-faint);
+  color: var(--oq-theme-color-1w4r, var(--oq-helper-faint));
   font-size: 0.9rem;
   font-weight: 600;
   line-height: 1.32;
@@ -296,7 +281,7 @@
 
 .oq-settings-storage-import h4 {
   margin: 0;
-  color: var(--oq-helper-ink);
+  color: var(--oq-theme-color-1w4r, var(--oq-helper-ink));
   font-size: 1rem;
   line-height: 1.25;
 }
@@ -319,7 +304,7 @@
 }
 
 .oq-settings-storage-import-file strong {
-  color: var(--oq-helper-ink);
+  color: var(--oq-theme-color-1w4r, var(--oq-helper-ink));
   font-size: 0.96rem;
   line-height: 1.24;
   overflow-wrap: anywhere;
@@ -353,71 +338,12 @@
   font-weight: 700;
 }
 
-.oq-helper-modal-backdrop--dark .oq-settings-storage-import h4,
-.oq-helper-modal-backdrop--dark .oq-settings-storage-import-file strong {
-  color: #f8fafc;
-}
-
 .oq-settings-storage-inline-action--danger h4 {
-  color: #b91c1c;
+  color: var(--oq-theme-color-16na, #b91c1c);
 }
 
 .oq-settings-storage-inline-action--danger p {
-  color: #7f1d1d;
-}
-
-.oq-helper-modal-backdrop--dark .oq-settings-storage-inline-action--danger h4 {
-  color: #fecaca;
-}
-
-.oq-helper-modal-backdrop--dark .oq-settings-storage-inline-action--danger p {
-  color: #fca5a5;
-}
-
-.oq-settings-storage-stat-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0;
-  overflow: hidden;
-  border-radius: 16px;
-  border: 1px solid var(--oq-helper-line);
-  background: rgba(248, 250, 252, 0.74);
-}
-
-.oq-helper-modal-backdrop--dark .oq-settings-storage-stat-grid {
-  background: rgba(15, 23, 42, 0.24);
-}
-
-.oq-settings-storage-stat-grid > div {
-  display: grid;
-  align-content: start;
-  gap: 5px;
-  min-width: 0;
-  padding: 10px 11px;
-  border-right: 1px solid var(--oq-helper-line);
-  border-bottom: 1px solid var(--oq-helper-line);
-}
-
-.oq-settings-storage-stat-grid > div:nth-child(3n) {
-  border-right: 0;
-}
-
-.oq-settings-storage-stat-grid > div:nth-last-child(-n + 3) {
-  border-bottom: 0;
-}
-
-.oq-settings-storage-stat-grid strong {
-  color: var(--oq-helper-ink);
-  font-size: 0.95rem;
-  line-height: 1.25;
-  overflow-wrap: anywhere;
-}
-
-.oq-settings-storage-stat-grid em {
-  color: var(--oq-helper-soft);
-  font-size: 0.82rem;
-  font-style: normal;
-  line-height: 1.25;
+  color: var(--oq-theme-color-cfj0, #7f1d1d);
 }
 
 .oq-settings-storage-technical {
@@ -425,11 +351,7 @@
   overflow: hidden;
   border: 1px solid var(--oq-helper-line);
   border-radius: 16px;
-  background: rgba(248, 250, 252, 0.7);
-}
-
-.oq-helper-modal-backdrop--dark .oq-settings-storage-technical {
-  background: rgba(15, 23, 42, 0.24);
+  background: var(--oq-theme-surface-1src, rgba(248, 250, 252, 0.7));
 }
 
 .oq-settings-storage-technical > summary {
@@ -469,7 +391,7 @@
 
 .oq-settings-storage-technical > summary strong,
 .oq-settings-storage-technical-row-head strong {
-  color: var(--oq-helper-ink);
+  color: var(--oq-theme-color-1w4r, var(--oq-helper-ink));
   font-size: 0.98rem;
   line-height: 1.2;
 }
@@ -541,7 +463,7 @@
 }
 
 .oq-settings-storage-technical-metrics strong {
-  color: var(--oq-helper-ink);
+  color: var(--oq-theme-color-1w4r, var(--oq-helper-ink));
   font-size: 0.9rem;
   line-height: 1.22;
   overflow-wrap: anywhere;
@@ -555,21 +477,5 @@
 }
 
 .oq-settings-storage-footnote strong {
-  color: var(--oq-helper-ink);
-}
-
-.oq-helper-shell--dark .oq-settings-storage-summary-copy h3,
-.oq-helper-shell--dark .oq-settings-storage-summary-metric strong,
-.oq-helper-modal-backdrop--dark .oq-settings-storage-summary-copy h3,
-.oq-helper-modal-backdrop--dark .oq-settings-storage-summary-metric strong,
-.oq-helper-modal-backdrop--dark .oq-settings-storage-domain-head h3,
-.oq-helper-modal-backdrop--dark .oq-settings-storage-row-copy h4,
-.oq-helper-modal-backdrop--dark .oq-settings-storage-row-copy p[data-oq-switch-copy],
-.oq-helper-modal-backdrop--dark .oq-settings-storage-inline-action h4,
-.oq-helper-modal-backdrop--dark .oq-settings-storage-stat-grid strong,
-.oq-helper-modal-backdrop--dark .oq-settings-storage-technical > summary strong,
-.oq-helper-modal-backdrop--dark .oq-settings-storage-technical-row-head strong,
-.oq-helper-modal-backdrop--dark .oq-settings-storage-technical-metrics strong,
-.oq-helper-modal-backdrop--dark .oq-settings-storage-footnote strong {
-  color: #f8fafc;
+  color: var(--oq-theme-color-1w4r, var(--oq-helper-ink));
 }

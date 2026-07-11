@@ -1,10 +1,11 @@
 import { hasEntity, isEntityActive } from "../core/app-shared.js";
 import { TOPOLOGY_HINT_KEYS } from "../core/config.js";
 import { getEntityValue } from "../core/entity-store.js";
+import { formatDurationFromMinutes } from "../core/formatting.js";
 import { state } from "../core/state.js";
 
   export function getDeviceMeta() {
-    const meta = typeof window !== "undefined" && window.__OQ_DEV_META && typeof window.__OQ_DEV_META === "object"
+    const meta = __OQ_PREVIEW__ && typeof window !== "undefined" && window.__OQ_DEV_META && typeof window.__OQ_DEV_META === "object"
       ? window.__OQ_DEV_META
       : {};
     return meta;
@@ -158,11 +159,6 @@ import { state } from "../core/state.js";
     return "";
   }
 
-  export function getFirmwareBuildLabel(connection = getFirmwareBuildConnection()) {
-    const topology = getInstallationTopology();
-    return getFirmwareBuildLabelFor(topology, connection);
-  }
-
   export function getFirmwareBuildLabelFor(topology = getInstallationTopology(), connection = getFirmwareBuildConnection()) {
     const topologyLabel = getFirmwareTopologyLabel(topology);
     const hardware = getFirmwareHardwareProfile();
@@ -210,22 +206,7 @@ import { state } from "../core/state.js";
     return `${datePart} · ${formatDeviceClock()}`;
   }
 
-  export function formatDurationFromMinutes(totalMinutes) {
-    if (!Number.isFinite(totalMinutes) || totalMinutes < 0) {
-      return "—";
-    }
-    const wholeMinutes = Math.floor(totalMinutes);
-    const days = Math.floor(wholeMinutes / 1440);
-    const hours = Math.floor((wholeMinutes % 1440) / 60);
-    const minutes = wholeMinutes % 60;
-    if (days > 0) {
-      return `${days}d ${hours}u`;
-    }
-    if (hours > 0) {
-      return `${hours}u ${minutes}m`;
-    }
-    return `${minutes}m`;
-  }
+  export { formatDurationFromMinutes };
 
   export function getNumericEntityUnit(entity) {
     return String(entity?.uom ?? entity?.unit_of_measurement ?? "").trim().toLowerCase();

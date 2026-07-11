@@ -27,13 +27,6 @@ import { state } from "./state.js";
     };
   }
 
-  export function getInputDraftValue(key) {
-    if (Object.prototype.hasOwnProperty.call(state.inputDrafts, key)) {
-      return state.inputDrafts[key];
-    }
-    return getEntityValue(key);
-  }
-
   export function parseLooseNumber(rawValue) {
     if (typeof rawValue === "number") {
       return rawValue;

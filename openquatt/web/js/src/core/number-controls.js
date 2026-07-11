@@ -1,4 +1,5 @@
-import { getInputDraftValue, getNumberMeta } from "./entity-store.js";
+import { getInputDraftValue } from "./control-drafts.js";
+import { getNumberMeta } from "./entity-store.js";
 import { escapeHtml } from "./html.js";
 import { state } from "./state.js";
 

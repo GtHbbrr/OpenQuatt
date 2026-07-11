@@ -93,7 +93,7 @@ import { escapeHtml } from "../core/html.js";
     return `
       <div class="oq-settings-strategy-grid">
         <button
-          class="oq-settings-strategy-card${curveActive ? "" : " is-active"}"
+          class="oq-helper-surface oq-settings-strategy-card${curveActive ? "" : " is-active"}"
           type="button"
           data-oq-action="select-settings-option"
           data-select-key="strategy"
@@ -111,7 +111,7 @@ import { escapeHtml } from "../core/html.js";
           </ul>
         </button>
         <button
-          class="oq-settings-strategy-card${curveActive ? " is-active" : ""}"
+          class="oq-helper-surface oq-settings-strategy-card${curveActive ? " is-active" : ""}"
           type="button"
           data-oq-action="select-settings-option"
           data-select-key="strategy"
@@ -179,7 +179,7 @@ import { escapeHtml } from "../core/html.js";
           const isActive = option.value === currentValue;
           if (option.value === "Custom" && isActive) {
             return `
-              <div class="oq-settings-choice-card oq-settings-choice-card--static oq-settings-choice-card--custom is-active">
+              <div class="oq-helper-surface oq-settings-choice-card oq-settings-choice-card--static oq-settings-choice-card--custom is-active">
                 <span class="oq-settings-choice-title">${escapeHtml(option.label)}</span>
                 <div class="oq-settings-choice-meta">
                   <span class="oq-settings-choice-meta-text">${escapeHtml(option.meta)}</span>
@@ -568,11 +568,3 @@ import { escapeHtml } from "../core/html.js";
     `;
   }
 
-  export function renderCurveInputs() {
-    return `
-      <div class="oq-helper-curve-grid">
-        ${CURVE_POINTS.map((point) => renderNumberInputField(point.key, `Aanvoertemp. bij ${point.label}`, `Doelaanvoertemperatuur bij ${point.label} buitentemperatuur.`)).join("")}
-        ${renderNumberInputField("curveFallbackSupply", "Fallback-aanvoertemperatuur zonder buitentemperatuur", "Aanvoertemperatuur die gebruikt wordt als de buitentemperatuursensor niet beschikbaar is.", { footerMarkup: renderCurveFallbackSuggestionMarkup(true) })}
-      </div>
-    `;
-  }

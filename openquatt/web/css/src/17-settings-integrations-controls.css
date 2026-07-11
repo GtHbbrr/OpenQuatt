@@ -15,7 +15,7 @@
   padding: 12px;
   border: 1px solid var(--oq-helper-line);
   border-radius: var(--oq-helper-radius-md);
-  background: var(--oq-helper-card);
+  background: var(--oq-theme-surface-1uy3, var(--oq-helper-card));
 }
 
 .oq-settings-integration-card--wide {
@@ -75,7 +75,7 @@
 }
 
 .oq-settings-toggle-state.is-on {
-  color: #166534;
+  color: var(--oq-theme-color-12vw, #166534);
 }
 
 .oq-settings-toggle-switch {
@@ -99,7 +99,7 @@
   height: 30px;
   border: 1px solid #d0d5dd;
   border-radius: 999px;
-  background: #f2f4f7;
+  background: var(--oq-theme-surface-zrqu, #f2f4f7);
   box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.05);
   transition: background 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
 }
@@ -117,14 +117,14 @@
 }
 
 .oq-settings-toggle-switch.is-on .oq-settings-toggle-switch-track {
-  border-color: rgba(134, 239, 172, 0.9);
-  background: #dcfce7;
+  border-color: var(--oq-theme-border-btlj, rgba(134, 239, 172, 0.9));
+  background: var(--oq-theme-surface-n8ng, #dcfce7);
   box-shadow: inset 0 1px 2px rgba(21, 128, 61, 0.08);
 }
 
 .oq-settings-toggle-switch.is-on .oq-settings-toggle-switch-knob {
   transform: translateX(22px);
-  background: #15803d;
+  background: var(--oq-theme-surface-148y, #15803d);
   box-shadow: 0 1px 2px rgba(21, 128, 61, 0.18), 0 4px 10px rgba(21, 128, 61, 0.12);
 }
 
@@ -138,26 +138,10 @@
   opacity: 0.62;
 }
 
-.oq-helper-shell--dark .oq-settings-toggle-state.is-on,
-.oq-helper-modal-backdrop--dark .oq-settings-toggle-state.is-on {
-  color: #86efac;
-}
-
 .oq-helper-shell--dark .oq-settings-toggle-switch-track,
 .oq-helper-modal-backdrop--dark .oq-settings-toggle-switch-track {
   border-color: rgba(71, 85, 105, 0.7);
-  background: rgba(15, 23, 42, 0.44);
-}
-
-.oq-helper-shell--dark .oq-settings-toggle-switch.is-on .oq-settings-toggle-switch-track,
-.oq-helper-modal-backdrop--dark .oq-settings-toggle-switch.is-on .oq-settings-toggle-switch-track {
-  border-color: rgba(74, 222, 128, 0.48);
-  background: rgba(20, 83, 45, 0.58);
-}
-
-.oq-helper-shell--dark .oq-settings-toggle-switch.is-on .oq-settings-toggle-switch-knob,
-.oq-helper-modal-backdrop--dark .oq-settings-toggle-switch.is-on .oq-settings-toggle-switch-knob {
-  background: #4ade80;
+  
 }
 
 .oq-settings-mqtt-sensor-inline-toggle {
@@ -245,7 +229,7 @@
   margin-top: 10px;
   border: 1px solid var(--oq-helper-line);
   border-radius: var(--oq-helper-radius-md);
-  background: var(--oq-helper-card);
+  background: var(--oq-theme-surface-1uy3, var(--oq-helper-card));
 }
 
 .oq-settings-integration-diagnostics summary {
@@ -305,7 +289,7 @@
   padding: 10px;
   border: 1px solid var(--oq-helper-line);
   border-radius: 10px;
-  background: var(--oq-helper-card-muted);
+  background: var(--oq-theme-surface-120b, var(--oq-helper-card-muted));
 }
 
 .oq-settings-integration-diagnostic-group h4 {
@@ -365,18 +349,6 @@
   color: var(--oq-helper-accent-deep);
 }
 
-.oq-helper-shell--dark .oq-settings-integration-card,
-.oq-helper-modal-backdrop--dark .oq-settings-integration-card,
-.oq-helper-shell--dark .oq-settings-integration-diagnostics,
-.oq-helper-modal-backdrop--dark .oq-settings-integration-diagnostics {
-  background: rgba(15, 23, 42, 0.28);
-}
-
-.oq-helper-shell--dark .oq-settings-integration-diagnostic-group,
-.oq-helper-modal-backdrop--dark .oq-settings-integration-diagnostic-group {
-  background: rgba(15, 23, 42, 0.2);
-}
-
 .oq-settings-source-grid {
   container-type: inline-size;
   display: grid;
@@ -392,7 +364,7 @@
   padding: 0;
   border: 1px solid var(--oq-helper-line);
   border-radius: var(--oq-helper-radius-md);
-  background: var(--oq-helper-card);
+  background: var(--oq-theme-surface-1uy3, var(--oq-helper-card));
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
 }
 
@@ -403,7 +375,7 @@
   min-width: 0;
   padding: 14px;
   border-bottom: 1px solid rgba(148, 163, 184, 0.16);
-  background: linear-gradient(180deg, rgba(248, 250, 252, 0.84), rgba(255, 255, 255, 0.96));
+  background: var(--oq-theme-surface-w5r3, linear-gradient(180deg, rgba(248, 250, 252, 0.84), rgba(255, 255, 255, 0.96)));
 }
 
 .oq-settings-source-card-icon {
@@ -414,8 +386,8 @@
   place-items: center;
   border: 1px solid rgba(37, 99, 235, 0.14);
   border-radius: 50%;
-  background: rgba(37, 99, 235, 0.08);
-  color: #1d4ed8;
+  background: var(--oq-theme-surface-1mjj, rgba(37, 99, 235, 0.08));
+  color: var(--oq-theme-color-7hmo, #1d4ed8);
 }
 
 .oq-settings-source-card-icon-svg {
@@ -453,7 +425,7 @@
 .oq-settings-source-group--active {
   min-height: 104px;
   box-sizing: border-box;
-  background: rgba(248, 250, 252, 0.56);
+  background: var(--oq-theme-surface-1hci, rgba(248, 250, 252, 0.56));
 }
 
 @container (min-width: 1156px) {
@@ -515,8 +487,8 @@
   height: 20px;
   place-items: center;
   border-radius: 50%;
-  background: rgba(37, 99, 235, 0.08);
-  color: #2563eb;
+  background: var(--oq-theme-surface-1mjj, rgba(37, 99, 235, 0.08));
+  color: var(--oq-theme-color-7hmo, #2563eb);
 }
 
 .oq-settings-source-group-icon-svg {
@@ -682,28 +654,13 @@
   color: #15803d;
 }
 
-.oq-helper-shell--dark .oq-settings-source-card,
-.oq-helper-modal-backdrop--dark .oq-settings-source-card {
-  background: rgba(15, 23, 42, 0.28);
-}
-
-.oq-helper-shell--dark .oq-settings-source-card-head,
-.oq-helper-modal-backdrop--dark .oq-settings-source-card-head {
-  background: linear-gradient(180deg, rgba(30, 41, 59, 0.62), rgba(15, 23, 42, 0.2));
-}
-
 .oq-helper-shell--dark .oq-settings-source-card-icon,
 .oq-helper-modal-backdrop--dark .oq-settings-source-card-icon,
 .oq-helper-shell--dark .oq-settings-source-group-icon,
 .oq-helper-modal-backdrop--dark .oq-settings-source-group-icon {
   border-color: rgba(96, 165, 250, 0.22);
-  background: rgba(37, 99, 235, 0.18);
-  color: #93c5fd;
-}
-
-.oq-helper-shell--dark .oq-settings-source-group--active,
-.oq-helper-modal-backdrop--dark .oq-settings-source-group--active {
-  background: rgba(15, 23, 42, 0.22);
+  
+  
 }
 
 @media (max-width: 720px) {
@@ -745,13 +702,13 @@
   flex: 0 0 22px;
   border: 1px solid var(--oq-helper-line-strong);
   border-radius: 6px;
-  background: var(--oq-helper-card);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  background: var(--oq-theme-surface-2hai, var(--oq-helper-card));
+  box-shadow: var(--oq-theme-shadow-1c6l, inset 0 1px 0 rgba(255, 255, 255, 0.7));
 }
 
 .oq-settings-checkbox-switch.is-active .oq-settings-checkbox-switch-box {
-  border-color: rgba(234, 88, 12, 0.48);
-  background: var(--oq-helper-accent);
+  border-color: var(--oq-theme-border-120w, rgba(234, 88, 12, 0.48));
+  background: var(--oq-theme-surface-14p7, var(--oq-helper-accent));
 }
 
 .oq-settings-checkbox-switch.is-active .oq-settings-checkbox-switch-box::after {
@@ -768,15 +725,9 @@
 
 .oq-helper-shell--dark .oq-settings-checkbox-switch-box,
 .oq-helper-modal-backdrop--dark .oq-settings-checkbox-switch-box {
-  background: rgba(15, 23, 42, 0.5);
+  
   border-color: rgba(148, 163, 184, 0.38);
-  box-shadow: none;
-}
-
-.oq-helper-shell--dark .oq-settings-checkbox-switch.is-active .oq-settings-checkbox-switch-box,
-.oq-helper-modal-backdrop--dark .oq-settings-checkbox-switch.is-active .oq-settings-checkbox-switch-box {
-  background: var(--oq-helper-accent);
-  border-color: rgba(251, 146, 60, 0.66);
+  
 }
 
 .oq-settings-control--select {
@@ -847,8 +798,8 @@
   padding: 12px 14px;
   border-radius: var(--oq-helper-radius-md);
   border: 1px solid var(--oq-helper-line);
-  background: rgba(255, 255, 255, 0.98);
-  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.12);
+  background: var(--oq-theme-surface-1e8i, rgba(255, 255, 255, 0.98));
+  box-shadow: var(--oq-theme-shadow-1wio, 0 16px 40px rgba(15, 23, 42, 0.12));
   box-sizing: border-box;
 }
 
@@ -858,11 +809,6 @@
 
 .oq-settings-field-head > .oq-settings-info {
   position: static;
-}
-
-.oq-helper-shell--dark .oq-settings-info-popover {
-  background: rgba(31, 45, 63, 0.98);
-  box-shadow: 0 18px 36px rgba(2, 6, 23, 0.26);
 }
 
 .oq-settings-info-popover p {
@@ -889,12 +835,7 @@
   min-height: 54px;
   padding: 0 50px 0 16px;
   font-variant-numeric: tabular-nums;
-  color-scheme: light;
-}
-
-.oq-helper-shell--dark .oq-settings-control--time .oq-helper-input,
-.oq-helper-shell--dark .oq-settings-control--datetime .oq-helper-input {
-  color-scheme: dark;
+  color-scheme: var(--oq-theme-color-scheme-1pq5, light);
 }
 
 .oq-settings-control--time .oq-helper-input::-webkit-date-and-time-value,
@@ -994,12 +935,12 @@
   padding: 12px 14px;
   border-radius: 16px;
   border: 1px solid rgba(15, 23, 42, 0.08);
-  background: rgba(248, 250, 252, 0.82);
+  background: var(--oq-theme-surface-21vy, rgba(248, 250, 252, 0.82));
 }
 
 .oq-helper-shell--dark .oq-curve-fallback-suggest {
   border-color: rgba(148, 163, 184, 0.12);
-  background: rgba(18, 27, 41, 0.82);
+  
 }
 
 .oq-curve-fallback-suggest--helper {

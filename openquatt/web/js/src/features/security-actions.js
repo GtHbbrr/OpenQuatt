@@ -1,4 +1,5 @@
 import { copyTextToClipboard } from "../core/browser-utils.js";
+import { invokeActionMap } from "../core/action-router.js";
 import { ENTITY_DEFS, LOGIN_MODAL_AUTH_STATUS_REFRESH_INTERVAL_MS } from "../core/config.js";
 import { beginDeviceReconnect } from "../core/device-reconnect.js";
 import { buildEntityPath } from "../core/domain-helpers.js";
@@ -472,4 +473,33 @@ import { render } from "../core/render-scheduler.js";
       state.authBusy = false;
       render();
     }
+  }
+
+  const securityActionHandlers = {
+    "open-login-modal": () => {
+      state.systemModal = "login";
+      syncAuthDraftsFromStatus();
+      state.authNotice = "";
+      state.authError = "";
+      render();
+      return refreshLoginModalAuthStatus({ poll: true });
+    },
+    "open-api-security-modal": () => {
+      state.systemModal = "api-security";
+      state.apiSecurityNotice = "";
+      state.apiSecurityError = "";
+      render();
+      return refreshApiSecurityStatus({ force: true });
+    },
+    "copy-api-security-key": () => copyApiSecurityKey(),
+    "enable-api-security": () => commitEnableApiSecurity(),
+    "rotate-api-security": () => commitRotateApiSecurity(),
+    "disable-api-security": () => commitDisableApiSecurity(),
+    "restart-api-security": () => restartForApiSecurityChange(),
+    "save-web-auth": () => commitWebAuthChanges(),
+    "disable-web-auth": () => commitDisableWebAuth(),
+  };
+
+  export function handleSecurityAction(action) {
+    return invokeActionMap(securityActionHandlers, action);
   }

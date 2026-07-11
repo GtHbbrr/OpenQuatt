@@ -116,7 +116,7 @@
 }
 
 .oq-overview-energy-category--blue .oq-overview-energy-category-head span {
-  color: #1d4ed8;
+  color: var(--oq-theme-color-7hmo, #1d4ed8);
 }
 
 .oq-overview-energy-category--blue .oq-overview-energy-category-head span::before {
@@ -124,19 +124,11 @@
 }
 
 .oq-overview-energy-category--orange .oq-overview-energy-category-head span {
-  color: #c2410c;
+  color: var(--oq-theme-color-11rp, #c2410c);
 }
 
 .oq-overview-energy-category--orange .oq-overview-energy-category-head span::before {
   background: linear-gradient(180deg, #f59e0b, #ef4444);
-}
-
-.oq-helper-shell--dark .oq-overview-energy-category--blue .oq-overview-energy-category-head span {
-  color: #93c5fd;
-}
-
-.oq-helper-shell--dark .oq-overview-energy-category--orange .oq-overview-energy-category-head span {
-  color: #fdba74;
 }
 
 .oq-overview-energy-category-groups {
@@ -321,11 +313,7 @@
   padding: 4px;
   border: 1px solid var(--oq-energy-history-border);
   border-radius: 14px;
-  background: var(--oq-energy-history-surface-muted);
-}
-
-.oq-helper-shell--dark .oq-energy-history-view-tabs {
-  background: rgba(15, 23, 42, 0.3);
+  background: var(--oq-theme-surface-1tra, var(--oq-energy-history-surface-muted));
 }
 
 .oq-energy-history-view-tab {
@@ -351,14 +339,9 @@
 }
 
 .oq-energy-history-view-tab.is-active {
-  color: var(--oq-energy-history-tab-ink);
-  background: var(--oq-energy-history-tab-bg);
+  color: var(--oq-theme-color-1532, var(--oq-energy-history-tab-ink));
+  background: var(--oq-theme-surface-1drk, var(--oq-energy-history-tab-bg));
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
-}
-
-.oq-helper-shell--dark .oq-energy-history-view-tab.is-active {
-  color: var(--oq-energy-history-tab-ink);
-  background: var(--oq-energy-history-tab-bg);
 }
 
 .oq-energy-history-period {
@@ -634,11 +617,7 @@
 }
 
 .oq-energy-history-chart-bg {
-  fill: var(--oq-energy-history-surface);
-}
-
-.oq-helper-shell--dark .oq-energy-history-chart-bg {
-  fill: var(--oq-energy-history-surface);
+  fill: var(--oq-theme-fill-xlqu, var(--oq-energy-history-surface));
 }
 
 .oq-energy-history-grid-line {

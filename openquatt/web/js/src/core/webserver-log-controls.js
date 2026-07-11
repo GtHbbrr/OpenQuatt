@@ -1,4 +1,5 @@
 import { state } from "./state.js";
+import { updateWebServerLogState } from "./feature-state.js";
 
 let webServerLogControls = {};
 
@@ -18,18 +19,19 @@ export function closeWebServerLogStream() {
   if (source) {
     source.close();
   }
-  state.webServerLogSource = null;
-  state.webServerLogConnected = false;
+  updateWebServerLogState({ webServerLogSource: null, webServerLogConnected: false });
 }
 
 export function clearWebServerLogOutput() {
   if (webServerLogControls.clearOutput) {
     return webServerLogControls.clearOutput();
   }
-  state.webServerLogEntries = [];
-  state.webServerLogError = "";
-  state.webServerLogRaw = "";
-  state.webServerLogNotice = "";
+  updateWebServerLogState({
+    webServerLogEntries: [],
+    webServerLogError: "",
+    webServerLogRaw: "",
+    webServerLogNotice: "",
+  });
 }
 
 export function resetWebServerLogRecoveryState() {
@@ -37,7 +39,6 @@ export function resetWebServerLogRecoveryState() {
     return webServerLogControls.resetRecoveryState();
   }
   closeWebServerLogStream();
-  state.webServerLogEnabled = null;
-  state.webServerLogConnected = false;
+  updateWebServerLogState({ webServerLogEnabled: null, webServerLogConnected: false });
   clearWebServerLogOutput();
 }

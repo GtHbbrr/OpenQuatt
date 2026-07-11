@@ -89,11 +89,14 @@ export function tickMotion(now) {
 }
 
 export function startMotionLoop() {
-  if (state.motionFrame || state.reducedMotion) {
+  if (state.reducedMotion) {
     return;
   }
 
   if (refreshMotionTargets() === 0) {
+    return;
+  }
+  if (state.motionFrame) {
     return;
   }
 

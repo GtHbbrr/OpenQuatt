@@ -3,10 +3,13 @@
   "version": "1.0.0",
   "description": "OpenQuatt firmware and embedded web UI tooling",
   "private": true,
+  "type": "module",
   "scripts": {
     "build:web": "node openquatt/web/build-assets.mjs",
-    "check:web": "node openquatt/web/build-assets.mjs --check",
-    "smoke:web": "node openquatt/web/smoke-web.mjs",
+    "build:web:preview": "node openquatt/web/build-assets.mjs --preview",
+    "check:web": "node openquatt/web/build-assets.mjs --check && node --test openquatt/web/tests/*.test.mjs && node openquatt/web/check-web-quality.mjs",
+    "smoke:web": "npm run build:web:preview && node openquatt/web/smoke-web.mjs",
+    "stats:web": "node openquatt/web/web-stats.mjs",
     "setup:git-merge-driver": "git config --local merge.openquatt-generated.name \"Keep current generated web bundle for rebuild\" && git config --local merge.openquatt-generated.driver true && git config --local merge.openquatt-generated.recursive binary"
   },
   "repository": {

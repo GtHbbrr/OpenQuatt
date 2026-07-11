@@ -1,10 +1,15 @@
 (function () {
-  const DOMAINS = new Set(["select", "number", "sensor", "text", "text_sensor", "binary_sensor", "button", "time", "datetime", "update", "switch"]);
   const OPENQUATT_RESUME_CLEAR_VALUE = "2000-01-01 00:00:00";
   const OPENQUATT_AUTH_RECOVERY_WINDOW_MS = 600000;
   const DEBUG_RECORDING_BUFFER_BYTES = 1024 * 1024;
   const DEBUG_RECORDING_SAMPLE_BYTES = 516;
   const DEBUG_RECORDING_SAMPLE_CAPACITY = Math.floor(DEBUG_RECORDING_BUFFER_BYTES / DEBUG_RECORDING_SAMPLE_BYTES);
+  const mockFixtures = window.__OQ_MOCK_FIXTURES__;
+  const mockEntityDefs = window.__OQ_MOCK_ENTITY_DEFS__;
+  if (!mockFixtures || !Array.isArray(mockEntityDefs)) {
+    throw new Error("OpenQuatt mockmetadata ontbreekt.");
+  }
+  const DOMAINS = new Set(mockEntityDefs.map(([domain]) => domain));
   const entities = new Map();
   let devControlsRoot = null;
   const state = {
@@ -196,58 +201,8 @@
     return !isCoolingScenario(name) && !isSummerIdleScenario(name) && name !== "idle";
   }
 
-  const HP2_ENTITIES = [
-    ["select", "HP2 - Excluded compressor level A", { value: "None", state: "None", option: ["None", "L1 (H30/C30)", "L2 (H39/C36)", "L3 (H49/C42)", "L4 (H55/C47)", "L5 (H61/C52)", "L6 (H67/C56)", "L7 (H72/C61)", "L8 (H79/C66)", "L9 (H85/C71)", "L10 (H90/C74)"] }],
-    ["select", "HP2 - Excluded compressor level B", { value: "None", state: "None", option: ["None", "L1 (H30/C30)", "L2 (H39/C36)", "L3 (H49/C42)", "L4 (H55/C47)", "L5 (H61/C52)", "L6 (H67/C56)", "L7 (H72/C61)", "L8 (H79/C66)", "L9 (H85/C71)", "L10 (H90/C74)"] }],
-    ["sensor", "HP2 - Power Input", { value: 0, uom: "W" }],
-    ["sensor", "HP2 - Heat Power", { value: 0, uom: "W" }],
-    ["sensor", "HP2 - Cooling Power", { value: 0, uom: "W" }],
-    ["sensor", "HP2 - COP", { value: 0, uom: "" }],
-    ["sensor", "HP2 compressor level", { value: 0, uom: "" }],
-    ["sensor", "HP2 - Compressor frequency", { value: 0, uom: "Hz" }],
-    ["sensor", "HP2 - Compressor starts 2h", { value: 3 }],
-    ["sensor", "HP2 - Compressor starts 6h", { value: 9 }],
-    ["sensor", "HP2 - Compressor starts 24h", { value: 24 }],
-    ["sensor", "HP2 - Compressor starts 72h", { value: 40 }],
-    ["sensor", "HP2 - Compressor last start age", { value: 18, uom: "min" }],
-    ["sensor", "HP2 - Fan speed", { value: 0, uom: "rpm" }],
-    ["sensor", "HP2 - Flow", { value: 0, uom: "L/h" }],
-    ["sensor", "HP2 - Evaporator coil temperature", { value: 0, uom: "\u00B0C" }],
-    ["sensor", "HP2 - Inner coil temperature", { value: 0, uom: "\u00B0C" }],
-    ["sensor", "HP2 - Outside temperature", { value: 0, uom: "\u00B0C" }],
-    ["sensor", "HP2 - Condenser pressure", { value: 0, uom: "bar" }],
-    ["sensor", "HP2 - Gas discharge temperature", { value: 0, uom: "\u00B0C" }],
-    ["sensor", "HP2 - Evaporator pressure", { value: 0, uom: "bar" }],
-    ["sensor", "HP2 - Gas return temperature", { value: 0, uom: "\u00B0C" }],
-    ["sensor", "HP2 - Suction superheat", { value: 3.4, uom: "K" }],
-    ["sensor", "HP2 - Discharge superheat", { value: 12.8, uom: "K" }],
-    ["text_sensor", "HP2 - Suction superheat status", { value: "OK" }],
-    ["sensor", "HP2 - EEV steps", { value: 0, uom: "p" }],
-    ["sensor", "HP2 - Water in temperature", { value: 25.4, uom: "°C" }],
-    ["sensor", "HP2 - Water out temperature", { value: 29.1, uom: "°C" }],
-    ["sensor", "HP2 - Water in temperature raw", { value: 25.4, uom: "\u00B0C" }],
-    ["sensor", "HP2 - Water out temperature raw", { value: 29.1, uom: "\u00B0C" }],
-    ["text_sensor", "HP2 - Working Mode Label", { state: "Standby", value: "Standby" }],
-    ["text_sensor", "HP2 - Active Failures List", { state: "None", value: "None" }],
-    ["binary_sensor", "HP2 - Defrost", { value: false }],
-    ["binary_sensor", "HP2 - 4-Way valve", { value: false }],
-    ["binary_sensor", "HP2 - Bottom plate heater", { value: true }],
-    ["binary_sensor", "HP2 - Crankcase heater", { value: true }],
-  ];
-
-  const COMPRESSOR_LEVEL_OPTIONS = [
-    "None",
-    "L1 (H30/C30)",
-    "L2 (H39/C36)",
-    "L3 (H49/C42)",
-    "L4 (H55/C47)",
-    "L5 (H61/C52)",
-    "L6 (H67/C56)",
-    "L7 (H72/C61)",
-    "L8 (H79/C66)",
-    "L9 (H85/C71)",
-    "L10 (H90/C74)",
-  ];
+  const HP2_ENTITIES = mockFixtures.hp2Entities;
+  const COMPRESSOR_LEVEL_OPTIONS = mockFixtures.compressorLevelOptions;
   const ODU_RUNTIME_FREQUENCY_LEVELS = Array.from({ length: 11 }, (_item, index) => index);
   const ODU_RUNTIME_FREQUENCY_MODES = ["cooling", "heating"];
 
@@ -327,6 +282,13 @@
       state: "",
       value: "",
       ...payload,
+    });
+  }
+
+  function seedEntityDefinitions() {
+    mockEntityDefs.forEach(([domain, name]) => {
+      const value = domain === "binary_sensor" || domain === "switch" ? false : domain === "sensor" || domain === "number" ? 0 : "";
+      setEntity(domain, name, { state: value, value });
     });
   }
 
@@ -1407,17 +1369,10 @@
 
   function seedEntities() {
     syncDevMeta();
-    setEntity("text_sensor", "Summary", { state: "" });
+    seedEntityDefinitions();
     setEntity("text_sensor", "OpenQuatt Installation Topology", { state: state.installation, value: state.installation });
     setEntity("text_sensor", "OpenQuatt Hardware Profile", { state: state.hardware, value: state.hardware });
     setEntity("text_sensor", "OpenQuatt Connection", { state: state.connection, value: state.connection });
-    setEntity("button", "Check Firmware Updates", { state: "" });
-    setEntity("button", "Install Firmware Test OTA", { state: "" });
-    setEntity("button", "Install Firmware Update Target", { state: "" });
-    setEntity("button", "Restart", { state: "" });
-    setEntity("button", "Acknowledge compressor cycling alert", { state: "" });
-    setEntity("text", "Firmware Test OTA URL", { state: "", value: "" });
-    setEntity("text", "Firmware Test OTA MD5 URL", { state: "", value: "" });
     setEntity("text_sensor", "OpenQuatt Version", { state: "v0.26.0", value: "v0.26.0" });
     setEntity("text_sensor", "OpenQuatt Release Channel", { state: "dev", value: "dev" });
     setEntity("sensor", "Uptime", { value: 0, uom: "h" });
@@ -1425,7 +1380,6 @@
     setEntity("sensor", "ESP Internal Temperature", { value: 37.8, uom: "°C" });
     setEntity("sensor", "Firmware Update Progress", { value: 0, uom: "%" });
     setEntity("text_sensor", "Firmware Update Status", { state: "Idle", value: "Idle" });
-    setEntity("button", "Trendhistorie nu opslaan", { state: "" });
     setEntity("text_sensor", "Trendhistorie beschikbaar", { state: "18,4 dagen", value: "18,4 dagen" });
     setEntity("text_sensor", "Trendhistorie oudste punt", { state: "14-04 06:00", value: "14-04 06:00" });
     setEntity("text_sensor", "Trendhistorie nieuwste punt", { state: "2 min geleden", value: "2 min geleden" });
@@ -1439,8 +1393,6 @@
     if (!state.energyHistoryHourRecords.length) {
       state.energyHistoryHourRecords = buildEnergyHistoryHourRecords();
     }
-    setEntity("button", "Lifetime energiehistorie nu opslaan", { state: "" });
-    setEntity("button", "Lifetime energiehistorie wissen", { state: "" });
     setEntity("select", "Uurdetail bewaren", {
       value: state.energyHistoryHourRetention,
       state: state.energyHistoryHourRetention,
@@ -1451,9 +1403,6 @@
       state: energyHistoryRecordCountText,
       value: energyHistoryRecordCountText,
     });
-    setEntity("text_sensor", "Lifetime energiehistorie oudste dag", { state: "", value: "" });
-    setEntity("text_sensor", "Lifetime energiehistorie nieuwste dag", { state: "", value: "" });
-    setEntity("text_sensor", "Lifetime energiehistorie laatste opslag", { state: "", value: "" });
     setEntity("sensor", "Lifetime energiehistorie grootte", { value: state.energyHistoryStoredKiB, uom: "kB" });
     setEntity("sensor", "Lifetime energiehistorie schrijfacties", { value: state.energyHistoryWrites });
     setEntity("update", "Firmware Update", {
@@ -1501,49 +1450,23 @@
       option: ["Flow Setpoint", "Manual PWM"],
     });
     setEntity("text_sensor", "Commissioning status", { state: "IDLE", value: "IDLE" });
-    setEntity("binary_sensor", "CM100 active", { value: false, state: false });
-    setEntity("button", "CM100 Start", {});
-    setEntity("button", "CM100 Stop", {});
-    setEntity("button", "Boiler Power Test Start", {});
-    setEntity("button", "Boiler Power Test Abort", {});
-    setEntity("button", "Boiler Power Test Apply", {});
-    setEntity("button", "Flow Autotune Start", {});
-    setEntity("button", "Flow Autotune Abort", {});
-    setEntity("button", "Apply Flow Autotune Kp-Ki", {});
-    setEntity("button", "Air Purge Start", {});
-    setEntity("button", "Air Purge Abort", {});
-    setEntity("button", "Manual Flow Start", {});
-    setEntity("button", "Manual Flow Abort", {});
-    setEntity("button", "Apply Manual Flow To Heating", {});
-    setEntity("button", "Apply Manual Flow To Cooling", {});
-    setEntity("switch", "Quick flow test", { value: false, state: false });
-    setEntity("button", "Manual HP Start", {});
-    setEntity("button", "Manual HP Abort", {});
-    setEntity("button", "HP Water Calibration Start", {});
-    setEntity("button", "HP Water Calibration Abort", {});
-    setEntity("button", "Apply HP Water Calibration Offsets", {});
     setEntity("switch", "Air purge return to Auto", { value: true, state: true });
-    setEntity("binary_sensor", "Boiler power test active", { value: false, state: false });
     setEntity("text_sensor", "Boiler power test status", { state: "IDLE", value: "IDLE" });
     setEntity("sensor", "Boiler power test result", { value: 0, uom: "W" });
     setEntity("sensor", "Boiler power test confidence", { value: 0, uom: "%" });
     setEntity("text_sensor", "Flow Autotune status", { state: "IDLE", value: "IDLE" });
     setEntity("number", "Flow Autotune Kp suggested", { value: 0, min_value: 0, max_value: 5, step: 0.01, uom: "" });
     setEntity("number", "Flow Autotune Ki suggested", { value: 0, min_value: 0, max_value: 5, step: 0.01, uom: "" });
-    setEntity("binary_sensor", "Air purge active", { value: false, state: false });
     setEntity("text_sensor", "Air purge status", { state: "IDLE", value: "IDLE" });
     setEntity("sensor", "Air purge remaining", { value: 0, uom: "s" });
     setEntity("sensor", "Air purge phase", { value: 0, uom: "" });
     setEntity("sensor", "Air purge target iPWM", { value: 0, uom: "iPWM" });
-    setEntity("binary_sensor", "Manual flow active", { value: false, state: false });
     setEntity("text_sensor", "Manual flow status", { state: "IDLE", value: "IDLE" });
     setEntity("sensor", "Manual flow target iPWM", { value: 400, uom: "iPWM" });
-    setEntity("binary_sensor", "Manual HP active", { value: false, state: false });
     setEntity("text_sensor", "Manual HP status", { state: "IDLE", value: "IDLE" });
     setEntity("text_sensor", "Manual HP guard status", { state: "Vrijgegeven", value: "Vrijgegeven" });
     setEntity("select", "Manual HP1 service mode", { value: "Standby", state: "Standby", option: ["Standby", "Heating", "Cooling"] });
     setEntity("select", "Manual HP2 service mode", { value: "Standby", state: "Standby", option: ["Standby", "Heating", "Cooling"] });
-    setEntity("binary_sensor", "HP water calibration active", { value: false, state: false });
     setEntity("text_sensor", "HP water calibration status", { state: "IDLE", value: "IDLE" });
     setEntity("sensor", "HP water calibration remaining", { value: 0, uom: "s" });
     setEntity("sensor", "HP water calibration phase", { value: 0, uom: "" });
@@ -1927,8 +1850,6 @@
     seedHp2Entities();
     seedOduRuntimeFrequencyEntities("HP2");
 
-    setEntity("button", "Complete setup", {});
-    setEntity("button", "Reset setup state", {});
   }
 
   function seedHp2Entities() {
@@ -4582,6 +4503,14 @@
     };
   }
 
+  function renderDevControlOptions(controlKey) {
+    const options = mockFixtures.devControlOptions[controlKey] || [];
+    return options
+      .filter((option) => !option.duoOnly || state.installation === "duo")
+      .map((option) => `<option value="${option.value}">${option.label}</option>`)
+      .join("");
+  }
+
   function renderDevControls() {
     return `
       <section class="oq-helper-hub-block oq-helper-hub-dev" data-oq-dev-controls>
@@ -4590,58 +4519,37 @@
           <label class="oq-helper-hub-dev-row">
             <span class="oq-helper-hub-dev-label">Installatie</span>
             <select class="oq-helper-hub-dev-select" data-oq-dev-control="installation">
-              <option value="single">Quatt Single</option>
-              <option value="duo">Quatt Duo</option>
+              ${renderDevControlOptions("installation")}
             </select>
           </label>
           <label class="oq-helper-hub-dev-row">
             <span class="oq-helper-hub-dev-label">Hardware</span>
             <select class="oq-helper-hub-dev-select" data-oq-dev-control="hardware">
-              <option value="heatpump_controller_q">Q-edition</option>
-              <option value="heatpump_listener">Listener</option>
-              <option value="waveshare">Waveshare</option>
+              ${renderDevControlOptions("hardware")}
             </select>
           </label>
           <label class="oq-helper-hub-dev-row">
             <span class="oq-helper-hub-dev-label">Verbinding</span>
             <select class="oq-helper-hub-dev-select" data-oq-dev-control="connection">
-              <option value="wifi">Wi-Fi</option>
-              <option value="eth">Ethernet</option>
+              ${renderDevControlOptions("connection")}
             </select>
           </label>
           <label class="oq-helper-hub-dev-row">
             <span class="oq-helper-hub-dev-label">Scenario</span>
             <select class="oq-helper-hub-dev-select" data-oq-dev-control="scenario">
-              <option value="idle">Standby</option>
-              <option value="heating">Winter - 1 warmtepomp</option>
-              ${state.installation === "duo" ? '<option value="dual">Winter - duo-bedrijf</option>' : ""}
-              ${state.installation === "duo" ? '<option value="heating_stop_reasons">Winter - verwarmstops vergeleken</option>' : ""}
-              ${state.installation === "duo" ? '<option value="start_blocked">Winter - start wacht</option>' : ""}
-              <option value="flow_hold">Waterflow - voor/naloop</option>
-              <option value="summer_idle">Zomer - pompbescherming</option>
-              <option value="cooling">Zomer - koeling vrijgegeven</option>
-              <option value="cooling_limited">Zomer - koeling veilig begrensd</option>
-              <option value="cooling_stop_reasons">Zomer - koelstops vergeleken</option>
-              <option value="cooling_limiter_log">Zomer - limiter herhaalt</option>
-              <option value="defrost">Winter - ontdooien</option>
+              ${renderDevControlOptions("scenario")}
             </select>
           </label>
           <label class="oq-helper-hub-dev-row">
             <span class="oq-helper-hub-dev-label">CV-ketel</span>
             <select class="oq-helper-hub-dev-select" data-oq-dev-control="boiler">
-              <option value="off">Uit</option>
-              <option value="on">Aan</option>
+              ${renderDevControlOptions("boiler")}
             </select>
           </label>
           <label class="oq-helper-hub-dev-row">
             <span class="oq-helper-hub-dev-label">Diagnose</span>
             <select class="oq-helper-hub-dev-select" data-oq-dev-control="diagnostics">
-              <option value="clear">Geen bijzonderheden</option>
-              <option value="cycling">Pendelen actief</option>
-              <option value="cycling-recovered">Pendelen hersteld, melding open</option>
-              <option value="hydraulics">Hydrauliek</option>
-              <option value="connections">Verbindingen</option>
-              <option value="hp-fault">Warmtepompstoring</option>
+              ${renderDevControlOptions("diagnostics")}
             </select>
           </label>
         </div>

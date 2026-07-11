@@ -1,10 +1,13 @@
 import { formatOverviewStatValue, getDerivedEfficiencyValue, getEntityNumericValue, getEntityStateText, hasEntity, isEfficiencyKey } from "../core/app-shared.js";
 import { OVERVIEW_ENERGY_COLUMN_CONFIGS } from "../core/config.js";
 import { setEnergyHistoryRequestQueryProvider } from "../core/energy-history-query.js";
+import { ENERGY_HISTORY_VALUE_KEYS, ENERGY_HISTORY_WEEKDAY_LABELS, addEnergyHistoryDays, addEnergyHistoryMonths, formatEnergyHistoryDateLabel, formatEnergyHistoryWeekLabel, getEnergyHistoryDateFromParts, getEnergyHistoryDateInputValue, getEnergyHistoryDateKeyFromDate, getEnergyHistoryDaysInMonth, getEnergyHistoryIsoWeekInfo, getEnergyHistoryMonthKeyFromDate, getEnergyHistoryRecordWh, getEnergyHistoryWeekStart, getEnergyHistoryWeekStartKeyFromDate, parseEnergyHistoryCurrentLine, parseEnergyHistoryDateInputValue, parseEnergyHistoryDateKey, parseEnergyHistoryHourLine, parseEnergyHistoryLine, parseEnergyHistoryMetadata, parseEnergyHistoryMonthInputValue, parseEnergyHistoryMonthKey, parseEnergyHistoryWeekValue } from "../core/energy-history-domain.js";
+export * from "../core/energy-history-domain.js";
 import { getRenderSignature } from "../core/render-signatures.js";
 import { state } from "../core/state.js";
 import { setViewPatchControls } from "../core/view-patch-controls.js";
 import { refreshEnergyHistoryData } from "../features/storage-history.js";
+import { updateEnergyHistoryState } from "../core/feature-state.js";
 import { escapeHtml } from "../core/html.js";
 import { render } from "../core/render-scheduler.js";
 import { replaceOuterHtmlIfSignatureChanged } from "./view-utils.js";
@@ -97,16 +100,6 @@ import { replaceOuterHtmlIfSignatureChanged } from "./view-utils.js";
     `;
   }
 
-  export const ENERGY_HISTORY_VALUE_KEYS = [
-    "electricalInputWh",
-    "heatingInputWh",
-    "coolingInputWh",
-    "heatpumpHeatOutputWh",
-    "heatpumpCoolingOutputWh",
-    "boilerHeatOutputWh",
-    "systemHeatOutputWh",
-  ];
-
   export const ENERGY_HISTORY_VIEW_OPTIONS = [
     { id: "day", label: "Dag" },
     { id: "week", label: "Week" },
@@ -116,8 +109,6 @@ import { replaceOuterHtmlIfSignatureChanged } from "./view-utils.js";
   ];
 
   export const ENERGY_HISTORY_PERIOD_VIEW_IDS = new Set(["day", "week", "month", "year"]);
-
-  export const ENERGY_HISTORY_WEEKDAY_LABELS = ["Zo", "Ma", "Di", "Wo", "Do", "Vr", "Za"];
 
   export function normalizeEnergyHistoryView(view) {
     const value = String(view || "").trim();
@@ -129,8 +120,7 @@ import { replaceOuterHtmlIfSignatureChanged } from "./view-utils.js";
     if (state.energyHistoryView === nextView) {
       return;
     }
-    state.energyHistoryView = nextView;
-    state.energyHistoryLastFetchAt = 0;
+    updateEnergyHistoryState({ energyHistoryView: nextView, energyHistoryLastFetchAt: 0 });
     render();
     requestEnergyHistoryDataRefresh();
   }
@@ -156,54 +146,7 @@ import { replaceOuterHtmlIfSignatureChanged } from "./view-utils.js";
   }
 
   export function getEnergyHistoryMetadataFromRaw() {
-    const raw = String(state.energyHistoryRaw || "");
-    const metadata = {
-      storedDayCount: 0,
-      oldestDateKey: null,
-      newestDateKey: null,
-      hourStoredDayCount: 0,
-      hourOldestDateKey: null,
-      hourNewestDateKey: null,
-      hourRequestedRetentionDays: 0,
-      hourSlotCount: 0,
-      hourPartitionAvailable: false,
-      hourRecordCount: 0,
-      hourWriteCount: 0,
-      hourStorageKb: 0,
-      hourLastWriteTimestampS: 0,
-      dayPartitionAvailable: false,
-      dayStorageKb: 0,
-      dayWriteCount: 0,
-      dayLastWriteTimestampS: 0,
-    };
-    raw.split(/\r?\n/).forEach((line) => {
-      if (!line.startsWith("@bounds|") && !line.startsWith("@day_retention|") && !line.startsWith("@hour_retention|")) {
-        return;
-      }
-      const parts = line.split("|");
-      if (line.startsWith("@bounds|")) {
-        metadata.storedDayCount = Number(parts[1]) || 0;
-        metadata.oldestDateKey = Number(parts[2]) || null;
-        metadata.newestDateKey = Number(parts[3]) || null;
-        metadata.hourStoredDayCount = Number(parts[4]) || 0;
-        metadata.hourOldestDateKey = Number(parts[5]) || null;
-        metadata.hourNewestDateKey = Number(parts[6]) || null;
-      } else if (line.startsWith("@day_retention|")) {
-        metadata.dayPartitionAvailable = Number(parts[1]) === 1;
-        metadata.dayStorageKb = Number(parts[2]) || 0;
-        metadata.dayWriteCount = Number(parts[3]) || 0;
-        metadata.dayLastWriteTimestampS = Number(parts[4]) || 0;
-      } else if (line.startsWith("@hour_retention|")) {
-        metadata.hourRequestedRetentionDays = Number(parts[1]) || 0;
-        metadata.hourSlotCount = Number(parts[2]) || 0;
-        metadata.hourPartitionAvailable = Number(parts[3]) === 1;
-        metadata.hourRecordCount = Number(parts[4]) || 0;
-        metadata.hourWriteCount = Number(parts[5]) || 0;
-        metadata.hourStorageKb = Number(parts[6]) || 0;
-        metadata.hourLastWriteTimestampS = Number(parts[7]) || 0;
-      }
-    });
-    return metadata;
+    return parseEnergyHistoryMetadata(state.energyHistoryRaw);
   }
 
   export function getEnergyHistoryCurrentDateKeyFromRaw() {
@@ -245,281 +188,12 @@ import { replaceOuterHtmlIfSignatureChanged } from "./view-utils.js";
     return dateKeys.length ? Math.max(...dateKeys) : getEnergyHistoryTodayKey();
   }
 
-  export function getEnergyHistoryDateKeyFromDate(date) {
-    return (date.getFullYear() * 10000) + ((date.getMonth() + 1) * 100) + date.getDate();
-  }
-
-  export function getEnergyHistoryDateFromParts(year, month, day) {
-    return new Date(year, month - 1, day, 12, 0, 0);
-  }
-
-  export function getEnergyHistoryDaysInMonth(year, month) {
-    return new Date(year, month, 0).getDate();
-  }
-
-  export function padEnergyHistoryDatePart(value) {
-    return String(value).padStart(2, "0");
-  }
-
-  export function getEnergyHistoryDateInputValue(dateKey) {
-    const parsed = parseEnergyHistoryDateKey(dateKey);
-    if (!parsed) {
-      return "";
-    }
-    return `${parsed.year}-${padEnergyHistoryDatePart(parsed.month)}-${padEnergyHistoryDatePart(parsed.day)}`;
-  }
-
-  export function parseEnergyHistoryDateInputValue(value) {
-    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value || "").trim());
-    if (!match) {
-      return null;
-    }
-    const year = Number(match[1]);
-    const month = Number(match[2]);
-    const day = Number(match[3]);
-    const date = getEnergyHistoryDateFromParts(year, month, day);
-    if (
-      date.getFullYear() !== year
-      || date.getMonth() + 1 !== month
-      || date.getDate() !== day
-    ) {
-      return null;
-    }
-    return parseEnergyHistoryDateKey(getEnergyHistoryDateKeyFromDate(date));
-  }
-
-  export function getEnergyHistoryMonthKey(year, month) {
-    return (Number(year) * 100) + Number(month);
-  }
-
-  export function getEnergyHistoryMonthKeyFromDate(date) {
-    return getEnergyHistoryMonthKey(date.getFullYear(), date.getMonth() + 1);
-  }
-
-  export function parseEnergyHistoryMonthKey(monthKey) {
-    const key = Number(monthKey);
-    if (!Number.isFinite(key) || key <= 0) {
-      return null;
-    }
-    const year = Math.floor(key / 100);
-    const month = key % 100;
-    if (year < 2020 || month < 1 || month > 12) {
-      return null;
-    }
-    return { key, year, month, date: new Date(year, month - 1, 1, 12, 0, 0) };
-  }
-
-  export function parseEnergyHistoryMonthInputValue(value) {
-    const raw = String(value || "").trim();
-    const match = /^(\d{4})-(\d{2})$/.exec(raw);
-    if (match) {
-      return parseEnergyHistoryMonthKey(getEnergyHistoryMonthKey(Number(match[1]), Number(match[2])));
-    }
-    return parseEnergyHistoryMonthKey(raw);
-  }
-
-  export function addEnergyHistoryMonths(monthKey, offset) {
-    const parsed = parseEnergyHistoryMonthKey(monthKey);
-    if (!parsed) {
-      return "";
-    }
-    const date = new Date(parsed.year, parsed.month - 1 + Number(offset || 0), 1, 12, 0, 0);
-    return String(getEnergyHistoryMonthKeyFromDate(date));
-  }
-
-  export function getEnergyHistoryWeekStart(date) {
-    const start = new Date(date.getTime());
-    const weekday = start.getDay();
-    const diff = weekday === 0 ? -6 : 1 - weekday;
-    start.setDate(start.getDate() + diff);
-    start.setHours(12, 0, 0, 0);
-    return start;
-  }
-
-  export function addEnergyHistoryDays(date, days) {
-    const next = new Date(date.getTime());
-    next.setDate(next.getDate() + days);
-    next.setHours(12, 0, 0, 0);
-    return next;
-  }
-
-  export function formatEnergyHistoryDayMonth(date) {
-    return date.toLocaleDateString("nl-NL", { day: "numeric", month: "short" }).replace(/\./g, "");
-  }
-
-  export function getEnergyHistoryIsoWeekInfo(date) {
-    const target = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-    const dayNumber = (target.getUTCDay() + 6) % 7;
-    target.setUTCDate(target.getUTCDate() - dayNumber + 3);
-    const weekYear = target.getUTCFullYear();
-    const firstThursday = new Date(Date.UTC(weekYear, 0, 4));
-    const firstDayNumber = (firstThursday.getUTCDay() + 6) % 7;
-    firstThursday.setUTCDate(firstThursday.getUTCDate() - firstDayNumber + 3);
-    const week = 1 + Math.round((target - firstThursday) / (7 * 24 * 60 * 60 * 1000));
-    return { week, year: weekYear };
-  }
-
-  export function getEnergyHistoryWeekStartKeyFromDate(date) {
-    return getEnergyHistoryDateKeyFromDate(getEnergyHistoryWeekStart(date));
-  }
-
-  export function parseEnergyHistoryWeekValue(value) {
-    const dateInput = parseEnergyHistoryDateInputValue(value);
-    const parsed = dateInput || parseEnergyHistoryDateKey(value);
-    if (!parsed) {
-      return null;
-    }
-    const start = getEnergyHistoryWeekStart(parsed.date);
-    return parseEnergyHistoryDateKey(getEnergyHistoryDateKeyFromDate(start));
-  }
-
-  export function formatEnergyHistoryWeekLabel(weekStartKey) {
-    const parsed = parseEnergyHistoryDateKey(weekStartKey);
-    if (!parsed) {
-      return "Week";
-    }
-    const start = getEnergyHistoryWeekStart(parsed.date);
-    const end = addEnergyHistoryDays(start, 6);
-    const week = getEnergyHistoryIsoWeekInfo(start).week;
-    return `Week ${week} (${formatEnergyHistoryDayMonth(start)} - ${formatEnergyHistoryDayMonth(end)})`;
-  }
-
-  export function parseEnergyHistoryDateKey(dateKey) {
-    const key = Number(dateKey);
-    if (!Number.isFinite(key) || key <= 0) {
-      return null;
-    }
-    const year = Math.floor(key / 10000);
-    const month = Math.floor(key / 100) % 100;
-    const day = key % 100;
-    if (year < 2020 || month < 1 || month > 12 || day < 1 || day > 31) {
-      return null;
-    }
-    return { key, year, month, day, date: new Date(year, month - 1, day, 12, 0, 0) };
-  }
-
-  export function formatEnergyHistoryDateLabel(dateKey, mode = "day") {
-    const parsed = parseEnergyHistoryDateKey(dateKey);
-    if (!parsed) {
-      return "—";
-    }
-    if (mode === "weekday") {
-      return ENERGY_HISTORY_WEEKDAY_LABELS[parsed.date.getDay()] || "";
-    }
-    if (mode === "month") {
-      return parsed.date.toLocaleDateString("nl-NL", { month: "short" });
-    }
-    if (mode === "year") {
-      return String(parsed.year);
-    }
-    return parsed.date.toLocaleDateString("nl-NL", { day: "2-digit", month: "short" });
-  }
-
   export function getEntityKwhAsWh(key) {
     const value = getEntityNumericValue(key);
     if (!Number.isFinite(value) || value < 0) {
       return null;
     }
     return Math.round(value * 1000);
-  }
-
-  export function normalizeEnergyHistoryWh(rawValue) {
-    const value = Number(rawValue);
-    return Number.isFinite(value) && value >= 0 ? value : null;
-  }
-
-  export function getEnergyHistoryRecordValuesFromParts(parts, offset = 0) {
-    const values = {};
-    ENERGY_HISTORY_VALUE_KEYS.forEach((key, index) => {
-      values[key] = normalizeEnergyHistoryWh(parts[offset + index]);
-    });
-    return values;
-  }
-
-  export function parseEnergyHistoryLine(line) {
-    const value = String(line || "").trim();
-    if (!value || value.startsWith("@")) {
-      return null;
-    }
-    const parts = value.split("|");
-    if (parts.length < 10) {
-      return null;
-    }
-    const sequence = Number(parts[0]);
-    const dateKey = Number(parts[1]);
-    const flags = Number(parts[2]);
-    const parsed = parseEnergyHistoryDateKey(dateKey);
-    if (!Number.isFinite(sequence) || !parsed) {
-      return null;
-    }
-    return {
-      sequence,
-      dateKey,
-      year: parsed.year,
-      month: parsed.month,
-      day: parsed.day,
-      partial: Boolean(flags & 1),
-      source: "flash",
-      ...getEnergyHistoryRecordValuesFromParts(parts, 3),
-    };
-  }
-
-  export function parseEnergyHistoryCurrentLine(line) {
-    const value = String(line || "").trim();
-    if (!value.startsWith("@current|")) {
-      return null;
-    }
-    const parts = value.split("|");
-    if (parts.length < 9) {
-      return null;
-    }
-    const dateKey = Number(parts[1]);
-    const parsed = parseEnergyHistoryDateKey(dateKey);
-    if (!parsed) {
-      return null;
-    }
-    return {
-      sequence: Number.MAX_SAFE_INTEGER,
-      dateKey,
-      year: parsed.year,
-      month: parsed.month,
-      day: parsed.day,
-      partial: true,
-      source: "current",
-      ...getEnergyHistoryRecordValuesFromParts(parts, 2),
-    };
-  }
-
-  export function parseEnergyHistoryHourLine(line) {
-    const value = String(line || "").trim();
-    if (!value.startsWith("@hour|")) {
-      return null;
-    }
-    const parts = value.split("|");
-    if (parts.length < 11) {
-      return null;
-    }
-    const sequence = Number(parts[1]);
-    const dateKey = Number(parts[2]);
-    const hour = Number(parts[3]);
-    const parsed = parseEnergyHistoryDateKey(dateKey);
-    if (!Number.isFinite(sequence) || !parsed || !Number.isInteger(hour) || hour < 0 || hour > 23) {
-      return null;
-    }
-    return {
-      sequence,
-      dateKey,
-      year: parsed.year,
-      month: parsed.month,
-      day: parsed.day,
-      hour,
-      partial: true,
-      source: "hour",
-      label: String(hour),
-      tooltipLabel: `${String(hour).padStart(2, "0")}:00 - ${String((hour + 1) % 24).padStart(2, "0")}:00`,
-      sortKey: (dateKey * 100) + hour,
-      ...getEnergyHistoryRecordValuesFromParts(parts, 4),
-    };
   }
 
   export function getEnergyHistoryTodayRecord() {
@@ -545,11 +219,6 @@ import { replaceOuterHtmlIfSignatureChanged } from "./view-utils.js";
       systemHeatOutputWh: getEntityKwhAsWh("systemThermalEnergyDaily"),
     };
     return ENERGY_HISTORY_VALUE_KEYS.some((key) => Number.isFinite(record[key])) ? record : null;
-  }
-
-  export function getEnergyHistoryRecordWh(record, key) {
-    const value = Number(record?.[key]);
-    return Number.isFinite(value) && value >= 0 ? value : 0;
   }
 
   export function getEnergyHistoryRecords() {
@@ -696,34 +365,12 @@ import { replaceOuterHtmlIfSignatureChanged } from "./view-utils.js";
     return bucket;
   }
 
-  export function copyEnergyHistoryRecordToBucket(record, label, sortKey = record?.dateKey) {
-    const parsed = parseEnergyHistoryDateKey(record?.dateKey);
-    if (!parsed) {
-      return null;
-    }
-    return mergeEnergyHistoryRecordIntoBucket(createEnergyHistoryBucket({
-      dateKey: parsed.key,
-      year: parsed.year,
-      month: parsed.month,
-      day: parsed.day,
-      label,
-      tooltipLabel: record.tooltipLabel || label,
-      sortKey,
-      source: record.source || "record",
-    }), record);
-  }
-
   export function getEnergyHistoryRecordsByDate(records) {
     const byDate = new Map();
     records.forEach((record) => {
       byDate.set(record.dateKey, record);
     });
     return byDate;
-  }
-
-  export function getEnergyHistoryLatestParsed(records) {
-    const latest = records[records.length - 1];
-    return latest ? parseEnergyHistoryDateKey(latest.dateKey) : null;
   }
 
   export function normalizeEnergyHistoryPeriodValue(view, value) {
@@ -959,11 +606,13 @@ import { replaceOuterHtmlIfSignatureChanged } from "./view-utils.js";
     const bounds = getEnergyHistoryPeriodBounds(records, normalizedView);
     const normalized = normalizeEnergyHistoryPeriodValue(normalizedView, value);
     const nextValue = clampEnergyHistoryPeriodValue(normalized || bounds.max, bounds);
-    state.energyHistoryPeriodSelection = {
-      ...state.energyHistoryPeriodSelection,
-      [normalizedView]: nextValue,
-    };
-    state.energyHistoryLastFetchAt = 0;
+    updateEnergyHistoryState({
+      energyHistoryPeriodSelection: {
+        ...state.energyHistoryPeriodSelection,
+        [normalizedView]: nextValue,
+      },
+      energyHistoryLastFetchAt: 0,
+    });
     render();
     requestEnergyHistoryDataRefresh();
   }
