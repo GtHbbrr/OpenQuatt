@@ -133,12 +133,6 @@ Een hogere `Cooling Demand Max` betekent niet dat OpenQuatt meteen hard gaat koe
 
 Als level 1 nog steeds te veel koelt, of als de aanvoer te snel richting de veilige ondergrens zakt, stopt OpenQuatt alsnog. Na zo'n waterzijde-stop gebruikt `Cooling Restart Delta` hoeveel de aanvoer eerst weer boven het doel moet opwarmen voordat de watercyclus opnieuw mag starten.
 
-### Koelen op lage compressorfrequentie
-
-De originele Quatt-koeltabellen gebruiken ongeveer `30 Hz` als lage compressorfrequentie. Runtime ODU-frequenties onder die grens zijn experimenteel. Bij te lage compressorfrequentie kan de suction superheat te laag worden: het koudemiddel heeft dan weinig marge om volledig gasvormig terug te keren naar de compressor.
-
-OpenQuatt toont daarom per warmtepomp een diagnose voor `Suction superheat`, berekend als `Gas return temperature - Evaporating temperature`. Een status `Low - floodback risk` of `Critical low - wet suction likely` is geen directe noodstop, maar wel een waarschuwing dat langdurig zacht koelen compressor- en smeringsrisico kan geven. Verlaag koel-frequenties onder de OEM-ondergrens alleen bewust en met logging.
-
 ### Waarom is dauwpunt zo belangrijk?
 
 Bij vloerkoeling of andere watergedragen koeling wil je voorkomen dat oppervlakken te koud worden en vocht uit de lucht erop condenseert.

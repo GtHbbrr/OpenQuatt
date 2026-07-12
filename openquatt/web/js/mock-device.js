@@ -1780,8 +1780,6 @@
       ["HP1 - Gas discharge temperature", 0, "\u00B0C"],
       ["HP1 - Evaporator pressure", 0, "bar"],
       ["HP1 - Gas return temperature", 0, "\u00B0C"],
-      ["HP1 - Suction superheat", 3.4, "K"],
-      ["HP1 - Discharge superheat", 12.8, "K"],
       ["HP1 - EEV steps", 0, "p"],
       ["HP1 - Water in temperature", 25.5, "°C"],
       ["HP1 - Water out temperature", 29.5, "°C"],
@@ -1794,7 +1792,6 @@
     [
       ["HP1 - Working Mode Label", "Standby"],
       ["HP1 - Active Failures List", "None"],
-      ["HP1 - Suction superheat status", "OK"],
       ["Room Temperature Effective Source", "OT thermostat"],
       ["Room Setpoint Effective Source", "OT thermostat"],
       ["Heating Enable Effective Source", "None"],

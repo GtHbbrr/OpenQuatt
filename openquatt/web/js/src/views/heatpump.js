@@ -376,20 +376,8 @@ import { replaceOuterHtmlIfSignatureChanged, setInnerHtmlIfChanged } from "./vie
     const animated = running || (!Number.isNaN(freqValue) && freqValue > 0) || (!Number.isNaN(powerValue) && powerValue > 80) || (!Number.isNaN(heatValue) && heatValue > 150);
     const waterFlowActive = !Number.isNaN(flowValue) && flowValue > 0;
     const statusText = getHeatPumpPanelStatusLabel(mode, animated);
-    const suctionSuperheatStatusRaw = hasEntity(keys.suctionSuperheatStatus)
-      ? getEntityStateText(keys.suctionSuperheatStatus, "")
-      : "";
-    const suctionSuperheatWarningActive = suctionSuperheatStatusRaw === "Low - floodback risk"
-      || suctionSuperheatStatusRaw === "Critical low - wet suction likely";
-    const suctionSuperheatWarningText = suctionSuperheatStatusRaw === "Critical low - wet suction likely"
-      ? "Superheat kritisch laag"
-      : suctionSuperheatStatusRaw === "Low - floodback risk"
-        ? "Superheat laag"
-        : "";
-    const failureText = failures === "Geen actieve storingen"
-      ? (suctionSuperheatWarningText || "Geen storingen")
-      : failures;
-    const warningActive = failureText !== "Geen storingen" || suctionSuperheatWarningActive;
+    const failureText = failures === "Geen actieve storingen" ? "Geen storingen" : failures;
+    const warningActive = failureText !== "Geen storingen";
     const defrostText = defrostActive ? "Actief" : "Uit";
     const waterOutText = formatHeatPumpReading(keys.waterOut, 1, "°C");
     const waterInText = formatHeatPumpReading(keys.waterIn, 1, "°C");
@@ -401,9 +389,6 @@ import { replaceOuterHtmlIfSignatureChanged, setInnerHtmlIfChanged } from "./vie
     const dischargeTempText = formatHeatPumpReading(keys.dischargeTemp, 1, "°C");
     const suctionPressureText = formatHeatPumpReading(keys.evaporatorPressure, 1, "bar");
     const suctionTempText = formatHeatPumpReading(keys.returnTemp, 1, "°C");
-    const suctionSuperheatText = formatHeatPumpReading(keys.suctionSuperheat, 1, "K");
-    const dischargeSuperheatText = formatHeatPumpReading(keys.dischargeSuperheat, 1, "K");
-    const suctionSuperheatStatusText = suctionSuperheatStatusRaw || "—";
     const bottomPlateActive = isEntityActive(keys.bottomPlate);
     const crankcaseActive = isEntityActive(keys.crankcase);
     const eevPositionText = formatComponentPositionLabel(keys.eev);
@@ -480,9 +465,6 @@ import { replaceOuterHtmlIfSignatureChanged, setInnerHtmlIfChanged } from "./vie
       dischargeTempText,
       suctionPressureText,
       suctionTempText,
-      suctionSuperheatText,
-      dischargeSuperheatText,
-      suctionSuperheatStatusText,
       bottomPlateActive,
       crankcaseActive,
       eevPositionText,
@@ -764,18 +746,6 @@ import { replaceOuterHtmlIfSignatureChanged, setInnerHtmlIfChanged } from "./vie
             <span>Defrost</span>
             <strong>${defrostActive ? "Actief" : "Uit"}</strong>
           </div>
-          ${hasEntity(keys.suctionSuperheat) ? `
-            <div class="oq-overview-hp-meta-chip">
-              <span>Suction SH</span>
-              <strong>${escapeHtml(schematicModel.suctionSuperheatText)}</strong>
-            </div>
-          ` : ""}
-          ${hasEntity(keys.suctionSuperheatStatus) ? `
-            <div class="oq-overview-hp-meta-chip">
-              <span>SH status</span>
-              <strong>${escapeHtml(schematicModel.suctionSuperheatStatusText)}</strong>
-            </div>
-          ` : ""}
         </div>
         <div class="oq-overview-temps-list">
           ${renderTempRow("Water in", keys.waterIn)}

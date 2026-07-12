@@ -120,8 +120,6 @@ export { hasEntity } from "./entity-store.js";
       hp1DischargeTemp: "°C",
       hp1EvaporatorPressure: "bar",
       hp1ReturnTemp: "°C",
-      hp1SuctionSuperheat: "K",
-      hp1DischargeSuperheat: "K",
       hp1WaterIn: "°C",
       hp1WaterOut: "°C",
       hp2EvaporatorCoilTemp: "°C",
@@ -131,8 +129,6 @@ export { hasEntity } from "./entity-store.js";
       hp2DischargeTemp: "°C",
       hp2EvaporatorPressure: "bar",
       hp2ReturnTemp: "°C",
-      hp2SuctionSuperheat: "K",
-      hp2DischargeSuperheat: "K",
       hp2WaterIn: "°C",
       hp2WaterOut: "°C",
     };

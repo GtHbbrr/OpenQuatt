@@ -649,42 +649,6 @@ sensor:
     web_server:
       sorting_group_id: oq_${hp_id}
 
-  - platform: template
-    id: ${hp_id}_suction_superheat
-    name: "${prefix}Suction superheat"
-    icon: mdi:thermometer-lines
-    unit_of_measurement: "K"
-    state_class: "measurement"
-    accuracy_decimals: 2
-    entity_category: diagnostic
-    disabled_by_default: true
-    update_interval: 10s
-    lambda: |-
-      const float gas_return_c = id(${hp_id}_gas_return_temp).state;
-      const float evaporating_c = id(${hp_id}_evaporating_temp).state;
-      if (isnan(gas_return_c) || isnan(evaporating_c)) return NAN;
-      return gas_return_c - evaporating_c;
-    web_server:
-      sorting_group_id: oq_${hp_id}
-
-  - platform: template
-    id: ${hp_id}_discharge_superheat
-    name: "${prefix}Discharge superheat"
-    icon: mdi:thermometer-lines
-    unit_of_measurement: "K"
-    state_class: "measurement"
-    accuracy_decimals: 2
-    entity_category: diagnostic
-    disabled_by_default: true
-    update_interval: 10s
-    lambda: |-
-      const float gas_discharge_c = id(${hp_id}_gas_discharge_temp).state;
-      const float condensing_c = id(${hp_id}_condensing_temp).state;
-      if (isnan(gas_discharge_c) || isnan(condensing_c)) return NAN;
-      return gas_discharge_c - condensing_c;
-    web_server:
-      sorting_group_id: oq_${hp_id}
-
   - platform: modbus_controller
     modbus_controller_id: ${hp_id}
     id: ${hp_id}_water_in_temp_raw
@@ -1232,52 +1196,6 @@ text_sensor:
           return std::string(buf);
         }
       }
-
-  - platform: template
-    id: ${hp_id}_suction_superheat_status
-    name: "${prefix}Suction superheat status"
-    icon: mdi:alert-circle-outline
-    update_interval: 10s
-    entity_category: diagnostic
-    disabled_by_default: true
-    web_server:
-      sorting_group_id: oq_${hp_id}
-    lambda: |-
-      // Gate the diagnostic until the compressor has been running long enough for pressures to settle.
-      static uint32_t compressor_active_since_ms = 0;
-      const float freq_hz = id(${hp_id}_compressor_frequency).state;
-      if (isnan(freq_hz)) {
-        compressor_active_since_ms = 0;
-        return std::string("Unknown");
-      }
-
-      const uint32_t now_ms = millis();
-      if (freq_hz < 10.0f) {
-        compressor_active_since_ms = 0;
-        return std::string("Standby");
-      }
-
-      if (compressor_active_since_ms == 0) {
-        compressor_active_since_ms = now_ms;
-      }
-      if ((uint32_t) (now_ms - compressor_active_since_ms) < 180000UL) {
-        return std::string("Stabilizing");
-      }
-
-      const float suction_superheat_k = id(${hp_id}_suction_superheat).state;
-      if (isnan(suction_superheat_k)) {
-        return std::string("Unknown");
-      }
-      if (suction_superheat_k < 0.5f) {
-        return std::string("Critical low - wet suction likely");
-      }
-      if (suction_superheat_k < 2.0f) {
-        return std::string("Low - floodback risk");
-      }
-      if (suction_superheat_k > 10.0f) {
-        return std::string("High - check refrigerant flow");
-      }
-      return std::string("OK");
 
   - platform: template
     id: ${hp_id}_excluded_levels_summary
