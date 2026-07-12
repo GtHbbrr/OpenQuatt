@@ -170,6 +170,8 @@ class OpenQuattEnergyHistory : public Component {
   bool write_hour_day_import_record_(uint32_t date_key, uint32_t hour_mask, const EnergyHistoryValues hours[24],
                                      bool rescan = true);
   EnergyHistoryValues delta_values_(const EnergyHistoryValues &current, const EnergyHistoryValues &previous) const;
+  void restore_current_day_hours_(uint32_t date_key, uint8_t current_hour,
+                                  const EnergyHistoryValues &current_values);
   void capture_hour_delta_(uint32_t date_key, uint8_t hour, const EnergyHistoryValues &values);
   uint16_t requested_flash_hourly_retention_days_() const;
   size_t max_hour_flash_total_bytes_() const;

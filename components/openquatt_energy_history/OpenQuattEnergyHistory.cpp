@@ -987,6 +987,62 @@ OpenQuattEnergyHistory::EnergyHistoryValues OpenQuattEnergyHistory::delta_values
   };
 }
 
+void OpenQuattEnergyHistory::restore_current_day_hours_(uint32_t date_key, uint8_t current_hour,
+                                                        const EnergyHistoryValues &current_values) {
+  if (date_key == 0U || current_hour > 23U) {
+    return;
+  }
+
+  EnergyHistoryValues restored[24];
+  uint32_t restored_sequences[24]{};
+  bool restored_hours[24]{};
+  for (auto &values : restored) {
+    values = EnergyHistoryValues{UNKNOWN_WH, UNKNOWN_WH, UNKNOWN_WH, UNKNOWN_WH,
+                                 UNKNOWN_WH, UNKNOWN_WH, UNKNOWN_WH};
+  }
+
+  for (uint32_t slot_index = 0; slot_index < this->hour_flash_slot_count_; ++slot_index) {
+    auto &record = this->hour_flash_record_buffer_;
+    if (!this->read_hour_day_record_(slot_index, &record) || !this->hour_day_record_valid_(record) ||
+        record.date_key != date_key) {
+      continue;
+    }
+    for (uint8_t hour = 0; hour < 24U; ++hour) {
+      if ((record.hour_mask & (1UL << hour)) == 0U || !record_has_values_(record.hours[hour]) ||
+          (restored_hours[hour] && record.sequence < restored_sequences[hour])) {
+        continue;
+      }
+      restored[hour] = record.hours[hour];
+      restored_sequences[hour] = record.sequence;
+      restored_hours[hour] = true;
+    }
+  }
+
+  EnergyHistoryValues restored_totals{0U, 0U, 0U, 0U, 0U, 0U, 0U};
+  for (uint8_t hour = 0; hour < 24U; ++hour) {
+    if (!restored_hours[hour]) {
+      continue;
+    }
+    this->capture_hour_delta_(date_key, hour, restored[hour]);
+    restored_totals.electrical_input_wh =
+        add_wh_(restored_totals.electrical_input_wh, restored[hour].electrical_input_wh);
+    restored_totals.heating_input_wh = add_wh_(restored_totals.heating_input_wh, restored[hour].heating_input_wh);
+    restored_totals.cooling_input_wh = add_wh_(restored_totals.cooling_input_wh, restored[hour].cooling_input_wh);
+    restored_totals.heatpump_heat_output_wh =
+        add_wh_(restored_totals.heatpump_heat_output_wh, restored[hour].heatpump_heat_output_wh);
+    restored_totals.heatpump_cooling_output_wh =
+        add_wh_(restored_totals.heatpump_cooling_output_wh, restored[hour].heatpump_cooling_output_wh);
+    restored_totals.boiler_heat_output_wh =
+        add_wh_(restored_totals.boiler_heat_output_wh, restored[hour].boiler_heat_output_wh);
+    restored_totals.system_heat_output_wh =
+        add_wh_(restored_totals.system_heat_output_wh, restored[hour].system_heat_output_wh);
+  }
+
+  // Older firmware stored per-boot hour fragments. Put any missing restored daily energy in the
+  // reboot hour so the live cumulative snapshot reconciles exactly with the restored day counters.
+  this->capture_hour_delta_(date_key, current_hour, this->delta_values_(current_values, restored_totals));
+}
+
 void OpenQuattEnergyHistory::capture_hour_delta_(uint32_t date_key, uint8_t hour, const EnergyHistoryValues &values) {
   if (date_key == 0 || hour > 23 || !record_has_values_(values)) {
     return;
@@ -1061,7 +1117,10 @@ void OpenQuattEnergyHistory::capture_day_totals(float electrical_input_kwh, floa
   }
 
   const uint8_t hour = this->get_current_hour_();
-  if (this->has_last_hour_sample_ && this->last_hour_sample_date_key_ == date_key) {
+  const bool starts_new_day_or_boot = !this->has_last_hour_sample_ || this->last_hour_sample_date_key_ != date_key;
+  if (starts_new_day_or_boot) {
+    this->restore_current_day_hours_(date_key, hour, values);
+  } else {
     this->capture_hour_delta_(date_key, hour, this->delta_values_(values, this->last_hour_sample_values_));
   }
 

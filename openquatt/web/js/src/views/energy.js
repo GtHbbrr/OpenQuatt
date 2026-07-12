@@ -1093,16 +1093,16 @@ import { replaceOuterHtmlIfSignatureChanged } from "./view-utils.js";
   export function getEnergyHistoryBucketTooltip(record) {
     const heatCop = formatEnergyRatio(record.heatpumpHeatOutputWh, record.heatingInputWh);
     const coolingEer = formatEnergyRatio(record.heatpumpCoolingOutputWh, record.coolingInputWh);
-    const overall = formatEnergyRatio(getEnergyHistoryOutputWh(record), record.electricalInputWh);
     return [
       record.tooltipLabel || record.label || formatEnergyHistoryDateLabel(record.dateKey),
-      `Elektrisch: ${formatEnergyAdaptiveWh(record.electricalInputWh, 1)}`,
+      `Elektrisch totaal: ${formatEnergyAdaptiveWh(record.electricalInputWh, 1)}`,
+      `Elektrisch verwarmen: ${formatEnergyAdaptiveWh(record.heatingInputWh, 1)}`,
+      `Elektrisch koelen: ${formatEnergyAdaptiveWh(record.coolingInputWh, 1)}`,
       `Warmtepomp warmte: ${formatEnergyAdaptiveWh(record.heatpumpHeatOutputWh, 1)}`,
       `Warmtepomp koeling: ${formatEnergyAdaptiveWh(record.heatpumpCoolingOutputWh, 1)}`,
-      `Cv-ketel: ${formatEnergyAdaptiveWh(record.boilerHeatOutputWh, 1)}`,
+      `Cv-ketel warmte: ${formatEnergyAdaptiveWh(record.boilerHeatOutputWh, 1)}`,
       `COP verwarmen: ${heatCop}`,
       `EER koelen: ${coolingEer}`,
-      `Output / elektrisch: ${overall}`,
     ].join("\n");
   }
 
@@ -1201,12 +1201,27 @@ import { replaceOuterHtmlIfSignatureChanged } from "./view-utils.js";
     `;
   }
 
+  export function getEnergyHistorySummaryRecords(records, buckets, activeView, selectedValue) {
+    const selectedDay = normalizeEnergyHistoryView(activeView) === "day" ? Number(selectedValue) : Number.NaN;
+    const selectedDayRecord = Number.isFinite(selectedDay)
+      ? records.find((record) => record.dateKey === selectedDay)
+      : null;
+    return selectedDayRecord ? [selectedDayRecord] : buckets;
+  }
+
   export function getEnergyHistoryPanelModel() {
     const records = getEnergyHistoryRecords();
     const activeView = normalizeEnergyHistoryView(state.energyHistoryView);
     const periodControl = getEnergyHistoryPeriodControlModel(records, activeView);
     const viewModel = getEnergyHistoryCalendarBuckets(records, activeView, periodControl);
-    const summary = getEnergyHistorySummary(viewModel.buckets);
+    // Hour buckets provide chart detail; day cards must keep using the authoritative day total.
+    const summaryRecords = getEnergyHistorySummaryRecords(
+      records,
+      viewModel.buckets,
+      activeView,
+      periodControl.selectedValue,
+    );
+    const summary = getEnergyHistorySummary(summaryRecords);
     return { records, buckets: viewModel.buckets, viewModel, periodControl, summary, activeView };
   }
 

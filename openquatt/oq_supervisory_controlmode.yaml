@@ -145,6 +145,12 @@ globals:
     restore_value: false
     initial_value: '0'  # 0,1,2,3,5,98
 
+  # Attribute all electrical input from cooling preflow through postflow to the cooling session.
+  - id: oq_cooling_energy_session_active
+    type: bool
+    restore_value: false
+    initial_value: 'false'
+
   # ----------------------------
   # Power limiter (duo current guard) - total demand cap
   # Cap is applied to total filtered demand f (0..20) before HP split.
@@ -1366,6 +1372,14 @@ interval:
           const int desired = resolve_desired_cm();
           const char* desired_cm = cm_code_to_id(desired);
           id(oq_control_mode_code) = desired;
+          const bool cooling_preflow =
+              desired == 1 && (cooling_req || id(oq_cm1_next_after) == 5);
+          if (desired == 5 || cooling_preflow) {
+            id(oq_cooling_energy_session_active) = true;
+          } else if (desired != 1 || id(oq_cm1_next_after) != 0) {
+            // Keep the cooling session latched only during CM1 postflow to CM0.
+            id(oq_cooling_energy_session_active) = false;
+          }
           // -------------------------------------------------
           // 5) Publish CM (writes-only-on-change)
           // -------------------------------------------------
