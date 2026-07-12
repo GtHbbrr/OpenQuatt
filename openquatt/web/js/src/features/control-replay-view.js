@@ -850,10 +850,10 @@ import { replaceOuterHtmlIfSignatureChanged } from "../views/view-utils.js";
 
   function getControlWorkingActiveStartupInhibit(nowMs = Date.now()) {
     const events = getDecisionLogEvents()
-      .filter((event) => ["startup_inhibit_start", "startup_inhibit_clear"].includes(String(event?.event_type || "")))
+      .filter((event) => ["startup_inhibit_start", "startup_inhibit_refresh", "startup_inhibit_clear"].includes(String(event?.event_type || "")))
       .sort((left, right) => Number(left?.uptime_s ?? left?.seq ?? 0) - Number(right?.uptime_s ?? right?.seq ?? 0));
     const latest = events[events.length - 1];
-    if (!latest || String(latest.event_type) !== "startup_inhibit_start") {
+    if (!latest || !["startup_inhibit_start", "startup_inhibit_refresh"].includes(String(latest.event_type))) {
       return null;
     }
     const startedEpochMs = getDecisionEventEpochMs(latest);
@@ -1500,6 +1500,15 @@ import { replaceOuterHtmlIfSignatureChanged } from "../views/view-utils.js";
         next: "Bij aanhoudende vraag gaat de controller automatisch verder met de gekozen warmtepomp.",
         checks: ["Wachttijd verstreken", "Start weer toegestaan", "Regeling gaat verder"],
       },
+      startup_inhibit_refresh: {
+        title: Number(event?.value_a) === 1 ? "Koelvraag tijdens wachttijd gewijzigd" : "Warmtevraag tijdens wachttijd gewijzigd",
+        reasonLabel: "Wachttijd blijft actief",
+        reasonSummary: "De gekozen warmtepomp of doelmodus veranderde, maar de wachttijd na de herstart loopt door.",
+        summary: "De controller heeft de actuele vraag opnieuw beoordeeld. De compressor blijft wachten tot dezelfde wachttijd voorbij is.",
+        detail: "Tijdens de wachttijd veranderde welke warmtepomp of doelmodus gewenst is. De blokkering is niet opgeheven; alleen de context van de wachtperiode is bijgewerkt.",
+        next: "Zodra de wachttijd voorbij is, mag de dan gekozen warmtepomp automatisch starten.",
+        checks: ["Vraag opnieuw beoordeeld", "Wachttijd blijft actief", "Start volgt automatisch"],
+      },
       defrost_seen_start: {
         title: `Ontdooien gestart (${subject})`,
         summary: `${subject} ontdooit kort. Dat is normaal bij koud en vochtig weer.`,
@@ -1697,7 +1706,7 @@ import { replaceOuterHtmlIfSignatureChanged } from "../views/view-utils.js";
       checks: Array.isArray(copy.checks) ? copy.checks : null,
       timelineHidden: ((eventType === "source_start" || eventType === "topology_change") && contextCm === 5) ||
         (eventType === "source_stop" && (event?._oq_cooling_stop_reason === "dew_stop" || reasonCode === "dew_stop")) ||
-        eventType === "startup_inhibit_start" || eventType === "startup_inhibit_clear",
+        eventType === "startup_inhibit_start" || eventType === "startup_inhibit_refresh" || eventType === "startup_inhibit_clear",
     };
   }
 
@@ -1833,6 +1842,9 @@ import { replaceOuterHtmlIfSignatureChanged } from "../views/view-utils.js";
           closeInterval("frost", event);
         } else if (eventType === "startup_inhibit_start") {
           openInterval("startupInhibit", event);
+        } else if (eventType === "startup_inhibit_refresh") {
+          closeInterval("startupInhibit", event);
+          openInterval("startupInhibit", event);
         } else if (eventType === "startup_inhibit_clear") {
           closeInterval("startupInhibit", event);
         } else if (eventType === "flow_hold_clear" && event.reason === "flow_postflow") {
@@ -1874,6 +1886,7 @@ import { replaceOuterHtmlIfSignatureChanged } from "../views/view-utils.js";
     intervals.startupInhibit.forEach((interval, index) => {
       const targetMode = Number(interval.startEvent?.value_a) || 0;
       const coolingWait = targetMode === 1;
+      const contextRefreshed = String(interval.endEvent?.event_type || "") === "startup_inhibit_refresh";
       addItem(createControlWorkingDerivedSpan({
         id: `fw-span-startup-inhibit-${index}-${interval.startEvent?.seq || interval.startEpochMs}`,
         startEpochMs: interval.startEpochMs,
@@ -1890,6 +1903,8 @@ import { replaceOuterHtmlIfSignatureChanged } from "../views/view-utils.js";
           ? coolingWait
             ? "De warmtepomp start automatisch met koelen zodra de wachttijd voorbij is."
             : "De warmtepomp start automatisch met verwarmen zodra de wachttijd voorbij is."
+          : contextRefreshed
+          ? "De gewenste warmtepomp of doelmodus veranderde, maar de wachttijd bleef actief."
           : "Na deze periode ging de normale regeling automatisch verder.",
         source: getDecisionModeSubjectLabel(interval.startEvent?.subject, coolingWait ? 5 : 2),
         reasonCode: "startup_inhibit",

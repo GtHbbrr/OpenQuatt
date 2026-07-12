@@ -854,31 +854,47 @@ interval:
           auto update_startup_inhibit_event = [&](int target_mode_code, int desired_hp1, int desired_hp2)->void {
             const bool has_request = desired_hp1 > 0 || desired_hp2 > 0;
             const bool blocks_request = startup_inhibit_active && has_request;
-            if (blocks_request && !id(oq_boot_startup_inhibit_event_active)) {
-              const uint8_t subject = desired_hp1 > 0 && desired_hp2 > 0
-                  ? openquatt_decision_log::SUBJECT_BOTH
-                  : desired_hp1 > 0
-                  ? openquatt_decision_log::SUBJECT_HP1
-                  : openquatt_decision_log::SUBJECT_HP2;
-              const uint32_t remaining_s = id(oq_boot_startup_inhibit_until_ms) > now_ms
-                  ? (id(oq_boot_startup_inhibit_until_ms) - now_ms + 999UL) / 1000UL
-                  : 0;
-              id(oq_boot_startup_inhibit_event_active) = true;
-              id(oq_boot_startup_inhibit_event_started_ms) = now_ms;
-              id(oq_boot_startup_inhibit_event_subject) = subject;
-              id(oq_boot_startup_inhibit_event_mode) = (uint8_t) std::max(0, std::min(255, target_mode_code));
+            const uint8_t requested_subject = desired_hp1 > 0 && desired_hp2 > 0
+                ? openquatt_decision_log::SUBJECT_BOTH
+                : desired_hp1 > 0
+                ? openquatt_decision_log::SUBJECT_HP1
+                : desired_hp2 > 0
+                ? openquatt_decision_log::SUBJECT_HP2
+                : openquatt_decision_log::SUBJECT_UNKNOWN;
+            const uint8_t requested_mode =
+                (uint8_t) std::max(0, std::min(255, target_mode_code));
+            const bool context_changed =
+                blocks_request &&
+                id(oq_boot_startup_inhibit_event_active) &&
+                (id(oq_boot_startup_inhibit_event_subject) != requested_subject ||
+                 id(oq_boot_startup_inhibit_event_mode) != requested_mode);
+
+            if (context_changed) {
+              uint16_t duration_s = 0;
+              if (id(oq_boot_startup_inhibit_event_started_ms) > 0) {
+                const uint32_t elapsed_s = (now_ms - id(oq_boot_startup_inhibit_event_started_ms)) / 1000UL;
+                duration_s = elapsed_s > UINT16_MAX ? UINT16_MAX : (uint16_t) elapsed_s;
+              }
               id(oq_decision_log).emit(
-                  openquatt_decision_log::EVENT_STARTUP_INHIBIT_START,
-                  subject,
+                  openquatt_decision_log::EVENT_STARTUP_INHIBIT_REFRESH,
+                  requested_subject,
                   openquatt_decision_log::REASON_STARTUP_INHIBIT,
                   openquatt_decision_log::SEVERITY_NORMAL,
                   (uint8_t) std::max(0, std::min(255, cm_code)),
-                  openquatt_decision_log::STATE_STANDBY,
                   openquatt_decision_log::STATE_BLOCKED,
-                  (int16_t) target_mode_code,
-                  (int16_t) std::min<uint32_t>(remaining_s, INT16_MAX),
-                  (int16_t) std::min<uint32_t>((uint32_t) ${oq_hp_min_off_s}, INT16_MAX));
-            } else if (!blocks_request && id(oq_boot_startup_inhibit_event_active)) {
+                  openquatt_decision_log::STATE_BLOCKED,
+                  (int16_t) requested_mode,
+                  (int16_t) std::min<uint32_t>(
+                      id(oq_boot_startup_inhibit_until_ms) > now_ms
+                          ? (id(oq_boot_startup_inhibit_until_ms) - now_ms + 999UL) / 1000UL
+                          : 0,
+                      INT16_MAX),
+                  (int16_t) std::min<uint32_t>((uint32_t) ${oq_hp_min_off_s}, INT16_MAX),
+                  duration_s);
+              id(oq_boot_startup_inhibit_event_started_ms) = now_ms;
+              id(oq_boot_startup_inhibit_event_subject) = requested_subject;
+              id(oq_boot_startup_inhibit_event_mode) = requested_mode;
+            } else if (id(oq_boot_startup_inhibit_event_active) && !blocks_request) {
               uint16_t duration_s = 0;
               if (id(oq_boot_startup_inhibit_event_started_ms) > 0) {
                 const uint32_t elapsed_s = (now_ms - id(oq_boot_startup_inhibit_event_started_ms)) / 1000UL;
@@ -891,7 +907,9 @@ interval:
                   openquatt_decision_log::SEVERITY_NORMAL,
                   (uint8_t) std::max(0, std::min(255, cm_code)),
                   openquatt_decision_log::STATE_BLOCKED,
-                  has_request ? openquatt_decision_log::STATE_ACTIVE : openquatt_decision_log::STATE_STANDBY,
+                  has_request
+                      ? openquatt_decision_log::STATE_ACTIVE
+                      : openquatt_decision_log::STATE_STANDBY,
                   (int16_t) id(oq_boot_startup_inhibit_event_mode),
                   0,
                   (int16_t) std::min<uint32_t>((uint32_t) ${oq_hp_min_off_s}, INT16_MAX),
@@ -900,6 +918,27 @@ interval:
               id(oq_boot_startup_inhibit_event_started_ms) = 0;
               id(oq_boot_startup_inhibit_event_subject) = openquatt_decision_log::SUBJECT_UNKNOWN;
               id(oq_boot_startup_inhibit_event_mode) = 0;
+            }
+
+            if (blocks_request && !id(oq_boot_startup_inhibit_event_active)) {
+              const uint32_t remaining_s = id(oq_boot_startup_inhibit_until_ms) > now_ms
+                  ? (id(oq_boot_startup_inhibit_until_ms) - now_ms + 999UL) / 1000UL
+                  : 0;
+              id(oq_boot_startup_inhibit_event_active) = true;
+              id(oq_boot_startup_inhibit_event_started_ms) = now_ms;
+              id(oq_boot_startup_inhibit_event_subject) = requested_subject;
+              id(oq_boot_startup_inhibit_event_mode) = requested_mode;
+              id(oq_decision_log).emit(
+                  openquatt_decision_log::EVENT_STARTUP_INHIBIT_START,
+                  requested_subject,
+                  openquatt_decision_log::REASON_STARTUP_INHIBIT,
+                  openquatt_decision_log::SEVERITY_NORMAL,
+                  (uint8_t) std::max(0, std::min(255, cm_code)),
+                  openquatt_decision_log::STATE_STANDBY,
+                  openquatt_decision_log::STATE_BLOCKED,
+                  (int16_t) target_mode_code,
+                  (int16_t) std::min<uint32_t>(remaining_s, INT16_MAX),
+                  (int16_t) std::min<uint32_t>((uint32_t) ${oq_hp_min_off_s}, INT16_MAX));
             }
           };
 

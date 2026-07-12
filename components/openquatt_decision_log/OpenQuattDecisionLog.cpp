@@ -459,6 +459,7 @@ const char *OpenQuattDecisionLog::event_type_to_string_(uint8_t value) {
     case EVENT_FLOW_HOLD_CLEAR: return "flow_hold_clear";
     case EVENT_STARTUP_INHIBIT_START: return "startup_inhibit_start";
     case EVENT_STARTUP_INHIBIT_CLEAR: return "startup_inhibit_clear";
+    case EVENT_STARTUP_INHIBIT_REFRESH: return "startup_inhibit_refresh";
     default: return "unknown";
   }
 }
