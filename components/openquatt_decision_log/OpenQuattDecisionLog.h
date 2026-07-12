@@ -4,15 +4,20 @@
 #include <cstdint>
 
 #include <esp_http_server.h>
+#include "OpenQuattFlashLayout.h"
+#include "esp_partition.h"
 #include <freertos/FreeRTOS.h>
 #include <freertos/portmacro.h>
 
+#include "esphome/components/switch/switch.h"
 #include "esphome/components/time/real_time_clock.h"
 #include "esphome/components/web_server_base/web_server_base.h"
 #include "esphome/core/component.h"
 
 namespace esphome {
 namespace openquatt_decision_log {
+
+using openquatt_common::OpenQuattFlashLayout;
 
 enum EventType : uint8_t {
   EVENT_UNKNOWN = 0,
@@ -132,6 +137,7 @@ struct DecisionEvent {
 
 struct HourBucket {
   uint64_t hour_start_uptime_s{0};
+  uint32_t hour_start_epoch_s{0};
   uint16_t starts_hp1{0};
   uint16_t starts_hp2{0};
   uint16_t stops_hp1{0};
@@ -162,12 +168,15 @@ class OpenQuattDecisionLog : public Component {
   ~OpenQuattDecisionLog();
 
   void set_clock(time::RealTimeClock *clock) { this->clock_ = clock; }
+  void set_flash_switch(switch_::Switch *flash_switch) { this->flash_switch_ = flash_switch; }
   void set_event_capacity(size_t capacity) { this->event_capacity_requested_ = capacity; }
   void set_event_fallback_capacity(size_t capacity) { this->event_capacity_fallback_ = capacity; }
   void set_hour_bucket_capacity(size_t capacity) { this->bucket_capacity_requested_ = capacity; }
   void set_hour_bucket_fallback_capacity(size_t capacity) { this->bucket_capacity_fallback_ = capacity; }
 
   void setup() override;
+  void loop() override;
+  void on_shutdown() override;
   void dump_config() override;
   float get_setup_priority() const override;
 
@@ -185,13 +194,83 @@ class OpenQuattDecisionLog : public Component {
             uint8_t flags = 0);
 
   void write_decision_log(httpd_req_t *req) const;
+  void write_metadata(httpd_req_t *req) const;
+  void set_flash_enabled(bool enabled);
+  bool force_flush();
+  bool clear_flash_history();
 
  protected:
+  static constexpr uint32_t FLASH_TAG_MAGIC = 0x4F444C47;  // "ODLG"
+  static constexpr uint16_t FLASH_TAG_VERSION = 2;
+  static constexpr size_t FLASH_PARTITION_OFFSET = OpenQuattFlashLayout::DECISION_LOG_OFFSET;
+  static constexpr size_t FLASH_SECTOR_SIZE = OpenQuattFlashLayout::SECTOR_SIZE;
+  static constexpr size_t FLASH_SLOT_SIZE = 512;
+  static constexpr size_t FLASH_SLOTS_PER_SECTOR = 8;
+  static constexpr size_t FLASH_SECTOR_COUNT = OpenQuattFlashLayout::DECISION_LOG_SECTOR_COUNT;
+  static constexpr size_t FLASH_SLOT_COUNT = FLASH_SLOTS_PER_SECTOR * FLASH_SECTOR_COUNT;
+  static constexpr size_t FLASH_TOTAL_BYTES = FLASH_SECTOR_SIZE * FLASH_SECTOR_COUNT;
+  static constexpr size_t FLASH_EVENTS_PER_SLOT = 20;
+  static constexpr size_t FLASH_EVENT_CAPACITY = FLASH_SLOT_COUNT * FLASH_EVENTS_PER_SLOT;
+  static constexpr uint32_t RETENTION_SECONDS = 7UL * 24UL * 60UL * 60UL;
+
+  static_assert(FLASH_EVENT_CAPACITY == 5120, "Decision-log flash ring capacity changed unexpectedly");
+  static_assert(FLASH_PARTITION_OFFSET % FLASH_SECTOR_SIZE == 0,
+                "Decision-log flash region must start on a sector boundary");
+  static_assert(FLASH_SLOT_SIZE * FLASH_SLOTS_PER_SECTOR == FLASH_SECTOR_SIZE,
+                "Decision-log flash slots must fit in sectors");
+
+  struct __attribute__((packed)) FlashEventRecord {
+    uint32_t seq;
+    uint32_t epoch_s;
+    int16_t value_a;
+    int16_t value_b;
+    int16_t threshold_a;
+    uint16_t duration_s;
+    uint8_t event_type;
+    uint8_t subject;
+    uint8_t reason_code;
+    uint8_t severity;
+    uint8_t control_mode_code;
+    uint8_t from_state;
+    uint8_t to_state;
+    uint8_t flags;
+  };
+
+  struct __attribute__((packed)) FlashBlockHeader {
+    uint32_t magic;
+    uint16_t version;
+    uint16_t event_count;
+    uint32_t block_sequence;
+    uint32_t write_epoch_s;
+    uint32_t first_event_seq;
+    uint32_t first_epoch_s;
+    uint32_t last_epoch_s;
+    uint32_t crc32;
+  };
+
+  struct FlashBlockInfo {
+    uint32_t block_sequence{0};
+    uint32_t write_epoch_s{0};
+    uint32_t first_event_seq{0};
+    uint32_t first_epoch_s{0};
+    uint32_t last_epoch_s{0};
+    uint16_t event_count{0};
+    uint32_t slot_index{0};
+  };
+
+  static_assert(sizeof(FlashEventRecord) == 24, "Decision-log flash event must stay compact");
+  static_assert(sizeof(FlashBlockHeader) == 32, "Decision-log flash header must stay packed");
+  static_assert(sizeof(FlashBlockHeader) + (sizeof(FlashEventRecord) * FLASH_EVENTS_PER_SLOT) == FLASH_SLOT_SIZE,
+                "Decision-log event block must fill one flash slot");
+
   time::RealTimeClock *clock_{nullptr};
+  switch_::Switch *flash_switch_{nullptr};
+  const esp_partition_t *flash_partition_{nullptr};
   DecisionEvent *events_{nullptr};
   HourBucket *buckets_{nullptr};
-  size_t event_capacity_requested_{512};
-  size_t event_capacity_fallback_{64};
+  FlashBlockInfo *flash_index_{nullptr};
+  size_t event_capacity_requested_{FLASH_EVENT_CAPACITY};
+  size_t event_capacity_fallback_{128};
   size_t bucket_capacity_requested_{168};
   size_t bucket_capacity_fallback_{24};
   size_t event_capacity_{0};
@@ -202,6 +281,16 @@ class OpenQuattDecisionLog : public Component {
   uint32_t dropped_count_{0};
   bool events_external_{false};
   bool buckets_external_{false};
+  bool flash_enabled_{false};
+  bool flash_archive_scanned_{false};
+  size_t flash_index_count_{0};
+  uint32_t next_flash_sequence_{0};
+  uint32_t last_persisted_event_seq_{0};
+  uint32_t flash_oldest_epoch_s_{0};
+  uint32_t flash_newest_epoch_s_{0};
+  uint32_t flash_last_flush_epoch_s_{0};
+  uint32_t flash_stored_event_count_{0};
+  uint32_t tracked_hour_start_epoch_s_{0};
   mutable portMUX_TYPE mux_ = portMUX_INITIALIZER_UNLOCKED;
 
   bool time_is_valid_() const;
@@ -212,9 +301,25 @@ class OpenQuattDecisionLog : public Component {
   void allocate_buffers_();
   void push_event_locked_(const DecisionEvent &event);
   void update_bucket_locked_(const DecisionEvent &event);
-  HourBucket *current_bucket_locked_(uint64_t uptime_s);
+  HourBucket *current_bucket_locked_(uint64_t uptime_s, uint32_t epoch_s, bool *created = nullptr);
   bool copy_event_(size_t index, DecisionEvent *out) const;
   bool copy_bucket_(size_t index, HourBucket *out) const;
+  bool copy_flash_info_(size_t index, FlashBlockInfo *out) const;
+  bool flash_switch_enabled_() const;
+  bool flash_partition_available_() const;
+  bool flash_archive_available_() const;
+  bool scan_flash_archive_();
+  bool read_flash_block_(uint32_t slot_index, uint32_t expected_sequence, FlashBlockInfo *info,
+                         FlashEventRecord *events) const;
+  bool write_flash_events_(const DecisionEvent *events, size_t event_count);
+  bool flush_pending_events_();
+  void restore_flash_events_();
+  void initialize_current_hour_();
+  void reset_flash_metadata_();
+  void rebuild_flash_metadata_();
+  static FlashEventRecord pack_flash_event_(const DecisionEvent &event);
+  static DecisionEvent unpack_flash_event_(const FlashEventRecord &event);
+  static uint32_t fnv1a_hash_(const uint8_t *data, size_t len);
 
   static const char *event_type_to_string_(uint8_t value);
   static const char *subject_to_string_(uint8_t value);

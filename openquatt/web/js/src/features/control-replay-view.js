@@ -851,7 +851,7 @@ import { replaceOuterHtmlIfSignatureChanged } from "../views/view-utils.js";
   function getControlWorkingActiveStartupInhibit(nowMs = Date.now()) {
     const events = getDecisionLogEvents()
       .filter((event) => ["startup_inhibit_start", "startup_inhibit_refresh", "startup_inhibit_clear"].includes(String(event?.event_type || "")))
-      .sort((left, right) => Number(left?.uptime_s ?? left?.seq ?? 0) - Number(right?.uptime_s ?? right?.seq ?? 0));
+      .sort(compareDecisionEvents);
     const latest = events[events.length - 1];
     if (!latest || !["startup_inhibit_start", "startup_inhibit_refresh"].includes(String(latest.event_type))) {
       return null;
@@ -1037,6 +1037,26 @@ import { replaceOuterHtmlIfSignatureChanged } from "../views/view-utils.js";
       return (bootEpochS + uptimeS) * 1000;
     }
     return Number.NaN;
+  }
+
+  function getDecisionEventSortValue(event) {
+    const epochMs = getDecisionEventEpochMs(event);
+    if (Number.isFinite(epochMs)) {
+      return epochMs / 1000;
+    }
+    const uptimeS = Number(event?.uptime_s);
+    if (Number.isFinite(uptimeS)) {
+      return uptimeS;
+    }
+    return Number(event?.seq) || 0;
+  }
+
+  function compareDecisionEvents(left, right) {
+    const timeDifference = getDecisionEventSortValue(left) - getDecisionEventSortValue(right);
+    if (timeDifference !== 0) {
+      return timeDifference;
+    }
+    return (Number(left?.seq) || 0) - (Number(right?.seq) || 0);
   }
 
   function getDecisionEventAgeMinutes(event, nowMs = Date.now()) {
@@ -1800,11 +1820,13 @@ import { replaceOuterHtmlIfSignatureChanged } from "../views/view-utils.js";
 
     events
       .filter((event) => event && !event._oq_hidden)
-      .sort((left, right) => Number(left?.uptime_s ?? left?.seq ?? 0) - Number(right?.uptime_s ?? right?.seq ?? 0))
+      .sort(compareDecisionEvents)
       .forEach((event) => {
         const eventType = String(event?.event_type || "");
         const contextCm = Number(event?._oq_context_cm ?? event?.cm);
-        if (eventType === "source_start") {
+        if (eventType === "boot_marker") {
+          Object.keys(open).forEach((key) => closeInterval(key, event));
+        } else if (eventType === "source_start") {
           sourceKeys(event.subject).forEach((key) => openInterval(key, event));
           if (contextCm === 5) {
             openInterval("cooling", event);
@@ -2011,11 +2033,7 @@ import { replaceOuterHtmlIfSignatureChanged } from "../views/view-utils.js";
   }
 
   function enrichControlWorkingDecisionLogEvents(events) {
-    const sorted = [...events].sort((left, right) => {
-      const leftTime = Number(left?.uptime_s ?? left?.seq ?? 0);
-      const rightTime = Number(right?.uptime_s ?? right?.seq ?? 0);
-      return leftTime - rightTime;
-    });
+    const sorted = [...events].sort(compareDecisionEvents);
     const activeSourceCm = { HP1: 0, HP2: 0 };
     const defrostOpen = { HP1: false, HP2: false };
     let activeTopologyCm = 0;
@@ -2031,11 +2049,11 @@ import { replaceOuterHtmlIfSignatureChanged } from "../views/view-utils.js";
       return normalized === "HP1" || normalized === "HP2" ? [normalized] : [];
     };
     const upcomingFlowContextCm = (index) => {
-      const currentUptime = Number(sorted[index]?.uptime_s);
+      const currentTime = getDecisionEventSortValue(sorted[index]);
       for (let offset = 1; offset <= 6 && index + offset < sorted.length; offset += 1) {
         const next = sorted[index + offset];
-        const nextUptime = Number(next?.uptime_s);
-        if (Number.isFinite(currentUptime) && Number.isFinite(nextUptime) && nextUptime - currentUptime > 300) {
+        const nextTime = getDecisionEventSortValue(next);
+        if (Number.isFinite(currentTime) && Number.isFinite(nextTime) && nextTime - currentTime > 300) {
           break;
         }
         const nextType = String(next?.event_type || "");
@@ -2058,6 +2076,16 @@ import { replaceOuterHtmlIfSignatureChanged } from "../views/view-utils.js";
       const subject = String(event?.subject || "").toUpperCase();
       const reason = String(event?.reason || "");
       const cm = Number(event?.cm) || 0;
+      if (eventType === "boot_marker") {
+        activeSourceCm.HP1 = 0;
+        activeSourceCm.HP2 = 0;
+        defrostOpen.HP1 = false;
+        defrostOpen.HP2 = false;
+        activeTopologyCm = 0;
+        activeFlowCm = 0;
+        previousModeCm = 0;
+        pendingCoolingStopReason = "";
+      }
       let contextCm = cm;
       let hidden = false;
       let activeCoolingSource = "";
@@ -2157,9 +2185,6 @@ import { replaceOuterHtmlIfSignatureChanged } from "../views/view-utils.js";
 
   function getControlWorkingDecisionLogItems() {
     const events = getDecisionLogEvents();
-    if (!events.length) {
-      return [];
-    }
     const selectedWindow = getControlWorkingSelectedWindow();
     const nowMs = Date.now();
     const enrichedEvents = enrichControlWorkingDecisionLogEvents(events);

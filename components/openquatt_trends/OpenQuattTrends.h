@@ -5,6 +5,7 @@
 #include <string>
 
 #include <esp_http_server.h>
+#include "OpenQuattFlashLayout.h"
 #include "esp_partition.h"
 #include "PsramBuffer.h"
 #include "esphome/components/switch/switch.h"
@@ -16,6 +17,7 @@ namespace esphome {
 namespace openquatt_trends {
 
 using openquatt_common::PsramBuffer;
+using openquatt_common::OpenQuattFlashLayout;
 
 class ChunkedTextWriter;
 
@@ -53,11 +55,11 @@ class OpenQuattTrends : public Component {
   static constexpr uint32_t RAM_WINDOW_MS = 7UL * 24UL * 60UL * 60UL * 1000UL;
   static constexpr uint32_t ARCHIVE_WINDOW_MS = 30UL * 24UL * 60UL * 60UL * 1000UL;
   static constexpr size_t RAM_CAPACITY = 7UL * 24UL * 12UL;
-  static constexpr size_t FLASH_SECTOR_SIZE = 4096;
+  static constexpr size_t FLASH_SECTOR_SIZE = OpenQuattFlashLayout::SECTOR_SIZE;
   static constexpr size_t FLASH_SLOT_SIZE = 512;
   static constexpr size_t FLASH_SAMPLES_PER_BLOCK = 12;
   static constexpr size_t FLASH_SLOTS_PER_SECTOR = 8;
-  static constexpr size_t FLASH_SECTOR_COUNT = 90;
+  static constexpr size_t FLASH_SECTOR_COUNT = OpenQuattFlashLayout::TRENDS_SECTOR_COUNT;
   static constexpr size_t FLASH_SLOT_COUNT = FLASH_SLOTS_PER_SECTOR * FLASH_SECTOR_COUNT;
   static constexpr size_t FLASH_TOTAL_BYTES = FLASH_SECTOR_SIZE * FLASH_SECTOR_COUNT;
 

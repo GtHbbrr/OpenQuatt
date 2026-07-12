@@ -731,8 +731,23 @@
     });
   }
 
-  function handleDecisionLog() {
+  function handleDecisionLog(url = null) {
     const nowMs = Date.now();
+    if (url?.searchParams?.get("meta")) {
+      return mockResponse(200, {
+        ok: true,
+        enabled: true,
+        available: true,
+        stored_events: 2840,
+        capacity_events: 5120,
+        retention_days: 7,
+        oldest_epoch_s: Math.floor((nowMs - (7 * 24 * 60 * 60 * 1000)) / 1000),
+        newest_epoch_s: Math.floor((nowMs - (60 * 60 * 1000)) / 1000),
+        last_flush_epoch_s: Math.floor((nowMs - (18 * 60 * 1000)) / 1000),
+        storage_bytes: 131072,
+        write_count: 482,
+      });
+    }
     const decisionLogBootedAt = nowMs - (8 * 24 * 60 * 60 * 1000);
     const bootEpochS = Math.floor(decisionLogBootedAt / 1000);
     const uptimeS = Math.max(0, Math.floor((nowMs - decisionLogBootedAt) / 1000));
@@ -884,6 +899,8 @@
       }
       buckets.push({
         hour_start_uptime_s: hourStartUptimeS,
+        hour_start_epoch_s: Math.floor((nowMs - (ageHours * 3600000)) / 3600000) * 3600,
+        source: ageHours === 0 ? "ram" : "flash",
         starts_hp1: bucketEvents.filter((event) => event.event_type === "source_start" && event.subject === "HP1").length,
         starts_hp2: bucketEvents.filter((event) => event.event_type === "source_start" && event.subject === "HP2").length,
         stops_hp1: bucketEvents.filter((event) => event.event_type === "source_stop" && event.subject === "HP1").length,
@@ -911,10 +928,12 @@
       storage: {
         events: "psram",
         buckets: "psram",
-        event_capacity: 512,
-        event_requested: 512,
+        event_capacity: 5120,
+        event_requested: 5120,
         bucket_capacity: 168,
         bucket_requested: 168,
+        event_archive: "flash",
+        flash_enabled: true,
       },
       meta: {
         event_record_size: 32,
@@ -926,6 +945,12 @@
         internal_heap_free: 87000,
         internal_heap_min: 72000,
         psram_free: 7400000,
+        flash_stored_events: events.length,
+        flash_oldest_epoch_s: Math.floor((nowMs - (7 * 24 * 60 * 60 * 1000)) / 1000),
+        flash_newest_epoch_s: Math.floor((nowMs - (60 * 60 * 1000)) / 1000),
+        flash_last_flush_epoch_s: Math.floor((nowMs - (18 * 60 * 1000)) / 1000),
+        flash_storage_bytes: 131072,
+        flash_write_count: 482,
       },
       events,
       buckets: buckets.sort((left, right) => left.hour_start_uptime_s - right.hour_start_uptime_s),
@@ -4495,7 +4520,7 @@
         return handleServiceStatus();
       }
       if (url.pathname.endsWith("/openquatt/decision-log") && method === "GET") {
-        return handleDecisionLog();
+        return handleDecisionLog(url);
       }
       if (url.pathname.endsWith("/openquatt/entities") && String(init?.method || "GET").toUpperCase() === "POST") {
         return handleBulkEntities(init || {});

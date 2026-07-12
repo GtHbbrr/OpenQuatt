@@ -65,6 +65,65 @@ import { render } from "../core/render-scheduler.js";
     };
   }
 
+  export function parseDecisionLogStorageMetadata(payload = {}) {
+    return {
+      enabled: payload?.enabled === true,
+      available: payload?.available === true,
+      storedEvents: Math.max(0, Number(payload?.stored_events) || 0),
+      capacityEvents: Math.max(0, Number(payload?.capacity_events) || 5120),
+      retentionDays: Math.max(0, Number(payload?.retention_days) || 7),
+      oldestEpochS: Math.max(0, Number(payload?.oldest_epoch_s) || 0),
+      newestEpochS: Math.max(0, Number(payload?.newest_epoch_s) || 0),
+      lastFlushEpochS: Math.max(0, Number(payload?.last_flush_epoch_s) || 0),
+      storageBytes: Math.max(0, Number(payload?.storage_bytes) || 0),
+      writeCount: Math.max(0, Number(payload?.write_count) || 0),
+    };
+  }
+
+  export async function refreshDecisionLogStorageMetadata(options = {}) {
+    const force = options.force === true;
+    const now = Date.now();
+    if (!force && state.decisionLogStorageMetadataFetchPromise) {
+      return state.decisionLogStorageMetadataFetchPromise;
+    }
+    if (!force && (state.decisionLogStorageMetadataSignature || state.decisionLogStorageMetadataError) &&
+        (now - Number(state.decisionLogStorageMetadataLastFetchAt || 0)) < TREND_HISTORY_REFRESH_INTERVAL_MS) {
+      return false;
+    }
+
+    state.decisionLogStorageMetadataFetchPromise = (async () => {
+      const response = await fetch(`${getBasePath()}/openquatt/decision-log?meta=1`, { cache: "no-store" });
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      const payload = await response.json();
+      if (!payload?.ok) {
+        throw new Error("ongeldig antwoord");
+      }
+      const signature = JSON.stringify(payload);
+      const changed = signature !== state.decisionLogStorageMetadataSignature || state.decisionLogStorageMetadataError !== "";
+      state.decisionLogStorageMetadata = parseDecisionLogStorageMetadata(payload);
+      state.decisionLogStorageMetadataError = "";
+      state.decisionLogStorageMetadataSignature = signature;
+      state.decisionLogStorageMetadataLastFetchAt = Date.now();
+      return changed;
+    })();
+
+    try {
+      return await state.decisionLogStorageMetadataFetchPromise;
+    } catch (error) {
+      const nextError = `Beslisloghistorie kon niet worden geladen. ${error.message}`;
+      const changed = state.decisionLogStorageMetadataError !== nextError;
+      state.decisionLogStorageMetadata = {};
+      state.decisionLogStorageMetadataError = nextError;
+      state.decisionLogStorageMetadataSignature = "";
+      state.decisionLogStorageMetadataLastFetchAt = Date.now();
+      return changed;
+    } finally {
+      state.decisionLogStorageMetadataFetchPromise = null;
+    }
+  }
+
   export function parseTrendHistoryMetadata(raw) {
     const metadata = getEmptyTrendHistoryMetadata();
     String(raw || "").split(/\r?\n/).forEach((line) => {
@@ -144,6 +203,7 @@ import { render } from "../core/render-scheduler.js";
     });
     await Promise.all([
       refreshTrendHistoryMetadata({ force: options.forceTrendHistory === true }),
+      refreshDecisionLogStorageMetadata({ force: options.forceDecisionLog === true }),
       refreshEnergyHistoryData({ force: options.forceEnergyHistory === true, metaOnly: true }),
     ]);
   }
@@ -157,6 +217,7 @@ import { render } from "../core/render-scheduler.js";
         void refreshSettingsStorageState({
           forceMissing: delayMs === 0,
           forceTrendHistory: options.forceTrendHistory === true,
+          forceDecisionLog: options.forceDecisionLog === true,
           forceEnergyHistory: options.forceEnergyHistory === true,
         }).finally(() => {
           if (state.appView === "settings" && state.mounted && !state.nativeOpen) {
@@ -1555,6 +1616,31 @@ import { render } from "../core/render-scheduler.js";
         refreshSettingsStorageStateSoon(undefined, { forceTrendHistory: true });
       });
     },
+    "flush-decision-log-history": ({ triggerNamedButton }) => {
+      return triggerNamedButton("decisionLogHistoryFlush", {
+        successNotice: "Beslisloghistorie is opgeslagen.",
+        errorPrefix: "Beslisloghistorie kon niet worden opgeslagen",
+        refreshKeys: getSettingsStorageRefreshKeys(),
+        refreshDelayMs: 500,
+      }).then(() => {
+        state.decisionLogStorageMetadataLastFetchAt = 0;
+        refreshSettingsStorageStateSoon(undefined, { forceDecisionLog: true });
+      });
+    },
+    "clear-decision-log-history": ({ triggerNamedButton }) => {
+      if (!window.confirm("Beslisloghistorie wissen?\n\nAlle bewaarde gebeurtenissen worden verwijderd. De actuele beslislog blijft beschikbaar.")) {
+        return;
+      }
+      return triggerNamedButton("decisionLogHistoryClear", {
+        successNotice: "Beslisloghistorie is gewist.",
+        errorPrefix: "Beslisloghistorie kon niet worden gewist",
+        refreshKeys: getSettingsStorageRefreshKeys(),
+        refreshDelayMs: 500,
+      }).then(() => {
+        state.decisionLogStorageMetadataLastFetchAt = 0;
+        refreshSettingsStorageStateSoon(undefined, { forceDecisionLog: true });
+      });
+    },
     "save-lifetime-energy-history": ({ triggerNamedButton }) => {
       return triggerNamedButton("lifetimeEnergyHistoryCapture", {
         successNotice: "Energiehistorie is opgeslagen.",
@@ -1598,15 +1684,32 @@ import { render } from "../core/render-scheduler.js";
     "import-energy-history-file": () => importEnergyHistoryRecords(),
     "export-energy-history": () => exportEnergyHistoryRecords(),
     "open-history-storage-modal": () => {
+      state.settingsStoragePage = "overview";
       state.systemModal = "history-storage";
       render();
-      const refreshPromise = refreshSettingsStorageState({ forceMissing: true, forceTrendHistory: true, forceEnergyHistory: true }).finally(() => {
+      const refreshPromise = refreshSettingsStorageState({ forceMissing: true, forceTrendHistory: true, forceDecisionLog: true, forceEnergyHistory: true }).finally(() => {
         if (state.systemModal === "history-storage") {
           render();
         }
       });
       refreshSettingsStorageStateSoon([1000, 3000, 7000]);
       return refreshPromise;
+    },
+    "open-storage-diagnosis": () => {
+      state.settingsStoragePage = "diagnosis";
+      render();
+    },
+    "open-storage-decision-log": () => {
+      state.settingsStoragePage = "decision-log";
+      render();
+    },
+    "open-storage-energy": () => {
+      state.settingsStoragePage = "energy";
+      render();
+    },
+    "back-storage-overview": () => {
+      state.settingsStoragePage = "overview";
+      render();
     },
     "download-settings-backup": () => exportSettingsBackup(),
     "open-settings-backup-import": () => {

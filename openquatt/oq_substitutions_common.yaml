@@ -33,6 +33,7 @@ components_root: "../../components"                  # Custom component root rel
 scripts_root: "../../../scripts"                     # Build script root relative to the active config file.
 oq_cpp_headers_dir: "${openquatt_root}/includes"     # Copy and include the grouped OpenQuatt C++ runtime headers.
 oq_component_psram_buffer_header: "${components_root}/openquatt_common/PsramBuffer.h" # Shared PSRAM-backed buffer helper for custom components.
+oq_component_flash_layout_header: "${components_root}/openquatt_common/OpenQuattFlashLayout.h" # Shared openquatt_data archive layout.
 external_components_path: "${components_root}"      # Local custom component directory.
 oq_timezone: "Europe/Amsterdam"                         # SNTP timezone used by runtime timestamps.
 oq_webserver_css_include: "${openquatt_root}/web/css/openquatt-app.css" # Bundled OpenQuatt web UI stylesheet.

@@ -32,8 +32,9 @@ openquatt_entities:
 openquatt_decision_log:
   id: oq_decision_log
   clock: oq_time
-  event_capacity: 512
-  event_fallback_capacity: 64
+  flash_switch: oq_decision_log_flash_switch
+  event_capacity: 5120
+  event_fallback_capacity: 128
   hour_buckets: 168
   hour_buckets_fallback: 24
 

@@ -463,6 +463,8 @@ export async function triggerNamedButton(key, options = {}) {
       "manualHpStart",
       "manualHpAbort",
       "trendHistoryFlush",
+      "decisionLogHistoryFlush",
+      "decisionLogHistoryClear",
       "lifetimeEnergyHistoryCapture",
       "lifetimeEnergyHistoryClear",
     ].includes(key) || ODU_RUNTIME_FREQUENCY_BUTTON_KEYS.has(key);

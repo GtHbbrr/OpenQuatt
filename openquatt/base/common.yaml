@@ -16,6 +16,7 @@ esphome:
   includes:
     - ${oq_cpp_headers_dir}
     - ${oq_component_psram_buffer_header}
+    - ${oq_component_flash_layout_header}
   platformio_options:
     build_flags:
       # Hard-pinned by the topology entrypoint to prevent accidental topology drift.

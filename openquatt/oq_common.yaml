@@ -689,6 +689,32 @@ button:
           id(oq_trends_endpoint).force_flush();
 
   - platform: template
+    id: oq_decision_log_flush_button
+    name: Beslisloghistorie nu opslaan
+    internal: true
+    disabled_by_default: true
+    icon: mdi:content-save
+    entity_category: config
+    web_server:
+      sorting_group_id: oq_system_diagnostics
+    on_press:
+      - lambda: |-
+          id(oq_decision_log).force_flush();
+
+  - platform: template
+    id: oq_decision_log_clear_button
+    name: Beslisloghistorie wissen
+    internal: true
+    disabled_by_default: true
+    icon: mdi:delete-clock
+    entity_category: config
+    web_server:
+      sorting_group_id: oq_system_diagnostics
+    on_press:
+      - lambda: |-
+          id(oq_decision_log).clear_flash_history();
+
+  - platform: template
     id: oq_lifetime_energy_history_clear_button
     name: Lifetime energiehistorie wissen
     internal: true
@@ -787,6 +813,23 @@ switch:
     turn_off_action:
       - lambda: |-
           id(oq_trends_endpoint).set_flash_enabled(false);
+    web_server:
+      sorting_group_id: oq_system_diagnostics
+
+  - platform: template
+    id: oq_decision_log_flash_switch
+    name: Beslisloghistorie bewaren
+    internal: true
+    icon: mdi:timeline-clock-outline
+    entity_category: config
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_ON
+    turn_on_action:
+      - lambda: |-
+          id(oq_decision_log).set_flash_enabled(true);
+    turn_off_action:
+      - lambda: |-
+          id(oq_decision_log).set_flash_enabled(false);
     web_server:
       sorting_group_id: oq_system_diagnostics
 

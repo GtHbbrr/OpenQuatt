@@ -287,20 +287,21 @@ OpenTherm thermostat support is part of the Heatpump Controller Q profile only. 
 
 All active hardware profiles configure PSRAM with `ignore_not_found: false`. OpenQuatt therefore treats PSRAM as required hardware for supported profiles, not as an optional acceleration path. Missing PSRAM should surface as a hardware or profile mismatch instead of silently degrading Trends and LogHistory behavior.
 
-Trends uses a fixed flash archive inside the `openquatt_data` partition:
+Persistent histories use separate, sector-aligned regions inside `openquatt_data`. The shared layout is defined in
+`components/openquatt_common/OpenQuattFlashLayout.h` so one archive cannot silently grow into another:
 
-- `components/openquatt_trends` reserves 90 flash sectors of 4 KiB.
-- Total Trends flash archive size is 360 KiB.
-- The archive stores 720 hourly blocks, covering up to 30 days.
+| Archive | Maximum reserved space | Contents |
+|---|---:|---|
+| Trends | 360 KiB | 720 hourly blocks, up to 30 days |
+| Energy day totals | 1024 KiB | Long-term daily records |
+| Energy hour detail | 368 KiB | Up to 365 retained day records |
+| Decision log | 128 KiB | Up to 5120 exact events, limited to 7 days |
 
-The custom partition tables leave different data headroom:
-
-| Partition table | `openquatt_data` size | Trends archive | Remaining data partition space |
-|---|---:|---:|---:|
-| `openquatt_8mb.csv` | 1920 KiB | 360 KiB | 1560 KiB |
-| `openquatt_16mb.csv` | 6016 KiB | 360 KiB | 5656 KiB |
-
-The 8 MB profile uses the remaining flash after both OTA slots for `openquatt_data`. Keep any future data-partition features explicit about their storage budget.
+The decision log keeps exact events in PSRAM and writes new records to flash in hourly batches. Each compact flash
+record is 24 bytes and retains its timestamp, type, source, reason, mode, transition values and duration. The smallest
+`openquatt_data` partition is 1920 KiB; all maximum archive regions together use 1880 KiB and therefore leave 40 KiB
+unassigned. The 16 MB table leaves 4136 KiB unassigned. The decision-log region is checked at compile time against the
+smallest partition and at runtime against the partition actually present.
 
 
 ## 10. UI and Observability Organization

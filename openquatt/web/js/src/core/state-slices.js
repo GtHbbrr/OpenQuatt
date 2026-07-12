@@ -16,6 +16,11 @@ export function createHistoryState(trendWindowHours) {
     decisionLogSignature: "",
     decisionLogLastFetchAt: 0,
     decisionLogFetchPromise: null,
+    decisionLogStorageMetadata: {},
+    decisionLogStorageMetadataError: "",
+    decisionLogStorageMetadataSignature: "",
+    decisionLogStorageMetadataLastFetchAt: 0,
+    decisionLogStorageMetadataFetchPromise: null,
     trendWindowHours,
     trendHistoryRaw: "",
     trendHistoryError: "",
@@ -56,6 +61,7 @@ export function createHistoryState(trendWindowHours) {
     energyHistoryExportError: "",
     energyHistoryExportNotice: "",
     settingsStorageDetailsOpen: false,
+    settingsStoragePage: "overview",
     energyHistoryPeriodSelection: { day: "", week: "", month: "", year: "" },
   };
 }

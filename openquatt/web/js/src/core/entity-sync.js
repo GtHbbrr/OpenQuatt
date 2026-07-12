@@ -749,7 +749,10 @@ import { fetchWithTimeout } from "./browser-utils.js";
       lastEvent.epoch_s ?? "",
       buckets.length,
       lastBucket.hour_start_uptime_s ?? "",
+      lastBucket.hour_start_epoch_s ?? "",
+      lastBucket.source ?? "",
       lastBucket.attention_count ?? "",
+      payload?.meta?.flash_write_count ?? "",
     ].join("|");
   }
 

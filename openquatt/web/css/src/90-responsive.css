@@ -325,6 +325,25 @@
     width: 100%;
   }
 
+  .oq-settings-storage-modal {
+    width: calc(100vw - 18px);
+    max-width: calc(100vw - 18px);
+  }
+
+  .oq-settings-storage-hub-item {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .oq-settings-storage-hub-status {
+    justify-content: space-between;
+    text-align: left;
+  }
+
+  .oq-settings-storage-hub-status strong {
+    max-width: none;
+  }
+
   .oq-settings-storage-row,
   .oq-settings-storage-inline-action,
   .oq-settings-storage-import-head,

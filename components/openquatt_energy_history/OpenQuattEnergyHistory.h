@@ -5,6 +5,7 @@
 #include <vector>
 
 #include <esp_http_server.h>
+#include "OpenQuattFlashLayout.h"
 #include "esphome/components/select/select.h"
 #include "esp_partition.h"
 #include "esphome/components/switch/switch.h"
@@ -14,6 +15,8 @@
 
 namespace esphome {
 namespace openquatt_energy_history {
+
+using openquatt_common::OpenQuattFlashLayout;
 
 class ChunkedTextWriter;
 
@@ -54,13 +57,12 @@ class OpenQuattEnergyHistory : public Component {
   static constexpr uint32_t HOUR_DAY_RECORD_MAGIC = 0x3248454F;  // "OEH2"
   static constexpr uint16_t HOUR_DAY_RECORD_VERSION = 1;
   static constexpr uint16_t FLAG_PARTIAL = 1U << 0U;
-  static constexpr size_t FLASH_SECTOR_SIZE = 4096;
+  static constexpr size_t FLASH_SECTOR_SIZE = OpenQuattFlashLayout::SECTOR_SIZE;
   static constexpr size_t FLASH_SLOT_SIZE = 64;
-  static constexpr size_t HOUR_FLASH_SLOT_SIZE = 1024;
-  static constexpr size_t TREND_FLASH_RESERVED_SECTOR_COUNT = 90;
-  static constexpr uint32_t BASE_OFFSET = TREND_FLASH_RESERVED_SECTOR_COUNT * FLASH_SECTOR_SIZE;
-  static constexpr size_t MAX_FLASH_SECTOR_COUNT = 256;
-  static constexpr uint32_t HOUR_FLASH_BASE_OFFSET = BASE_OFFSET + (MAX_FLASH_SECTOR_COUNT * FLASH_SECTOR_SIZE);
+  static constexpr size_t HOUR_FLASH_SLOT_SIZE = OpenQuattFlashLayout::ENERGY_HOURLY_SLOT_SIZE;
+  static constexpr uint32_t BASE_OFFSET = OpenQuattFlashLayout::ENERGY_DAILY_OFFSET;
+  static constexpr size_t MAX_FLASH_SECTOR_COUNT = OpenQuattFlashLayout::ENERGY_DAILY_MAX_SECTOR_COUNT;
+  static constexpr uint32_t HOUR_FLASH_BASE_OFFSET = OpenQuattFlashLayout::ENERGY_HOURLY_OFFSET;
   static constexpr uint16_t MIN_DATE_YEAR = 2020;
   static constexpr uint16_t MAX_DATE_YEAR = 2099;
   static constexpr size_t DATE_BITMAP_YEAR_COUNT = (MAX_DATE_YEAR - MIN_DATE_YEAR) + 1U;
@@ -69,7 +71,8 @@ class OpenQuattEnergyHistory : public Component {
   static constexpr uint8_t HOURLY_RETENTION_DAYS = 7;
   static constexpr size_t HOURLY_SLOT_COUNT = static_cast<size_t>(HOURLY_RETENTION_DAYS) * 24U;
   static constexpr uint16_t DEFAULT_FLASH_HOURLY_RETENTION_DAYS = 180;
-  static constexpr uint16_t MAX_FLASH_HOURLY_RETENTION_DAYS = 365;
+  static constexpr uint16_t MAX_FLASH_HOURLY_RETENTION_DAYS =
+      OpenQuattFlashLayout::ENERGY_HOURLY_MAX_RETENTION_DAYS;
   static constexpr size_t EXPORT_HOUR_DATE_COUNT = MAX_FLASH_HOURLY_RETENTION_DAYS + HOURLY_RETENTION_DAYS;
   static constexpr uint32_t UNKNOWN_WH = 0xFFFFFFFFU;
 
