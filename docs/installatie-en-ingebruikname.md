@@ -131,6 +131,10 @@ Zie voor de lokale web-app:
 
 ## Daarna: Home Assistant
 
+Home Assistant ontdekt OpenQuatt meestal automatisch zodra beide op hetzelfde netwerk zitten. Open de melding bij **Instellingen -> Apparaten & diensten** en kies **Configureren**. Verschijnt er geen melding, kies dan **Integratie toevoegen -> ESPHome** en vul `openquatt.local` of het IP-adres van OpenQuatt in. Voer de ESPHome API-encryptiesleutel in als Home Assistant daarom vraagt.
+
+Zie ook de officiële ESPHome-handleiding: [Connecting your device to Home Assistant](https://esphome.io/guides/getting_started_hassio/#connecting-your-device-to-home-assistant).
+
 > [!IMPORTANT]
 > Selecteer bij het toevoegen van OpenQuatt nog geen Home Assistant-area. Sinds Home Assistant 2026.6 kan de gekozen area tijdens de eerste aanmaak in de `entity_id` terechtkomen, bijvoorbeeld `sensor.zolder_openquatt_flow`. De meegeleverde dashboards verwachten `sensor.openquatt_...`. Wacht daarom tot alle OpenQuatt-entiteiten bestaan en ken pas daarna een area toe. Een latere area-toewijzing verandert bestaande entity-ID's niet.
 
