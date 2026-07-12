@@ -19,6 +19,40 @@ import { renderControlReplayView } from "../features/control-replay-view.js";
 import { renderOverviewView, syncTechTooltipLayers } from "./heatpump.js";
 import { renderDiagnosisView, syncOverviewTrendInteractions } from "./overview.js";
 
+function captureFocusedSettingsField() {
+  const active = document.activeElement;
+  if (state.appView !== "settings" || !state.root?.contains(active) || !active?.dataset?.oqField) {
+    return null;
+  }
+  return {
+    field: active.dataset.oqField,
+    modalId: active.closest("[data-oq-modal]")?.dataset.oqModal || "",
+    selectionStart: active.selectionStart,
+    selectionEnd: active.selectionEnd,
+  };
+}
+
+function restoreFocusedSettingsField(focusState) {
+  if (!focusState || !state.root) {
+    return;
+  }
+
+  const modal = document.activeElement.closest("[data-oq-modal]");
+  if ((modal?.dataset.oqModal || "") !== focusState.modalId) {
+    return;
+  }
+
+  const input = (modal || state.root).querySelector(`[data-oq-field="${focusState.field}"]`);
+  if (!input || input.disabled) {
+    return;
+  }
+
+  input.focus({ preventScroll: true });
+  if (typeof focusState.selectionStart === "number" && typeof input.setSelectionRange === "function") {
+    input.setSelectionRange(focusState.selectionStart, focusState.selectionEnd);
+  }
+}
+
 export function renderSettingsView() {
     return `
       <section class="oq-helper-panel">
@@ -180,6 +214,8 @@ export function renderSettingsView() {
       return;
     }
 
+    const focusedSettingsField = captureFocusedSettingsField();
+
     const webServerLogScrollState = state.systemModal === "webserver-logs"
       ? captureWebServerLogScrollState()
       : null;
@@ -256,6 +292,7 @@ export function renderSettingsView() {
       ${renderDeviceReconnectModal()}
     `;
     syncModalFocus(state.root);
+    restoreFocusedSettingsField(focusedSettingsField);
     state.renderedAppView = state.appView;
     state.renderedSettingsGroup = state.appView === "settings" ? state.settingsGroup : "";
     state.settingsRenderSignature = state.appView === "settings" ? getSettingsRenderSignature() : "";
