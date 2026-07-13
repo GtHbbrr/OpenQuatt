@@ -1,6 +1,11 @@
 # Dashboard installeren
 
-In deze map staan de dashboardbestanden voor OpenQuatt in Home Assistant.
+In deze map staan de dashboardbestanden voor OpenQuatt in Home Assistant. Volg voor een nieuwe installatie deze volgorde:
+
+1. Rond Quick Start af via `http://openquatt.local`.
+2. Voeg OpenQuatt via de ESPHome-integratie toe aan Home Assistant.
+3. Installeer de twee vereiste dashboardkaarten via HACS.
+4. Importeer het dashboardbestand dat bij je opstelling past.
 
 ## Welk bestand kies je?
 
@@ -13,15 +18,56 @@ Kies het bestand dat past bij je opstelling en voorkeurstaal:
 
 Gebruik `duo` voor Duo en `single` voor Single. Kies daarna `nl` of `en`.
 
-## Importeren in Home Assistant
+## OpenQuatt via ESPHome toevoegen aan Home Assistant
+
+OpenQuatt draait al op ESPHome-firmware. Je hoeft daarom niet eerst de ESPHome Device Builder-app in Home Assistant te installeren. De ingebouwde ESPHome-integratie is voldoende om het apparaat en alle entiteiten aan Home Assistant toe te voegen.
+
+1. Zorg dat OpenQuatt en Home Assistant via hetzelfde netwerk bereikbaar zijn.
+2. Open **Instellingen -> Apparaten & diensten**.
+3. Staat OpenQuatt bij **Ontdekt**, kies dan **Configureren**.
+4. Verschijnt OpenQuatt niet automatisch, kies **Integratie toevoegen -> ESPHome**.
+5. Vul bij host `openquatt.local` of het IP-adres van OpenQuatt in. Laat de standaard API-poort `6053` staan.
+6. Voer de ESPHome API-encryptiesleutel in als Home Assistant daarom vraagt. Je vindt of wijzigt die in de OpenQuatt web-app onder **Instellingen -> Systeem -> Toegang & Beveiliging**.
+7. Rond de configuratie af zonder een area te selecteren.
+8. Controleer bij het nieuwe OpenQuatt-apparaat of de sensoren en overige entiteiten verschijnen en waarden ontvangen.
+
+Zie ook de officiële Home Assistant-documentatie voor de [ESPHome-integratie](https://www.home-assistant.io/integrations/esphome/).
 
 > [!IMPORTANT]
 > Selecteer bij het toevoegen van OpenQuatt nog geen Home Assistant-area. Sinds Home Assistant 2026.6 kan de area tijdens de eerste aanmaak onderdeel worden van de `entity_id`, bijvoorbeeld `sensor.zolder_openquatt_flow`. Deze dashboards gebruiken de vaste vorm `sensor.openquatt_...`. Laat de area daarom eerst leeg, wacht tot alle OpenQuatt-entiteiten zijn aangemaakt en ken daarna pas de area toe. Home Assistant wijzigt de bestaande entity-ID's dan niet meer.
 
+## Vereiste dashboardkaarten installeren
+
+De dashboards gebruiken twee custom dashboardkaarten die niet standaard in Home Assistant zitten:
+
+| Dashboardkaart | Gebruikt voor |
+| --- | --- |
+| [Mini Graph Card](https://github.com/kalkih/mini-graph-card) | Compacte grafieken bij actuele meetwaarden |
+| [ApexCharts Card](https://github.com/RomRider/apexcharts-card) | Uitgebreide temperatuur-, vermogen- en statusgrafieken |
+
+Installeer beide kaarten bij voorkeur via [HACS](https://www.hacs.xyz/docs/use/download/download/):
+
+1. Open **HACS** in de zijbalk van Home Assistant.
+2. Zoek naar `Mini Graph Card`, open het resultaat en kies **Downloaden**.
+3. Zoek naar `ApexCharts Card`, open het resultaat en kies **Downloaden**.
+4. Herstart Home Assistant als HACS aangeeft dat dit nodig is.
+5. Vernieuw de dashboardpagina volledig. Wis zo nodig de browsercache of herlaad de Home Assistant-app.
+
+HACS registreert de JavaScript-resources normaal automatisch. Controleer bij problemen onder **Instellingen -> Dashboards -> menu met drie puntjes -> Resources** of deze modules aanwezig zijn:
+
+```text
+/hacsfiles/mini-graph-card/mini-graph-card-bundle.js
+/hacsfiles/apexcharts-card/apexcharts-card.js
+```
+
+Zie je het menu **Resources** niet, schakel dan eerst **Geavanceerde modus** in via je Home Assistant-gebruikersprofiel.
+
+## Dashboard importeren in Home Assistant
+
 1. Open Home Assistant.
 2. Ga naar **Instellingen -> Dashboards**.
-3. Maak een nieuw dashboard aan of open een bestaand dashboard.
-4. Open het menu met de drie puntjes.
+3. Maak bij voorkeur een nieuw leeg dashboard aan of open een bestaand handmatig beheerd dashboard.
+4. Open het dashboard en daarna het menu met de drie puntjes.
 5. Kies **Raw configuration editor**.
 6. Plak de inhoud van het gekozen YAML-bestand.
 7. Sla op en laad het dashboard opnieuw.
@@ -32,6 +78,8 @@ Gebruik `duo` voor Duo en `single` voor Single. Kies daarna `nl` of `en`.
 - Controleer of je de volledige YAML hebt geplakt.
 - Controleer of de OpenQuatt-entiteiten al in Home Assistant bestaan.
 - Controleer of de entity-ID's beginnen met `openquatt_` en niet met een area-prefix zoals `zolder_openquatt_`.
+- Krijg je `Custom element doesn't exist: mini-graph-card` of `Custom element doesn't exist: apexcharts-card`, controleer dan of beide kaarten in HACS zijn gedownload en bij **Resources** staan.
+- Zijn alleen de grafieken leeg, controleer dan onder **Ontwikkelaarstools -> Statussen** of de gebruikte `sensor.openquatt_...`-entiteiten bestaan en historie opbouwen.
 
 ### Area was al geselecteerd
 
