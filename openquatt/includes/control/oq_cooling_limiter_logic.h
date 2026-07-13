@@ -189,7 +189,11 @@ inline void update_hysteretic_capacity_cap(const LimiterInput &in,
           (uint32_t)(in.now_ms - state.capacity_last_change_ms) >= tuning.capacity_min_hold_ms;
       if (hold_elapsed && elapsed(in.now_ms, state.capacity_recovery_since_ms,
                                   tuning.capacity_recovery_stable_ms)) {
-        current_cap = std::min(capacity_demand_max, std::min(risk_cap, current_cap + 1));
+        const bool full_capacity_recovered =
+            risk_cap >= capacity_demand_max && current_cap >= 3;
+        current_cap = full_capacity_recovered
+            ? capacity_demand_max
+            : std::min(capacity_demand_max, std::min(risk_cap, current_cap + 1));
         state.capacity_last_change_ms = in.now_ms;
         state.capacity_recovery_since_ms = 0;
       }
