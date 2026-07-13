@@ -906,7 +906,11 @@ sensor:
       const float water_cp_j_per_kgk = ${oq_water_cp_j_per_kgk};  // J/(kg·K)
       const float mass_flow_kgps = flow_lph / 3600.0f;            // kg/s (≈ L/h)
       const float delta_t_k = t_in_c - t_out_c;                   // K, positive while cooling
-      return mass_flow_kgps * water_cp_j_per_kgk * delta_t_k;
+      const float cooling_power_w = mass_flow_kgps * water_cp_j_per_kgk * delta_t_k;
+
+      // During startup the water outlet can briefly still be warmer than the inlet.
+      // That is not cooling output, so do not expose or integrate it as negative power.
+      return (cooling_power_w < 0.0f) ? 0.0f : cooling_power_w;
 
   - platform: template
     id: ${hp_id}_cop
