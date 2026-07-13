@@ -17,6 +17,12 @@ namespace openquatt_web_auth {
 static const char *const TAG = "openquatt.web_auth";
 static const uint32_t STORAGE_KEY = fnv1_hash("openquatt_web_auth_store");
 static const uint32_t API_SECURITY_STORAGE_KEY = fnv1_hash("openquatt_api_security_store");
+#ifdef USE_API_NOISE
+// ESPHome APIServer::setup() uses this key for its runtime-provisioned Noise PSK.
+static constexpr uint32_t API_NOISE_STORAGE_KEY = 88491486UL;
+static constexpr uint32_t API_SECURITY_GUARD_INTERVAL_MS = 25;
+static constexpr uint32_t API_SECURITY_GUARD_DURATION_MS = 1000;
+#endif
 
 static std::string base64_encode_bytes_(const uint8_t *data, size_t length) {
   static constexpr char TABLE[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
@@ -339,6 +345,9 @@ void OpenQuattWebAuth::setup() {
   this->register_http_handlers_();
   this->pref_ = global_preferences->make_preference<AuthStorage>(STORAGE_KEY, true);
   this->api_security_pref_ = global_preferences->make_preference<ApiSecurityStorage>(API_SECURITY_STORAGE_KEY, true);
+#ifdef USE_API_NOISE
+  this->api_noise_pref_ = global_preferences->make_preference<api::SavedNoisePsk>(API_NOISE_STORAGE_KEY, true);
+#endif
 
   AuthStorage storage{};
   if (this->load_storage_(&storage)) {
@@ -371,6 +380,17 @@ void OpenQuattWebAuth::loop() {
   }
 #ifdef USE_API_NOISE
   if (api::global_api_server != nullptr) {
+    const uint32_t now = millis();
+    if (this->api_security_guard_until_ms_ != 0) {
+      if (static_cast<int32_t>(now - this->api_security_guard_until_ms_) >= 0) {
+        this->api_security_guard_until_ms_ = 0;
+      } else if (this->api_security_guard_last_check_ms_ == 0 ||
+                 now - this->api_security_guard_last_check_ms_ >= API_SECURITY_GUARD_INTERVAL_MS) {
+        this->api_security_guard_last_check_ms_ = now;
+        this->reconcile_api_security_();
+      }
+    }
+
     const bool transport_active = api::global_api_server->get_noise_ctx().has_psk();
     this->api_security_transport_active_ = transport_active;
     bool pending_applied = this->api_security_enabled_ == transport_active;
@@ -382,6 +402,12 @@ void OpenQuattWebAuth::loop() {
     }
     if (this->api_security_restart_pending_ && pending_applied) {
       this->api_security_restart_pending_ = false;
+    }
+    if (pending_applied) {
+      this->api_security_transport_update_pending_ = false;
+    } else if (this->api_security_ready_ && !this->api_security_restart_pending_ &&
+               !this->api_security_transport_update_pending_) {
+      this->reconcile_api_security_();
     }
   }
 #endif
@@ -494,6 +520,17 @@ bool OpenQuattWebAuth::rotate_api_security_key() {
   return true;
 }
 
+void OpenQuattWebAuth::on_api_client_connected() {
+#ifdef USE_API_NOISE
+  if (!this->api_security_ready_ || this->api_security_restart_pending_) {
+    return;
+  }
+  const uint32_t now = millis();
+  this->api_security_guard_until_ms_ = now + API_SECURITY_GUARD_DURATION_MS;
+  this->api_security_guard_last_check_ms_ = 0;
+#endif
+}
+
 bool OpenQuattWebAuth::load_storage_(AuthStorage *storage) {
   if (storage == nullptr) {
     return false;
@@ -564,6 +601,7 @@ bool OpenQuattWebAuth::apply_api_security_storage_(const ApiSecurityStorage &sto
           ESP_LOGE(TAG, "Failed to activate API encryption");
           return false;
         }
+        this->api_security_transport_update_pending_ = true;
         transport_active = true;
       }
     } else if (transport_active) {
@@ -571,6 +609,7 @@ bool OpenQuattWebAuth::apply_api_security_storage_(const ApiSecurityStorage &sto
         ESP_LOGE(TAG, "Failed to clear API encryption");
         return false;
       }
+      this->api_security_transport_update_pending_ = true;
       transport_active = false;
     }
   }
@@ -582,6 +621,7 @@ bool OpenQuattWebAuth::apply_api_security_storage_(const ApiSecurityStorage &sto
 
   this->api_security_key_present_ = key_present;
   this->api_security_key_ = key;
+  this->api_security_key_bytes_ = storage.key;
   this->api_security_enabled_ = enabled;
   this->api_security_source_ = source != nullptr ? source : "";
   this->api_security_transport_active_ = transport_active;
@@ -709,12 +749,78 @@ bool OpenQuattWebAuth::initialize_api_security_() {
     }
   }
 
+#ifdef USE_API_NOISE
+  api::SavedNoisePsk saved_noise{};
+  const bool noise_pref_loaded = this->api_noise_pref_.load(&saved_noise);
+  const bool noise_pref_has_key =
+      noise_pref_loaded && std::any_of(saved_noise.psk.begin(), saved_noise.psk.end(), [](uint8_t value) {
+        return value != 0;
+      });
+  ESP_LOGI(TAG, "Initializing API security: desired=%s key_present=%s transport_active=%s stored_psk=%s",
+           YESNO(storage.enabled != 0), YESNO(storage.key_present != 0),
+           YESNO(api::global_api_server->get_noise_ctx().has_psk()), YESNO(noise_pref_has_key));
+#endif
+
   if (!this->apply_api_security_storage_(storage, storage.enabled ? "stored" : "bootstrap-disabled")) {
     return false;
   }
 
   this->api_security_ready_ = true;
   return true;
+}
+
+void OpenQuattWebAuth::reconcile_api_security_() {
+#ifdef USE_API_NOISE
+  if (!this->api_security_ready_ || this->api_security_restart_pending_ || api::global_api_server == nullptr) {
+    return;
+  }
+
+  api::SavedNoisePsk saved_noise{};
+  const bool noise_pref_loaded = this->api_noise_pref_.load(&saved_noise);
+  const bool stored_psk = noise_pref_loaded &&
+                          std::any_of(saved_noise.psk.begin(), saved_noise.psk.end(), [](uint8_t value) {
+                            return value != 0;
+                          });
+  const bool transport_active = api::global_api_server->get_noise_ctx().has_psk();
+  const bool stored_matches = this->api_security_enabled_
+                                  ? noise_pref_loaded && stored_psk &&
+                                        std::equal(this->api_security_key_bytes_.begin(),
+                                                   this->api_security_key_bytes_.end(), saved_noise.psk.begin())
+                                  : !stored_psk;
+  const bool transport_matches =
+      this->api_security_enabled_
+          ? transport_active &&
+                std::equal(this->api_security_key_bytes_.begin(), this->api_security_key_bytes_.end(),
+                           api::global_api_server->get_noise_ctx().get_psk().begin())
+          : !transport_active;
+  if (stored_matches && transport_matches) {
+    return;
+  }
+  if (stored_matches && this->api_security_transport_update_pending_) {
+    return;
+  }
+
+  ESP_LOGW(TAG, "API Noise PSK diverged from the configured state; restoring OpenQuatt API security");
+  if (transport_matches) {
+    api::SavedNoisePsk desired_noise{};
+    if (this->api_security_enabled_) {
+      desired_noise.psk = this->api_security_key_bytes_;
+    }
+    if (!this->api_noise_pref_.save(&desired_noise) || !global_preferences->sync()) {
+      ESP_LOGE(TAG, "Failed to restore the stored API Noise PSK");
+    }
+    return;
+  }
+
+  const bool restored = this->api_security_enabled_
+                            ? api::global_api_server->save_noise_psk(this->api_security_key_bytes_, true)
+                            : api::global_api_server->clear_noise_psk(true);
+  if (!restored) {
+    ESP_LOGE(TAG, "Failed to restore the active API Noise PSK");
+    return;
+  }
+  this->api_security_transport_update_pending_ = true;
+#endif
 }
 
 bool OpenQuattWebAuth::is_api_security_transport_active() const {

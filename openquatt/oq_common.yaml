@@ -90,6 +90,10 @@ debug:
 api:
   reboot_timeout: 0s
   encryption:
+  on_client_connected:
+    then:
+      - lambda: |-
+          id(oq_web_auth_store).on_api_client_connected();
 
 ota:
   - platform: esphome

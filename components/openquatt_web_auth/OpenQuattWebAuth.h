@@ -26,6 +26,7 @@ class OpenQuattWebAuth : public Component {
   bool start_recovery_window(uint32_t duration_ms = 600000UL);
   bool set_api_security_enabled(bool enabled);
   bool rotate_api_security_key();
+  void on_api_client_connected();
   const std::string &get_active_username() const { return this->active_username_; }
   const std::string &get_credential_source() const { return this->credential_source_; }
   bool is_auth_enabled() const { return !this->active_username_.empty(); }
@@ -75,6 +76,7 @@ class OpenQuattWebAuth : public Component {
   static std::string encode_api_security_key_(const std::array<uint8_t, 32> &key);
   static std::array<uint8_t, 32> generate_api_security_key_();
   bool initialize_api_security_();
+  void reconcile_api_security_();
   void publish_state_();
   void register_http_handlers_();
   bool suspend_auth_runtime_(const char *source);
@@ -90,6 +92,7 @@ class OpenQuattWebAuth : public Component {
   std::string csrf_token_;
   std::string api_security_key_;
   std::string api_security_source_;
+  std::array<uint8_t, 32> api_security_key_bytes_{};
   bool default_auth_enabled_{true};
   bool api_security_enabled_{false};
   bool api_security_key_present_{false};
@@ -97,9 +100,13 @@ class OpenQuattWebAuth : public Component {
   bool api_security_restart_pending_{false};
   ESPPreferenceObject pref_;
   ESPPreferenceObject api_security_pref_;
+  ESPPreferenceObject api_noise_pref_;
   bool handlers_registered_{false};
   bool api_security_handlers_registered_{false};
   bool api_security_ready_{false};
+  bool api_security_transport_update_pending_{false};
+  uint32_t api_security_guard_until_ms_{0};
+  uint32_t api_security_guard_last_check_ms_{0};
   uint32_t setup_window_until_ms_{0};
   AuthStorage suspended_storage_{};
   bool has_suspended_storage_{false};
