@@ -40,6 +40,7 @@ substitutions:
   hpcq_status_led_inverted: "false"                     # Set true when the board LED is active-low.
 
 packages:
+  oq_hardware_revision: !include heatpump_controller_q_hardware_revision.yaml
   oq_status_leds: !include heatpump_controller_q_status_leds.yaml
   oq_cic_compatibility: !include heatpump_controller_q_cic_compatibility.yaml
   oq_sensor_source_selects_opentherm: !include ../oq_sensor_source_selects_opentherm.yaml
