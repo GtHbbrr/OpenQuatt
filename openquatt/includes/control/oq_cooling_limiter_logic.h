@@ -47,12 +47,6 @@ struct LimiterTuning {
   float capacity_fast_fall_rate_c_per_min = -0.15f;
   float capacity_slow_fall_rate_c_per_min = -0.05f;
   float capacity_recovery_min_rate_c_per_min = -0.02f;
-  float hp_out_cap1_gap_c = 0.25f;
-  float hp_out_cap2_gap_c = 0.55f;
-  float hp_out_cap3_gap_c = 0.85f;
-  float hp_out_release_to2_gap_c = 0.65f;
-  float hp_out_release_to3_gap_c = 0.85f;
-  float hp_out_release_full_gap_c = 1.05f;
 };
 
 struct LimiterState {
@@ -79,7 +73,6 @@ struct LimiterInput {
   float filtered_gap_c = NAN;
   float gap_rate_c_per_min = 0.0f;
   float dew_gap_c = NAN;
-  float active_hp_out_gap_c = NAN;
   float safety_margin_c = 0.0f;
 };
 
@@ -144,15 +137,6 @@ inline int dew_capacity_risk_cap(const LimiterInput &in,
     risk_cap = std::min(risk_cap, 2);
   }
 
-  if (finite_float(in.active_hp_out_gap_c)) {
-    if (in.active_hp_out_gap_c <= tuning.hp_out_cap1_gap_c) {
-      risk_cap = std::min(risk_cap, 1);
-    } else if (in.active_hp_out_gap_c <= tuning.hp_out_cap2_gap_c) {
-      risk_cap = std::min(risk_cap, 2);
-    } else if (in.active_hp_out_gap_c <= tuning.hp_out_cap3_gap_c) {
-      risk_cap = std::min(risk_cap, 3);
-    }
-  }
   return risk_cap;
 }
 
@@ -191,16 +175,9 @@ inline void update_hysteretic_capacity_cap(const LimiterInput &in,
         current_cap <= 1 ? dew_release_to2_gap_c :
         current_cap == 2 ? dew_release_to3_gap_c :
         dew_release_full_gap_c;
-    const float required_hp_out_gap_c =
-        current_cap <= 1 ? tuning.hp_out_release_to2_gap_c :
-        current_cap == 2 ? tuning.hp_out_release_to3_gap_c :
-        tuning.hp_out_release_full_gap_c;
-    const bool hp_out_recovered =
-        !finite_float(in.active_hp_out_gap_c) || in.active_hp_out_gap_c >= required_hp_out_gap_c;
     const bool recovery_ready =
         in.dew_gap_c >= required_dew_gap_c &&
-        in.gap_rate_c_per_min >= tuning.capacity_recovery_min_rate_c_per_min &&
-        hp_out_recovered;
+        in.gap_rate_c_per_min >= tuning.capacity_recovery_min_rate_c_per_min;
 
     if (recovery_ready) {
       if (state.capacity_recovery_since_ms == 0 || in.now_ms <= state.capacity_recovery_since_ms) {

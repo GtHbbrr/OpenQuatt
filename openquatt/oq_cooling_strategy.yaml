@@ -971,53 +971,6 @@ interval:
           if (demand_max > 10) demand_max = 10;
           const int capacity_demand_max = demand_max;
 
-          const float active_hp_out_gap_c = [&]()->float {
-            if (!dew_mode || isnan(id(cooling_dew_point_selected).state)) return NAN;
-            const float dew_c = id(cooling_dew_point_selected).state;
-            int owner = id(oq_cooling_request_owner_hp);
-            if (owner == 0) owner = id(oq_cooling_owner_hp);
-
-            auto gap_if_valid = [&](float temp_c)->float {
-              if (isnan(temp_c)) return NAN;
-              return temp_c - dew_c;
-            };
-
-            if (owner == 1 && id(hp1_water_out_temp).has_state()) {
-              const float gap_c = gap_if_valid(id(hp1_water_out_temp).state);
-              if (!isnan(gap_c)) return gap_c;
-            }
-            #if OQ_TOPOLOGY_DUO
-            if (owner == 2 && id(${secondary_water_out_temp_id}).has_state()) {
-              const float gap_c = gap_if_valid(id(${secondary_water_out_temp_id}).state);
-              if (!isnan(gap_c)) return gap_c;
-            }
-            #endif
-
-            if (id(hp1_last_applied_level) > 0 && id(hp1_water_out_temp).has_state()) {
-              const float gap_c = gap_if_valid(id(hp1_water_out_temp).state);
-              if (!isnan(gap_c)) return gap_c;
-            }
-            #if OQ_TOPOLOGY_DUO
-            if (id(${secondary_last_applied_level_id}) > 0 && id(${secondary_water_out_temp_id}).has_state()) {
-              const float gap_c = gap_if_valid(id(${secondary_water_out_temp_id}).state);
-              if (!isnan(gap_c)) return gap_c;
-            }
-            #endif
-
-            if (id(oq_cooling_request_hp1_level) > 0 && id(hp1_water_out_temp).has_state()) {
-              const float gap_c = gap_if_valid(id(hp1_water_out_temp).state);
-              if (!isnan(gap_c)) return gap_c;
-            }
-            #if OQ_TOPOLOGY_DUO
-            if (id(oq_cooling_request_hp2_level) > 0 && id(${secondary_water_out_temp_id}).has_state()) {
-              const float gap_c = gap_if_valid(id(${secondary_water_out_temp_id}).state);
-              if (!isnan(gap_c)) return gap_c;
-            }
-            #endif
-
-            return NAN;
-          }();
-
           bool room_cap_active = false;
           if (room_error_valid) {
             const int before_room_cap = demand_max;
@@ -1050,7 +1003,6 @@ interval:
           limiter_input.filtered_gap_c = filtered_gap_c;
           limiter_input.gap_rate_c_per_min = gap_rate_c_per_min;
           limiter_input.dew_gap_c = dew_gap_c;
-          limiter_input.active_hp_out_gap_c = active_hp_out_gap_c;
           limiter_input.safety_margin_c = safety_margin_c;
 
           const auto limiter_output =
