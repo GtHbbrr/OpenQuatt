@@ -12,31 +12,32 @@ substitutions:
   esp_flash_size: "16MB"                                # Active ESP flash size.
   esp_variant: "esp32s3"                                # Active ESP variant.
   esp_partitions: "${openquatt_root}/partitions/openquatt_16mb.csv" # Active partition table.
-  uart_tx_pin: "GPIO40"                                 # Modbus 2 TX; primary heat-pump bus.
-  uart_rx_pin: "GPIO39"                                 # Modbus 2 RX; primary heat-pump bus.
-  uart_rts_pin: "GPIO38"                                # Modbus 2 DE/RE; primary heat-pump bus.
-  oq_ot_thermostat_in_pin: "GPIO16"                     # OpenTherm thermostat input.
-  oq_ot_thermostat_out_pin: "GPIO15"                    # OpenTherm thermostat output.
-  ds18b20_pin: "GPIO14"                                 # Dallas DS18B20 1-Wire input.
-  oq_boiler_relay_pin: "GPIO7"                          # Relay 1 output.
-  controller_aux_relay_pin: "GPIO8"                     # Relay 2 output reserved for controller logic.
+  uart_tx_pin: "GPIO40"                                 # Modbus 1 TX; primary heat-pump bus.
+  uart_rx_pin: "GPIO42"                                 # Modbus 1 RX; primary heat-pump bus.
+  uart_rts_pin: "GPIO41"                                # Modbus 1 mode / DE/RE; primary heat-pump bus.
+  oq_ot_thermostat_in_pin: "GPIO21"                     # OpenTherm slave input.
+  oq_ot_thermostat_out_pin: "GPIO14"                    # OpenTherm slave output.
+  ds18b20_pin: "GPIO18"                                 # Dallas DS18B20 1-Wire input.
+  oq_boiler_relay_pin: "GPIO16"                         # Relay 1 output.
+  controller_aux_relay_pin: "GPIO3"                     # Relay 2 output reserved for controller logic.
   web_auth_recovery_pin: "GPIO46"                       # Boot switch / recovery input.
   eth_mosi_pin: "GPIO10"                                # W5500 SPI MOSI.
   eth_miso_pin: "GPIO11"                                # W5500 SPI MISO.
   eth_clk_pin: "GPIO12"                                 # W5500 SPI CLK.
   eth_cs_pin: "GPIO13"                                  # W5500 SPI CS.
-  hpcq_pt1000_mosi_pin: "GPIO5"                         # MAX31865 MOSI / SDI.
-  hpcq_pt1000_miso_pin: "GPIO2"                         # MAX31865 MISO / SDO.
-  hpcq_pt1000_clk_pin: "GPIO4"                          # MAX31865 SPI clock.
-  hpcq_pt1000_cs_pin: "GPIO3"                           # MAX31865 chip select.
+  eth_int_pin: "GPIO9"                                  # W5500 interrupt.
+  hpcq_pt1000_mosi_pin: "GPIO7"                         # MAX31865 MOSI / SDI.
+  hpcq_pt1000_miso_pin: "GPIO4"                         # MAX31865 MISO / SDO.
+  hpcq_pt1000_clk_pin: "GPIO6"                          # MAX31865 SPI clock.
+  hpcq_pt1000_cs_pin: "GPIO5"                           # MAX31865 chip select.
   hpcq_pt1000_reference_resistance_ohm: "1500"          # PT1000 MAX31865 reference resistor.
   hpcq_pt1000_nominal_resistance_ohm: "1000"            # PT1000 nominal resistance at 0 degrees C.
   hpcq_pt1000_rtd_wires: "2"                            # Probe wiring mode; board jumpers must match.
-  hpcq_flow_pin: "GPIO6"                                # V1 central flowmeter pulse input.
+  hpcq_flow_pin: "GPIO15"                               # V1 central flowmeter pulse input.
   hpcq_flow_kf_lpm_per_hz: "0.05"                       # DN15 datasheet Kff: Qv[l/min] = Kf * f[Hz] + Q0.
   hpcq_flow_q0_lpm: "0"                                 # DN15 datasheet intercept [l/min].
-  hpcq_status_led_yellow_pin: "GPIO47"                  # Yellow status LED output.
-  hpcq_status_led_red_pin: "GPIO48"                     # Red status LED output.
+  hpcq_status_led_yellow_pin: "GPIO1"                   # Yellow status LED output.
+  hpcq_status_led_red_pin: "GPIO2"                      # Red status LED output.
   hpcq_status_led_inverted: "false"                     # Set true when the board LED is active-low.
 
 packages:

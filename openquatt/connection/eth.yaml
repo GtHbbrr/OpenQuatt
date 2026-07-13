@@ -14,6 +14,7 @@ ethernet:
   mosi_pin: ${eth_mosi_pin}
   miso_pin: ${eth_miso_pin}
   cs_pin: ${eth_cs_pin}
+  interrupt_pin: ${eth_int_pin}
 
 text_sensor:
   - platform: ethernet_info
