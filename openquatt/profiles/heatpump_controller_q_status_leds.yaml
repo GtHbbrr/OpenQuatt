@@ -7,8 +7,8 @@
 #
 # Behavior:
 #   - Yellow LED: on while the active network interface is connected.
-#   - Red LED: on while a firmware, OpenTherm, heat-pump or hard safety fault
-#     is active.
+#   - Red LED: on while a firmware, sensor, OpenTherm, heat-pump or hard safety
+#     fault is active.
 #   - Status LEDs enabled: disables both LED outputs when off.
 #
 # ==============================================================================
@@ -38,6 +38,30 @@ switch:
     web_server:
       sorting_group_id: oq_system_diagnostics
 
+binary_sensor:
+  - platform: template
+    id: oq_pt1000_read_problem
+    name: "PT1000 read problem"
+    internal: true
+    icon: mdi:thermometer-alert
+    device_class: problem
+    entity_category: diagnostic
+    lambda: |-
+      if (!id(water_supply_source).has_state() ||
+          !id(oq_local_supply_temp_source).has_state()) {
+        return false;
+      }
+
+      const bool pt1000_selected =
+          id(water_supply_source).current_option() == "Local" &&
+          id(oq_local_supply_temp_source).current_option() == "PT1000";
+      if (!pt1000_selected) return false;
+
+      return !id(water_supply_temp_pt1000).has_state() ||
+             isnan(id(water_supply_temp_pt1000).state);
+    filters:
+      - delayed_on: 15s
+
 interval:
   - interval: 1s
     then:
@@ -66,6 +90,8 @@ interval:
           const bool ota_fault = id(oq_ota_phase_code) == 5 || id(oq_ota_phase_code) == 6;
           const bool ot_problem =
               id(ot_link_problem).has_state() && id(ot_link_problem).state;
+          const bool pt1000_problem =
+              id(oq_pt1000_read_problem).has_state() && id(oq_pt1000_read_problem).state;
           const bool hp1_fault =
               id(hp1_ot_fault_active).has_state() && id(hp1_ot_fault_active).state;
           const bool secondary_fault =
@@ -77,6 +103,7 @@ interval:
           const bool fault_active =
               ota_fault ||
               ot_problem ||
+              pt1000_problem ||
               hp_fault ||
               id(oq_lowflow_fault_active) ||
               id(oq_strategy_water_hard_trip_active);
