@@ -127,6 +127,7 @@ button:
 # ----------------------------
 interval:
   - interval: ${oq_flow_ts}s
+    startup_delay: ${oq_flow_autotune_startup_delay_ms}ms
     then:
       - lambda: |-
           const auto cfg = oq_flow_autotune::make_runtime_config(

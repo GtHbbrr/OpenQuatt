@@ -67,7 +67,7 @@ button:
     on_press:
       - lambda: |-
           oq_air_purge::runtime().start(
-              oq_air_purge::make_runtime_config(${oq_flow_loop_s}),
+              oq_air_purge::make_runtime_config(${oq_air_purge_loop_s}),
               (uint32_t) millis());
 
   - platform: template
@@ -98,10 +98,10 @@ switch:
 # MAIN LOOP
 # ----------------------------
 interval:
-  - interval: ${oq_flow_loop_s}s
+  - interval: ${oq_air_purge_loop_s}s
     startup_delay: 5200ms
     then:
       - lambda: |-
           oq_air_purge::runtime().tick(
-              oq_air_purge::make_runtime_config(${oq_flow_loop_s}),
+              oq_air_purge::make_runtime_config(${oq_air_purge_loop_s}),
               (uint32_t) millis());

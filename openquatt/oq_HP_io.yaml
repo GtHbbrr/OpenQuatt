@@ -111,7 +111,7 @@ select:
       "Standby": 0
       "Cooling": 1
       "Heating": 2
-    skip_updates: ${oq_skip_10s}
+    skip_updates: ${oq_modbus_target_readback_skip}
     web_server:
       sorting_group_id: oq_${hp_id}
 
@@ -137,7 +137,7 @@ select:
       "8": 8
       "9": 9
       "10": 10
-    skip_updates: ${oq_skip_30s}
+    skip_updates: ${oq_modbus_control_readback_skip}
     web_server:
       sorting_group_id: oq_${hp_id}
 
@@ -154,7 +154,7 @@ select:
     optionsmap:
       "Off": 0
       "On": 1
-    skip_updates: ${oq_skip_30s}
+    skip_updates: ${oq_modbus_control_readback_skip}
     web_server:
       sorting_group_id: oq_${hp_id}
 
@@ -171,7 +171,7 @@ select:
     optionsmap:
       "Off": 0
       "On": 4096
-    skip_updates: ${oq_skip_30s}
+    skip_updates: ${oq_modbus_control_readback_skip}
     web_server:
       sorting_group_id: oq_${hp_id}
 
@@ -238,7 +238,7 @@ number:
     min_value: 0
     max_value: 1000
     mode: slider
-    skip_updates: ${oq_skip_30s}
+    skip_updates: ${oq_modbus_control_readback_skip}
     web_server:
       sorting_group_id: oq_${hp_id}
 
@@ -270,7 +270,7 @@ sensor:
     state_class: measurement
     register_type: holding
     address: 2099
-    #skip_updates: 0
+    skip_updates: ${oq_modbus_telemetry_skip}
     on_value:
       then:
         - lambda: |-
@@ -295,7 +295,7 @@ sensor:
           min_value: 0
           max_value: 300
           ignore_out_of_range: true
-    skip_updates: ${oq_skip_30s}
+    skip_updates: ${oq_modbus_telemetry_skip}
     web_server:
       sorting_group_id: oq_${hp_id}
 
@@ -316,7 +316,7 @@ sensor:
           min_value: 0
           max_value: 16
           ignore_out_of_range: true
-    skip_updates: ${oq_skip_30s}
+    skip_updates: ${oq_modbus_telemetry_skip}
     web_server:
       sorting_group_id: oq_${hp_id}
 
@@ -337,7 +337,7 @@ sensor:
           min_value: 0
           max_value: 100
           ignore_out_of_range: true
-    skip_updates: ${oq_skip_10s}
+    skip_updates: ${oq_modbus_telemetry_skip}
     web_server:
       sorting_group_id: oq_${hp_id}
 
@@ -358,7 +358,7 @@ sensor:
           min_value: 0
           max_value: 100
           ignore_out_of_range: true
-    skip_updates: ${oq_skip_10s}
+    skip_updates: ${oq_modbus_telemetry_skip}
     on_value:
       then:
         - lambda: |-
@@ -386,7 +386,7 @@ sensor:
           min_value: 0
           max_value: 1000
           ignore_out_of_range: true
-    skip_updates: ${oq_skip_30s}
+    skip_updates: ${oq_modbus_telemetry_skip}
     web_server:
       sorting_group_id: oq_${hp_id}
 
@@ -400,14 +400,14 @@ sensor:
     unit_of_measurement: "RPM"
     state_class: "measurement"
     accuracy_decimals: 0
-    # register_count: 2  # 2105 - 2106
+    register_count: 2  # 2105-2106; bridge reserved register 2106.
     filters:
       - multiply: 1
       - clamp:
           min_value: 0
           max_value: 1000
           ignore_out_of_range: true
-    skip_updates: ${oq_skip_30s}
+    skip_updates: ${oq_modbus_telemetry_skip}
     web_server:
       sorting_group_id: oq_${hp_id}
 
@@ -427,7 +427,7 @@ sensor:
           min_value: 0
           max_value: 1000
           ignore_out_of_range: true
-    skip_updates: ${oq_skip_10s}
+    skip_updates: ${oq_modbus_telemetry_skip}
     web_server:
       sorting_group_id: oq_${hp_id}
 
@@ -450,7 +450,7 @@ sensor:
           min_value: -30
           max_value: 100
           ignore_out_of_range: true
-    skip_updates: ${oq_skip_10s}
+    skip_updates: ${oq_modbus_telemetry_skip}
     on_value:
       then:
         - lambda: |-
@@ -478,7 +478,7 @@ sensor:
           min_value: -30
           max_value: 100
           ignore_out_of_range: true
-    skip_updates: ${oq_skip_30s}
+    skip_updates: ${oq_modbus_telemetry_skip}
     web_server:
       sorting_group_id: oq_${hp_id}
 
@@ -500,7 +500,7 @@ sensor:
           min_value: -30
           max_value: 150
           ignore_out_of_range: true
-    skip_updates: ${oq_skip_30s}
+    skip_updates: ${oq_modbus_telemetry_skip}
     web_server:
       sorting_group_id: oq_${hp_id}
 
@@ -515,7 +515,7 @@ sensor:
     device_class: "temperature"
     state_class: "measurement"
     accuracy_decimals: 2
-    register_count: 2  # 2113 - 2114
+    register_count: 3  # 2113-2115; bridge reserved register 2115.
     filters:
       - offset: -3000
       - multiply: 0.01
@@ -523,7 +523,7 @@ sensor:
           min_value: -30
           max_value: 100
           ignore_out_of_range: true
-    skip_updates: ${oq_skip_30s}
+    skip_updates: ${oq_modbus_telemetry_skip}
     web_server:
       sorting_group_id: oq_${hp_id}
 
@@ -544,7 +544,7 @@ sensor:
           min_value: 0
           max_value: 20
           ignore_out_of_range: true
-    skip_updates: ${oq_skip_30s}
+    skip_updates: ${oq_modbus_telemetry_skip}
     web_server:
       sorting_group_id: oq_${hp_id}
 
@@ -566,7 +566,7 @@ sensor:
           min_value: 0
           max_value: 60
           ignore_out_of_range: true
-    skip_updates: ${oq_skip_30s}
+    skip_updates: ${oq_modbus_telemetry_skip}
     web_server:
       sorting_group_id: oq_${hp_id}
 
@@ -575,7 +575,7 @@ sensor:
     id: ${hp_id}_pcb_firmware_raw
     register_type: holding
     address: 2122
-    skip_updates: ${oq_skip_30s}
+    skip_updates: ${oq_modbus_telemetry_skip}
     value_type: U_WORD
     internal: true
 
@@ -588,7 +588,7 @@ sensor:
     register_type: holding
     register_count: 4  # 2123 - 2127
     address: 2123
-    skip_updates: ${oq_skip_30s}
+    skip_updates: ${oq_modbus_telemetry_skip}
     web_server:
       sorting_group_id: oq_${hp_id}
 
@@ -601,7 +601,7 @@ sensor:
     register_type: holding
     register_count: 4  # 2127 - 2131
     address: 2127
-    skip_updates: ${oq_skip_30s}
+    skip_updates: ${oq_modbus_telemetry_skip}
     web_server:
       sorting_group_id: oq_${hp_id}
 
@@ -623,7 +623,7 @@ sensor:
           min_value: -30
           max_value: 100
           ignore_out_of_range: true
-    skip_updates: ${oq_skip_30s}
+    skip_updates: ${oq_modbus_telemetry_skip}
     web_server:
       sorting_group_id: oq_${hp_id}
 
@@ -645,7 +645,7 @@ sensor:
           min_value: -30
           max_value: 100
           ignore_out_of_range: true
-    skip_updates: ${oq_skip_30s}
+    skip_updates: ${oq_modbus_telemetry_skip}
     web_server:
       sorting_group_id: oq_${hp_id}
 
@@ -671,7 +671,7 @@ sensor:
           min_value: -10
           max_value: 100
           ignore_out_of_range: true
-    skip_updates: ${oq_skip_10s}
+    skip_updates: ${oq_modbus_telemetry_skip}
     web_server:
       sorting_group_id: oq_${hp_id}
 
@@ -697,7 +697,7 @@ sensor:
           min_value: -10
           max_value: 100
           ignore_out_of_range: true
-    skip_updates: ${oq_skip_10s}
+    skip_updates: ${oq_modbus_telemetry_skip}
     web_server:
       sorting_group_id: oq_${hp_id}
 
@@ -746,7 +746,7 @@ sensor:
     device_class: "temperature"
     state_class: "measurement"
     accuracy_decimals: 2
-    # register_count: 2  # 2135 - 2137
+    register_count: 2  # 2135-2136; bridge reserved register 2136.
     filters:
       - offset: -3000
       - multiply: 0.01
@@ -754,7 +754,7 @@ sensor:
           min_value: -30
           max_value: 100
           ignore_out_of_range: true
-    skip_updates: ${oq_skip_30s}
+    skip_updates: ${oq_modbus_telemetry_skip}
     web_server:
       sorting_group_id: oq_${hp_id}
 
@@ -772,7 +772,7 @@ sensor:
     accuracy_decimals: 2
     filters:
       - multiply: 0.1
-    skip_updates: ${oq_skip_30s}
+    skip_updates: ${oq_modbus_telemetry_skip}
     web_server:
       sorting_group_id: oq_${hp_id}
 
@@ -783,8 +783,8 @@ sensor:
     icon: mdi:water-pump
     register_type: holding
     address: 2138
-    force_new_range: true
-    #skip_updates: 0
+    force_new_range: false
+    skip_updates: ${oq_modbus_telemetry_skip}
     unit_of_measurement: "L/h"
     device_class: "volume_flow_rate"
     state_class: "measurement"
@@ -955,11 +955,32 @@ sensor:
   # individual Modbus bit entities per heat pump.
   - platform: modbus_controller
     modbus_controller_id: ${hp_id}
+    id: ${hp_id}_status_2108_raw
+    register_type: holding
+    address: 2108
+    value_type: U_WORD
+    register_count: 2  # 2108-2109; bridge reserved register 2109.
+    skip_updates: ${oq_modbus_telemetry_skip}
+    internal: true
+    on_value:
+      then:
+        - lambda: |-
+            const uint16_t status = static_cast<uint16_t>(lroundf(x));
+            id(${hp_id}_fan_low_speed_mode).publish_state((status & 0x0001u) != 0u);
+            id(${hp_id}_bottom_plate_heater).publish_state((status & 0x0004u) != 0u);
+            id(${hp_id}_crankcase_heater).publish_state((status & 0x0008u) != 0u);
+            id(${hp_id}_fan_defrost_mode).publish_state((status & 0x0010u) != 0u);
+            id(${hp_id}_fan_high_speed_mode).publish_state((status & 0x0020u) != 0u);
+            id(${hp_id}_4_way_valve).publish_state((status & 0x0040u) != 0u);
+            id(${hp_id}_pump_relay).publish_state((status & 0x0800u) != 0u);
+
+  - platform: modbus_controller
+    modbus_controller_id: ${hp_id}
     id: ${hp_id}_status_2119_raw
     register_type: holding
     address: 2119
     value_type: U_WORD
-    skip_updates: ${oq_skip_10s}
+    skip_updates: ${oq_modbus_telemetry_skip}
     internal: true
 
   - platform: modbus_controller
@@ -968,7 +989,7 @@ sensor:
     register_type: holding
     address: 2120
     value_type: U_WORD
-    skip_updates: ${oq_skip_10s}
+    skip_updates: ${oq_modbus_telemetry_skip}
     internal: true
 
   - platform: modbus_controller
@@ -977,7 +998,7 @@ sensor:
     register_type: holding
     address: 2121
     value_type: U_WORD
-    skip_updates: ${oq_skip_10s}
+    skip_updates: ${oq_modbus_telemetry_skip}
     internal: true
 
   # ----------------------------
@@ -985,87 +1006,57 @@ sensor:
   # ----------------------------
 binary_sensor:
   # At least bits 0,2,4,5,6,11 are used for status in R2108.
-  - platform: modbus_controller
-    modbus_controller_id: ${hp_id}
+  - platform: template
     id: ${hp_id}_fan_low_speed_mode
     name: "${prefix}Fan Low Speed Mode"
     internal: true
     disabled_by_default: true
     icon: mdi:fan-speed-1
     device_class: running
-    register_type: holding
-    address: 2108
-    bitmask: 0x1
-    skip_updates: ${oq_skip_10s}
     web_server:
       sorting_group_id: oq_${hp_id}
 
-  - platform: modbus_controller
-    modbus_controller_id: ${hp_id}
+  - platform: template
     id: ${hp_id}_bottom_plate_heater
     name: "${prefix}Bottom plate heater"
     icon: mdi:radiator
     device_class: heat
-    register_type: holding
-    address: 2108
-    bitmask: 0x4
-    skip_updates: ${oq_skip_10s}
     web_server:
       sorting_group_id: oq_${hp_id}
 
-  - platform: modbus_controller
-    modbus_controller_id: ${hp_id}
+  - platform: template
     id: ${hp_id}_crankcase_heater
     name: "${prefix}Crankcase heater"
     icon: mdi:radiator
     device_class: heat
-    register_type: holding
-    address: 2108
-    bitmask: 0x8
-    skip_updates: ${oq_skip_10s}
     web_server:
       sorting_group_id: oq_${hp_id}
 
-  - platform: modbus_controller
-    modbus_controller_id: ${hp_id}
+  - platform: template
     id: ${hp_id}_fan_defrost_mode
     name: "${prefix}Fan Defrost Mode"
     internal: true
     disabled_by_default: true
     icon: mdi:snowflake-melt
     device_class: running
-    register_type: holding
-    address: 2108
-    bitmask: 0x10
-    skip_updates: ${oq_skip_10s}
     web_server:
       sorting_group_id: oq_${hp_id}
 
-  - platform: modbus_controller
-    modbus_controller_id: ${hp_id}
+  - platform: template
     id: ${hp_id}_fan_high_speed_mode
     name: "${prefix}Fan High Speed Mode"
     internal: true
     disabled_by_default: true
     icon: mdi:fan-speed-3
     device_class: running
-    register_type: holding
-    address: 2108
-    bitmask: 0x20
-    skip_updates: ${oq_skip_10s}
     web_server:
       sorting_group_id: oq_${hp_id}
 
-  - platform: modbus_controller
-    modbus_controller_id: ${hp_id}
+  - platform: template
     id: ${hp_id}_4_way_valve
     name: "${prefix}4-Way valve"
     icon: mdi:valve
     device_class: running
-    register_type: holding
-    address: 2108
-    bitmask: 0x40
-    skip_updates: ${oq_skip_10s}
     on_state:
       then:
         - lambda: |-
@@ -1073,16 +1064,11 @@ binary_sensor:
     web_server:
       sorting_group_id: oq_${hp_id}
 
-  - platform: modbus_controller
-    modbus_controller_id: ${hp_id}
+  - platform: template
     id: ${hp_id}_pump_relay
     name: "${prefix}DC Pump Relay"
     icon: mdi:electric-switch
     device_class: running
-    register_type: holding
-    address: 2108
-    bitmask: 0x800
-    skip_updates: ${oq_skip_10s}
     web_server:
       sorting_group_id: oq_${hp_id}
 
@@ -1094,7 +1080,7 @@ binary_sensor:
     device_class: running
     register_type: holding
     address: 2118
-    #skip_updates: 0
+    skip_updates: ${oq_modbus_telemetry_skip}
     on_state:
       then:
         - lambda: |-
