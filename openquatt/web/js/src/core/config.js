@@ -188,11 +188,13 @@
     hp1CompressorStarts24h: { domain: "sensor", name: "HP1 - Compressor starts 24h", optional: true },
     hp1CompressorStarts72h: { domain: "sensor", name: "HP1 - Compressor starts 72h", optional: true },
     hp1CompressorLastStartAge: { domain: "sensor", name: "HP1 - Compressor last start age", optional: true },
+    hp1RuntimeHours: { domain: "sensor", name: "HP1 - Runtime Hours", optional: true },
     hp2CompressorStarts2h: { domain: "sensor", name: "HP2 - Compressor starts 2h", optional: true },
     hp2CompressorStarts6h: { domain: "sensor", name: "HP2 - Compressor starts 6h", optional: true },
     hp2CompressorStarts24h: { domain: "sensor", name: "HP2 - Compressor starts 24h", optional: true },
     hp2CompressorStarts72h: { domain: "sensor", name: "HP2 - Compressor starts 72h", optional: true },
     hp2CompressorLastStartAge: { domain: "sensor", name: "HP2 - Compressor last start age", optional: true },
+    hp2RuntimeHours: { domain: "sensor", name: "HP2 - Runtime Hours", optional: true },
     lowflowFaultActive: { domain: "binary_sensor", name: "Lowflow fault active", optional: true },
     flowMismatch: { domain: "binary_sensor", name: "Flow mismatch (HP1 vs HP2)", optional: true },
     cicPollingEnabled: { domain: "switch", name: "CIC - Enable polling", optional: true },
@@ -1263,6 +1265,13 @@
     "silentActive",
     "stickyActive",
     ...HP_PANEL_ENTITY_KEYS,
+  ];
+  export const CONTROL_REPLAY_STATE_KEYS = [
+    "strategyActiveCode",
+    "hp1CompressorStarts24h",
+    "hp2CompressorStarts24h",
+    "hp1RuntimeHours",
+    "hp2RuntimeHours",
   ];
   export const FAST_OVERVIEW_KEYS = [
     "strategy",

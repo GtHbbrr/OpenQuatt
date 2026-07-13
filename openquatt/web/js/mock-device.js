@@ -1787,6 +1787,7 @@
       ["HP1 - Compressor starts 24h", 29, ""],
       ["HP1 - Compressor starts 72h", 40, ""],
       ["HP1 - Compressor last start age", 12, "min"],
+      ["HP1 - Runtime Hours", 2854, "h"],
       ["Compressor cycling alert first seen", 0, "s"],
       ["Compressor cycling alert last seen", 0, "s"],
       ["Compressor cycling alert HP1 peak 2h", 0, ""],

@@ -32,6 +32,7 @@
     ["sensor", "HP2 - Compressor starts 24h", { value: 24 }],
     ["sensor", "HP2 - Compressor starts 72h", { value: 40 }],
     ["sensor", "HP2 - Compressor last start age", { value: 18, uom: "min" }],
+    ["sensor", "HP2 - Runtime Hours", { value: 2761, uom: "h" }],
     ["sensor", "HP2 - Fan speed", { value: 0, uom: "rpm" }],
     ["sensor", "HP2 - Flow", { value: 0, uom: "L/h" }],
     ["sensor", "HP2 - Evaporator coil temperature", { value: 0, uom: "\u00B0C" }],

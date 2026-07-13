@@ -1063,6 +1063,12 @@
   font-size: 1.25rem;
 }
 
+.oq-working-source-card-note {
+  align-self: end;
+  margin: 10px 0 0;
+  color: var(--oq-overview-muted);
+}
+
 .oq-working-chart-panel {
   position: relative;
   display: grid;

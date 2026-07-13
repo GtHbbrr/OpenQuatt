@@ -44,11 +44,11 @@ import { replaceOuterHtmlIfSignatureChanged } from "../views/view-utils.js";
     if (!hasEntity(key)) {
       return fallback;
     }
-    const minutes = getEntityNumericValue(key);
-    if (!Number.isFinite(minutes)) {
+    const hours = getEntityNumericValue(key);
+    if (!Number.isFinite(hours)) {
       return fallback;
     }
-    return `${Math.round(minutes / 60)} u`;
+    return `${Math.round(hours)} u`;
   }
 
   function isControlReplayHpRunning(panel) {
@@ -155,8 +155,8 @@ import { replaceOuterHtmlIfSignatureChanged } from "../views/view-utils.js";
 
   function formatControlReplayStrategyLabel() {
     const code = Math.round(getEntityNumericValue("strategyActiveCode"));
-    if (code === 1) return "Cooling";
-    if (code === 2) return "Heating Curve";
+    if (code === 1) return "Koeling";
+    if (code === 2) return "Stooklijn";
     if (code === 3) return "Power House";
     return getEntityStateText("strategy", "—");
   }
@@ -1008,12 +1008,12 @@ import { replaceOuterHtmlIfSignatureChanged } from "../views/view-utils.js";
       hp2Status: hp2Panel ? (hp2Running ? "Actief" : hp2Waiting ? "Wacht" : "Beschikbaar") : "Niet aanwezig",
       cvStatus: boilerActive ? "Actief" : "Uit",
       outsideTemp: formatControlReplayNumber("outsideTempSelected", 1, "°C", "—"),
-      supplyTemp: formatControlReplayNumber("waterSupplyTempSelected", 1, "°C", "—"),
+      supplyTemp: formatControlReplayNumber("supplyTemp", 1, "°C", "—"),
       flow: formatControlReplayNumber("flowSelected", 0, "L/h", "—"),
       hp1Starts: getControlReplayCounterValue("hp1CompressorStarts24h", "—"),
       hp2Starts: getControlReplayCounterValue("hp2CompressorStarts24h", hp2Panel ? "—" : "n.v.t."),
-      hp1Hours: formatControlReplayRuntimeHours("hp1Minutes", "—"),
-      hp2Hours: hp2Panel ? formatControlReplayRuntimeHours("hp2Minutes", "—") : "n.v.t.",
+      hp1Hours: formatControlReplayRuntimeHours("hp1RuntimeHours", "—"),
+      hp2Hours: hp2Panel ? formatControlReplayRuntimeHours("hp2RuntimeHours", "—") : "n.v.t.",
       cooling: coolingContext,
       coolingProtection,
       startupInhibit,
@@ -2876,17 +2876,17 @@ import { replaceOuterHtmlIfSignatureChanged } from "../views/view-utils.js";
     `;
   }
 
-  function renderControlWorkingSourceCard(title, status, starts, hours, active) {
+  function renderControlWorkingSourceCard(title, status, starts, hours, active, note = "") {
     return `
       <article class="oq-working-source-card${active ? " is-active" : ""}">
         <div>
           <span>${escapeHtml(title)}</span>
           <strong>${escapeHtml(status)}</strong>
         </div>
-        <dl>
+        ${note ? `<p class="oq-working-source-card-note">${escapeHtml(note)}</p>` : `<dl>
           <div><dt>Starts 24u</dt><dd>${escapeHtml(starts)}</dd></div>
           <div><dt>Draaiuren</dt><dd>${escapeHtml(hours)}</dd></div>
-        </dl>
+        </dl>`}
       </article>
     `;
   }
@@ -2963,13 +2963,16 @@ import { replaceOuterHtmlIfSignatureChanged } from "../views/view-utils.js";
         ["Rusttijd vrij", "normal", "activity"],
         ["Waterflow bewaakt", "info", "waves"],
       ];
+    const coolingContextActive = current.cooling.requestActive || isCoolingGuard || isCoolingCap || current.strategyLabel === "Koeling";
     const telemetryRows = [
       ["Aanvoer", current.supplyTemp],
       ["Buiten", current.outsideTemp],
       ["Flow", current.flow],
-      ["Strategie", current.strategyLabel],
     ];
-    if (current.cooling.requestActive || isCoolingGuard || isCoolingCap) {
+    if (!coolingContextActive) {
+      telemetryRows.push(["Strategie", current.strategyLabel]);
+    }
+    if (coolingContextActive) {
       telemetryRows.push(["Dauwpunt", current.cooling.dewPoint]);
       telemetryRows.push(["Veilige min.", current.cooling.safeSupply]);
     }
@@ -2993,7 +2996,7 @@ import { replaceOuterHtmlIfSignatureChanged } from "../views/view-utils.js";
           <section class="oq-working-source-grid" aria-label="Bronnen">
             ${renderControlWorkingSourceCard("HP1", current.hp1Status, current.hp1Starts, current.hp1Hours, current.hp1Running)}
             ${renderControlWorkingSourceCard("HP2", current.hp2Status, current.hp2Starts, current.hp2Hours, current.hp2Running)}
-            ${renderControlWorkingSourceCard("CV", current.cvStatus, "—", "—", current.cvStatus === "Actief")}
+            ${renderControlWorkingSourceCard("CV", current.cvStatus, "", "", current.cvStatus === "Actief", coolingContextActive ? "Geen rol bij koelen." : "Tijdelijke ondersteuning bij extra warmtevraag.")}
           </section>
           <section class="oq-working-guard-panel">
             <span class="oq-working-eyebrow">${escapeHtml(guardEyebrow)}</span>
