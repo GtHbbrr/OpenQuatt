@@ -10,6 +10,7 @@ import {
   startQuickStartFlowTest,
 } from "./quickstart-actions.js";
 import { selectQuickStepByOffset } from "./quickstart.js";
+import { installQuickStartSetupSwitch } from "./firmware-actions.js";
 
 function moveQuickStartStep(offset) {
   selectQuickStepByOffset(offset);
@@ -23,7 +24,7 @@ const quickStartActionHandlers = {
     render();
   },
   "open-quickstart-modal": () => {
-    state.currentStep = "generation";
+    state.currentStep = "setup";
     state.quickStartModalMode = "wizard";
     state.quickStartModalOpen = true;
     render();
@@ -39,6 +40,15 @@ const quickStartActionHandlers = {
     render();
     void refreshQuickStartStepHydration(state.currentStep);
   },
+  "select-quickstart-setup": (button) => {
+    state.quickStartSetupDraft = button.dataset.setupTarget || "";
+    state.quickStartSetupConfirmed = false;
+    state.controlError = "";
+    state.controlNotice = "";
+    render();
+    void refreshQuickStartStepHydration("setup");
+  },
+  "install-quickstart-setup": () => installQuickStartSetupSwitch(),
   "apply-quickstart-flow-source": () => applyQuickStartFlowSourceConfiguration(),
   "refresh-quickstart-flow-signal": () => refreshQuickStartFlowSignal(),
   "start-quickstart-flow-test": () => startQuickStartFlowTest(),

@@ -75,6 +75,12 @@ const actionDelegates = [
   }
 
   export function handleInput(event) {
+    if (event.target.dataset.oqQuickstartSetupConfirm) {
+      state.quickStartSetupConfirmed = Boolean(event.target.checked);
+      render();
+      return;
+    }
+
     if (event.target.dataset.oqFirmwareConnectionConfirm) {
       updateFirmwareState({ firmwareConnectionSwitchConfirmed: Boolean(event.target.checked) });
       render();

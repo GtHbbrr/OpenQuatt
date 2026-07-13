@@ -48,10 +48,11 @@ Wil je de interface eerst rustig bekijken zonder echte hardware, open dan de [we
 
 Na de eerste installatie opent de web-app Quick Start zolang de basisinstallatie nog niet is afgerond.
 
-Quick Start bestaat uit zeven stappen:
+Quick Start begint voor de Heatpump Controller Q met een controle van de firmware-setup. Daarna volgen de bestaande configuratiestappen:
 
 | Stap | Wat kies je? | Waarom? |
 |---|---|---|
+| `Kies je setup` | `Single` of `Duo`, via `Wi-Fi` of `Ethernet` | Installeert zo nodig direct de passende Q-edition-firmware voordat je verder configureert. |
 | `Kies je Quatt Hybrid` | V1, V1.5 of V2 | OpenQuatt gebruikt hiermee de juiste basislogica. |
 | `Kies de verwarmingsstrategie` | `Power House` of `Water Temperature Control` | Dit bepaalt hoe OpenQuatt warmtevraag maakt. |
 | `Werk de regeling uit` | Strategie-instellingen | Je ziet alleen velden die bij de gekozen strategie horen. |
@@ -196,7 +197,9 @@ De web-app toont update-informatie via de firmware-updatefunctie. Normaal volg j
 
 Gebruik een dev-kanaal alleen als je bewust test en weet dat de firmware nog kan veranderen. Voor releasegebruik is het stabiele kanaal de route.
 
-Bij de Heatpump Controller Q kan de OTA-modal ook de verbinding wisselen tussen Wi-Fi en Ethernet. Dat is geen gewone update: de web-app installeert dan dezelfde `Single`- of `Duo`-build voor de andere netwerkverbinding. Controleer bij `Wi-Fi -> Ethernet` eerst of de netwerkkabel is aangesloten. Bij `Ethernet -> Wi-Fi` verdwijnt Ethernet na de herstart; als er geen Wi-Fi-gegevens bekend zijn, start de Wi-Fi-build het OpenQuatt fallback access point.
+Bij de Heatpump Controller Q kan Quick Start vóór de verdere configuratie direct wisselen tussen `Single Wi-Fi`, `Single Ethernet`, `Duo Wi-Fi` en `Duo Ethernet`. De OTA-modal kan later nog steeds de verbinding of opstelling afzonderlijk wisselen. Dit zijn geen gewone updates: de web-app installeert de firmware voor de gekozen setup. Controleer bij Ethernet eerst of de netwerkkabel is aangesloten en bij Duo of de tweede warmtepomp bij deze controller hoort.
+
+Als de verbinding voor de firmwaredownload niet kan worden geopend, probeert OpenQuatt dit eenmaal automatisch opnieuw. Mislukt ook die poging of wordt de installatie afgebroken, dan stopt de voortgang en kun je de setupwissel opnieuw starten.
 
 ## Web-login en API-beveiliging
 

@@ -85,6 +85,50 @@ import { render } from "../core/render-scheduler.js";
     };
   }
 
+  export function getFirmwareBuildSwitchModel(targetTopology, targetConnection) {
+    const hardware = getFirmwareHardwareProfile();
+    const currentTopology = getInstallationTopology();
+    const currentConnection = getFirmwareBuildConnection();
+    const topology = normalizeInstallationTopologyLabel(targetTopology);
+    const connection = normalizeFirmwareConnection(targetConnection);
+    const topologyChanges = topology && topology !== currentTopology;
+    const connectionChanges = connection && connection !== currentConnection;
+    const targetOption = topologyChanges && connectionChanges
+      ? "alternate topology and connection"
+      : topologyChanges
+        ? "alternate topology"
+        : connectionChanges
+          ? "alternate connection"
+          : "current build";
+    const valid = hardware === "heatpump_controller_q"
+      && ["single", "duo"].includes(currentTopology)
+      && ["single", "duo"].includes(topology)
+      && ["wifi", "eth"].includes(currentConnection)
+      && ["wifi", "eth"].includes(connection);
+    const targetEntityAvailable = hasEntity("firmwareUpdateTarget");
+    const targetOptionAvailable = hasFirmwareUpdateTargetOption(targetOption);
+    const installActionAvailable = hasEntity("installFirmwareUpdateTarget");
+
+    return {
+      available: valid,
+      canSwitch: valid
+        && targetOption !== "current build"
+        && targetEntityAvailable
+        && targetOptionAvailable
+        && installActionAvailable,
+      targetEntityAvailable,
+      targetOptionAvailable,
+      installActionAvailable,
+      currentTopology,
+      currentConnection,
+      targetTopology: topology,
+      targetConnection: connection,
+      targetOption,
+      currentBuildLabel: getFirmwareBuildLabelFor(currentTopology, currentConnection),
+      targetBuildLabel: getFirmwareBuildLabelFor(topology, connection),
+    };
+  }
+
   export function getFirmwareTestPrNumber(value = state.updateTestFirmwarePr) {
     const normalized = String(value || "").trim().replace(/^#?pr[-\s]*/i, "").replace(/^#/, "");
     return /^\d{1,6}$/.test(normalized) ? normalized : "";
@@ -286,7 +330,7 @@ import { render } from "../core/render-scheduler.js";
     const phase = getFirmwareProgressPhase();
     const percent = getFirmwareProgressPercent();
 
-    if (phase === "starting" || phase === "uploading" || phase === "rebooting") {
+    if (phase === "starting" || phase === "retrying" || phase === "uploading" || phase === "rebooting") {
       state.updateInstallPhaseHint = phase;
       if (!Number.isNaN(percent)) {
         state.updateInstallProgressHint = phase === "rebooting"
@@ -300,7 +344,10 @@ import { render } from "../core/render-scheduler.js";
       return;
     }
 
-    if (hasInstalledFirmwareTargetVersion()) {
+    // Setup switches commonly keep the same semantic version across builds.
+    // Only a normal version update may infer rebooting from the version alone;
+    // build switches must wait for the live OTA phase from the device.
+    if (state.updateInstallMode === "normal" && hasInstalledFirmwareTargetVersion()) {
       state.updateInstallPhaseHint = "rebooting";
       state.updateInstallProgressHint = 100;
       return;
@@ -314,14 +361,25 @@ import { render } from "../core/render-scheduler.js";
 
   export function isFirmwareProgressActive() {
     const phase = getFirmwareProgressPhase();
-    return phase === "starting" || phase === "uploading" || phase === "rebooting";
+    return phase === "starting" || phase === "retrying" || phase === "uploading" || phase === "rebooting";
+  }
+
+  export function getFirmwareInstallFailureMessage() {
+    const phase = getFirmwareProgressPhase();
+    if (phase === "error") {
+      return "De firmware-installatie op het device is mislukt. Controleer de netwerkverbinding en probeer opnieuw.";
+    }
+    if (phase === "aborted") {
+      return "De firmware-installatie is door het device afgebroken. Probeer de installatie opnieuw.";
+    }
+    return "";
   }
 
   export function getFirmwareProgressModel() {
     syncFirmwareInstallHints();
 
     const livePhase = getFirmwareProgressPhase();
-    const hasLivePhase = livePhase === "starting" || livePhase === "uploading" || livePhase === "rebooting";
+    const hasLivePhase = livePhase === "starting" || livePhase === "retrying" || livePhase === "uploading" || livePhase === "rebooting";
     const phase = hasLivePhase ? livePhase : state.updateInstallPhaseHint;
     const rawPercent = getFirmwareProgressPercent();
     const hintedPercent = Number.isNaN(state.updateInstallProgressHint) ? 0 : Math.round(state.updateInstallProgressHint);
@@ -339,9 +397,17 @@ import { render } from "../core/render-scheduler.js";
           ? "Testfirmware is geplaatst. Het device start opnieuw op en komt daarna vanzelf terug."
           : state.updateInstallMode === "connection-switch"
           ? "Firmware is geplaatst. Het device start opnieuw op en komt daarna via de gekozen verbinding terug."
-          : state.updateInstallMode === "topology-switch"
+          : state.updateInstallMode === "topology-switch" || state.updateInstallMode === "build-switch"
           ? "Firmware is geplaatst. Het device start opnieuw op en komt daarna met de gekozen opstelling terug."
           : "Firmware is geplaatst. Het device start nu opnieuw op en komt daarna vanzelf terug.",
+      };
+    }
+
+    if (phase === "retrying") {
+      return {
+        phaseLabel: "Opnieuw proberen",
+        percent: 0,
+        copy: "De eerste verbinding voor de firmwaredownload mislukte. OpenQuatt probeert het automatisch nog één keer.",
       };
     }
 
@@ -353,7 +419,7 @@ import { render } from "../core/render-scheduler.js";
           ? `Testfirmware wordt nu door ${getFirmwareDeviceLabel()} gedownload en geïnstalleerd.`
           : state.updateInstallMode === "connection-switch"
           ? `De ${getFirmwareConnectionLabel(state.updateInstallTargetConnection)}-build wordt nu naar ${getFirmwareDeviceLabel()} verzonden.`
-          : state.updateInstallMode === "topology-switch"
+          : state.updateInstallMode === "topology-switch" || state.updateInstallMode === "build-switch"
           ? `De ${getFirmwareBuildLabelFor(state.updateInstallTargetTopology, state.updateInstallTargetConnection)}-build wordt nu naar ${getFirmwareDeviceLabel()} verzonden.`
           : `Firmware wordt nu naar ${getFirmwareDeviceLabel()} verzonden.`,
       };
@@ -366,7 +432,7 @@ import { render } from "../core/render-scheduler.js";
         ? `Testfirmware-installatie is gestart voor ${getFirmwareDeviceLabel()}.`
         : state.updateInstallMode === "connection-switch"
         ? `Verbindingswissel naar ${getFirmwareConnectionLabel(state.updateInstallTargetConnection)} is gestart.`
-        : state.updateInstallMode === "topology-switch"
+        : state.updateInstallMode === "topology-switch" || state.updateInstallMode === "build-switch"
         ? `Opstellingswissel naar ${getFirmwareTopologyLabel(state.updateInstallTargetTopology)} is gestart.`
         : `OTA-update is gestart voor ${getFirmwareDeviceLabel()}.`,
     };
@@ -726,6 +792,12 @@ import { render } from "../core/render-scheduler.js";
       await wait(attempt === 0 ? initialDelayMs : pollDelayMs);
       try {
         await refreshEntities(FIRMWARE_MODAL_KEYS, "all", { forceMissing: true });
+        const failureMessage = getFirmwareInstallFailureMessage();
+        if (failureMessage) {
+          const failure = new Error(failureMessage);
+          failure.firmwareInstallTerminal = true;
+          throw failure;
+        }
         if (getFirmwareProgressPhase() === "rebooting") {
           beginDeviceReconnect("ota");
         }
@@ -751,6 +823,19 @@ import { render } from "../core/render-scheduler.js";
           ) {
             return true;
           }
+        } else if (state.updateInstallMode === "build-switch") {
+          const expectedTopology = normalizeInstallationTopologyLabel(state.updateInstallTargetTopology);
+          const expectedConnection = normalizeFirmwareConnection(state.updateInstallTargetConnection);
+          if (
+            expectedTopology
+            && expectedConnection
+            && getInstallationTopology() === expectedTopology
+            && getFirmwareBuildConnection() === expectedConnection
+            && !isFirmwareProgressActive()
+            && !isFirmwareUpdateInstalling()
+          ) {
+            return true;
+          }
         } else if (
           hasInstalledFirmwareTargetVersion()
           || isFirmwareInstallSettled()
@@ -759,6 +844,9 @@ import { render } from "../core/render-scheduler.js";
             return true;
         }
       } catch (error) {
+        if (error?.firmwareInstallTerminal) {
+          throw error;
+        }
         if (!waitingForReconnect) {
           state.controlNotice = "Wachten tot het device opnieuw is opgestart...";
           render();

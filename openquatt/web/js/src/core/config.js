@@ -10,6 +10,7 @@
   export const STRATEGY_OPTION_CURVE = "Water Temperature Control (heating curve)";
 
   export const QUICK_STEPS = [
+    ["setup", "Kies je setup", "Controleer of je Q-edition als Single of Duo en via Wi-Fi of Ethernet moet werken."],
     ["generation", "Kies je Quatt Hybrid", "Geef hier aan welke Quatt Hybrid je hebt. Dan zet OpenQuatt de juiste regeling klaar."],
     ["flow-source", "Flowmeting configureren", "Controleer en activeer de flowbron die bij jouw Quatt-versie en controller hoort."],
     ["thermostat-source", "Thermostaatgegevens configureren", "Leg vast waar OpenQuatt de kamertemperatuur en het kamer-setpoint samen vandaan haalt."],

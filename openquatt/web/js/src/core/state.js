@@ -35,7 +35,7 @@ export const state = {
   interfacePanelOpen: getStoredInterfacePanelOpen(),
   devPanelOpen: __OQ_PREVIEW__ && getStoredDevPanelOpen(),
   nativeOpen: getStoredSurface() === "native",
-  currentStep: "generation",
+  currentStep: "setup",
   quickStartModalMode: "wizard",
   settingsGroup: getStoredSettingsGroup(),
   appView: "",

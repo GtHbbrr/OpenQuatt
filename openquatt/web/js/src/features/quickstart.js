@@ -5,13 +5,114 @@ import { formatValue, getEntityValue, toTimeInputValue } from "../core/entity-st
 import { createScrollKeeper } from "../core/scroll-keeper.js";
 import { renderModalShell } from "../core/modal-shell.js";
 import { state } from "../core/state.js";
-import { getDeviceMeta, getInstallationTopology } from "./device-context.js";
+import { getDeviceMeta, getFirmwareBuildConnection, getInstallationTopology } from "./device-context.js";
+import { getFirmwareBuildSwitchModel, getFirmwareProgressModel } from "./firmware-update.js";
 import { formatSettingsOptionLabel, renderSettingsFieldCard, renderSettingsInfoToggle } from "../settings/controls.js";
 import { renderCurveGraph, renderFlowSettingsFields, renderHeatingCurveProfileField, renderHeatingStrategyExplainCards, renderPowerHouseAdvancedField, renderPowerHouseBaseFields, renderSettingsCurveInputs, renderStrategySelectionFields } from "../settings/heating.js";
 import { renderBoilerCvFields, renderHpGenerationField } from "../settings/installation.js";
 import { renderSilentSettingsGrid } from "../settings/silent.js";
 import { renderWaterSettingsFields } from "../settings/water.js";
 import { escapeHtml } from "../core/html.js";
+
+  export function getQuickStartSetupModel() {
+    const currentTopology = getInstallationTopology();
+    const currentConnection = getFirmwareBuildConnection();
+    const currentKey = `${currentTopology}:${currentConnection}`;
+    const selectedKey = state.quickStartSetupDraft || currentKey;
+    const [targetTopology, targetConnection] = selectedKey.split(":");
+    const switchModel = getFirmwareBuildSwitchModel(targetTopology, targetConnection);
+    return {
+      ...switchModel,
+      currentKey,
+      selectedKey,
+      changes: selectedKey !== currentKey,
+      targetIsDuo: targetTopology === "duo",
+      targetIsEthernet: targetConnection === "eth",
+    };
+  }
+
+  export function renderSetupWorkspace() {
+    const model = getQuickStartSetupModel();
+    const progress = getFirmwareProgressModel();
+    const busy = Boolean(progress || state.updateInstallBusy);
+    const options = [
+      ["single:wifi", "Single · Wi-Fi", "Eén warmtepomp via het draadloze netwerk."],
+      ["single:eth", "Single · Ethernet", "Eén warmtepomp via een vaste netwerkkabel."],
+      ["duo:wifi", "Duo · Wi-Fi", "Twee warmtepompen via het draadloze netwerk."],
+      ["duo:eth", "Duo · Ethernet", "Twee warmtepompen via een vaste netwerkkabel."],
+    ];
+    const requirements = [
+      model.targetIsDuo ? "De tweede warmtepomp is aangesloten en hoort bij deze controller." : "Deze controller wordt voor één warmtepomp gebruikt.",
+      model.targetIsEthernet ? "De netwerkkabel is aangesloten." : "De Wi-Fi-gegevens zijn beschikbaar op de controller.",
+    ];
+
+    return `
+      <section class="oq-helper-panel">
+        <p class="oq-helper-label">${escapeHtml(getQuickStepKicker("setup"))}</p>
+        <h2 class="oq-helper-section-title">Kies je setup</h2>
+        <p class="oq-helper-section-copy">De gemarkeerde setup is de configuratie die nu op je Q-edition actief is. Kies alleen een andere setup als je installatie anders is opgebouwd of een andere netwerkverbinding moet gebruiken.</p>
+        <div class="oq-helper-fields">
+          ${options.map(([key, title, copy]) => {
+            const selected = model.selectedKey === key;
+            const current = model.currentKey === key;
+            return `
+              <button
+                class="oq-helper-field oq-helper-field--step${selected ? " is-current" : ""}"
+                type="button"
+                data-oq-action="select-quickstart-setup"
+                data-setup-target="${escapeHtml(key)}"
+                aria-pressed="${selected ? "true" : "false"}"
+                ${busy ? "disabled" : ""}
+              >
+                <div class="oq-helper-field-step-head">
+                  <h3>${escapeHtml(title)}</h3>
+                  ${current ? '<span class="oq-helper-field-step-state">Actief</span>' : ""}
+                </div>
+                <p>${escapeHtml(copy)}</p>
+              </button>
+            `;
+          }).join("")}
+        </div>
+        ${model.changes ? `
+          <div class="oq-firmware-advanced-detail">
+            ${progress ? `
+              <div class="oq-helper-modal-progress" aria-live="polite">
+                <div class="oq-helper-modal-progress-head">
+                  <strong>${escapeHtml(progress.phaseLabel)}</strong>
+                  <span>${escapeHtml(`${progress.percent}%`)}</span>
+                </div>
+                <div class="oq-helper-modal-progress-track" aria-hidden="true">
+                  <span class="oq-helper-modal-progress-fill" style="width:${Math.max(0, Math.min(100, progress.percent))}%"></span>
+                </div>
+                <p class="oq-helper-modal-note">${escapeHtml(progress.copy)}</p>
+              </div>
+            ` : ""}
+            <div class="oq-helper-modal-grid">
+              <div class="oq-helper-modal-row"><span class="oq-helper-modal-label">Huidige build</span><strong class="oq-helper-modal-value">${escapeHtml(model.currentBuildLabel)}</strong></div>
+              <div class="oq-helper-modal-row"><span class="oq-helper-modal-label">Nieuwe build</span><strong class="oq-helper-modal-value">${escapeHtml(model.targetBuildLabel)}</strong></div>
+            </div>
+            <p class="oq-helper-modal-note">Voor deze wijziging installeert OpenQuatt de passende firmware en start de controller opnieuw op.</p>
+            <label class="oq-helper-modal-check">
+              <input type="checkbox" data-oq-quickstart-setup-confirm="true" ${state.quickStartSetupConfirmed ? "checked" : ""} ${busy ? "disabled" : ""}>
+              <span>${escapeHtml(requirements.join(" "))}</span>
+            </label>
+            <div class="oq-firmware-advanced-footer">
+              <button class="oq-helper-button oq-helper-button--primary" type="button" data-oq-action="install-quickstart-setup" ${busy || !state.quickStartSetupConfirmed || !model.canSwitch ? "disabled" : ""}>
+                ${busy ? "Setupwissel uitvoeren..." : "Nieuwe setup installeren"}
+              </button>
+            </div>
+            ${!model.canSwitch && !busy ? `<p class="oq-helper-modal-note oq-helper-modal-note--muted">${escapeHtml(
+              !model.targetEntityAvailable || !model.installActionAvailable
+                ? "De firmwarebediening wordt nog geladen. Wacht een moment en probeer opnieuw."
+                : "Deze firmware mist nog het vereiste OTA-target. Werk eerst bij naar een build die setupwissels ondersteunt.",
+            )}</p>` : ""}
+          </div>
+        ` : renderQuickStartStepNav()}
+        ${state.controlNotice ? `<p class="oq-helper-notice">${escapeHtml(state.controlNotice)}</p>` : ""}
+        ${state.controlError ? `<p class="oq-helper-error">${escapeHtml(state.controlError)}</p>` : ""}
+      </section>
+    `;
+  }
 
   export function renderGenerationWorkspace(mode = "wizard") {
     const pickerMode = mode === "picker";
@@ -484,7 +585,7 @@ import { escapeHtml } from "../core/html.js";
       titleId: "oq-quickstart-modal-title",
       kicker: "Quick Start",
       title: "Rond eerst de Quick Start af",
-      copy: "Kies eerst de Quatt Hybrid en loop daarna stap voor stap door de basisinstellingen.",
+      copy: "Controleer eerst je setup en loop daarna stap voor stap door de basisinstellingen.",
       copyInHeader: true,
       backdropClass: "oq-helper-modal-backdrop--quickstart",
       className: "oq-helper-modal--wide oq-helper-modal--quickstart",
@@ -632,38 +733,43 @@ import { escapeHtml } from "../core/html.js";
   }
 
   export function renderActiveStep() {
-    if (state.currentStep === "generation") {
+    const activeStep = getCurrentQuickStep().id;
+    if (activeStep === "setup") {
+      return renderSetupWorkspace();
+    }
+    if (activeStep === "generation") {
       return renderGenerationWorkspace();
     }
-    if (state.currentStep === "boiler") {
+    if (activeStep === "boiler") {
       return hasEntity("boilerCvAssistEnabled") ? renderBoilerWorkspace() : renderStrategyWorkspace();
     }
-    if (state.currentStep === "flow-source") {
+    if (activeStep === "flow-source") {
       return renderFlowSourceWorkspace();
     }
-    if (state.currentStep === "thermostat-source") {
+    if (activeStep === "thermostat-source") {
       return renderThermostatSourceWorkspace();
     }
-    if (state.currentStep === "flow") {
+    if (activeStep === "flow") {
       return renderFlowWorkspace();
     }
-    if (state.currentStep === "heating") {
+    if (activeStep === "heating") {
       return renderHeatingWorkspace();
     }
-    if (state.currentStep === "water") {
+    if (activeStep === "water") {
       return renderWaterWorkspace();
     }
-    if (state.currentStep === "silent") {
+    if (activeStep === "silent") {
       return renderSilentWorkspace();
     }
-    if (state.currentStep === "confirm") {
+    if (activeStep === "confirm") {
       return renderConfirmWorkspace();
     }
     return renderStrategyWorkspace();
   }
 
   export function getQuickSteps() {
-    return QUICK_STEPS.filter((step) => !step.optionalEntity || hasEntity(step.optionalEntity));
+    const isQEdition = getQuickStartHardwareProfileModel().isQEdition;
+    return QUICK_STEPS.filter((step) => (step.id !== "setup" || isQEdition) && (!step.optionalEntity || hasEntity(step.optionalEntity)));
   }
 
   export function getQuickStepKicker(stepId) {

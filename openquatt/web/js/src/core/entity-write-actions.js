@@ -394,6 +394,8 @@ export async function triggerButton(action) {
     await refreshEntities(["setupComplete"], "state");
     if (action === "reset") {
       state.currentStep = QUICK_STEPS[0].id;
+      state.quickStartSetupDraft = "";
+      state.quickStartSetupConfirmed = false;
       state.quickStartModalMode = "wizard";
       state.quickStartModalOpen = true;
     }

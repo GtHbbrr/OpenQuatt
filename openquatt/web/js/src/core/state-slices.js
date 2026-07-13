@@ -83,6 +83,8 @@ export function createDiagnosticsState(debugRecordingAcknowledgedId) {
     quickStartScrollRestoreToken: 0,
     quickStartCicFeedUrlDraft: null,
     quickStartThermostatSourceDraft: null,
+    quickStartSetupDraft: "",
+    quickStartSetupConfirmed: false,
     webServerLogCopyMessage: "",
     webServerLogCopyError: "",
     webServerLogRecentTail: [],

@@ -21,6 +21,8 @@ substitutions:
   alternate_topology: "single"
   alternate_topology_main_release_manifest_url: "https://github.com/jeroen85/OpenQuatt/releases/latest/download/openquatt-heatpump-controller-q-single-wifi-ota.manifest.json"
   alternate_topology_dev_release_manifest_url: "https://github.com/jeroen85/OpenQuatt/releases/download/dev-latest/openquatt-heatpump-controller-q-single-wifi-ota.manifest.json"
+  alternate_build_main_release_manifest_url: "https://github.com/jeroen85/OpenQuatt/releases/latest/download/openquatt-heatpump-controller-q-single-eth-ota.manifest.json"
+  alternate_build_dev_release_manifest_url: "https://github.com/jeroen85/OpenQuatt/releases/download/dev-latest/openquatt-heatpump-controller-q-single-eth-ota.manifest.json"
 
 esphome:
   build_path: ../../../.esphome/build/heatpump_controller_q_duo_wifi

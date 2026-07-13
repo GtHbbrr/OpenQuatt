@@ -32,6 +32,51 @@ esphome:
           #endif
           id(oq_hardware_profile_text).publish_state("${oq_hardware_profile}");
           id(oq_connection_text).publish_state("${oq_connection}");
+          id(oq_firmware_update).add_on_state_callback([]() {
+            const uint32_t request_generation = id(oq_fw_check_request_generation);
+            if (request_generation == 0 || id(oq_fw_check_completed_generation) == request_generation) {
+              return;
+            }
+
+            std::string hardware_slug;
+            const std::string hardware = "${oq_hardware_profile}";
+            if (hardware == "waveshare") {
+              hardware_slug = "waveshare";
+            } else if (hardware == "heatpump_listener") {
+              hardware_slug = "heatpump-listener";
+            } else if (hardware == "heatpump_controller_q") {
+              hardware_slug = "heatpump-controller-q";
+            }
+            #if OQ_TOPOLOGY_DUO
+            std::string topology = "duo";
+            #else
+            std::string topology = "single";
+            #endif
+            std::string connection = "${oq_connection}";
+            const std::string target = id(oq_firmware_update_target).current_option();
+            if (target == "alternate connection" && std::string("${alternate_connection}") != "") {
+              connection = "${alternate_connection}";
+            } else if (target == "alternate topology" && std::string("${alternate_topology}") != "") {
+              topology = "${alternate_topology}";
+            } else if (target == "alternate topology and connection"
+                       && std::string("${alternate_connection}") != ""
+                       && std::string("${alternate_topology}") != "") {
+              connection = "${alternate_connection}";
+              topology = "${alternate_topology}";
+            }
+
+            const std::string expected_file =
+                "openquatt-" + hardware_slug + "-" + topology + "-" + connection + ".firmware.ota.bin";
+            const std::string firmware_url = id(oq_firmware_update).update_info.firmware_url;
+            id(oq_fw_check_target_ready) = !hardware_slug.empty()
+                && firmware_url.size() >= expected_file.size()
+                && firmware_url.compare(firmware_url.size() - expected_file.size(),
+                                        expected_file.size(), expected_file) == 0;
+            id(oq_fw_check_completed_generation) = request_generation;
+            ESP_LOGI("oq_fw", "Firmware manifest check %lu completed: target %s.",
+                     (unsigned long) request_generation,
+                     id(oq_fw_check_target_ready) ? "ready" : "mismatch");
+          });
 
 logger:
   level: DEBUG
@@ -67,6 +112,7 @@ ota:
     on_end:
       then:
         - lambda: |-
+            id(oq_firmware_target_install_active) = false;
             id(oq_runtime_polling_paused).publish_state(false);
             ESP_LOGI("oq_fw", "Runtime polling resumed after OTA.");
             id(oq_ota_phase_code) = 3;
@@ -76,6 +122,7 @@ ota:
     on_error:
       then:
         - lambda: |-
+            id(oq_firmware_target_install_active) = false;
             id(oq_runtime_polling_paused).publish_state(false);
             ESP_LOGI("oq_fw", "Runtime polling resumed after OTA error.");
             id(oq_ota_phase_code) = 5;
@@ -83,6 +130,7 @@ ota:
     on_abort:
       then:
         - lambda: |-
+            id(oq_firmware_target_install_active) = false;
             id(oq_runtime_polling_paused).publish_state(false);
             ESP_LOGI("oq_fw", "Runtime polling resumed after OTA abort.");
             id(oq_ota_phase_code) = 6;
@@ -107,6 +155,7 @@ ota:
     on_end:
       then:
         - lambda: |-
+            id(oq_firmware_target_install_active) = false;
             id(oq_runtime_polling_paused).publish_state(false);
             ESP_LOGI("oq_fw", "Runtime polling resumed after OTA.");
             id(oq_ota_phase_code) = 3;
@@ -118,11 +167,34 @@ ota:
         - lambda: |-
             id(oq_runtime_polling_paused).publish_state(false);
             ESP_LOGI("oq_fw", "Runtime polling resumed after OTA error.");
-            id(oq_ota_phase_code) = 5;
-            id(oq_firmware_update_status).publish_state("Error");
+        - if:
+            condition:
+              lambda: |-
+                return id(oq_firmware_target_install_active)
+                    && id(oq_firmware_target_install_attempt) < 2
+                    && id(oq_ota_progress_pct) <= 0.0f;
+            then:
+              - lambda: |-
+                  id(oq_firmware_target_install_attempt) += 1;
+                  id(oq_ota_phase_code) = 7;
+                  id(oq_ota_progress_pct) = 0.0f;
+                  id(oq_firmware_update_status).publish_state("Retrying");
+                  id(oq_firmware_update_progress).publish_state(0.0f);
+                  ESP_LOGW("oq_fw", "Firmware download connection failed; retrying attempt %u/2 in 5 seconds.",
+                           id(oq_firmware_target_install_attempt));
+              - delay: 5s
+              - update.perform:
+                  id: oq_firmware_update
+                  force_update: true
+            else:
+              - lambda: |-
+                  id(oq_firmware_target_install_active) = false;
+                  id(oq_ota_phase_code) = 5;
+                  id(oq_firmware_update_status).publish_state("Error");
     on_abort:
       then:
         - lambda: |-
+            id(oq_firmware_target_install_active) = false;
             id(oq_runtime_polling_paused).publish_state(false);
             ESP_LOGI("oq_fw", "Runtime polling resumed after OTA abort.");
             id(oq_ota_phase_code) = 6;
@@ -168,6 +240,26 @@ globals:
     type: uint32_t
     restore_value: false
     initial_value: '0'
+  - id: oq_fw_check_request_generation
+    type: uint32_t
+    restore_value: false
+    initial_value: '0'
+  - id: oq_fw_check_completed_generation
+    type: uint32_t
+    restore_value: false
+    initial_value: '0'
+  - id: oq_fw_check_target_ready
+    type: bool
+    restore_value: false
+    initial_value: 'false'
+  - id: oq_firmware_target_install_active
+    type: bool
+    restore_value: false
+    initial_value: 'false'
+  - id: oq_firmware_target_install_attempt
+    type: uint8_t
+    restore_value: false
+    initial_value: '0'
   - id: oq_boot_startup_inhibit_until_ms
     type: uint32_t
     restore_value: false
@@ -202,6 +294,7 @@ script:
           const std::string target = id(oq_firmware_update_target).current_option();
           const bool alternate_connection_update_target = target == "alternate connection";
           const bool alternate_topology_update_target = target == "alternate topology";
+          const bool alternate_build_update_target = target == "alternate topology and connection";
           const bool dev_channel = channel == "dev";
 
           const char *source_url = dev_channel ? "${dev_release_manifest_url}" : "${main_release_manifest_url}";
@@ -209,7 +302,11 @@ script:
             dev_channel ? "${alternate_dev_release_manifest_url}" : "${alternate_main_release_manifest_url}";
           const char *alternate_topology_url =
             dev_channel ? "${alternate_topology_dev_release_manifest_url}" : "${alternate_topology_main_release_manifest_url}";
-          if (alternate_connection_update_target && alternate_connection_url[0] != '\0') {
+          const char *alternate_build_url =
+            dev_channel ? "${alternate_build_dev_release_manifest_url}" : "${alternate_build_main_release_manifest_url}";
+          if (alternate_build_update_target && alternate_build_url[0] != '\0') {
+            source_url = alternate_build_url;
+          } else if (alternate_connection_update_target && alternate_connection_url[0] != '\0') {
             source_url = alternate_connection_url;
           } else if (alternate_topology_update_target && alternate_topology_url[0] != '\0') {
             source_url = alternate_topology_url;
@@ -222,89 +319,60 @@ script:
   - id: oq_install_firmware_update_target_deferred
     mode: restart
     then:
+      - lambda: |-
+          // Clear a terminal phase from an earlier attempt before the web UI starts polling this install.
+          id(oq_ota_phase_code) = 1;
+          id(oq_firmware_update_status).publish_state("Starting");
+          id(oq_firmware_update_progress).publish_state(0.0f);
       # Let the web_server/API button response finish before TLS-heavy GitHub OTA starts.
       - delay: 1500ms
       - script.execute: oq_apply_firmware_update_source
       - script.wait: oq_apply_firmware_update_source
+      - lambda: |-
+          id(oq_fw_check_request_generation) += 1;
+          if (id(oq_fw_check_request_generation) == 0) {
+            id(oq_fw_check_request_generation) = 1;
+          }
+          id(oq_fw_check_target_ready) = false;
+          ESP_LOGI("oq_fw", "Waiting for firmware manifest check %lu before install.",
+                   (unsigned long) id(oq_fw_check_request_generation));
       - update.check:
           id: oq_firmware_update
       - wait_until:
           condition:
             lambda: |-
-              // Wait until the parsed manifest OTA file matches the selected target.
-              std::string hardware_slug;
-              const std::string hardware = "${oq_hardware_profile}";
-              if (hardware == "waveshare") {
-                hardware_slug = "waveshare";
-              } else if (hardware == "heatpump_listener") {
-                hardware_slug = "heatpump-listener";
-              } else if (hardware == "heatpump_controller_q") {
-                hardware_slug = "heatpump-controller-q";
-              } else {
-                return false;
-              }
-              #if OQ_TOPOLOGY_DUO
-              std::string topology = "duo";
-              #else
-              std::string topology = "single";
-              #endif
-              std::string connection = "${oq_connection}";
-              const std::string target = id(oq_firmware_update_target).current_option();
-              if (target == "alternate connection" && std::string("${alternate_connection}") != "") {
-                connection = "${alternate_connection}";
-              } else if (target == "alternate topology" && std::string("${alternate_topology}") != "") {
-                topology = "${alternate_topology}";
-              }
-              const std::string expected_file =
-                  "openquatt-" + hardware_slug + "-" + topology + "-" + connection + ".firmware.ota.bin";
-              const std::string firmware_url = id(oq_firmware_update).update_info.firmware_url;
-              return firmware_url.size() >= expected_file.size() &&
-                     firmware_url.compare(firmware_url.size() - expected_file.size(),
-                                          expected_file.size(), expected_file) == 0;
+              return id(oq_fw_check_completed_generation) == id(oq_fw_check_request_generation);
           timeout: 20s
       - if:
           condition:
             lambda: |-
-              // Block installation when http_request.update still contains stale OTA metadata.
-              std::string hardware_slug;
-              const std::string hardware = "${oq_hardware_profile}";
-              if (hardware == "waveshare") {
-                hardware_slug = "waveshare";
-              } else if (hardware == "heatpump_listener") {
-                hardware_slug = "heatpump-listener";
-              } else if (hardware == "heatpump_controller_q") {
-                hardware_slug = "heatpump-controller-q";
-              } else {
-                ESP_LOGW("oq_fw", "Firmware install blocked: unsupported hardware profile '%s'.", hardware.c_str());
-                id(oq_firmware_update_status).publish_state("Error");
-                return false;
-              }
-              #if OQ_TOPOLOGY_DUO
-              std::string topology = "duo";
-              #else
-              std::string topology = "single";
-              #endif
-              std::string connection = "${oq_connection}";
-              const std::string target = id(oq_firmware_update_target).current_option();
-              if (target == "alternate connection" && std::string("${alternate_connection}") != "") {
-                connection = "${alternate_connection}";
-              } else if (target == "alternate topology" && std::string("${alternate_topology}") != "") {
-                topology = "${alternate_topology}";
-              }
-              const std::string expected_file =
-                  "openquatt-" + hardware_slug + "-" + topology + "-" + connection + ".firmware.ota.bin";
-              const std::string firmware_url = id(oq_firmware_update).update_info.firmware_url;
-              const bool matched = firmware_url.size() >= expected_file.size() &&
-                  firmware_url.compare(firmware_url.size() - expected_file.size(),
-                                       expected_file.size(), expected_file) == 0;
-              if (!matched) {
-                ESP_LOGW("oq_fw", "Firmware install blocked: cached OTA URL '%s' does not match target file '%s'.",
-                         firmware_url.c_str(), expected_file.c_str());
-                id(oq_firmware_update_status).publish_state("Error");
-              }
-              return matched;
+              return id(oq_fw_check_completed_generation) != id(oq_fw_check_request_generation)
+                  || !id(oq_fw_check_target_ready);
           then:
             - lambda: |-
+                id(oq_fw_check_request_generation) += 1;
+                if (id(oq_fw_check_request_generation) == 0) {
+                  id(oq_fw_check_request_generation) = 1;
+                }
+                id(oq_fw_check_target_ready) = false;
+                ESP_LOGW("oq_fw", "Firmware manifest check did not complete; retrying check %lu once.",
+                         (unsigned long) id(oq_fw_check_request_generation));
+            - update.check:
+                id: oq_firmware_update
+            - wait_until:
+                condition:
+                  lambda: |-
+                    return id(oq_fw_check_completed_generation) == id(oq_fw_check_request_generation);
+                timeout: 20s
+      - if:
+          condition:
+            lambda: |-
+              return id(oq_fw_check_completed_generation) == id(oq_fw_check_request_generation)
+                  && id(oq_fw_check_target_ready);
+          then:
+            - lambda: |-
+                id(oq_firmware_target_install_active) = true;
+                id(oq_firmware_target_install_attempt) = 1;
                 id(oq_runtime_polling_paused).publish_state(true);
                 ESP_LOGI("oq_fw", "Runtime polling paused before deferred OTA.");
                 id(oq_firmware_update_status).publish_state("Starting");
@@ -313,6 +381,12 @@ script:
             - update.perform:
                 id: oq_firmware_update
                 force_update: true
+          else:
+            - lambda: |-
+                id(oq_firmware_target_install_active) = false;
+                id(oq_ota_phase_code) = 5;
+                id(oq_firmware_update_status).publish_state("Error");
+                ESP_LOGE("oq_fw", "Firmware install blocked: target manifest check failed twice.");
 
   - id: oq_capture_overview_trend_sample
     mode: single
@@ -449,11 +523,16 @@ select:
               id(oq_firmware_update_target).current_option() == "alternate connection";
             const bool alternate_topology_update_target =
               id(oq_firmware_update_target).current_option() == "alternate topology";
+            const bool alternate_build_update_target =
+              id(oq_firmware_update_target).current_option() == "alternate topology and connection";
             if (x == "dev") {
               const char *source_url = "${dev_release_manifest_url}";
               const char *alternate_connection_url = "${alternate_dev_release_manifest_url}";
               const char *alternate_topology_url = "${alternate_topology_dev_release_manifest_url}";
-              if (alternate_connection_update_target && alternate_connection_url[0] != '\0') {
+              const char *alternate_build_url = "${alternate_build_dev_release_manifest_url}";
+              if (alternate_build_update_target && alternate_build_url[0] != '\0') {
+                source_url = alternate_build_url;
+              } else if (alternate_connection_update_target && alternate_connection_url[0] != '\0') {
                 source_url = alternate_connection_url;
               } else if (alternate_topology_update_target && alternate_topology_url[0] != '\0') {
                 source_url = alternate_topology_url;
@@ -463,7 +542,10 @@ select:
               const char *source_url = "${main_release_manifest_url}";
               const char *alternate_connection_url = "${alternate_main_release_manifest_url}";
               const char *alternate_topology_url = "${alternate_topology_main_release_manifest_url}";
-              if (alternate_connection_update_target && alternate_connection_url[0] != '\0') {
+              const char *alternate_build_url = "${alternate_build_main_release_manifest_url}";
+              if (alternate_build_update_target && alternate_build_url[0] != '\0') {
+                source_url = alternate_build_url;
+              } else if (alternate_connection_update_target && alternate_connection_url[0] != '\0') {
                 source_url = alternate_connection_url;
               } else if (alternate_topology_update_target && alternate_topology_url[0] != '\0') {
                 source_url = alternate_topology_url;
@@ -499,7 +581,7 @@ select:
     entity_category: config
     optimistic: true
     restore_value: false
-    options: ["current build", "alternate connection", "alternate topology"]
+    options: ["current build", "alternate connection", "alternate topology", "alternate topology and connection"]
     initial_option: "current build"
     on_value:
       then:
@@ -507,11 +589,15 @@ select:
             // Switch between the current-build manifest and alternate target manifests.
             const bool alternate_connection_update_target = x == "alternate connection";
             const bool alternate_topology_update_target = x == "alternate topology";
+            const bool alternate_build_update_target = x == "alternate topology and connection";
             if (id(oq_firmware_update_channel).current_option() == "dev") {
               const char *source_url = "${dev_release_manifest_url}";
               const char *alternate_connection_url = "${alternate_dev_release_manifest_url}";
               const char *alternate_topology_url = "${alternate_topology_dev_release_manifest_url}";
-              if (alternate_connection_update_target && alternate_connection_url[0] != '\0') {
+              const char *alternate_build_url = "${alternate_build_dev_release_manifest_url}";
+              if (alternate_build_update_target && alternate_build_url[0] != '\0') {
+                source_url = alternate_build_url;
+              } else if (alternate_connection_update_target && alternate_connection_url[0] != '\0') {
                 source_url = alternate_connection_url;
               } else if (alternate_topology_update_target && alternate_topology_url[0] != '\0') {
                 source_url = alternate_topology_url;
@@ -521,7 +607,10 @@ select:
               const char *source_url = "${main_release_manifest_url}";
               const char *alternate_connection_url = "${alternate_main_release_manifest_url}";
               const char *alternate_topology_url = "${alternate_topology_main_release_manifest_url}";
-              if (alternate_connection_update_target && alternate_connection_url[0] != '\0') {
+              const char *alternate_build_url = "${alternate_build_main_release_manifest_url}";
+              if (alternate_build_update_target && alternate_build_url[0] != '\0') {
+                source_url = alternate_build_url;
+              } else if (alternate_connection_update_target && alternate_connection_url[0] != '\0') {
                 source_url = alternate_connection_url;
               } else if (alternate_topology_update_target && alternate_topology_url[0] != '\0') {
                 source_url = alternate_topology_url;
@@ -965,6 +1054,8 @@ text_sensor:
           return {"Error"};
         case 6:
           return {"Aborted"};
+        case 7:
+          return {"Retrying"};
         default:
           return {"Idle"};
       }
