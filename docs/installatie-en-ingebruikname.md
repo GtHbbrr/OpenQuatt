@@ -2,6 +2,8 @@
 
 Deze handleiding beschrijft de eerste installatie van OpenQuatt. Heb je een module gekocht waar OpenQuatt al op staat, dan gebruik je de web installer alleen om Wi-Fi in te stellen. Flashen is dan niet nodig. Na het verbinden ga je eerst naar de lokale web-app via `http://openquatt.local`; Home Assistant komt daarna.
 
+Heb je de Heatpump Controller Q-edition, gebruik dan bij voorkeur de doorlopende handleiding [Heatpump Controller Q-edition aansluiten en in gebruik nemen](q-edition.md).
+
 ## Installatieroute
 
 Voor een eerste installatie gebruik je de web installer uit de [README](../README.md). Daarmee stel je bij een voorgeïnstalleerde module alleen Wi-Fi in, of flash je zelf de juiste firmware. Bij Ethernet sluit je na het flashen de netwerkkabel aan.

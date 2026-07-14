@@ -34,6 +34,7 @@ class RenderedPage:
 
 PAGES = [
     Page(PurePosixPath("README.md"), PurePosixPath("index.html"), "OpenQuatt", "Project", "Projectoverzicht, snelle start en hoofdroute."),
+    Page(PurePosixPath("docs/q-edition.md"), PurePosixPath("q-edition.html"), "Heatpump Controller Q-edition installeren", "Aan de slag", "Doorlopende route voor aansluiten, netwerk instellen, Quick Start en Home Assistant."),
     Page(PurePosixPath("docs/installatie-en-ingebruikname.md"), PurePosixPath("installatie-en-ingebruikname.html"), "Installatie en ingebruikname", "Docs", "Installeren via de installer en daarna Quick Start in de web-app."),
     Page(PurePosixPath("docs/web-app.md"), PurePosixPath("web-app.html"), "Web-app gebruiken", "Handleiding", "Quick Start, instellingen, updates, backup en beveiliging via openquatt.local."),
     Page(PurePosixPath("docs/dashboard/README.md"), PurePosixPath("dashboard/index.html"), "Dashboard installeren", "Docs", "Importeer het juiste dashboardbestand voor Single of Duo."),
@@ -56,6 +57,7 @@ SIDEBAR_GROUPS = [
         "Van projectintro naar eerste werkende installatie.",
         [
             PurePosixPath("README.md"),
+            PurePosixPath("docs/q-edition.md"),
             PurePosixPath("docs/installatie-en-ingebruikname.md"),
             PurePosixPath("docs/web-app.md"),
             PurePosixPath("docs/dashboard/README.md"),
@@ -173,7 +175,9 @@ def render_inline(text: str, source: PurePosixPath, current_output: PurePosixPat
     def replace_link(match: re.Match[str]) -> str:
         label, linked_href = match.group(1), match.group(2)
         url = rewrite_href(source, current_output, linked_href)
-        return stash(f'<a href="{escape(url, quote=True)}">{render_inline(label, source, current_output)}</a>')
+        new_tab = linked_href == "install/index.html#wifi-provision-panel"
+        target = ' target="_blank" rel="noreferrer"' if new_tab else ""
+        return stash(f'<a href="{escape(url, quote=True)}"{target}>{render_inline(label, source, current_output)}</a>')
 
     text = re.sub(r"`([^`]+)`", replace_code, text)
     text = re.sub(r"!\[([^\]]*)\]\(([^)]+)\)", replace_image, text)
@@ -467,6 +471,7 @@ def render_template(rendered_page: RenderedPage, rendered_pages: list[RenderedPa
     page = rendered_page.page
     asset_prefix = "./" if page.output.parent == PurePosixPath(".") else "../"
     install_href = rel_url(page.output, PurePosixPath("install/index.html"))
+    body_class = f"page-{slugify(page.output.stem, {})}"
 
 
     lead_html = f'<p class="doc-lead">{rendered_page.lead}</p>' if rendered_page.lead else ""
@@ -484,7 +489,7 @@ def render_template(rendered_page: RenderedPage, rendered_pages: list[RenderedPa
     <link rel="stylesheet" href="{asset_prefix}site.css" />
     <script defer src="{asset_prefix}site.js"></script>
   </head>
-  <body>
+  <body class="{escape(body_class, quote=True)}">
     <header class="site-header">
       <div class="site-header-inner">
         <div class="site-header-start">

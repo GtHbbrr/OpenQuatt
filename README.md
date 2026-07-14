@@ -30,7 +30,7 @@ OpenQuatt ondersteunt momenteel Quatt Hybrid `Single` en `Duo` (V1, V1.5 en V2).
 
 Voor nieuwe installaties is de [`Electropaultje Heatpump Controller Q-edition`](https://electropaultje.nl/product/heatpump-controller-q-edition/) de aanbevolen en volledig ondersteunde module. Deze hardware is speciaal voor OpenQuatt gemaakt en is de primaire focus voor support en nieuwe ontwikkeling.
 
-`Waveshare ESP32-S3-Relay-1CH` en `Electropaultje Heatpump Listener` blijven beschikbaar met limited/best-effort support. Ze blijven waarschijnlijk gewoon functioneren, maar actieve ontwikkeling en support richten zich op Q-edition.
+`Waveshare ESP32-S3-Relay-1CH` en `Electropaultje Heatpump Listener` blijven beschikbaar met limited/best-effort support. Ze blijven waarschijnlijk gewoon functioneren, maar actieve ontwikkeling en support richten zich op de Heatpump Controller Q-edition.
 
 Alle Wi-Fi-combinaties van bovenstaande opstelling en hardware zijn beschikbaar. Voor de Heatpump Controller Q zijn daarnaast Ethernet-builds beschikbaar voor `Single` en `Duo`. Ethernet en Wi-Fi zijn nu nog aparte firmware-builds; een Ethernet-build verwacht dus een werkende kabel/netwerkroute en heeft geen automatische Wi-Fi fallback of captive portal.
 
@@ -48,6 +48,7 @@ Alleen de nieuwste stabiele eerste-installatiebestanden worden standaard via de 
 
 Voor de volledige installatiestappen en eerste controle:
 
+- [Heatpump Controller Q-edition aansluiten en in gebruik nemen](docs/q-edition.md)
 - [Installatie en ingebruikname](docs/installatie-en-ingebruikname.md)
 - [Web-app gebruiken](docs/web-app.md)
 - [Web-app demo](https://jeroen85.github.io/OpenQuatt/demo/)
@@ -83,8 +84,8 @@ Alle ondersteunde OpenQuatt-profielen gebruiken PSRAM. De firmware zet `psram.ig
 Belangrijke beperkingen voor deze fase:
 
 - OpenQuatt is bedoeld voor Quatt Hybrid `Single` en `Duo`, niet voor Quatt All-Electric, Quatt Chill of Quatt HomeBattery.
-- Q-edition is de support- en ontwikkelfocus; Waveshare en Heatpump Listener zijn limited/best-effort.
-- OpenTherm betekent nu: thermostaat uitlezen op Q-edition. OpenTherm-aansturing van de ketel staat op de roadmap.
+- De Heatpump Controller Q-edition is de support- en ontwikkelfocus; Waveshare en Heatpump Listener zijn limited/best-effort.
+- OpenTherm betekent nu: thermostaat uitlezen op de Heatpump Controller Q-edition. OpenTherm-aansturing van de ketel staat op de roadmap.
 - Ethernet en Wi-Fi zijn nu nog aparte firmware-builds.
 - CV-assist in Heating Curve, CV/boiler-only mode en uitgebreidere storingsafhandeling staan op de roadmap.
 - OpenQuatt is geen officiële Quatt-helpdesk of individuele installatieservice.

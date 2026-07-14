@@ -798,6 +798,524 @@ kbd {
   font-size: 0.88rem;
 }
 
+/* Q-edition onboarding */
+.page-q-edition .doc-header {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  margin: 0 -28px 38px;
+  padding: 48px 42px 52px;
+  border-radius: 0 0 24px 24px;
+  background:
+    linear-gradient(115deg, rgba(255, 247, 237, 0.98), rgba(255, 255, 255, 0.92)),
+    repeating-linear-gradient(90deg, transparent 0 44px, rgba(234, 88, 12, 0.08) 44px 45px);
+}
+
+.page-q-edition .doc-header::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  right: -72px;
+  bottom: -116px;
+  width: 320px;
+  height: 320px;
+  border: 44px solid rgba(234, 88, 12, 0.1);
+  border-radius: 50%;
+  box-shadow: 0 0 0 32px rgba(234, 88, 12, 0.04);
+}
+
+.page-q-edition .doc-header h1 {
+  max-width: 18ch;
+  animation: q-edition-rise 420ms ease-out both;
+}
+
+.page-q-edition .doc-lead {
+  max-width: 67ch;
+  animation: q-edition-rise 420ms 80ms ease-out both;
+}
+
+.page-q-edition .prose > table:first-of-type {
+  table-layout: fixed;
+  margin: 10px 0 28px;
+}
+
+.page-q-edition .prose > table:first-of-type th,
+.page-q-edition .prose > table:first-of-type td {
+  padding: 16px 18px;
+  line-height: 1.5;
+}
+
+.page-q-edition .prose > table:first-of-type th {
+  color: var(--ink-soft);
+  font-size: 0.78rem;
+  font-weight: 750;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.page-q-edition .prose > table:first-of-type th:nth-child(1) {
+  width: 27%;
+}
+
+.page-q-edition .prose > table:first-of-type th:nth-child(2) {
+  width: 18%;
+}
+
+.page-q-edition .prose > table:first-of-type th:nth-child(3) {
+  width: 55%;
+}
+
+.page-q-edition .prose > table:first-of-type td:first-child {
+  color: var(--ink);
+  font-weight: 650;
+}
+
+.page-q-edition .prose > table:first-of-type td:nth-child(2),
+.page-q-edition .prose > table:first-of-type code {
+  white-space: nowrap;
+}
+
+@media (min-width: 1241px) {
+  .page-q-edition .docs-shell {
+    grid-template-columns: 272px minmax(0, 1fr);
+  }
+
+  .page-q-edition .page-rail {
+    display: none;
+  }
+}
+
+.page-q-edition .prose > ol:first-of-type {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: q-step;
+  border-top: 1px solid var(--line-strong);
+  border-bottom: 1px solid var(--line-strong);
+}
+
+.page-q-edition .prose > ol:first-of-type li {
+  position: relative;
+  min-height: 112px;
+  padding: 24px 20px 22px 58px;
+  counter-increment: q-step;
+  transition: background 160ms ease, transform 160ms ease;
+  animation: q-edition-rise 360ms ease-out both;
+}
+
+.page-q-edition .prose > ol:first-of-type li::before {
+  content: counter(q-step, decimal-leading-zero);
+  position: absolute;
+  top: 24px;
+  left: 18px;
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  font-weight: 500;
+}
+
+.page-q-edition .prose > ol:first-of-type li:nth-child(2),
+.page-q-edition .prose > ol:first-of-type li:nth-child(5) {
+  animation-delay: 45ms;
+}
+
+.page-q-edition .prose > ol:first-of-type li:nth-child(3),
+.page-q-edition .prose > ol:first-of-type li:nth-child(6) {
+  animation-delay: 90ms;
+}
+
+.page-q-edition .prose > ol:first-of-type li:hover {
+  z-index: 1;
+  background: var(--accent-soft);
+  transform: translateY(-2px);
+}
+
+.page-q-edition .prose > ol:first-of-type li + li {
+  margin-top: 0;
+  border-left: 1px solid var(--line);
+}
+
+.page-q-edition .prose > ol:first-of-type li:nth-child(4) {
+  border-left: 0;
+}
+
+.page-q-edition .prose > ol:first-of-type li:nth-child(n + 4) {
+  border-top: 1px solid var(--line);
+}
+
+.page-q-edition .prose > ol:first-of-type p {
+  margin: 0;
+  font-weight: 650;
+  line-height: 1.45;
+}
+
+.page-q-edition .prose a[href="install/index.html#wifi-provision-panel"] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 46px;
+  margin: 2px 0 24px;
+  padding: 0 18px;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  background: var(--accent);
+  color: #fff;
+  font-weight: 700;
+  box-shadow: 0 8px 20px rgba(234, 88, 12, 0.16);
+  transition: background 160ms ease, border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+.page-q-edition .prose a[href="install/index.html#wifi-provision-panel"]:hover {
+  border-color: var(--accent-strong);
+  background: var(--accent-strong);
+  color: #fff;
+  box-shadow: 0 12px 26px rgba(194, 65, 12, 0.2);
+  transform: translateY(-1px);
+}
+
+.page-q-edition .prose img:is([src$="q-edition-overzetten.svg"], [src$="q-edition-kabels-stappen.svg"]) {
+  width: 100%;
+  border: 1px solid var(--line);
+  background: #fff;
+  box-shadow: 0 22px 54px rgba(17, 24, 39, 0.09);
+  transition: box-shadow 180ms ease, transform 180ms ease;
+}
+
+.page-q-edition .prose img:is([src$="q-edition-overzetten.svg"], [src$="q-edition-kabels-stappen.svg"]):hover {
+  box-shadow: 0 26px 68px rgba(17, 24, 39, 0.13);
+  transform: translateY(-2px);
+}
+
+.page-q-edition .cable-stepper {
+  margin: 28px 0 18px;
+  padding: 26px 28px 24px;
+  border: 1px solid var(--line-strong);
+  border-radius: 20px;
+  background: #fff;
+  box-shadow: 0 14px 36px rgba(15, 23, 42, 0.055);
+}
+
+.page-q-edition .cable-stepper-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 18px;
+}
+
+.page-q-edition .cable-stepper-kicker {
+  margin: 0 0 3px;
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-size: 0.73rem;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.page-q-edition .cable-stepper-header h4 {
+  margin: 0;
+  font-size: clamp(1.2rem, 2.4vw, 1.55rem);
+  letter-spacing: -0.025em;
+}
+
+.page-q-edition .cable-stepper-header-tools {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.page-q-edition .cable-stepper-status {
+  flex: 0 0 auto;
+  margin: 0;
+  color: var(--ink-soft);
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  font-weight: 500;
+}
+
+.page-q-edition .cable-stepper-zoom {
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  gap: 7px;
+  padding: 0 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: border-color 160ms ease, color 160ms ease, transform 160ms ease;
+}
+
+.page-q-edition .cable-stepper-zoom svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+.page-q-edition .cable-stepper-zoom:hover {
+  border-color: var(--accent);
+  color: var(--accent-strong);
+  transform: translateY(-1px);
+}
+
+.page-q-edition .cable-stepper-progress {
+  height: 3px;
+  overflow: hidden;
+  background: var(--line);
+}
+
+.page-q-edition .cable-stepper-progress span {
+  display: block;
+  width: 14.2857%;
+  height: 100%;
+  background: var(--accent);
+  transition: width 220ms ease;
+}
+
+.page-q-edition .cable-stepper-tabs {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  margin-bottom: 22px;
+  border-bottom: 1px solid var(--line);
+}
+
+.page-q-edition .cable-stepper-tab {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding: 13px 8px 11px;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  background: transparent;
+  color: var(--ink-soft);
+  text-align: left;
+  cursor: pointer;
+  transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
+}
+
+.page-q-edition .cable-stepper-tab span {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+}
+
+.page-q-edition .cable-stepper-tab strong {
+  overflow: hidden;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.page-q-edition .cable-stepper-tab:hover {
+  background: var(--accent-soft);
+  color: var(--ink);
+}
+
+.page-q-edition .cable-stepper-tab[aria-selected="true"] {
+  border-bottom-color: var(--accent);
+  color: var(--accent-strong);
+}
+
+.page-q-edition .cable-stepper-tab:focus-visible,
+.page-q-edition .cable-stepper-button:focus-visible,
+.page-q-edition .cable-stepper-zoom:focus-visible,
+.page-q-edition .cable-stepper-dialog-close:focus-visible {
+  outline: 3px solid rgba(234, 88, 12, 0.24);
+  outline-offset: 2px;
+}
+
+.page-q-edition .cable-stepper-canvas {
+  display: flex;
+  min-height: 0;
+  align-items: center;
+  overflow: visible;
+}
+
+.page-q-edition .cable-stepper-viewport {
+  width: 100%;
+  overflow: visible;
+  background: transparent;
+}
+
+.page-q-edition .cable-stepper .cable-stepper-image,
+.page-q-edition .cable-stepper .cable-stepper-image:hover {
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  margin: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  transform: none;
+}
+
+.page-q-edition .cable-stepper-viewport.is-entering {
+  animation: q-cable-step-enter 220ms ease-out both;
+}
+
+.page-q-edition .cable-stepper-actions {
+  display: grid;
+  grid-template-columns: auto auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+
+.page-q-edition .cable-stepper-button {
+  min-height: 42px;
+  padding: 0 16px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 160ms ease, border-color 160ms ease, color 160ms ease, transform 160ms ease;
+}
+
+.page-q-edition .cable-stepper-button:not(:disabled):hover {
+  transform: translateY(-1px);
+}
+
+.page-q-edition .cable-stepper-button-secondary {
+  background: var(--panel);
+  color: var(--ink-soft);
+}
+
+.page-q-edition .cable-stepper-button-primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+}
+
+.page-q-edition .cable-stepper-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
+}
+
+.page-q-edition .cable-stepper-dialog {
+  width: min(1180px, calc(100vw - 48px));
+  max-width: none;
+  max-height: calc(100vh - 48px);
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--line-strong);
+  border-radius: 20px;
+  background: #fff;
+  color: var(--ink);
+  box-shadow: 0 30px 90px rgba(15, 23, 42, 0.28);
+}
+
+.page-q-edition .cable-stepper-dialog::backdrop {
+  background: rgba(15, 23, 42, 0.64);
+  backdrop-filter: blur(4px);
+}
+
+.page-q-edition .cable-stepper-dialog-shell {
+  position: relative;
+  max-height: calc(100vh - 48px);
+  padding: 34px 42px 28px;
+  overflow: auto;
+}
+
+.page-q-edition .cable-stepper-dialog-close {
+  position: absolute;
+  z-index: 2;
+  top: 18px;
+  right: 18px;
+  display: grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  padding: 0 0 3px;
+  border: 1px solid var(--line-strong);
+  border-radius: 50%;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+  font-size: 1.65rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.page-q-edition .cable-stepper-dialog .cable-stepper {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.page-q-edition .cable-stepper-dialog .cable-stepper-header {
+  padding-right: 50px;
+}
+
+.page-q-edition .cable-stepper-dialog .cable-stepper-zoom {
+  display: none;
+}
+
+.page-q-edition .cable-stepper-dialog .cable-stepper-canvas {
+  min-height: 0;
+}
+
+.page-q-edition .prose a:is([href="assets/q-edition-overzetten.svg"], [href="assets/q-edition-kabels-stappen.svg"]) {
+  display: inline-flex;
+  align-items: center;
+  min-height: 38px;
+  margin: -4px 0 26px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--panel);
+  color: var(--ink-soft);
+  font-size: 0.86rem;
+  font-weight: 650;
+  transition: border-color 160ms ease, color 160ms ease;
+}
+
+.page-q-edition .prose a:is([href="assets/q-edition-overzetten.svg"], [href="assets/q-edition-kabels-stappen.svg"]):hover {
+  border-color: rgba(234, 88, 12, 0.35);
+  color: var(--accent-strong);
+}
+
+@keyframes q-cable-step-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes q-edition-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 @media (max-width: 1240px) {
   .docs-shell {
     grid-template-columns: 272px minmax(0, 1fr);
@@ -884,6 +1402,215 @@ kbd {
     padding: 26px 8px 44px;
   }
 
+  .page-q-edition .doc-header {
+    margin: -26px -8px 32px;
+    padding: 36px 24px 40px;
+    border-radius: 0 0 20px 20px;
+  }
+
+  .page-q-edition .prose > ol:first-of-type {
+    grid-template-columns: 1fr;
+  }
+
+  .page-q-edition .prose > ol:first-of-type li {
+    min-height: auto;
+    padding: 18px 16px 18px 54px;
+    border-top: 1px solid var(--line);
+    border-left: 0;
+  }
+
+  .page-q-edition .prose > ol:first-of-type li:first-child {
+    border-top: 0;
+  }
+
+  .page-q-edition .prose > ol:first-of-type li::before {
+    top: 20px;
+    left: 16px;
+  }
+
+  .page-q-edition .prose > table:first-of-type {
+    display: block;
+    margin-top: 12px;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+  }
+
+  .page-q-edition .prose > table:first-of-type thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .page-q-edition .prose > table:first-of-type tbody {
+    display: grid;
+    gap: 12px;
+  }
+
+  .page-q-edition .prose > table:first-of-type tr {
+    display: grid;
+    overflow: hidden;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: #fff;
+  }
+
+  .page-q-edition .prose > table:first-of-type td {
+    display: block;
+    width: auto;
+    padding: 11px 14px;
+    border-bottom: 0;
+    border-top: 1px solid var(--line);
+    line-height: 1.55;
+  }
+
+  .page-q-edition .prose > table:first-of-type td:first-child {
+    border-top: 0;
+  }
+
+  .page-q-edition .prose > table:first-of-type td::before {
+    display: block;
+    margin-bottom: 5px;
+    color: var(--ink-soft);
+    font-size: 0.68rem;
+    font-weight: 750;
+    letter-spacing: 0.07em;
+    line-height: 1.4;
+    text-transform: uppercase;
+  }
+
+  .page-q-edition .prose > table:first-of-type td:nth-child(1)::before {
+    content: "Van de CiC";
+  }
+
+  .page-q-edition .prose > table:first-of-type td:nth-child(2)::before {
+    content: "Naar de HCQ";
+  }
+
+  .page-q-edition .prose > table:first-of-type td:nth-child(3)::before {
+    content: "Zo sluit je aan";
+  }
+
+  .page-q-edition .prose > table:first-of-type td:nth-child(2) {
+    white-space: normal;
+  }
+
+  .page-q-edition .prose > table:first-of-type code {
+    white-space: nowrap;
+  }
+
+  .page-q-edition .prose p:has(> img:is([src$="q-edition-overzetten.svg"], [src$="q-edition-kabels-stappen.svg"])) {
+    overflow-x: auto;
+    margin-right: -8px;
+    margin-left: -8px;
+    padding: 0 8px 10px;
+  }
+
+  .page-q-edition .prose img[src$="q-edition-overzetten.svg"] {
+    width: 820px;
+    max-width: none;
+  }
+
+  .page-q-edition .prose img[src$="q-edition-kabels-stappen.svg"] {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .page-q-edition .cable-stepper {
+    margin: 22px 0 16px;
+    padding: 18px 12px;
+    border-radius: 16px;
+    box-shadow: none;
+  }
+
+  .page-q-edition .cable-stepper-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .page-q-edition .cable-stepper-header-tools {
+    width: 100%;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .page-q-edition .cable-stepper-status {
+    max-width: none;
+    text-align: left;
+  }
+
+  .page-q-edition .cable-stepper-tabs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    overflow: visible;
+  }
+
+  .page-q-edition .cable-stepper-tab:nth-child(n + 3) {
+    border-top: 1px solid var(--line);
+  }
+
+  .page-q-edition .cable-stepper-tab:last-child {
+    grid-column: 1 / -1;
+  }
+
+  .page-q-edition .cable-stepper-canvas {
+    min-height: 0;
+    margin: 0;
+    padding: 0;
+    overflow: visible;
+  }
+
+  .page-q-edition .cable-stepper-viewport {
+    flex: 1 1 auto;
+    width: 100%;
+  }
+
+  .page-q-edition .cable-stepper-actions {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .page-q-edition .cable-stepper-button {
+    width: 100%;
+  }
+
+  .page-q-edition .cable-stepper-dialog {
+    width: 100vw;
+    height: 100dvh;
+    max-height: none;
+    border: 0;
+    border-radius: 0;
+  }
+
+  .page-q-edition .cable-stepper-dialog-shell {
+    height: 100%;
+    max-height: none;
+    padding: 58px 12px 22px;
+  }
+
+  .page-q-edition .cable-stepper-dialog-close {
+    top: 10px;
+    right: 12px;
+  }
+
+  .page-q-edition .cable-stepper-dialog .cable-stepper-header {
+    padding-right: 0;
+  }
+
+  .page-q-edition .cable-stepper-dialog .cable-stepper-canvas {
+    margin: 0 -12px;
+    padding: 0 12px 10px;
+    overflow-x: auto;
+  }
+
+  .page-q-edition .cable-stepper-dialog .cable-stepper-viewport {
+    flex: 0 0 760px;
+    width: 760px;
+  }
+
   .doc-header h1 {
     font-size: clamp(2rem, 12vw, 2.6rem);
   }
@@ -894,5 +1621,29 @@ kbd {
 
   .search-foot {
     font-size: 0.8rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-q-edition .doc-header h1,
+  .page-q-edition .doc-lead,
+  .page-q-edition .prose > ol:first-of-type li {
+    animation: none;
+  }
+
+  .page-q-edition .prose > ol:first-of-type li,
+  .page-q-edition .prose a[href="install/index.html#wifi-provision-panel"],
+  .page-q-edition .prose img:is([src$="q-edition-overzetten.svg"], [src$="q-edition-kabels-stappen.svg"]) {
+    transition: none;
+  }
+
+  .page-q-edition .cable-stepper-progress span,
+  .page-q-edition .cable-stepper-tab,
+  .page-q-edition .cable-stepper-button {
+    transition: none;
+  }
+
+  .page-q-edition .cable-stepper-viewport.is-entering {
+    animation: none;
   }
 }
