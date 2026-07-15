@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 430 650" role="img" aria-labelledby="title desc">
+  <title id="title">Stap 1: voorbereiden</title>
+  <desc id="desc">Schakel de CiC en buitenunits uit, maak een foto en label de kabels.</desc>
+  <style>
+    text { font-family: Inter, "Segoe UI", Arial, sans-serif; fill: #111827; }
+    .kicker { font-size: 14px; font-weight: 850; letter-spacing: 1.2px; fill: #ea580c; }
+    .title { font-size: 25px; font-weight: 820; letter-spacing: -.5px; }
+    .item { font-size: 16px; font-weight: 700; }
+  </style>
+  <rect width="430" height="650" rx="22" fill="#f8fafc" stroke="#e2e8f0"/>
+  <text x="22" y="34" class="kicker">01 · VOORBEREIDEN</text>
+  <text x="22" y="70" class="title">Spanning eraf. Foto maken.</text>
+  <text x="22" y="99" class="title">Kabels labelen.</text>
+  <svg x="20" y="118" width="390" height="250" viewBox="45 270 330 220" preserveAspectRatio="xMidYMid meet">
+    <image href="q-edition-kabels-stappen.svg" width="1000" height="2901"/>
+  </svg>
+  <g>
+    <circle cx="39" cy="402" r="13" fill="#dcfce7"/><path d="M33 402l5 5 9-11" fill="none" stroke="#15803d" stroke-width="3"/>
+    <text x="62" y="408" class="item">Schakel de CiC uit.</text>
+    <circle cx="39" cy="448" r="13" fill="#dcfce7"/><path d="M33 448l5 5 9-11" fill="none" stroke="#15803d" stroke-width="3"/>
+    <text x="62" y="442" class="item">Maak alle Quatt-buitenunits</text>
+    <text x="62" y="463" class="item">spanningsloos via de werkschakelaar.</text>
+    <circle cx="39" cy="500" r="13" fill="#dcfce7"/><path d="M33 500l5 5 9-11" fill="none" stroke="#15803d" stroke-width="3"/>
+    <text x="62" y="506" class="item">Fotografeer de complete aansluitstrook.</text>
+    <circle cx="39" cy="546" r="13" fill="#dcfce7"/><path d="M33 546l5 5 9-11" fill="none" stroke="#15803d" stroke-width="3"/>
+    <text x="62" y="540" class="item">Label iedere kabel op functie,</text>
+    <text x="62" y="561" class="item">niet alleen op kleur.</text>
+  </g>
+  <rect x="20" y="594" width="390" height="36" rx="10" fill="#eef2f7"/>
+  <text x="215" y="617" text-anchor="middle" class="item">Schakel pas na de eindcontrole weer in.</text>
+</svg>

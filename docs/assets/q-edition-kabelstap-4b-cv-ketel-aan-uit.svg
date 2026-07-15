@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 936 390" role="img" aria-labelledby="title desc">
+  <title id="title">Stap 4b: aan-uit-ketel naar R1</title>
+  <desc id="desc">Maak de twee aders van het CV-aan-uit-contact los van de CiC en sluit ze aan op COM en NO van R1; NC blijft vrij.</desc>
+  <style>
+    text { font-family: Inter, "Segoe UI", Arial, sans-serif; fill: #111827; }
+    .step-no { font-size: 16px; font-weight: 850; fill: #ea580c; }
+    .step-title { font-size: 26px; font-weight: 820; }
+    .step-copy { font-size: 16px; font-weight: 500; fill: #4b5563; }
+    .panel-kicker { font-size: 11px; font-weight: 850; letter-spacing: 1.2px; fill: #64748b; }
+    .panel-title { font-size: 16px; font-weight: 800; }
+    .map-copy { font-size: 14px; font-weight: 650; fill: #475569; }
+    .route-label { font-size: 13px; font-weight: 850; }
+  </style>
+  <rect width="936" height="390" rx="24" fill="#f8fbff" stroke="#bfdbfe"/>
+  <text x="26" y="42" class="step-no">04B · CV-KETEL · AAN/UIT</text>
+  <text x="26" y="77" class="step-title">Neem de twee aan/uit-aders over naar R1.</text>
+  <text x="26" y="104" class="step-copy">Het CV-aan/uit-contact van de CiC zit onder een apart afdekkapje.</text>
+
+  <rect x="26" y="124" width="390" height="238" rx="18" fill="#f8fafc"/>
+  <text x="46" y="152" class="panel-kicker">LOSMAKEN VAN CIC</text>
+  <text x="46" y="176" class="panel-title">CV-ketel · twee aan/uit-aders</text>
+  <use href="q-edition-kabels-stappen.svg#cic-device" transform="translate(44 188) scale(.62)"/>
+  <path d="M224 243 C272 243 316 268 386 268" fill="none" stroke="#2563eb" stroke-width="5"/>
+  <path d="M224 257 C272 257 316 282 386 282" fill="none" stroke="#2563eb" stroke-width="5"/>
+  <text x="326" y="253" class="route-label" fill="#1d4ed8">AAN/UIT</text>
+
+  <circle cx="468" cy="244" r="23" fill="#ea580c"/>
+  <path d="M458 244h19m-7-7 7 7-7 7" fill="none" stroke="#ffffff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <rect x="520" y="124" width="390" height="238" rx="18" fill="#eff6ff"/>
+  <text x="540" y="152" class="panel-kicker" fill="#1d4ed8">AANSLUITEN OP HCQ</text>
+  <text x="540" y="176" class="panel-title">R1 · COM + NO</text>
+  <path d="M540 250 H764" fill="none" stroke="#2563eb" stroke-width="5"/>
+  <path d="M540 256 H764" fill="none" stroke="#2563eb" stroke-width="5"/>
+  <use href="q-edition-kabels-stappen.svg#hcq-device" transform="translate(760 185) scale(.62)"/>
+  <text x="540" y="314" class="map-copy">NC boven blijft vrij.</text>
+  <text x="540" y="335" class="map-copy">COM midden · NO onder.</text>
+  <text x="540" y="356" class="map-copy">Adervolgorde maakt niet uit.</text>
+</svg>

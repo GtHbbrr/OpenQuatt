@@ -976,6 +976,68 @@ kbd {
   transform: translateY(-1px);
 }
 
+.page-q-edition .prose img[src$="hcq-aansluitingen-referentie.png"] {
+  display: block;
+  width: 100%;
+  margin: 18px 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 16px 42px rgba(15, 23, 42, 0.08);
+}
+
+.page-q-edition .prose a[href="assets/hcq-aansluitingen-referentie.png"]:has(> img) {
+  display: block;
+}
+
+.page-q-edition .wifi-route-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 22px;
+  margin: 22px 0 34px;
+}
+
+.page-q-edition .wifi-route {
+  min-width: 0;
+  padding: 22px 24px 24px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: #fff;
+}
+
+.page-q-edition .wifi-route.is-recommended {
+  border-color: rgba(234, 88, 12, 0.38);
+  background: linear-gradient(135deg, #fff7ed, #fff 72%);
+  box-shadow: 0 12px 30px rgba(234, 88, 12, 0.08);
+}
+
+.page-q-edition .wifi-route-recommendation {
+  margin: 0 0 8px;
+  color: var(--ink-soft);
+  font-family: var(--font-mono);
+  font-size: 0.69rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.page-q-edition .wifi-route.is-recommended .wifi-route-recommendation {
+  color: var(--accent-strong);
+}
+
+.page-q-edition .wifi-route h3 {
+  margin-top: 0;
+}
+
+.page-q-edition .wifi-route ol,
+.page-q-edition .wifi-route ul {
+  padding-left: 22px;
+}
+
+.page-q-edition .wifi-route > :last-child {
+  margin-bottom: 0;
+}
+
 .page-q-edition .prose img:is([src$="q-edition-overzetten.svg"], [src$="q-edition-kabels-stappen.svg"]) {
   width: 100%;
   border: 1px solid var(--line);
@@ -1086,7 +1148,7 @@ kbd {
 
 .page-q-edition .cable-stepper-tabs {
   display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
+  grid-template-columns: repeat(8, minmax(0, 1fr));
   margin-bottom: 22px;
   border-bottom: 1px solid var(--line);
 }
@@ -1520,6 +1582,21 @@ kbd {
     max-width: 100%;
   }
 
+  .page-q-edition .prose img[src$="hcq-aansluitingen-referentie.png"] {
+    border-radius: 14px;
+    box-shadow: none;
+  }
+
+  .page-q-edition .wifi-route-options {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  .page-q-edition .wifi-route {
+    padding: 18px 16px 20px;
+    border-radius: 14px;
+  }
+
   .page-q-edition .cable-stepper {
     margin: 22px 0 16px;
     padding: 18px 12px;
@@ -1551,10 +1628,6 @@ kbd {
 
   .page-q-edition .cable-stepper-tab:nth-child(n + 3) {
     border-top: 1px solid var(--line);
-  }
-
-  .page-q-edition .cable-stepper-tab:last-child {
-    grid-column: 1 / -1;
   }
 
   .page-q-edition .cable-stepper-canvas {
@@ -1601,14 +1674,14 @@ kbd {
   }
 
   .page-q-edition .cable-stepper-dialog .cable-stepper-canvas {
-    margin: 0 -12px;
-    padding: 0 12px 10px;
-    overflow-x: auto;
+    margin: 0;
+    padding: 0 0 10px;
+    overflow: visible;
   }
 
   .page-q-edition .cable-stepper-dialog .cable-stepper-viewport {
-    flex: 0 0 760px;
-    width: 760px;
+    flex: 1 1 auto;
+    width: 100%;
   }
 
   .doc-header h1 {

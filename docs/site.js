@@ -76,59 +76,88 @@
         number: "01",
         label: "Voorbereiden",
         file: "q-edition-kabelstap-1-voorbereiden.svg",
+        mobileFile: "q-edition-kabelstap-1-voorbereiden-mobile.svg",
         height: 332,
+        mobileHeight: 650,
         alt: "Stap 1 van 7: installatie spanningsloos maken, fotograferen en kabels labelen.",
       },
       {
         number: "02",
         label: "Modbus",
         file: "q-edition-kabelstap-2-modbus.svg",
+        mobileFile: "q-edition-kabelstap-2-modbus-mobile.svg",
         height: 405,
+        mobileHeight: 720,
         alt: "Stap 2 van 7: Modbus A, G en B van de CiC verplaatsen naar M1 van de HCQ.",
       },
       {
         number: "03",
         label: "Thermostaat",
         file: "q-edition-kabelstap-3-thermostaat.svg",
+        mobileFile: "q-edition-kabelstap-3-thermostaat-mobile.svg",
         height: 345,
+        mobileHeight: 630,
         alt: "Stap 3 van 7: de twee OpenTherm-aders van de kamerthermostaat verplaatsen naar OTT.",
       },
       {
-        number: "04",
-        label: "CV-ketel",
-        file: "q-edition-kabelstap-4-cv-ketel.svg",
-        height: 430,
-        alt: "Stap 4 van 7: voor de CV-ketel kiezen tussen OpenTherm naar OTB en aan-uit naar R1.",
+        number: "04A",
+        label: "Ketel · OT",
+        statusLabel: "OpenTherm",
+        file: "q-edition-kabelstap-4a-cv-ketel-opentherm.svg",
+        mobileFile: "q-edition-kabelstap-4a-cv-ketel-opentherm-mobile.svg",
+        height: 390,
+        mobileHeight: 720,
+        alt: "Stap 4a van 7: de twee OpenTherm-aders van de CV-ketel verplaatsen van de CiC naar OTB van de HCQ.",
+      },
+      {
+        number: "04B",
+        label: "Ketel · aan/uit",
+        statusLabel: "Aan/uit",
+        file: "q-edition-kabelstap-4b-cv-ketel-aan-uit.svg",
+        mobileFile: "q-edition-kabelstap-4b-cv-ketel-aan-uit-mobile.svg",
+        height: 390,
+        mobileHeight: 720,
+        alt: "Stap 4b van 7: de twee aders van het CV-aan-uit-contact verplaatsen van de CiC naar COM en NO van R1.",
       },
       {
         number: "05",
         label: "Sensor",
         file: "q-edition-kabelstap-5-sensor.svg",
+        mobileFile: "q-edition-kabelstap-5-sensor-mobile.svg",
         height: 345,
+        mobileHeight: 630,
         alt: "Stap 5 van 7: de bestaande Quatt flow- of temperatuursensorkabel verplaatsen naar Q.",
       },
       {
         number: "06",
         label: "CiC-optie",
         file: "q-edition-kabelstap-6-cic-compatibiliteit.svg",
+        mobileFile: "q-edition-kabelstap-6-cic-compatibiliteit-mobile.svg",
         height: 405,
+        mobileHeight: 800,
         alt: "Stap 6 van 7, optioneel: M2 met een aparte RS485-kabel verbinden met de vrijgekomen Modbuspoort van de CiC.",
       },
       {
         number: "07",
         label: "Eindcontrole",
         file: "q-edition-kabelstap-7-eindcontrole.svg",
+        mobileFile: "q-edition-kabelstap-7-eindcontrole-mobile.svg",
         height: 329,
+        mobileHeight: 650,
         alt: "Stap 7 van 7: alle aansluitingen controleren voordat de installatie wordt ingeschakeld.",
       },
     ];
 
     const fallbackSource = fallbackImage.getAttribute("src") || "";
     const assetPrefix = fallbackSource.slice(0, fallbackSource.lastIndexOf("/") + 1);
+    const mobileViewportQuery = window.matchMedia("(max-width: 720px)");
     steps.forEach((step) => {
       step.src = `${assetPrefix}${step.file}`;
+      step.mobileSrc = `${assetPrefix}${step.mobileFile}`;
       const preload = new Image();
       preload.src = step.src;
+      const mobilePreload = new Image();
+      mobilePreload.src = step.mobileSrc;
     });
 
     const stepper = document.createElement("section");
@@ -225,17 +254,24 @@
     function showStep(index, { focusTab = false, animate = true } = {}) {
       const boundedIndex = Math.max(0, Math.min(steps.length - 1, index));
       const step = steps[boundedIndex];
+      const mobileView = mobileViewportQuery.matches;
+      const source = mobileView ? step.mobileSrc : step.src;
+      const width = mobileView ? 430 : 936;
+      const height = mobileView ? step.mobileHeight : step.height;
+      const logicalStepNumber = step.number.replace(/^0/, "").toLowerCase();
+      const logicalProgress = Number.parseInt(step.number, 10);
       activeStep = boundedIndex;
       stepper.dataset.activeStep = String(boundedIndex + 1);
+      stepper.dataset.mobileView = String(mobileView);
 
-      viewport.style.aspectRatio = `936 / ${step.height}`;
-      stepGraphic.data = step.src;
+      viewport.style.aspectRatio = `${width} / ${height}`;
+      stepGraphic.data = source;
       stepGraphic.setAttribute("aria-label", step.alt);
       stepGraphic.textContent = step.alt;
-      status.textContent = `Stap ${boundedIndex + 1} van ${steps.length} · ${step.label}`;
-      progress.setAttribute("aria-valuenow", String(boundedIndex + 1));
-      progress.setAttribute("aria-valuetext", `Stap ${boundedIndex + 1} van ${steps.length}: ${step.label}`);
-      progressBar.style.width = `${((boundedIndex + 1) / steps.length) * 100}%`;
+      status.textContent = `Stap ${logicalStepNumber} van 7 · ${step.statusLabel || step.label}`;
+      progress.setAttribute("aria-valuenow", String(logicalProgress));
+      progress.setAttribute("aria-valuetext", `Stap ${logicalStepNumber} van 7: ${step.label}`);
+      progressBar.style.width = `${(logicalProgress / 7) * 100}%`;
       tabs.forEach((tab, tabIndex) => {
         const selected = tabIndex === boundedIndex;
         tab.setAttribute("aria-selected", String(selected));
@@ -284,6 +320,7 @@
 
     previousButton.addEventListener("click", () => showStep(activeStep - 1));
     nextButton.addEventListener("click", () => showStep(activeStep + 1));
+    mobileViewportQuery.addEventListener("change", () => showStep(activeStep, { animate: false }));
 
     function restoreStepper() {
       if (stepperPlaceholder.isConnected) {
@@ -318,6 +355,63 @@
 
     fallbackContainer.replaceWith(stepper);
     showStep(0, { animate: false });
+  }
+
+  function enhanceWifiRoutes() {
+    const routeAHeading = document.getElementById("route-a-via-usb");
+    const routeBHeading = document.getElementById("route-b-via-het-openquatt-access-point");
+    if (!routeAHeading || !routeBHeading || routeAHeading.dataset.routeEnhanced === "true") {
+      return;
+    }
+
+    const routeANodes = [];
+    let cursor = routeAHeading;
+    while (cursor && cursor !== routeBHeading) {
+      routeANodes.push(cursor);
+      cursor = cursor.nextSibling;
+    }
+
+    const routeBNodes = [];
+    cursor = routeBHeading;
+    while (cursor && !(cursor.nodeType === Node.ELEMENT_NODE && cursor.tagName === "H2")) {
+      routeBNodes.push(cursor);
+      cursor = cursor.nextSibling;
+    }
+
+    const routeOptions = document.createElement("div");
+    routeOptions.className = "wifi-route-options";
+    routeOptions.setAttribute("aria-label", "Kies een route om Wi-Fi in te stellen");
+    routeAHeading.before(routeOptions);
+
+    function createRoute(kind, nodes) {
+      const section = document.createElement("section");
+      section.className = "wifi-route";
+      section.dataset.wifiRoute = kind;
+      const recommendation = document.createElement("p");
+      recommendation.className = "wifi-route-recommendation";
+      section.appendChild(recommendation);
+      nodes.forEach((node) => section.appendChild(node));
+      return { section, recommendation };
+    }
+
+    const usbRoute = createRoute("usb", routeANodes);
+    const accessPointRoute = createRoute("access-point", routeBNodes);
+    const mobileRouteQuery = window.matchMedia("(max-width: 720px)");
+
+    function arrangeRoutes() {
+      const mobile = mobileRouteQuery.matches;
+      const preferred = mobile ? accessPointRoute : usbRoute;
+      const secondary = mobile ? usbRoute : accessPointRoute;
+      preferred.section.classList.add("is-recommended");
+      secondary.section.classList.remove("is-recommended");
+      preferred.recommendation.textContent = mobile ? "Aanbevolen op telefoon of tablet" : "Aanbevolen op computer";
+      secondary.recommendation.textContent = "Alternatieve route";
+      routeOptions.replaceChildren(preferred.section, secondary.section);
+    }
+
+    routeAHeading.dataset.routeEnhanced = "true";
+    arrangeRoutes();
+    mobileRouteQuery.addEventListener("change", arrangeRoutes);
   }
 
   if (sidebarToggle) {
@@ -382,4 +476,5 @@
 
   enhanceCodeBlocks();
   enhanceCableStepper();
+  enhanceWifiRoutes();
 })();

@@ -91,7 +91,7 @@ import { escapeHtml } from "../core/html.js";
               <div class="oq-helper-modal-row"><span class="oq-helper-modal-label">Huidige build</span><strong class="oq-helper-modal-value">${escapeHtml(model.currentBuildLabel)}</strong></div>
               <div class="oq-helper-modal-row"><span class="oq-helper-modal-label">Nieuwe build</span><strong class="oq-helper-modal-value">${escapeHtml(model.targetBuildLabel)}</strong></div>
             </div>
-            <p class="oq-helper-modal-note">Voor deze wijziging installeert OpenQuatt de passende firmware en start de controller opnieuw op.</p>
+            <p class="oq-helper-modal-note">Voor deze wijziging installeert OpenQuatt de passende firmware en start de controller opnieuw op. Bestaande OpenQuatt-instellingen blijven behouden.</p>
             <label class="oq-helper-modal-check">
               <input type="checkbox" data-oq-quickstart-setup-confirm="true" ${state.quickStartSetupConfirmed ? "checked" : ""} ${busy ? "disabled" : ""}>
               <span>${escapeHtml(requirements.join(" "))}</span>

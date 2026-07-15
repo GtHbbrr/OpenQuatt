@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 936 390" role="img" aria-labelledby="title desc">
+  <title id="title">Stap 4a: OpenTherm-ketel naar OTB</title>
+  <desc id="desc">Maak de twee OpenTherm-aders van de CV-ketel los van de CiC en sluit ze aan op OTB van de HCQ.</desc>
+  <style>
+    text { font-family: Inter, "Segoe UI", Arial, sans-serif; fill: #111827; }
+    .step-no { font-size: 16px; font-weight: 850; fill: #ea580c; }
+    .step-title { font-size: 26px; font-weight: 820; }
+    .step-copy { font-size: 16px; font-weight: 500; fill: #4b5563; }
+    .panel-kicker { font-size: 11px; font-weight: 850; letter-spacing: 1.2px; fill: #64748b; }
+    .panel-title { font-size: 16px; font-weight: 800; }
+    .map-copy { font-size: 14px; font-weight: 650; fill: #475569; }
+    .route-label { font-size: 13px; font-weight: 850; }
+  </style>
+  <rect width="936" height="390" rx="24" fill="#fffaf7" stroke="#fed7aa"/>
+  <text x="26" y="42" class="step-no">04A · CV-KETEL · OPENTHERM</text>
+  <text x="26" y="77" class="step-title">Neem de twee OpenTherm-aders over naar OTB.</text>
+  <text x="26" y="104" class="step-copy">Gebruik deze route alleen als de ketel via OpenTherm op de CiC was aangesloten.</text>
+
+  <rect x="26" y="124" width="390" height="238" rx="18" fill="#f8fafc"/>
+  <text x="46" y="152" class="panel-kicker">LOSMAKEN VAN CIC</text>
+  <text x="46" y="176" class="panel-title">CV-ketel · twee OpenTherm-aders</text>
+  <use href="q-edition-kabels-stappen.svg#cic-device" transform="translate(44 188) scale(.62)"/>
+  <path d="M218 319 C218 334 236 344 264 344 H386" fill="none" stroke="#ea580c" stroke-width="5"/>
+  <path d="M228 319 C228 327 244 335 270 335 H386" fill="none" stroke="#ea580c" stroke-width="5"/>
+  <text x="326" y="322" class="route-label" fill="#c2410c">OPENTHERM</text>
+
+  <circle cx="468" cy="244" r="23" fill="#ea580c"/>
+  <path d="M458 244h19m-7-7 7 7-7 7" fill="none" stroke="#ffffff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <rect x="520" y="124" width="390" height="238" rx="18" fill="#fff7ed"/>
+  <text x="540" y="152" class="panel-kicker" fill="#c2410c">AANSLUITEN OP HCQ</text>
+  <text x="540" y="176" class="panel-title">OTB · OpenTherm boiler</text>
+  <use href="q-edition-kabels-stappen.svg#hcq-device" transform="translate(670 170) scale(.62)"/>
+  <path d="M803 294 H888" fill="none" stroke="#ea580c" stroke-width="5"/>
+  <path d="M803 301 H888" fill="none" stroke="#ea580c" stroke-width="5"/>
+  <text x="844" y="281" text-anchor="middle" class="route-label" fill="#c2410c">OTB</text>
+  <text x="540" y="345" class="map-copy">Polariteit en adervolgorde maken niet uit.</text>
+</svg>

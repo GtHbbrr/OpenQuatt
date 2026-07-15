@@ -1,14 +1,14 @@
 # Heatpump Controller Q-edition aansluiten en in gebruik nemen
 
-Van nieuwe controller naar een werkende OpenQuatt-installatie. De Heatpump Controller Q-edition (HCQ) wordt standaard geleverd met `Single` + `Wi-Fi` voorgeïnstalleerd. Je brengt hem eerst online; de web-app begeleidt je daarna met de installatiekeuzes en eventuele wissel van opstelling of verbinding.
+Van nieuwe controller naar een werkende OpenQuatt-installatie. De Heatpump Controller Q-edition (HCQ) wordt standaard geleverd met `Single` + `Wi-Fi` voorgeïnstalleerd. Je brengt hem eerst online; de web-app begeleidt je daarna bij de juiste configuratie voor jouw opstelling en netwerkverbinding.
 
 ## De route in zes stappen
 
-1. Maak de installatie spanningsloos en sluit de controller aan.
-2. Stel Wi-Fi in via USB of het access point.
-3. Open `openquatt.local`.
-4. Kies in stap 1 van Quick Start de juiste setup.
-5. Rond de overige Quick Start-stappen af.
+1. Maak de CiC en Quatt-buitenunit(s) spanningsloos, verplaats de kabels en voer de eindcontrole uit.
+2. Voed de HCQ via USB en schakel daarna de Quatt-buitenunit(s) weer in.
+3. Stel Wi-Fi in via USB of het OpenQuatt access point.
+4. Open `openquatt.local`.
+5. Kies in **Quick Start → Kies je setup** de juiste configuratie en rond Quick Start af.
 6. Voeg OpenQuatt eventueel toe aan Home Assistant.
 
 ## 1. Controller aansluiten
@@ -19,7 +19,7 @@ De HCQ neemt de signaalkabels van de CiC over. Sluit dezelfde kabel nooit tegeli
 
 ### Interactief aansluiten: één stap tegelijk
 
-Gebruik de foto van je eigen CiC als uitgangspunt. De stappenhulp toont steeds één grote stap. Kies een stap bovenaan of gebruik **Vorige** en **Volgende**.
+Gebruik de foto van je eigen CiC als uitgangspunt. De stappenhulp toont steeds één grote stap. Kies een stap bovenaan of gebruik **Vorige** en **Volgende**. Voor de CV-ketel gebruik je alleen **stap 4a** bij OpenTherm óf **stap 4b** bij aan/uit.
 
 ![Kabels stap voor stap verplaatsen van Quatt CiC naar Heatpump Controller Q-edition](assets/q-edition-kabels-stappen.svg)
 
@@ -30,7 +30,7 @@ Gebruik de foto van je eigen CiC als uitgangspunt. De stappenhulp toont steeds �
 | Buitenunit(s) · Modbus `A/G/B` | `M1` · `GND/B/A` | Let goed op de juiste volgorde: `A → A` (rood), `G → GND` (groen), `B → B` (blauw). |
 | Kamerthermostaat · OpenTherm | `OTT` | Neem de twee aders over. |
 | CV-ketel · OpenTherm | `OTB` | Neem de twee aders over. |
-| CV-ketel · aan/uit | `R1` · `COM + NO` | Het CV-aan/uit-contact van de CiC zit onder een apart afdekkapje. `NC` blijft vrij. |
+| CV-ketel · aan/uit | `R1` · `COM + NO` | Het CV-aan/uit-contact van de CiC zit onder een apart afdekkapje. Op R1 blijft de bovenste klem `NC` vrij; gebruik de middelste klem `COM` en de onderste klem `NO`. |
 | Quatt flowmeter / PT1000 | `Q` | Steek de bestaande Quatt-sensorstekker over. |
 | **Optioneel:** vrijgekomen buitenunit-Modbus `A/G/B` op de CiC | `M2` · `GND/B/A` | Gebruik een aparte RS485-kabel: `A → A`, `G → GND`, `B → B`. |
 
@@ -38,10 +38,25 @@ Gebruik de foto van je eigen CiC als uitgangspunt. De stappenhulp toont steeds �
 > Bij de OpenTherm-verbindingen (`OTT` en `OTB`) en het aan/uit-contact (`R1`: `COM` + `NO`) maakt de polariteit of volgorde van de twee aders niet uit. Gebruik wel de genoemde aansluitklemmen.
 
 > [!IMPORTANT]
-> Kies voor de CV-ketel óf `OTB` óf `R1`; gebruik beide routes niet tegelijk. `T` is de losse Dallas/DS18B20-ingang en is niet de aansluiting voor de bestaande Quatt flowmeter/PT1000-kabel.
+> Kies voor de CV-ketel óf `OTB` óf `R1`; gebruik beide routes niet tegelijk.
 
 > [!TIP]
 > De verbinding tussen `M2` en de CiC is optioneel. Activeer daarna **CiC-compatibiliteit** onder **Instellingen → Bronnen / integraties** als de Quatt app via de CiC moet blijven meekijken. Deze functie staat standaard uit en geeft alleen OpenQuatt-data door; de CiC neemt de regeling niet over.
+
+### M1, M2 en de optionele aansluitingen
+
+- **M1** is de primaire Modbuspoort voor de Quatt-buitenunit(s). Deze verbinding is nodig voor de normale regeling.
+- **M2** is de optionele Modbuspoort voor CiC-compatibiliteit. Verbind M2 alleen met de vrijgekomen Modbuspoort van de CiC als de Quatt app moet blijven meekijken.
+- **R2** is een tweede potentiaalvrij wisselrelais met `NC`, `COM` en `NO`. Momenteel zijn er geen functies aan R2 gekoppeld; laat deze aansluiting vrij.
+- **T** is een 1-Wire-aansluiting voor een optionele Dallas/DS18B20-temperatuursensor: `+5V`, `GND` en `DATA`.
+
+### Aansluitingen op de HCQ
+
+Onderstaand referentiebeeld toont de fysieke positie en functie van alle aansluitingen. De aansluitingen staan op de behuizing aangeduid als `Q`, `R1`, `R2`, `T`, `M1`, `M2`, `OTT` en `OTB`.
+
+[![Referentiebeeld met alle aansluitingen van de Heatpump Controller Q-edition](assets/hcq-aansluitingen-referentie.png)](assets/hcq-aansluitingen-referentie.png)
+
+[Open het referentiebeeld op volledige grootte](assets/hcq-aansluitingen-referentie.png)
 
 ### Na het overzetten
 
@@ -51,7 +66,7 @@ Laat de USB-poort bereikbaar. Je hebt deze later ook nodig voor Wi-Fi provisioni
 
 ## 2. Wi-Fi instellen
 
-Een Wi-Fi-build biedt twee routes. Probeer eerst provisioning via USB; gebruik het OpenQuatt access point als fallback.
+Een Wi-Fi-build biedt twee routes. Op een computer is provisioning via USB meestal het handigst. Op een telefoon of tablet staat de route via het OpenQuatt access point daarom als eerste.
 
 ### Route A: via USB
 
@@ -108,7 +123,7 @@ Zie [Web-app gebruiken](web-app.md) voor bediening, updates, backups en beveilig
 
 ## 4. Quick Start afronden
 
-Quick Start verschijnt zolang de basisinstellingen nog niet zijn afgerond. De eerste stap is **Kies je setup**. De gemarkeerde kaart toont welke setup nu actief is; bij levering is dat normaal `Single · Wi-Fi`.
+Quick Start verschijnt zolang de basisinstellingen nog niet zijn afgerond. De eerste stap heet in de web-app **Kies je setup**. De gemarkeerde kaart toont welke configuratie nu actief is; bij levering is dat normaal `Single · Wi-Fi`.
 
 Kies hier direct de combinatie die bij je installatie hoort:
 
@@ -117,7 +132,7 @@ Kies hier direct de combinatie die bij je installatie hoort:
 
 Sluit bij Ethernet eerst de netwerkkabel aan. Kies alleen `Duo` als de installatie daadwerkelijk twee warmtepompen heeft.
 
-Is je keuze anders dan de actieve setup, dan begeleidt de web-app de benodigde wissel vanuit Quick Start. Daarbij kan de controller andere firmware installeren en opnieuw opstarten. Je hoeft bij de eerste ingebruikname dus niet via **Instellingen → Systeem → Updates** te wisselen. Open na een herstart zo nodig opnieuw `http://openquatt.local` en ga verder met Quick Start.
+Is je keuze anders dan de actieve configuratie, dan begeleidt de web-app de benodigde firmwarewissel vanuit Quick Start. Daarbij kan de controller andere firmware installeren en opnieuw opstarten. **Bestaande OpenQuatt-instellingen blijven bij een firmware-update of firmwarewissel behouden.** Je hoeft bij de eerste ingebruikname dus niet via **Instellingen → Systeem → Updates** te wisselen. Open na een herstart zo nodig opnieuw `http://openquatt.local` en ga verder met Quick Start.
 
 Daarna geef je aan welke Quatt Hybrid en installatie je hebt. V1, V1.5 en V2 beschrijven de generatie van de warmtepomp en staan los van de keuze voor `Single` of `Duo`.
 
@@ -135,15 +150,15 @@ Volg de route die de web-app voor jouw installatie toont. De basisstappen zijn:
 10. **Stille uren en niveaus:** stel het stille venster en de compressorlimieten voor dag en nacht in.
 11. **Bevestigen en afronden:** controleer je keuzes en markeer Quick Start als voltooid.
 
-## 5. Setup later wijzigen
+## 5. Configuratie later wijzigen
 
-Heb je Quick Start al afgerond en verandert de installatie later, dan kun je dezelfde setupwissel alsnog via de web-app starten. Maak eerst een backup.
+Heb je Quick Start al afgerond en verandert de installatie later, dan kun je dezelfde firmwarewissel alsnog via de web-app starten. Maak voor de zekerheid eerst een backup; de bestaande OpenQuatt-instellingen blijven tijdens de update of wissel behouden.
 
 Open in de web-app **Instellingen → Systeem** en kies bij **Updates** voor **Openen**. Onder **Geavanceerd** vind je, wanneer beschikbaar, **Opstelling wisselen** en **Verbinding wisselen**.
 
 - Gebruik **Opstelling wisselen** om tussen `Single` en `Duo` te wisselen.
 - Gebruik **Verbinding wisselen** om tussen Wi-Fi en Ethernet te wisselen. Sluit vóór een wissel naar Ethernet de netwerkkabel aan.
-- Wijzig V1, V1.5 of V2 bij de installatie-instellingen; daarvoor is geen setupwissel nodig.
+- Wijzig V1, V1.5 of V2 onder **Instellingen → Installatie**; daarvoor is geen firmwarewissel nodig.
 - Gebruik voor alleen een andere Wi-Fi-netwerknaam of een ander wachtwoord opnieuw **Configureer Wi-Fi via USB** of het OpenQuatt access point.
 
 > [!IMPORTANT]
@@ -164,6 +179,7 @@ Selecteer bij de eerste toevoeging nog geen Home Assistant-area. Wacht tot de Op
 ## Als het niet lukt
 
 - **Geen USB-poort zichtbaar:** controleer of je een USB-datakabel gebruikt en probeer een andere USB-poort.
+- **Instabiel of onverklaarbaar gedrag:** een USB-voedingsadapter van onvoldoende kwaliteit of vermogen kan vreemde storingen veroorzaken. Probeer een andere, betrouwbare voedingsadapter.
 - **Geen captive portal:** controleer dat je met `OpenQuatt` bent verbonden en dat je geen Ethernet-build gebruikt.
 - **`openquatt.local` opent niet:** zoek het IP-adres in je router.
 - **Geen warmtepompdata:** controleer voeding, communicatiebedrading en of `Single` of `Duo` klopt.

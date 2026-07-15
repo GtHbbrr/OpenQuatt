@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 430 630" role="img" aria-labelledby="title desc">
+  <title id="title">Stap 3: kamerthermostaat naar OTT</title>
+  <desc id="desc">Neem de twee OpenTherm-aders van de kamerthermostaat over naar OTT.</desc>
+  <style>
+    text { font-family: Inter, "Segoe UI", Arial, sans-serif; fill: #111827; }
+    .kicker { font-size: 14px; font-weight: 850; letter-spacing: 1.2px; fill: #ea580c; }
+    .title { font-size: 24px; font-weight: 820; letter-spacing: -.4px; }
+    .copy { font-size: 16px; font-weight: 700; fill: #475569; }
+  </style>
+  <rect width="430" height="630" rx="22" fill="#f8fbff" stroke="#dbeafe"/>
+  <text x="22" y="34" class="kicker">03 · KAMERTHERMOSTAAT</text>
+  <text x="22" y="70" class="title">Neem de twee OT-aders over</text>
+  <text x="22" y="99" class="title">naar OTT.</text>
+  <svg x="20" y="120" width="390" height="215" viewBox="58 1042 400 220" preserveAspectRatio="xMidYMid meet">
+    <image href="q-edition-kabels-stappen.svg" width="1000" height="2901"/>
+  </svg>
+  <circle cx="215" cy="365" r="22" fill="#ea580c"/>
+  <path d="M215 354v22m-8-8 8 8 8-8" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <svg x="20" y="395" width="390" height="215" viewBox="542 1042 400 220" preserveAspectRatio="xMidYMid meet">
+    <image href="q-edition-kabels-stappen.svg" width="1000" height="2901"/>
+  </svg>
+</svg>
