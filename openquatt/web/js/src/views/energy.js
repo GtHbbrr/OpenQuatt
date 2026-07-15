@@ -236,7 +236,7 @@ import { replaceOuterHtmlIfSignatureChanged } from "./view-utils.js";
     });
 
     const todayRecord = getEnergyHistoryTodayRecord();
-    if (todayRecord) {
+    if (todayRecord && !byDate.has(todayRecord.dateKey)) {
       byDate.set(todayRecord.dateKey, todayRecord);
     }
 
@@ -1237,7 +1237,7 @@ import { replaceOuterHtmlIfSignatureChanged } from "./view-utils.js";
       recordCount: model.records.length,
       bucketCount: model.buckets.length,
       latestDate: model.records[model.records.length - 1]?.dateKey || 0,
-      currentValues: ENERGY_HISTORY_VALUE_KEYS.map((key) => model.buckets[model.buckets.length - 1]?.[key] ?? null),
+      summary: model.summary,
     });
   }
 

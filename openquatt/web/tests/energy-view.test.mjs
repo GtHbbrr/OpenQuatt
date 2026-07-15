@@ -4,7 +4,13 @@ import test from "node:test";
 globalThis.__OQ_PREVIEW__ = false;
 globalThis.localStorage = { getItem: () => null };
 
-const { getEnergyHistoryBucketTooltip, getEnergyHistorySummaryRecords } = await import("../js/src/views/energy.js");
+const { state } = await import("../js/src/core/state.js");
+const {
+  getEnergyHistoryBucketTooltip,
+  getEnergyHistoryRecords,
+  getEnergyHistoryRenderSignature,
+  getEnergyHistorySummaryRecords,
+} = await import("../js/src/views/energy.js");
 
 test("energy history tooltip exposes the inputs used by COP and EER", () => {
   const tooltip = getEnergyHistoryBucketTooltip({
@@ -30,4 +36,42 @@ test("day summary uses the authoritative day record instead of partial hour buck
 
   assert.deepEqual(getEnergyHistorySummaryRecords([dayRecord], hourBuckets, "day", "20260712"), [dayRecord]);
   assert.deepEqual(getEnergyHistorySummaryRecords([dayRecord], hourBuckets, "week", "20260706"), hourBuckets);
+});
+
+test("current history record stays authoritative while live energy entities load", () => {
+  const previousEntities = state.entities;
+  const previousRaw = state.energyHistoryRaw;
+  state.entities = {
+    electricalEnergyDaily: { value: "" },
+    coolingElectricalEnergyDaily: { value: 5.052 },
+    heatpumpCoolingEnergyDaily: { value: 25.314 },
+  };
+  state.energyHistoryRaw = "@current|20260714|5131|0|5048|0|25289|0|0";
+
+  try {
+    const record = getEnergyHistoryRecords().find((item) => item.dateKey === 20260714);
+    assert.equal(record?.electricalInputWh, 5131);
+    assert.equal(record?.coolingInputWh, 5048);
+    assert.equal(record?.heatpumpCoolingOutputWh, 25289);
+  } finally {
+    state.entities = previousEntities;
+    state.energyHistoryRaw = previousRaw;
+  }
+});
+
+test("energy history render signature tracks day summary changes", () => {
+  const model = {
+    activeView: "day",
+    periodControl: { view: "day", selectedValue: "20260714", minValue: "20260714", maxValue: "20260714" },
+    records: [{ dateKey: 20260714 }],
+    buckets: [{ dateKey: 20260714, electricalInputWh: 5131 }],
+    summary: { electricalInputWh: 0, coolingOutputWh: 25289 },
+  };
+  const before = getEnergyHistoryRenderSignature(model);
+  const after = getEnergyHistoryRenderSignature({
+    ...model,
+    summary: { ...model.summary, electricalInputWh: 5131 },
+  });
+
+  assert.notEqual(before, after);
 });
