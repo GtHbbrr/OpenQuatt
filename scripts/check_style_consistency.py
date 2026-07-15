@@ -180,6 +180,7 @@ NESTED_KEY_ORDER_RULES = {
         "openquatt_profile_heatpump_controller_q",
         "openquatt_base_common",
         "openquatt_connection_wifi",
+        "openquatt_connection_wifi_w5500_power_down",
     ),
     ("configs/heatpump_controller_q/single_eth.yaml", "packages"): (
         "openquatt_profile_heatpump_controller_q",
@@ -191,6 +192,7 @@ NESTED_KEY_ORDER_RULES = {
         "openquatt_profile_heatpump_controller_q_cic_compatibility_duo",
         "openquatt_base_common",
         "openquatt_connection_wifi",
+        "openquatt_connection_wifi_w5500_power_down",
     ),
     ("configs/heatpump_controller_q/duo_eth.yaml", "packages"): (
         "openquatt_profile_heatpump_controller_q",

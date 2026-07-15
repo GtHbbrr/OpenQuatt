@@ -31,4 +31,5 @@ packages:
   openquatt_profile_heatpump_controller_q: !include ../../openquatt/profiles/heatpump_controller_q.yaml
   openquatt_base_common: !include ../../openquatt/base/common.yaml
   openquatt_connection_wifi: !include ../../openquatt/connection/wifi.yaml
+  openquatt_connection_wifi_w5500_power_down: !include ../../openquatt/connection/wifi_w5500_power_down.yaml
   <<: !include ../../openquatt/oq_packages_common.yaml
