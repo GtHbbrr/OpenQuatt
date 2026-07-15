@@ -14,6 +14,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 2
 
       - name: Run settings-backup consistency check
         run: node openquatt/web/check-settings-backup.mjs
@@ -22,6 +24,8 @@ jobs:
         run: npm ci
 
       - name: Check generated web bundles
+        env:
+          OPENQUATT_WEB_BUNDLE_BASE_REF: ${{ github.event.pull_request.base.sha }}
         run: npm run check:web
 
       - name: Run web smoke checks

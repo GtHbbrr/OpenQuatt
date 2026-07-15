@@ -2,10 +2,8 @@ import { access, readdir, readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import vm from "node:vm";
-import { gzipSync } from "node:zlib";
 import { build, transform } from "esbuild";
 import { resolveCssSources } from "./css-source-list.mjs";
-import { WEB_BUNDLE_BUDGETS } from "./web-budgets.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const webDir = path.dirname(__filename);
@@ -274,20 +272,6 @@ async function checkCssBundleFresh() {
   const actual = await readFile(outputPath, "utf8");
   if (actual !== expected) {
     throw new Error("CSS bundle is stale. Run: rtk npm run build:web");
-  }
-}
-
-async function checkBundleGzipBudgets() {
-  const errors = [];
-  for (const budget of WEB_BUNDLE_BUDGETS) {
-    const bytes = await readFile(path.join(webDir, budget.file));
-    const gzipBytes = gzipSync(bytes).length;
-    if (gzipBytes > budget.gzip) {
-      errors.push(`${budget.file} gzip ${gzipBytes} B exceeds budget ${budget.gzip} B`);
-    }
-  }
-  if (errors.length) {
-    throw new Error(`Bundle budget check failed:\n- ${errors.join("\n- ")}`);
   }
 }
 
@@ -729,7 +713,6 @@ async function main() {
   await checkRuntimeBoundaryContracts();
   await checkJavaScriptBundleFresh();
   await checkCssBundleFresh();
-  await checkBundleGzipBudgets();
   console.log("Web smoke ok");
 }
 

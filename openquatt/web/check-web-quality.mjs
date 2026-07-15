@@ -1,12 +1,14 @@
+import { execFileSync } from "node:child_process";
 import { gzipSync } from "node:zlib";
 import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { WEB_BUNDLE_BUDGETS } from "./web-budgets.mjs";
+import { WEB_BUNDLE_BUDGETS, WEB_BUNDLE_GZIP_GROWTH_LIMIT } from "./web-budgets.mjs";
 
 const webDir = path.dirname(fileURLToPath(import.meta.url));
 const sourceRoots = [path.join(webDir, "js", "src"), path.join(webDir, "css", "src")];
 const mojibakePattern = /â€|Ã.|Â(?:\s|\u00a0)/u;
+const bundleBaseRef = process.env.OPENQUATT_WEB_BUNDLE_BASE_REF?.trim();
 
 async function collectFiles(directory) {
   const entries = await readdir(directory, { withFileTypes: true });
@@ -15,6 +17,23 @@ async function collectFiles(directory) {
     return entry.isDirectory() ? collectFiles(entryPath) : [entryPath];
   }));
   return files.flat();
+}
+
+function readBundleAtRef(ref, file) {
+  const gitPath = path.posix.join("openquatt/web", file);
+  try {
+    return execFileSync("git", ["-C", webDir, "show", `${ref}:${gitPath}`], {
+      maxBuffer: 10 * 1024 * 1024,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+  } catch (error) {
+    const detail = error.stderr?.toString().trim();
+    throw new Error(`Could not read ${gitPath} at ${ref}${detail ? `: ${detail}` : ""}`);
+  }
+}
+
+function formatDelta(value) {
+  return `${value >= 0 ? "+" : ""}${value}`;
 }
 
 const sourceFiles = (await Promise.all(sourceRoots.map(collectFiles))).flat();
@@ -27,15 +46,41 @@ for (const sourceFile of sourceFiles) {
 }
 
 const budgetFailures = [];
+const bundleReports = [];
 for (const budget of WEB_BUNDLE_BUDGETS) {
   const contents = await readFile(path.join(webDir, budget.file));
-  const sizes = { raw: contents.byteLength, gzip: gzipSync(contents).byteLength };
-  for (const kind of ["raw", "gzip"]) {
-    if (sizes[kind] > budget[kind]) {
-      budgetFailures.push(`${budget.file} ${kind}: ${sizes[kind]} > ${budget[kind]} bytes`);
-    }
+  const rawBytes = contents.byteLength;
+  const gzipBytes = gzipSync(contents).byteLength;
+  if (rawBytes > budget.raw) {
+    budgetFailures.push(`${budget.file} raw: ${rawBytes} > ${budget.raw} bytes`);
+  }
+
+  if (!bundleBaseRef) {
+    bundleReports.push(`${budget.file}: raw ${rawBytes} B, gzip ${gzipBytes} B (no base comparison)`);
+    continue;
+  }
+
+  const baseGzipBytes = gzipSync(readBundleAtRef(bundleBaseRef, budget.file)).byteLength;
+  const gzipDelta = gzipBytes - baseGzipBytes;
+  const ratioLimit = Math.floor(baseGzipBytes * WEB_BUNDLE_GZIP_GROWTH_LIMIT.ratio);
+  const allowedIncrease = Math.min(WEB_BUNDLE_GZIP_GROWTH_LIMIT.bytes, ratioLimit);
+  const deltaPercent = baseGzipBytes ? (gzipDelta / baseGzipBytes) * 100 : 0;
+  const formattedDeltaPercent = `${deltaPercent >= 0 ? "+" : ""}${deltaPercent.toFixed(2)}`;
+  bundleReports.push(
+    `${budget.file}: raw ${rawBytes} B, gzip ${gzipBytes} B, `
+    + `base ${baseGzipBytes} B, delta ${formatDelta(gzipDelta)} B (${formattedDeltaPercent}%), `
+    + `limit +${allowedIncrease} B`,
+  );
+  if (gzipDelta > allowedIncrease) {
+    budgetFailures.push(
+      `${budget.file} gzip growth: ${formatDelta(gzipDelta)} > +${allowedIncrease} bytes `
+      + `(base ${baseGzipBytes}, current ${gzipBytes})`,
+    );
   }
 }
+
+console.log(`Web bundle sizes${bundleBaseRef ? ` compared with ${bundleBaseRef}` : ""}:`);
+bundleReports.forEach((report) => console.log(`- ${report}`));
 
 if (encodingFailures.length || budgetFailures.length) {
   const failures = [
