@@ -23,7 +23,8 @@
     ></script>
     <script type="module" src="install.js"></script>
   </head>
-  <body class="install-page">
+  <body class="install-page" data-search-index-url="../search-index.json" data-version-url="../firmware/main/version.json">
+    <a class="skip-link" href="#main-content">Ga naar de inhoud</a>
     <header class="site-header">
       <div class="site-header-inner">
         <div class="site-header-start">
@@ -40,6 +41,11 @@
         </div>
 
         <div class="site-header-actions">
+          <button class="search-trigger" type="button" data-search-open aria-label="Zoeken" aria-haspopup="dialog" aria-expanded="false">
+            <span class="search-input-icon" aria-hidden="true">⌕</span>
+            <span class="search-trigger-label">Zoeken</span>
+            <kbd aria-hidden="true">/</kbd>
+          </button>
           <a class="header-link" href="https://github.com/jeroen85/OpenQuatt" target="_blank" rel="noreferrer">GitHub</a>
         </div>
       </div>
@@ -55,7 +61,8 @@
             <p class="sidebar-copy">
               Stel Wi-Fi in op een voorgeïnstalleerde module of flash de stabiele OpenQuatt-firmware via USB.
             </p>
-            <a class="sidebar-utility" href="../verwarmen-en-koelen.html">Naar uitleg</a>
+            <a class="sidebar-utility" href="../q-edition.html">Open aansluithulp</a>
+            <p class="docs-version" data-docs-version>Docs vanaf main</p>
           </section>
 
           <section class="sidebar-section">
@@ -66,7 +73,7 @@
             <div class="sidebar-section-panel" id="install-nav-0" data-nav-panel>
               <ul class="nav-list">
                 <li><a class="sidebar-link" href="../index.html" data-sidebar-link>OpenQuatt</a></li>
-                <li><a class="sidebar-link current" href="./" data-sidebar-link>Installatiehulp</a></li>
+                <li><a class="sidebar-link current" href="./" data-sidebar-link aria-current="page">Installatiehulp</a></li>
               </ul>
             </div>
           </section>
@@ -89,7 +96,7 @@
         </div>
       </aside>
 
-      <main class="docs-main">
+      <main class="docs-main" id="main-content" tabindex="-1">
         <section class="doc-header">
           <p class="doc-kicker">Installatiehulp</p>
           <h1>Verbind of installeer je OpenQuatt-module</h1>
@@ -98,7 +105,7 @@
           </p>
           <p class="install-warning-inline">
             <span>Let op</span>
-            OpenQuatt kan gevolgen hebben voor je Quatt-garantie.
+            OpenQuatt kan gevolgen hebben voor Quatts commerciële garantie. Zie de <a href="https://www.quatt.io/algemene-voorwaarden">actuele voorwaarden</a>.
           </p>
         </section>
 
@@ -276,7 +283,7 @@
                       <esp-web-install-button id="install-button">
                         <button class="install-cta" slot="activate">Installeer OpenQuatt</button>
                         <span class="install-fallback" slot="unsupported">
-                          Web Serial is in deze browser niet beschikbaar. Gebruik Chrome, Edge of Firefox op desktop.
+                          Web Serial is in deze browser niet beschikbaar. Gebruik Chrome of Edge op desktop.
                         </span>
                         <span class="install-fallback" slot="not-allowed">
                           Open deze installatiehulp via HTTPS om Web Serial te kunnen gebruiken.
@@ -320,6 +327,26 @@
         </section>
       </main>
 
+    </div>
+
+    <div class="search-modal" data-search-modal hidden role="dialog" aria-modal="true" aria-labelledby="site-search-title">
+      <button class="search-scrim" type="button" data-search-close tabindex="-1" aria-label="Zoeken sluiten"></button>
+      <section class="search-panel">
+        <header class="search-head">
+          <div>
+            <p class="search-kicker">OpenQuatt Docs</p>
+            <h2 id="site-search-title">Zoeken in de documentatie</h2>
+          </div>
+          <button class="search-close" type="button" data-search-close aria-label="Zoeken sluiten">×</button>
+        </header>
+        <label class="search-input-wrap">
+          <span class="search-input-icon" aria-hidden="true">⌕</span>
+          <span class="sr-only">Zoekterm</span>
+          <input type="search" data-search-input autocomplete="off" placeholder="Bijvoorbeeld: flow, Quick Start of firmware-update" />
+        </label>
+        <div class="search-results" data-search-results aria-live="polite"></div>
+        <p class="search-foot"><span>Typ om alle handleidingen te doorzoeken.</span><span><kbd>Esc</kbd> sluit zoeken.</span></p>
+      </section>
     </div>
   </body>
 </html>

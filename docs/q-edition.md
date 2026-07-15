@@ -15,6 +15,9 @@ Van nieuwe controller naar een werkende OpenQuatt-installatie. De Heatpump Contr
 
 Schakel eerst de CiC uit en maak alle Quatt-buitenunits spanningsloos, bijvoorbeeld met de werkschakelaar. Maak daarna een foto van de complete aansluitstrook en label de kabels voordat je iets losmaakt.
 
+> [!WARNING]
+> Twijfel je over de bedrading of aansluitingen? Stop dan en laat dit door een vakbekwaam installateur uitvoeren.
+
 De HCQ neemt de signaalkabels van de CiC over. Sluit dezelfde kabel nooit tegelijk op de CiC en de HCQ aan.
 
 ### Interactief aansluiten: één stap tegelijk
@@ -24,6 +27,8 @@ Gebruik de foto van je eigen CiC als uitgangspunt. De stappenhulp toont steeds �
 ![Kabels stap voor stap verplaatsen van Quatt CiC naar Heatpump Controller Q-edition](assets/q-edition-kabels-stappen.svg)
 
 ### Welke kabel gaat waarheen?
+
+Draadkleuren in de schema's en stappenhulp zijn illustratief. De klemmarkeringen en functies zijn altijd leidend.
 
 | Van de CiC | Naar de HCQ | Zo sluit je aan |
 |---|---|---|
@@ -136,6 +141,10 @@ Is je keuze anders dan de actieve configuratie, dan begeleidt de web-app de beno
 
 Daarna geef je aan welke Quatt Hybrid en installatie je hebt. V1, V1.5 en V2 beschrijven de generatie van de warmtepomp en staan los van de keuze voor `Single` of `Duo`.
 
+- Kies `V1` bij model `AMM4`: flowmeter bij de CV-ketel en vorstbeveiligingsklep buiten de buitenunit. Dit geldt ook voor een gemengde V1/V1.5 Duo.
+- Kies `V1.5` bij model `AMM4-V1.5`: flowmeter in de buitenunit en onder de CV-ketel alleen een kleine clip-on temperatuursensor.
+- Kies `V2` bij model `AMH6` of `AMH6-2`: flowmeter in de buitenunit en onder de CV-ketel alleen een kleine clip-on temperatuursensor.
+
 Volg de route die de web-app voor jouw installatie toont. De basisstappen zijn:
 
 1. **Kies je setup:** `Single` of `Duo` en Wi-Fi of Ethernet.
@@ -166,7 +175,7 @@ Open in de web-app **Instellingen → Systeem** en kies bij **Updates** voor **O
 
 ## 6. Toevoegen aan Home Assistant
 
-Home Assistant is optioneel. Zodra OpenQuatt en Home Assistant op hetzelfde netwerk zitten, wordt het ESPHome-apparaat meestal automatisch gevonden.
+Home Assistant is optioneel voor OpenQuatt zelf en aanbevolen voor dashboards en automatisering. Zodra OpenQuatt en Home Assistant op hetzelfde netwerk zitten, wordt het ESPHome-apparaat meestal automatisch gevonden.
 
 Gebruik de bestaande handleidingen voor de vervolgstappen:
 

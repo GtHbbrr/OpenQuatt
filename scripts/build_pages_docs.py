@@ -30,6 +30,7 @@ class RenderedPage:
     lead: str
     body_html: str
     toc: list[tuple[int, str, str]]
+    search_text: str
 
 
 PAGES = [
@@ -86,6 +87,7 @@ SIDEBAR_GROUPS = [
         "Naslag",
         "Fallbacks en technische routes die je meestal niet dagelijks nodig hebt.",
         [
+            PurePosixPath("docs/mqtt.md"),
             PurePosixPath("docs/handmatige-installatie.md"),
         ],
     ),
@@ -417,10 +419,11 @@ def build_sidebar(current_page: Page) -> str:
             linked_page = PAGE_BY_SOURCE[source]
             href = rel_url(current_page.output, linked_page.output)
             current = " current" if current_page.source == source else ""
+            current_attr = ' aria-current="page"' if current else ""
             items.append(
                 f"""
                 <li>
-                  <a class="sidebar-link{current}" href="{href}" data-sidebar-link>{escape(linked_page.label)}</a>
+                  <a class="sidebar-link{current}" href="{href}" data-sidebar-link{current_attr}>{escape(linked_page.label)}</a>
                 </li>
                 """
             )
@@ -471,10 +474,20 @@ def render_template(rendered_page: RenderedPage, rendered_pages: list[RenderedPa
     page = rendered_page.page
     asset_prefix = "./" if page.output.parent == PurePosixPath(".") else "../"
     install_href = rel_url(page.output, PurePosixPath("install/index.html"))
+    q_edition_href = rel_url(page.output, PurePosixPath("q-edition.html"))
+    search_index_href = rel_url(page.output, PurePosixPath("search-index.json"))
+    version_href = rel_url(page.output, PurePosixPath("firmware/main/version.json"))
     body_class = f"page-{slugify(page.output.stem, {})}"
 
-
     lead_html = f'<p class="doc-lead">{rendered_page.lead}</p>' if rendered_page.lead else ""
+    doc_actions = ""
+    if page.source == PurePosixPath("README.md"):
+        doc_actions = f"""
+          <div class="doc-actions" aria-label="Snel starten">
+            <a class="doc-action doc-action-primary" href="{install_href}">Open installer</a>
+            <a class="doc-action" href="{q_edition_href}">Bekijk aansluithulp</a>
+          </div>
+        """
 
     return f"""<!DOCTYPE html>
 <html lang="nl">
@@ -489,7 +502,8 @@ def render_template(rendered_page: RenderedPage, rendered_pages: list[RenderedPa
     <link rel="stylesheet" href="{asset_prefix}site.css" />
     <script defer src="{asset_prefix}site.js"></script>
   </head>
-  <body class="{escape(body_class, quote=True)}">
+  <body class="{escape(body_class, quote=True)}" data-search-index-url="{search_index_href}" data-version-url="{version_href}">
+    <a class="skip-link" href="#main-content">Ga naar de inhoud</a>
     <header class="site-header">
       <div class="site-header-inner">
         <div class="site-header-start">
@@ -506,6 +520,11 @@ def render_template(rendered_page: RenderedPage, rendered_pages: list[RenderedPa
         </div>
 
         <div class="site-header-actions">
+          <button class="search-trigger" type="button" data-search-open aria-label="Zoeken" aria-haspopup="dialog" aria-expanded="false">
+            <span class="search-input-icon" aria-hidden="true">⌕</span>
+            <span class="search-trigger-label">Zoeken</span>
+            <kbd aria-hidden="true">/</kbd>
+          </button>
           <a class="header-link" href="{GITHUB_REPO_URL}">GitHub</a>
         </div>
       </div>
@@ -520,16 +539,18 @@ def render_template(rendered_page: RenderedPage, rendered_pages: list[RenderedPa
             <p class="sidebar-kicker">OpenQuatt Docs</p>
             <p class="sidebar-copy">Een korte route voor installeren, begrijpen en rustig bijsturen.</p>
             <a class="sidebar-utility" href="{install_href}">Open webinstaller</a>
+            <p class="docs-version" data-docs-version>Docs vanaf main</p>
           </section>
           {build_sidebar(page)}
         </div>
       </aside>
 
-      <main class="docs-main">
+      <main class="docs-main" id="main-content" tabindex="-1">
         <section class="doc-header">
           <p class="doc-kicker">{escape(page.kind)}</p>
           <h1>{escape(page.label)}</h1>
           {lead_html}
+          {doc_actions}
 
         </section>
 
@@ -545,6 +566,25 @@ def render_template(rendered_page: RenderedPage, rendered_pages: list[RenderedPa
       </aside>
     </div>
 
+    <div class="search-modal" data-search-modal hidden role="dialog" aria-modal="true" aria-labelledby="site-search-title">
+      <button class="search-scrim" type="button" data-search-close tabindex="-1" aria-label="Zoeken sluiten"></button>
+      <section class="search-panel">
+        <header class="search-head">
+          <div>
+            <p class="search-kicker">OpenQuatt Docs</p>
+            <h2 id="site-search-title">Zoeken in de documentatie</h2>
+          </div>
+          <button class="search-close" type="button" data-search-close aria-label="Zoeken sluiten">×</button>
+        </header>
+        <label class="search-input-wrap">
+          <span class="search-input-icon" aria-hidden="true">⌕</span>
+          <span class="sr-only">Zoekterm</span>
+          <input type="search" data-search-input autocomplete="off" placeholder="Bijvoorbeeld: flow, Quick Start of firmware-update" />
+        </label>
+        <div class="search-results" data-search-results aria-live="polite"></div>
+        <p class="search-foot"><span>Typ om alle handleidingen te doorzoeken.</span><span><kbd>Esc</kbd> sluit zoeken.</span></p>
+      </section>
+    </div>
 
   </body>
 </html>
@@ -557,13 +597,34 @@ def build_site(site_dir: Path) -> None:
         renderer = MarkdownRenderer(page.source, page.output)
         text = (REPO_ROOT / page.source).read_text(encoding="utf-8")
         lead, body = renderer.render(text)
-        rendered_pages.append(RenderedPage(page, lead, body, list(renderer.toc)))
+        search_text = " ".join(
+            strip_markdown(line)
+            for line in text.splitlines()
+            if line.strip() and not line.lstrip().startswith(("```", "<img"))
+        )
+        rendered_pages.append(RenderedPage(page, lead, body, list(renderer.toc), search_text))
 
     for rendered_page in rendered_pages:
         html = render_template(rendered_page, rendered_pages)
         output_path = site_dir / rendered_page.page.output
         output_path.parent.mkdir(parents=True, exist_ok=True)
         output_path.write_text(html, encoding="utf-8")
+
+    search_index = [
+        {
+            "title": rendered.page.label,
+            "summary": rendered.page.summary,
+            "kind": rendered.page.kind,
+            "url": rendered.page.output.as_posix(),
+            "headings": [label for _level, label, _anchor in rendered.toc],
+            "text": rendered.search_text,
+        }
+        for rendered in rendered_pages
+    ]
+    (site_dir / "search-index.json").write_text(
+        json.dumps(search_index, ensure_ascii=False, separators=(",", ":")) + "\n",
+        encoding="utf-8",
+    )
 
 
 def main(argv: list[str]) -> int:

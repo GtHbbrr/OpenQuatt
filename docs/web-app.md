@@ -54,6 +54,9 @@ Quick Start begint voor de Heatpump Controller Q met een controle van de firmwar
 |---|---|---|
 | `Kies je setup` | `Single` of `Duo`, via `Wi-Fi` of `Ethernet` | Installeert zo nodig direct de passende Q-edition-firmware voordat je verder configureert. |
 | `Kies je Quatt Hybrid` | V1, V1.5 of V2 | OpenQuatt gebruikt hiermee de juiste basislogica. |
+| `Flowmeting configureren` | De flowbron voor jouw Quatt-versie en controller | Zorgt dat de regeling de juiste flowmeting gebruikt. |
+| `Thermostaatgegevens configureren` | Eén bron voor kamertemperatuur en kamer-setpoint | Voorkomt dat de regeling waarden uit verschillende bronnen combineert. |
+| `CV-ketel of boiler` | Wel of geen ondersteuning door de ketel of boiler | Bepaalt of OpenQuatt aanvullende warmte mag inzetten. |
 | `Kies de verwarmingsstrategie` | `Power House` of `Water Temperature Control` | Dit bepaalt hoe OpenQuatt warmtevraag maakt. |
 | `Werk de regeling uit` | Strategie-instellingen | Je ziet alleen velden die bij de gekozen strategie horen. |
 | `Flowregeling en afstelling` | Automatische flow of vaste pompstand, plus Kp/Ki | Hiermee blijft de waterdoorstroming beheersbaar. |
@@ -65,13 +68,15 @@ Je hoeft niet meteen perfecte waardes te kiezen. Het doel van Quick Start is een
 
 ## Hoofdschermen
 
-De web-app heeft vier hoofdschermen.
+De web-app heeft zes hoofdschermen.
 
 | Scherm | Gebruik |
 |---|---|
 | `Overzicht` | Live zien wat OpenQuatt nu doet en of de belangrijkste waarden logisch zijn. |
-| `Trends` | Korte historie bekijken als trendopslag beschikbaar is. |
 | `Energie` | Vermogen, energie, COP en EER bekijken. |
+| `Resultaten` | Opgeslagen energie- en resultaathistorie over een langere periode bekijken. |
+| `Beslislog` | Terugzien welke regelbeslissingen OpenQuatt nam en waarom. Deze functie is nog beta. |
+| `Diagnose` | Live waarden en korte trendhistorie naast elkaar bekijken om gedrag te onderzoeken. |
 | `Instellingen` | OpenQuatt configureren, bijwerken en beheren. |
 
 Voor dagelijks kijken is `Overzicht` meestal genoeg. Ga pas naar `Instellingen` als je bewust iets wilt veranderen.
@@ -90,9 +95,13 @@ Let vooral op:
 
 Zie je hier al vreemde waarden, ga dan niet meteen tunen. Controleer eerst de bronkeuze in Home Assistant of in de instellingen.
 
-## Trends
+## Resultaten
 
-`Trends` is bedoeld voor korte historie. Dat helpt bij vragen zoals:
+`Resultaten` bundelt opgeslagen resultaten en historie. Gebruik dit scherm om prestaties over een langere periode te vergelijken. Voor een snelle diagnose van het actuele regelgedrag is `Diagnose` geschikter.
+
+## Diagnose
+
+`Diagnose` combineert actuele waarden met korte historie. Dat helpt bij vragen zoals:
 
 - loopt de aanvoertemperatuur rustig op;
 - blijft de flow stabiel;
@@ -104,6 +113,10 @@ Trendopslag kan onder `Instellingen -> Systeem` worden beheerd. Als trendopslag 
 OpenQuatt bewaart de korte trendhistorie in PSRAM en kan aanvullend tot 30 dagen trendhistorie in flash bewaren. Als je flashopslag uitzet, blijft bestaande flashhistorie staan; OpenQuatt stopt dan alleen met nieuwe trenddata naar flash schrijven. Alle ondersteunde OpenQuatt-profielen gebruiken PSRAM; ontbrekende PSRAM wijst dus op een hardware- of profielprobleem.
 
 Via `Instellingen -> Gegevens bewaren` zijn Diagnose, Beslislog en Energie afzonderlijk te beheren. De Beslislog bewaart maximaal zeven dagen exacte gebeurtenissen en redenen na een herstart. Nieuwe gebeurtenissen worden per uur gebundeld naar flash geschreven. Met `Nu opslaan` kunnen nog niet opgeslagen gebeurtenissen vóór een update of herstart alvast worden vastgelegd.
+
+## Beslislog
+
+`Beslislog` laat zien welke regelkeuze OpenQuatt maakte en welke signalen daarbij meespeelden. Gebruik dit scherm vooral om een onverwachte omschakeling of begrenzing te verklaren. De functie is nog beta; combineer de uitleg daarom met de actuele waarden in `Diagnose`.
 
 ## Energie
 
@@ -123,7 +136,7 @@ Onder `Instellingen` staan de onderdelen bewust gescheiden. Het idee is: eerst d
 
 ### Installatie
 
-Hier staan basiskeuzes zoals Quatt Hybrid-versie, flowregeling, service & commissioning, boiler- of CV-ondersteuning, stille uren en watergrenzen.
+Hier staan basiskeuzes zoals Quatt Hybrid-versie, flowregeling, boiler- of CV-ondersteuning, stille uren, watergrenzen en compressorinstellingen.
 
 Gebruik dit deel vooral tijdens de eerste inrichting of als je installatie later verandert.
 
@@ -148,29 +161,31 @@ Bij `Expliciet toestaan` gebruikt OpenQuatt geen dauwpuntgrens: ook een beschikb
 
 Wil je dauwpuntbronnen uit Home Assistant gebruiken, kijk dan bij [Dashboard installeren](dashboard/README.md#optioneel-dynamische-koelbronnen-via-home-assistant). De web-app kiest daarna welke koelingsdauwpuntbron OpenQuatt gebruikt: `Auto`, `Home Assistant` of `MQTT`. In `Auto` gebruikt OpenQuatt de hoogste geldige dauwpuntwaarde.
 
-Wil je externe bronwaarden of toestemmingssignalen via MQTT aanleveren, configureer dan eerst de broker bij **Integratie -> MQTT inputbronnen**. In **MQTT sensoren** kun je per topic zien wat OpenQuatt verwacht en ongebruikte topics uitzetten. Zie [MQTT inputbronnen](mqtt.md) voor topics, payload en geldigheid.
+Wil je externe bronwaarden of toestemmingssignalen via MQTT aanleveren, configureer dan eerst de broker bij **Bronnen / integraties -> MQTT inputbronnen**. In **MQTT sensoren** kun je per topic zien wat OpenQuatt verwacht en ongebruikte topics uitzetten. Zie [MQTT inputbronnen](mqtt.md) voor topics, payload en geldigheid.
 
-### Geavanceerd
+### Bronnen / integraties
 
-Hier staan instellingen die je meestal niet nodig hebt bij normaal gebruik, zoals compressoruitsluitingen, minimale runtime en compatibiliteitsopties.
-
-Je kunt hier ook de directe integraties beheren:
+Hier beheer je de directe gegevensbronnen en integraties:
 
 - `OpenTherm`: zet de lokale OpenTherm-thermostaatkoppeling aan of uit;
 - `CIC-polling`: zet het uitlezen van een externe CIC JSON-feed aan of uit en pas de feed-URL aan;
 - `MQTT inputbronnen`: configureer een broker voor externe MQTT-bronwaarden zoals dauwpunt, buiten- en kamerwaarden en toestemmingssignalen, en zet ongebruikte topics uit;
 - `CiC-compatibiliteit`: gebruik dit alleen als de Quatt app via de CiC moet blijven meekijken.
 
-Dezelfde sectie toont compacte diagnostiek voor OpenTherm en CIC, zoals linkstatus, JSON-feedstatus, kamertemperatuur, setpoint en flow wanneer de firmware die signalen exposeert.
+Dezelfde groep toont compacte diagnostiek voor OpenTherm en CIC, zoals linkstatus, JSON-feedstatus, kamertemperatuur, setpoint en flow wanneer de firmware die signalen exposeert.
 
 Laat dit met rust zolang OpenQuatt logisch werkt. Verander liever een instelling per keer en kijk daarna wat het systeem doet.
+
+### Service
+
+Hier staan commissioning, tests, kalibratie en andere servicetaken. Gebruik deze groep alleen voor een gerichte controle of afstelling en volg de aanwijzingen in de web-app.
 
 ### Systeem
 
 Hier vind je beheerfuncties:
 
 - Quick Start opnieuw openen;
-- trendopslag;
+- opslag voor Diagnose, Beslislog en Energie;
 - firmware-updates en updatekanaal;
 - web-login en API-beveiliging;
 - backup en restore;

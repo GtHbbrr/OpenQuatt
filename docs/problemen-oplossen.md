@@ -148,6 +148,16 @@ Gebruik je MQTT voor het dauwpunt, controleer dan ook:
 
 Zie [MQTT inputbronnen](mqtt.md) voor topic en payload.
 
+## Firmware-update lijkt mislukt
+
+- laat de web-app open zolang er nog voortgang zichtbaar is en onderbreek de voeding dan niet;
+- wacht enkele minuten op de herstart en probeer daarna `openquatt.local` en het bekende IP-adres;
+- controleer in je router of OpenQuatt na de herstart een ander IP-adres kreeg;
+- opent de web-app weer, controleer dan onder **Instellingen -> Systeem -> Updates** welke versie actief is;
+- blijft de controller onbereikbaar, sluit hem via USB aan en gebruik de normale installer of [Handmatige installatie](handmatige-installatie.md) als herstelroute.
+
+Start een update pas opnieuw als de controller weer stabiel bereikbaar is.
+
 ## Wanneer niets veranderen?
 
 Verander bij voorkeur niets als:
@@ -171,6 +181,20 @@ Gebruik deze werkwijze:
 5. draai terug als het slechter wordt.
 
 Begin bijna altijd met bronkeuze en flow. Strategie-instellingen komen daarna pas.
+
+## Vraag stellen of bug melden
+
+Voor gebruiksvragen en hulp bij diagnose kun je terecht in het [OpenQuatt Discord-kanaal](https://discord.com/channels/1176602554885492786/1464174190788874427). Een reproduceerbare bug meld je als [GitHub-issue](https://github.com/jeroen85/OpenQuatt/issues/new/choose).
+
+Vermeld bij een hulpvraag of bugmelding:
+
+- OpenQuatt-versie en hardwareprofiel;
+- Quatt-generatie, `Single` of `Duo`, en Wi-Fi of Ethernet;
+- wat je verwachtte en wat er daadwerkelijk gebeurde;
+- het tijdstip en de stappen om het probleem te herhalen;
+- relevante screenshots uit `Diagnose` of `Beslislog` en recente wijzigingen.
+
+Deel nooit Wi-Fi-wachtwoorden, API-sleutels of andere geheimen.
 
 ## Verder lezen
 

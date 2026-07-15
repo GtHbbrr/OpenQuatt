@@ -30,6 +30,15 @@ Toelichting:
 
 <!-- Optioneel: extra context, ontwerpkeuzes, screenshots, trade-offs, links, follow-up werk. -->
 
+## Documentatie
+
+- [ ] Documentatie bijgewerkt voor de gebruikersgerichte wijziging
+- [ ] Geen documentatiewijziging nodig
+
+Docs-impact motivatie:
+
+<!-- Verplicht invullen als "Geen documentatiewijziging nodig" is aangevinkt. -->
+
 ## Validatie
 
 <!-- Wat is lokaal getest? Noem commando's/configs waar relevant. -->

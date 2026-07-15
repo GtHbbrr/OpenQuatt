@@ -1,15 +1,200 @@
 (() => {
   const body = document.body;
   const sidebarToggle = document.querySelector("[data-sidebar-toggle]");
+  const sidebar = document.querySelector("[data-sidebar]");
   const sidebarBackdrop = document.querySelector("[data-sidebar-backdrop]");
   const sidebarLinks = [...document.querySelectorAll("[data-sidebar-link]"), ...document.querySelectorAll("[data-toc-link]")];
   const navToggles = [...document.querySelectorAll("[data-nav-toggle]")];
   const tocLinks = [...document.querySelectorAll("[data-toc-link]")];
+  const searchOpenButton = document.querySelector("[data-search-open]");
+  const searchModal = document.querySelector("[data-search-modal]");
+  const searchInput = document.querySelector("[data-search-input]");
+  const searchResults = document.querySelector("[data-search-results]");
+  const searchCloseButtons = [...document.querySelectorAll("[data-search-close]")];
+  const docsVersion = document.querySelector("[data-docs-version]");
+  const focusableSelector = 'a[href], button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])';
+  let sidebarPreviousFocus = null;
+  let searchPreviousFocus = null;
+  let searchIndexPromise = null;
 
-  function setSidebarOpen(isOpen) {
-    body.classList.toggle("sidebar-open", isOpen);
+  function setPageInert(isInert, targets) {
+    targets.filter(Boolean).forEach((target) => {
+      target.inert = isInert;
+    });
+  }
+
+  function getFocusableElements(container) {
+    if (!container) {
+      return [];
+    }
+    return [...container.querySelectorAll(focusableSelector)].filter((element) => !element.hidden && element.offsetParent !== null);
+  }
+
+  function setSidebarOpen(isOpen, { restoreFocus = true } = {}) {
+    const mobile = window.innerWidth <= 960;
+    const shouldOpen = Boolean(isOpen && mobile && sidebar);
+    if (shouldOpen && !body.classList.contains("sidebar-open")) {
+      sidebarPreviousFocus = document.activeElement;
+    }
+    body.classList.toggle("sidebar-open", shouldOpen);
     if (sidebarToggle) {
-      sidebarToggle.setAttribute("aria-expanded", String(isOpen));
+      sidebarToggle.setAttribute("aria-expanded", String(shouldOpen));
+      const label = sidebarToggle.querySelector(".sr-only");
+      if (label) {
+        label.textContent = shouldOpen ? "Sluit navigatie" : "Open navigatie";
+      }
+    }
+    setPageInert(shouldOpen, [
+      document.querySelector(".site-brand"),
+      document.querySelector(".site-header-actions"),
+      document.querySelector(".docs-main"),
+      document.querySelector(".page-rail"),
+    ]);
+    if (shouldOpen) {
+      window.requestAnimationFrame(() => getFocusableElements(sidebar)[0]?.focus());
+    } else if (restoreFocus && sidebarPreviousFocus instanceof HTMLElement) {
+      sidebarPreviousFocus.focus();
+    }
+  }
+
+  function normalizeSearchText(value) {
+    return String(value || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase();
+  }
+
+  function loadSearchIndex() {
+    if (!searchIndexPromise) {
+      const indexUrl = body.dataset.searchIndexUrl;
+      searchIndexPromise = indexUrl
+        ? fetch(indexUrl).then((response) => {
+          if (!response.ok) {
+            throw new Error(`Zoekindex gaf HTTP ${response.status}`);
+          }
+          return response.json();
+        })
+        : Promise.resolve([]);
+    }
+    return searchIndexPromise;
+  }
+
+  function createSearchResult(item) {
+    const link = document.createElement("a");
+    const indexUrl = new URL(body.dataset.searchIndexUrl, document.baseURI);
+    link.className = "search-result";
+    link.href = new URL(item.url, indexUrl).href;
+
+    const title = document.createElement("span");
+    title.className = "search-result-title";
+    title.textContent = item.title;
+    const summary = document.createElement("span");
+    summary.className = "search-result-summary";
+    summary.textContent = item.summary;
+    const meta = document.createElement("span");
+    meta.className = "search-result-meta";
+    meta.textContent = item.kind;
+    link.append(title, summary, meta);
+    return link;
+  }
+
+  async function renderSearchResults(query) {
+    if (!searchResults) {
+      return;
+    }
+    const normalizedQuery = normalizeSearchText(query).trim();
+    if (!normalizedQuery) {
+      searchResults.innerHTML = '<p class="search-empty">Zoek op een onderwerp, schermnaam of foutmelding.</p>';
+      return;
+    }
+
+    searchResults.innerHTML = '<p class="search-empty">Zoeken…</p>';
+    try {
+      const tokens = normalizedQuery.split(/\s+/).filter(Boolean);
+      const index = await loadSearchIndex();
+      const matches = index
+        .map((item) => {
+          const title = normalizeSearchText(item.title);
+          const headings = normalizeSearchText((item.headings || []).join(" "));
+          const summary = normalizeSearchText(item.summary);
+          const allText = `${title} ${headings} ${summary} ${normalizeSearchText(item.text)}`;
+          if (!tokens.every((token) => allText.includes(token))) {
+            return null;
+          }
+          const score = tokens.reduce((total, token) => total
+            + (title.includes(token) ? 8 : 0)
+            + (headings.includes(token) ? 4 : 0)
+            + (summary.includes(token) ? 2 : 0), 0);
+          return { item, score };
+        })
+        .filter(Boolean)
+        .sort((left, right) => right.score - left.score || left.item.title.localeCompare(right.item.title, "nl"))
+        .slice(0, 8);
+
+      searchResults.replaceChildren();
+      if (!matches.length) {
+        searchResults.innerHTML = '<p class="search-empty">Geen resultaten. Probeer een kortere of andere zoekterm.</p>';
+        return;
+      }
+      matches.forEach(({ item }) => searchResults.appendChild(createSearchResult(item)));
+    } catch (error) {
+      console.warn("Zoekindex kon niet worden geladen", error);
+      searchResults.innerHTML = '<p class="search-empty">Zoeken is nu niet beschikbaar. Gebruik de navigatie links.</p>';
+    }
+  }
+
+  function setSearchOpen(isOpen) {
+    if (!searchModal) {
+      return;
+    }
+    if (isOpen && searchModal.hidden) {
+      searchPreviousFocus = document.activeElement;
+      setSidebarOpen(false, { restoreFocus: false });
+    }
+    searchModal.hidden = !isOpen;
+    body.classList.toggle("search-open", isOpen);
+    searchOpenButton?.setAttribute("aria-expanded", String(isOpen));
+    setPageInert(isOpen, [document.querySelector(".site-header"), document.querySelector(".docs-shell")]);
+    if (isOpen) {
+      renderSearchResults(searchInput?.value || "");
+      window.requestAnimationFrame(() => searchInput?.focus());
+    } else if (searchPreviousFocus instanceof HTMLElement) {
+      searchPreviousFocus.focus();
+    }
+  }
+
+  function trapFocus(event, container, extraElements = []) {
+    const elements = [...extraElements, ...getFocusableElements(container)].filter(Boolean);
+    if (!elements.length) {
+      return;
+    }
+    const first = elements[0];
+    const last = elements[elements.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  }
+
+  async function enhanceVersionContext() {
+    if (!docsVersion || !body.dataset.versionUrl) {
+      return;
+    }
+    try {
+      const response = await fetch(body.dataset.versionUrl);
+      if (!response.ok) {
+        return;
+      }
+      const metadata = await response.json();
+      if (metadata.version) {
+        const label = metadata.channel === "local" ? "Lokale preview" : "Firmware stable";
+        docsVersion.textContent = `${label}: ${metadata.version} · docs vanaf main`;
+      }
+    } catch (_error) {
+      // De fallbacktekst blijft bruikbaar in losse of offline previews.
     }
   }
 
@@ -38,7 +223,7 @@
     try {
       await navigator.clipboard.writeText(text);
       const originalLabel = button.textContent;
-      button.textContent = "Copied";
+      button.textContent = "Gekopieerd";
       window.setTimeout(() => {
         button.textContent = originalLabel;
       }, 1400);
@@ -56,7 +241,8 @@
       const button = document.createElement("button");
       button.type = "button";
       button.className = "code-copy";
-      button.textContent = "Copy";
+      button.textContent = "Kopiëren";
+      button.setAttribute("aria-live", "polite");
       button.addEventListener("click", () => {
         copyCode(button, pre);
       });
@@ -426,8 +612,47 @@
 
   sidebarLinks.forEach((link) => {
     link.addEventListener("click", () => {
-      setSidebarOpen(false);
+      setSidebarOpen(false, { restoreFocus: false });
     });
+  });
+
+  searchOpenButton?.addEventListener("click", () => {
+    setSearchOpen(true);
+  });
+
+  searchCloseButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+      setSearchOpen(false);
+    });
+  });
+
+  searchInput?.addEventListener("input", () => {
+    renderSearchResults(searchInput.value);
+  });
+
+  document.addEventListener("keydown", (event) => {
+    const target = event.target;
+    const editing = target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target?.isContentEditable;
+    if (event.key === "/" && !editing && !event.metaKey && !event.ctrlKey && !event.altKey) {
+      event.preventDefault();
+      setSearchOpen(true);
+      return;
+    }
+    if (event.key === "Escape") {
+      if (!searchModal?.hidden) {
+        event.preventDefault();
+        setSearchOpen(false);
+      } else if (body.classList.contains("sidebar-open")) {
+        event.preventDefault();
+        setSidebarOpen(false);
+      }
+      return;
+    }
+    if (event.key === "Tab" && !searchModal?.hidden) {
+      trapFocus(event, searchModal);
+    } else if (event.key === "Tab" && body.classList.contains("sidebar-open")) {
+      trapFocus(event, sidebar, [sidebarToggle]);
+    }
   });
 
   navToggles.forEach((button) => {
@@ -438,7 +663,7 @@
 
   window.addEventListener("resize", () => {
     if (window.innerWidth > 960) {
-      setSidebarOpen(false);
+      setSidebarOpen(false, { restoreFocus: false });
     }
   });
 
@@ -477,4 +702,5 @@
   enhanceCodeBlocks();
   enhanceCableStepper();
   enhanceWifiRoutes();
+  enhanceVersionContext();
 })();

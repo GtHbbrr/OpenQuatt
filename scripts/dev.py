@@ -623,6 +623,13 @@ def validate_command(args: argparse.Namespace) -> int:
         log_path=log_dir / "docs-consistency.log",
         label="docs consistency",
     )
+    run_logged(
+        ["node", str(command_scripts_dir / "check_web_docs_sync.mjs")],
+        cwd=command_root,
+        env=env,
+        log_path=log_dir / "web-docs-sync.log",
+        label="web/docs contract",
+    )
 
     for config in args.configs:
         stem = config_log_stem(config)
@@ -798,6 +805,7 @@ def preview_pages_command(args: argparse.Namespace) -> int:
             json.dumps(
                 {
                     "version": describe_version(root_dir),
+                    "channel": "local",
                     "release_url": "https://github.com/jeroen85/OpenQuatt/releases/latest",
                 },
                 indent=2,
