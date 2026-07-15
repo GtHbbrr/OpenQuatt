@@ -201,14 +201,14 @@
 
   <rect x="542" y="646" width="400" height="254" rx="18" fill="#fff7ed"/>
   <text x="562" y="674" class="panel-kicker" fill="#c2410c">AANSLUITEN OP HCQ</text>
-  <text x="562" y="698" class="panel-title">M1 · GND / B / A</text>
+  <text x="562" y="698" class="panel-title">M1 · GND / A / B</text>
   <path d="M888 750 C861 750 842 766 817 766" fill="none" stroke="#16a34a" stroke-width="5"/>
-  <path d="M888 770 C861 770 842 770 817 770" fill="none" stroke="#2563eb" stroke-width="5"/>
-  <path d="M888 790 C861 790 842 775 817 775" fill="none" stroke="#dc2626" stroke-width="5"/>
+  <path d="M888 770 C861 770 842 770 817 770" fill="none" stroke="#dc2626" stroke-width="5"/>
+  <path d="M888 790 C861 790 842 775 817 775" fill="none" stroke="#2563eb" stroke-width="5"/>
   <use href="#hcq-device" transform="translate(687 714) scale(.62)"/>
   <text x="916" y="755" class="route-label" fill="#166534" text-anchor="middle">GND</text>
-  <text x="916" y="775" class="route-label" fill="#1d4ed8" text-anchor="middle">B</text>
-  <text x="916" y="795" class="route-label" fill="#b91c1c" text-anchor="middle">A</text>
+  <text x="916" y="775" class="route-label" fill="#b91c1c" text-anchor="middle">A</text>
+  <text x="916" y="795" class="route-label" fill="#1d4ed8" text-anchor="middle">B</text>
   <text x="562" y="878" class="map-copy" fill="#b91c1c">Let bij M1 goed op de juiste volgorde van de aders.</text>
 
   <!-- Stap 3 -->
@@ -296,12 +296,12 @@
 
   <rect x="542" y="2237" width="400" height="244" rx="18" fill="#ede9fe"/>
   <text x="562" y="2265" class="panel-kicker" fill="#6d28d9">AANSLUITEN OP HCQ</text>
-  <text x="562" y="2289" class="panel-title">M2 · GND / B / A</text>
+  <text x="562" y="2289" class="panel-title">M2 · GND / A / B</text>
 
   <use href="#cic-device" transform="translate(76 2302) scale(.62)"/>
   <path d="M203 2433 C203 2440 220 2440 245 2440 H820 C870 2440 895 2415 895 2402 C895 2386 858 2377 820 2377" fill="none" stroke="#16a34a" stroke-width="5" stroke-linecap="round"/>
-  <path d="M214 2433 C214 2448 232 2448 258 2448 H830 C880 2448 905 2420 905 2408 C905 2392 860 2382 820 2382" fill="none" stroke="#2563eb" stroke-width="5" stroke-linecap="round"/>
-  <path d="M192 2433 C192 2456 212 2456 242 2456 H840 C890 2456 915 2425 915 2414 C915 2398 862 2387 820 2387" fill="none" stroke="#dc2626" stroke-width="5" stroke-linecap="round"/>
+  <path d="M192 2433 C192 2448 212 2448 242 2448 H830 C880 2448 905 2420 905 2408 C905 2392 860 2382 820 2382" fill="none" stroke="#dc2626" stroke-width="5" stroke-linecap="round"/>
+  <path d="M214 2433 C214 2456 232 2456 258 2456 H840 C890 2456 915 2425 915 2414 C915 2398 862 2387 820 2387" fill="none" stroke="#2563eb" stroke-width="5" stroke-linecap="round"/>
   <use href="#hcq-device" transform="translate(687 2302) scale(.62)"/>
 
   <text x="500" y="2503" class="map-copy" text-anchor="middle">Na Quick Start: Instellingen → Bronnen / integraties → CiC-compatibiliteit (standaard uit).</text>
