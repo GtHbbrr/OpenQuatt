@@ -1,0 +1,125 @@
+{
+  "version": 1,
+  "rules": [
+    {
+      "name": "Quick Start en onboarding",
+      "source_patterns": [
+        "openquatt/web/js/src/features/quickstart*.js",
+        "openquatt/web/js/src/core/config.js",
+        "openquatt/web/js/src/core/quickstart*.js",
+        "openquatt/web/js/src/settings/installation.js"
+      ],
+      "docs_any_of": [
+        "docs/web-app.md",
+        "docs/q-edition.md",
+        "docs/installatie-en-ingebruikname.md"
+      ]
+    },
+    {
+      "name": "Web-appschermen",
+      "source_patterns": [
+        "openquatt/web/js/src/views/*.js"
+      ],
+      "docs_any_of": [
+        "docs/web-app.md",
+        "docs/problemen-oplossen.md"
+      ]
+    },
+    {
+      "name": "Web-appinstellingen",
+      "source_patterns": [
+        "openquatt/web/js/src/settings/*.js"
+      ],
+      "docs_any_of": [
+        "docs/web-app.md",
+        "docs/instellingen-en-meetwaarden.md"
+      ]
+    },
+    {
+      "name": "Updates, opslag en beveiliging",
+      "source_patterns": [
+        "openquatt/web/js/src/features/firmware-update.js",
+        "openquatt/web/js/src/features/security-access.js",
+        "openquatt/web/js/src/features/storage-history.js"
+      ],
+      "docs_any_of": [
+        "docs/web-app.md",
+        "docs/problemen-oplossen.md"
+      ]
+    },
+    {
+      "name": "Installer en firmwarematrix",
+      "source_patterns": [
+        "build_targets.yaml",
+        "docs/install/install.js",
+        "docs/install/index.html",
+        "openquatt/connection/*.yaml",
+        "openquatt/profiles/*.yaml",
+        "openquatt/topology/*.yaml",
+        "scripts/build_targets.py"
+      ],
+      "docs_any_of": [
+        "docs/install/index.html",
+        "docs/installatie-en-ingebruikname.md",
+        "docs/q-edition.md",
+        "docs/handmatige-installatie.md"
+      ]
+    },
+    {
+      "name": "Home Assistant-dashboards",
+      "source_patterns": [
+        "docs/dashboard/*.yaml"
+      ],
+      "docs_any_of": [
+        "docs/dashboard/README.md",
+        "docs/dashboardoverzicht.md"
+      ]
+    },
+    {
+      "name": "Regelstrategieën en flow",
+      "source_patterns": [
+        "openquatt/oq_boiler_control.yaml",
+        "openquatt/oq_cooling_safety.yaml",
+        "openquatt/oq_cooling_strategy.yaml",
+        "openquatt/oq_flow_autotune.yaml",
+        "openquatt/oq_flow_control.yaml",
+        "openquatt/oq_heating_curve_strategy.yaml",
+        "openquatt/oq_power_house_strategy.yaml",
+        "openquatt/oq_strategy_manager.yaml",
+        "openquatt/oq_supervisory_controlmode.yaml",
+        "openquatt/oq_thermal_request_control.yaml"
+      ],
+      "docs_any_of": [
+        "docs/verwarmen-en-koelen.md",
+        "docs/power-house.md",
+        "docs/water-temperature-control.md",
+        "docs/regelgedrag-van-openquatt.md",
+        "docs/problemen-oplossen.md"
+      ]
+    },
+    {
+      "name": "Gebruikersentiteiten en instellingen",
+      "source_patterns": [
+        "openquatt/oq_common.yaml",
+        "openquatt/oq_substitutions_common.yaml"
+      ],
+      "docs_any_of": [
+        "docs/instellingen-en-meetwaarden.md",
+        "docs/dashboardoverzicht.md",
+        "docs/web-app.md"
+      ]
+    },
+    {
+      "name": "Web-appdemo",
+      "source_patterns": [
+        "openquatt/web/js/mock-device.js",
+        "openquatt/web/js/mock-fixtures.js",
+        "openquatt/web/js/mock-scenarios.js"
+      ],
+      "docs_any_of": [
+        "README.md",
+        "docs/web-app.md"
+      ]
+    }
+  ]
+}

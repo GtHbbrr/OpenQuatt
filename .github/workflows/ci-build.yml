@@ -9,6 +9,25 @@ permissions:
   contents: read
 
 jobs:
+  docs-consistency:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Check documentation contracts
+        run: npm run check:docs
+
+      - name: Enforce documentation impact on pull requests
+        if: github.event_name == 'pull_request'
+        run: python3 scripts/check_docs_consistency.py --changed-only --strict
+
+      - name: Report documentation impact on direct pushes
+        if: github.event_name == 'push'
+        run: python3 scripts/check_docs_consistency.py --changed-only
+
   validate-web-settings-backup:
     runs-on: ubuntu-latest
     steps:
@@ -32,7 +51,7 @@ jobs:
         run: npm run smoke:web
 
   validate-and-compile:
-    needs: validate-web-settings-backup
+    needs: [docs-consistency, validate-web-settings-backup]
     uses: ./.github/workflows/esphome-build.yml
     with:
       artifact_suffix: firmware-${{ github.sha }}

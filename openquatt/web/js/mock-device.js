@@ -4,6 +4,9 @@
   const DEBUG_RECORDING_BUFFER_BYTES = 1024 * 1024;
   const DEBUG_RECORDING_SAMPLE_BYTES = 516;
   const DEBUG_RECORDING_SAMPLE_CAPACITY = Math.floor(DEBUG_RECORDING_BUFFER_BYTES / DEBUG_RECORDING_SAMPLE_BYTES);
+  const MOCK_STABLE_VERSION = "v0.0.0-demo";
+  const MOCK_DEV_VERSION = "v0.0.1-demo";
+  const MOCK_TEST_VERSION = "v0.0.0-demo-pr.test";
   const mockFixtures = window.__OQ_MOCK_FIXTURES__;
   const mockEntityDefs = window.__OQ_MOCK_ENTITY_DEFS__;
   if (!mockFixtures || !Array.isArray(mockEntityDefs)) {
@@ -1409,7 +1412,7 @@
     setEntity("text_sensor", "OpenQuatt Installation Topology", { state: state.installation, value: state.installation });
     setEntity("text_sensor", "OpenQuatt Hardware Profile", { state: state.hardware, value: state.hardware });
     setEntity("text_sensor", "OpenQuatt Connection", { state: state.connection, value: state.connection });
-    setEntity("text_sensor", "OpenQuatt Version", { state: "v0.26.0", value: "v0.26.0" });
+    setEntity("text_sensor", "OpenQuatt Version", { state: MOCK_STABLE_VERSION, value: MOCK_STABLE_VERSION });
     setEntity("text_sensor", "OpenQuatt Release Channel", { state: "dev", value: "dev" });
     setEntity("sensor", "Uptime", { value: 0, uom: "h" });
     syncUptimeEntity();
@@ -1444,8 +1447,8 @@
     setEntity("update", "Firmware Update", {
       state: "available",
       value: "available",
-      current_version: "v0.26.0",
-      latest_version: "v0.26.1-dev3",
+      current_version: MOCK_STABLE_VERSION,
+      latest_version: MOCK_DEV_VERSION,
       title: "OpenQuatt firmware",
       summary: "Nieuwe firmware met verdere UI- en regelingverbeteringen staat klaar voor deze preview.",
       release_url: getMockReleaseUrl("dev"),
@@ -3295,8 +3298,8 @@
       setText("text_sensor", "Firmware Update Status", "Idle");
       setNumber("Firmware Update Progress", 0, "%");
       const updateEntity = getEntity("update", "Firmware Update");
-      const currentVersion = String(getEntity("text_sensor", "OpenQuatt Version")?.value || "v0.26.0");
-      const latestVersion = value === "main" ? "v0.26.0" : "v0.26.1-dev3";
+      const currentVersion = String(getEntity("text_sensor", "OpenQuatt Version")?.value || MOCK_STABLE_VERSION);
+      const latestVersion = value === "main" ? MOCK_STABLE_VERSION : MOCK_DEV_VERSION;
       if (updateEntity) {
         updateEntity.current_version = currentVersion;
         updateEntity.latest_version = latestVersion;
@@ -3316,7 +3319,7 @@
       setText("text_sensor", "Firmware Update Status", "Idle");
       setNumber("Firmware Update Progress", 0, "%");
       const updateEntity = getEntity("update", "Firmware Update");
-      const currentVersion = String(getEntity("text_sensor", "OpenQuatt Version")?.value || "v0.26.0");
+      const currentVersion = String(getEntity("text_sensor", "OpenQuatt Version")?.value || MOCK_STABLE_VERSION);
       const alternateBuild = value !== "current build";
       const targetConnection = value === "alternate connection" || value === "alternate topology and connection"
         ? state.connection === "wifi" ? "eth" : "wifi"
@@ -3327,7 +3330,7 @@
       const targetLabel = `Heatpump Controller Q ${targetTopology === "duo" ? "Duo" : "Single"} ${targetConnection === "eth" ? "Ethernet" : "Wi-Fi"}`;
       if (updateEntity) {
         updateEntity.current_version = currentVersion;
-        updateEntity.latest_version = alternateBuild ? currentVersion : "v0.26.1-dev3";
+        updateEntity.latest_version = alternateBuild ? currentVersion : MOCK_DEV_VERSION;
         updateEntity.release_url = getMockReleaseUrl(String(getEntity("select", "Firmware Update Channel")?.value || "dev"));
         updateEntity.state = alternateBuild ? "up_to_date" : "available";
         updateEntity.value = updateEntity.state;
@@ -4095,9 +4098,9 @@
       const channel = String(getEntity("select", "Firmware Update Channel")?.value || "dev");
       const target = String(getEntity("select", "Firmware Update Target")?.value || "current build");
       const updateEntity = getEntity("update", "Firmware Update");
-      const currentVersion = String(getEntity("text_sensor", "OpenQuatt Version")?.value || "v0.26.0");
+      const currentVersion = String(getEntity("text_sensor", "OpenQuatt Version")?.value || MOCK_STABLE_VERSION);
       const alternateBuild = target !== "current build";
-      const latestVersion = alternateBuild ? currentVersion : channel === "main" ? "v0.26.0" : "v0.26.1-dev3";
+      const latestVersion = alternateBuild ? currentVersion : channel === "main" ? MOCK_STABLE_VERSION : MOCK_DEV_VERSION;
       clearOtaSimulation();
       setText("text_sensor", "Firmware Update Status", "Idle");
       setNumber("Firmware Update Progress", 0, "%");
@@ -4156,8 +4159,8 @@
       ? (state.installation === "single" ? "duo" : "single")
       : state.installation;
     const targetVersion = testFirmware
-      ? "v0.26.0-pr.test"
-      : String(updateEntity.latest_version || updateEntity.current_version || "v0.26.0");
+      ? MOCK_TEST_VERSION
+      : String(updateEntity.latest_version || updateEntity.current_version || MOCK_STABLE_VERSION);
     const scheduleStep = (delay, callback) => {
       const timer = window.setTimeout(() => {
         callback();

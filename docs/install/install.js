@@ -600,7 +600,7 @@ async function disconnectProvisionClient(message = "USB-verbinding verbroken.") 
 
 async function startProvisionFlow() {
   if (!("serial" in navigator)) {
-    setProvisionState("Web Serial is in deze browser niet beschikbaar. Gebruik Chrome, Edge of Firefox op desktop.", "error");
+    setProvisionState("Web Serial is in deze browser niet beschikbaar. Gebruik Chrome of Edge op desktop.", "error");
     return;
   }
   if (!window.isSecureContext) {
@@ -997,7 +997,7 @@ loadReleaseInfo();
 
 if (!("serial" in navigator)) {
   provisionConnectButton.disabled = true;
-  setProvisionState("Web Serial is in deze browser niet beschikbaar. Gebruik Chrome, Edge of Firefox op desktop.", "error");
+  setProvisionState("Web Serial is in deze browser niet beschikbaar. Gebruik Chrome of Edge op desktop.", "error");
 } else if (!window.isSecureContext) {
   provisionConnectButton.disabled = true;
   setProvisionState("Open deze installatiehulp via HTTPS om Web Serial te kunnen gebruiken.", "error");

@@ -7,7 +7,7 @@ OpenQuatt is open-source ESPHome-firmware voor Quatt Hybrid `Single`- en `Duo`-i
 > [!WARNING]
 > OpenQuatt is community-firmware voor gebruikers met enig technisch inzicht. Gebruik het bewust en test wijzigingen stap voor stap.
 >
-> Gebruik van OpenQuatt kan gevolgen hebben voor je Quatt-garantie. De standaard commerciële Quatt-garantie vervalt in principe bij gebruik van externe aansturing zoals OpenQuatt. De wettelijke garantie blijft bestaan, maar een garantieclaim kan daardoor in de praktijk wel ingewikkelder worden.
+> Gebruik van OpenQuatt kan gevolgen hebben voor Quatts commerciële garantie. Raadpleeg de [actuele Quatt-voorwaarden](https://www.quatt.io/algemene-voorwaarden); wettelijke rechten staan daar los van.
 
 ## Wat is OpenQuatt?
 
@@ -17,12 +17,12 @@ OpenQuatt is bedoeld voor gebruikers van een Quatt Hybrid `Single` of `Duo` die:
 - lokale controle willen via een uitgebreide web-app;
 - instellingen en verwarmingsstrategie zelf willen beheren;
 - koeling willen kunnen gebruiken waar hun installatie dat ondersteunt;
-- optioneel Home Assistant willen gebruiken voor dashboarding en automatisering;
+- Home Assistant willen gebruiken voor dashboards en automatisering;
 - via de installer de juiste firmware voor hun opstelling, hardware en verbinding willen kiezen.
 
 OpenQuatt richt zich niet op Quatt All-Electric, Quatt Chill of koppeling met Quatt HomeBattery.
 
-Je hoeft voor de eerste installatie niet eerst alle technische achtergronddocumenten te lezen. De hoofdroute is: installer openen, je opstelling, hardware en verbinding kiezen, flashen, `openquatt.local` openen en Quick Start afronden. Home Assistant is optioneel en komt daarna.
+Je hoeft voor de eerste installatie niet eerst alle technische achtergronddocumenten te lezen. De hoofdroute is: installer openen, je opstelling, hardware en verbinding kiezen, flashen, `openquatt.local` openen en Quick Start afronden. Home Assistant is optioneel voor OpenQuatt zelf en aanbevolen voor dashboards en automatisering.
 
 ## Ondersteunde combinaties
 
@@ -118,4 +118,4 @@ Meer heb je voor normaal gebruik meestal niet nodig.
 
 Dit project bevat een `LICENSE`-bestand in de root van de repository.
 
-Built with <a href="https://esphome.io/"><img src="https://media.esphome.io/logo/logo-text-on-light.svg" alt="ESPHome" height="24" align="absmiddle" /></a>
+Built with [ESPHome](https://esphome.io/).
