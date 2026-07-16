@@ -286,24 +286,31 @@
         alt: "Stap 3 van 7: de twee OpenTherm-aders van de kamerthermostaat verplaatsen naar OTT.",
       },
       {
-        number: "04A",
-        label: "Ketel · OT",
-        statusLabel: "OpenTherm",
-        file: "q-edition-kabelstap-4a-cv-ketel-opentherm.svg",
-        mobileFile: "q-edition-kabelstap-4a-cv-ketel-opentherm-mobile.svg",
-        height: 390,
-        mobileHeight: 720,
-        alt: "Stap 4a van 7: de twee OpenTherm-aders van de CV-ketel verplaatsen van de CiC naar OTB van de HCQ.",
-      },
-      {
-        number: "04B",
-        label: "Ketel · aan/uit",
-        statusLabel: "Aan/uit",
-        file: "q-edition-kabelstap-4b-cv-ketel-aan-uit.svg",
-        mobileFile: "q-edition-kabelstap-4b-cv-ketel-aan-uit-mobile.svg",
-        height: 390,
-        mobileHeight: 720,
-        alt: "Stap 4b van 7: de twee aders van het CV-aan-uit-contact verplaatsen van de CiC naar COM en NO van R1.",
+        number: "04",
+        label: "CV-ketel",
+        statusLabel: "Kies je ketelroute",
+        routes: [
+          {
+            id: "opentherm",
+            label: "OpenTherm",
+            target: "OTB",
+            file: "q-edition-kabelstap-4a-cv-ketel-opentherm.svg",
+            mobileFile: "q-edition-kabelstap-4a-cv-ketel-opentherm-mobile.svg",
+            height: 390,
+            mobileHeight: 720,
+            alt: "Stap 4 van 7, OpenTherm-route: de twee OpenTherm-aders van de CV-ketel verplaatsen van de CiC naar OTB van de HCQ.",
+          },
+          {
+            id: "on-off",
+            label: "Aan/uit",
+            target: "R1 · COM + NO",
+            file: "q-edition-kabelstap-4b-cv-ketel-aan-uit.svg",
+            mobileFile: "q-edition-kabelstap-4b-cv-ketel-aan-uit-mobile.svg",
+            height: 390,
+            mobileHeight: 720,
+            alt: "Stap 4 van 7, aan-uitroute: de twee aders van het CV-aan-uit-contact verplaatsen van de CiC naar COM en NO van R1.",
+          },
+        ],
       },
       {
         number: "05",
@@ -337,7 +344,7 @@
     const fallbackSource = fallbackImage.getAttribute("src") || "";
     const assetPrefix = fallbackSource.slice(0, fallbackSource.lastIndexOf("/") + 1);
     const mobileViewportQuery = window.matchMedia("(max-width: 720px)");
-    steps.forEach((step) => {
+    steps.flatMap((step) => step.routes || [step]).forEach((step) => {
       step.src = `${assetPrefix}${step.file}`;
       step.mobileSrc = `${assetPrefix}${step.mobileFile}`;
       const preload = new Image();
@@ -419,7 +426,39 @@
     stepGraphic.setAttribute("role", "img");
     stepGraphic.setAttribute("aria-label", steps[0].alt);
     stepGraphic.textContent = steps[0].alt;
-    viewport.appendChild(stepGraphic);
+
+    const routeChoice = document.createElement("div");
+    routeChoice.className = "cable-stepper-route-choice";
+    routeChoice.hidden = true;
+    routeChoice.setAttribute("role", "group");
+    routeChoice.setAttribute("aria-labelledby", "q-edition-ketelroute-title");
+    routeChoice.innerHTML = `
+      <p class="cable-stepper-route-kicker">04 · CV-ketel</p>
+      <h5 id="q-edition-ketelroute-title">Kijk hoe de kabel naar de CV-ketel is aangesloten.</h5>
+      <p class="cable-stepper-route-copy">Laat de kabel nog op de CiC zitten en vergelijk de aansluiting met de twee voorbeelden.</p>
+      <div class="cable-stepper-route-options">
+        <button type="button" class="cable-stepper-route-option" data-cable-route="opentherm">
+          <img src="./assets/q-edition-ketelroute-opentherm.svg" alt="" aria-hidden="true" />
+          <span class="cable-stepper-route-option-copy">
+            <span>Route A</span>
+            <strong>OpenTherm</strong>
+            <small>Twee aders op de onderste CiC-aansluiting met het vlam- en OT-symbool.</small>
+            <em>Dit is mijn aansluiting →</em>
+          </span>
+        </button>
+        <button type="button" class="cable-stepper-route-option" data-cable-route="on-off">
+          <img src="./assets/q-edition-ketelroute-aan-uit.svg" alt="" aria-hidden="true" />
+          <span class="cable-stepper-route-option-copy">
+            <span>Route B</span>
+            <strong>Aan/uit</strong>
+            <small>Twee aders aan de rechterkant van de CiC, onder het aparte afdekkapje.</small>
+            <em>Dit is mijn aansluiting →</em>
+          </span>
+        </button>
+      </div>
+      <p class="cable-stepper-route-warning">Kies één van de twee. Sluit de CV-ketel straks niet op beide manieren aan.</p>
+    `;
+    viewport.append(routeChoice, stepGraphic);
 
     const tabs = steps.map((step, index) => {
       const button = document.createElement("button");
@@ -435,28 +474,40 @@
     });
 
     let activeStep = 0;
+    let selectedBoilerRoute = "";
     let animationTimer = 0;
 
     function showStep(index, { focusTab = false, animate = true } = {}) {
       const boundedIndex = Math.max(0, Math.min(steps.length - 1, index));
       const step = steps[boundedIndex];
+      const selectedRoute = step.routes?.find((route) => route.id === selectedBoilerRoute) || null;
+      const displayedStep = selectedRoute || step;
+      const choosingRoute = Boolean(step.routes && !selectedRoute);
       const mobileView = mobileViewportQuery.matches;
-      const source = mobileView ? step.mobileSrc : step.src;
+      const source = mobileView ? displayedStep.mobileSrc : displayedStep.src;
       const width = mobileView ? 430 : 936;
-      const height = mobileView ? step.mobileHeight : step.height;
+      const height = mobileView ? displayedStep.mobileHeight : displayedStep.height;
       const logicalStepNumber = step.number.replace(/^0/, "").toLowerCase();
       const logicalProgress = Number.parseInt(step.number, 10);
       activeStep = boundedIndex;
       stepper.dataset.activeStep = String(boundedIndex + 1);
       stepper.dataset.mobileView = String(mobileView);
+      stepper.dataset.boilerRoute = selectedRoute?.id || "";
 
-      viewport.style.aspectRatio = `${width} / ${height}`;
-      stepGraphic.data = source;
-      stepGraphic.setAttribute("aria-label", step.alt);
-      stepGraphic.textContent = step.alt;
-      status.textContent = `Stap ${logicalStepNumber} van 7 · ${step.statusLabel || step.label}`;
+      routeChoice.hidden = !choosingRoute;
+      stepGraphic.hidden = choosingRoute;
+      if (choosingRoute) {
+        viewport.style.aspectRatio = "auto";
+      } else {
+        viewport.style.aspectRatio = `${width} / ${height}`;
+        stepGraphic.data = source;
+        stepGraphic.setAttribute("aria-label", displayedStep.alt);
+        stepGraphic.textContent = displayedStep.alt;
+      }
+      const statusLabel = selectedRoute ? `${selectedRoute.label} → ${selectedRoute.target}` : step.statusLabel || step.label;
+      status.textContent = `Stap ${logicalStepNumber} van 7 · ${statusLabel}`;
       progress.setAttribute("aria-valuenow", String(logicalProgress));
-      progress.setAttribute("aria-valuetext", `Stap ${logicalStepNumber} van 7: ${step.label}`);
+      progress.setAttribute("aria-valuetext", `Stap ${logicalStepNumber} van 7: ${statusLabel}`);
       progressBar.style.width = `${(logicalProgress / 7) * 100}%`;
       tabs.forEach((tab, tabIndex) => {
         const selected = tabIndex === boundedIndex;
@@ -466,8 +517,9 @@
       viewport.setAttribute("aria-labelledby", tabs[boundedIndex].id);
 
       previousButton.disabled = boundedIndex === 0;
-      nextButton.disabled = boundedIndex === steps.length - 1;
-      nextButton.textContent = boundedIndex === steps.length - 1 ? "Klaar" : "Volgende";
+      previousButton.textContent = selectedRoute ? "Andere route" : "Vorige";
+      nextButton.disabled = choosingRoute || boundedIndex === steps.length - 1;
+      nextButton.textContent = choosingRoute ? "Kies een route" : boundedIndex === steps.length - 1 ? "Klaar" : "Volgende";
 
       window.clearTimeout(animationTimer);
       viewport.classList.remove("is-entering");
@@ -487,6 +539,13 @@
       tab.addEventListener("click", () => showStep(index));
     });
 
+    routeChoice.querySelectorAll("[data-cable-route]").forEach((button) => {
+      button.addEventListener("click", () => {
+        selectedBoilerRoute = button.dataset.cableRoute || "";
+        showStep(activeStep);
+      });
+    });
+
     tabsContainer.addEventListener("keydown", (event) => {
       let targetIndex = activeStep;
       if (event.key === "ArrowRight") {
@@ -504,7 +563,14 @@
       showStep(targetIndex, { focusTab: true });
     });
 
-    previousButton.addEventListener("click", () => showStep(activeStep - 1));
+    previousButton.addEventListener("click", () => {
+      if (steps[activeStep].routes && selectedBoilerRoute) {
+        selectedBoilerRoute = "";
+        showStep(activeStep);
+        return;
+      }
+      showStep(activeStep - 1);
+    });
     nextButton.addEventListener("click", () => showStep(activeStep + 1));
     mobileViewportQuery.addEventListener("change", () => showStep(activeStep, { animate: false }));
 

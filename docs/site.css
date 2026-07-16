@@ -1257,7 +1257,7 @@ kbd {
 
 .page-q-edition .cable-stepper-tabs {
   display: grid;
-  grid-template-columns: repeat(8, minmax(0, 1fr));
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   margin-bottom: 22px;
   border-bottom: 1px solid var(--line);
 }
@@ -1301,6 +1301,7 @@ kbd {
 
 .page-q-edition .cable-stepper-tab:focus-visible,
 .page-q-edition .cable-stepper-button:focus-visible,
+.page-q-edition .cable-stepper-route-option:focus-visible,
 .page-q-edition .cable-stepper-zoom:focus-visible,
 .page-q-edition .cable-stepper-dialog-close:focus-visible {
   outline: 3px solid rgba(234, 88, 12, 0.24);
@@ -1318,6 +1319,136 @@ kbd {
   width: 100%;
   overflow: visible;
   background: transparent;
+}
+
+.page-q-edition .cable-stepper-route-choice {
+  display: grid;
+  min-height: 390px;
+  align-content: center;
+  padding: clamp(28px, 5vw, 52px);
+  border: 1px solid #fed7aa;
+  border-radius: 24px;
+  background: #fffaf7;
+}
+
+.page-q-edition .cable-stepper-route-choice[hidden],
+.page-q-edition .cable-stepper-image[hidden] {
+  display: none !important;
+}
+
+.page-q-edition .cable-stepper-route-kicker {
+  margin: 0 0 8px;
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.page-q-edition .cable-stepper-route-choice h5 {
+  max-width: 760px;
+  margin: 0;
+  font-size: clamp(1.35rem, 3vw, 2rem);
+  letter-spacing: -0.035em;
+}
+
+.page-q-edition .cable-stepper-route-copy {
+  max-width: 680px;
+  margin: 8px 0 24px;
+  color: var(--ink-soft);
+  font-size: 0.98rem;
+}
+
+.page-q-edition .cable-stepper-route-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.page-q-edition .cable-stepper-route-option {
+  display: grid;
+  grid-template-columns: 140px minmax(0, 1fr);
+  gap: 18px;
+  min-height: 174px;
+  align-items: center;
+  padding: 22px;
+  border: 1px solid var(--line-strong);
+  border-top: 4px solid var(--accent);
+  border-radius: 16px;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+.page-q-edition .cable-stepper-route-option[data-cable-route="on-off"] {
+  border-top-color: #2563eb;
+}
+
+.page-q-edition .cable-stepper-route-option:hover {
+  border-color: var(--accent);
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.08);
+  transform: translateY(-2px);
+}
+
+.page-q-edition .cable-stepper-route-option[data-cable-route="on-off"]:hover {
+  border-color: #2563eb;
+}
+
+.page-q-edition .cable-stepper-route-option > img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.page-q-edition .cable-stepper-route-option-copy {
+  display: grid;
+  align-content: start;
+  min-width: 0;
+}
+
+.page-q-edition .cable-stepper-route-option-copy > span {
+  color: var(--ink-soft);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.page-q-edition .cable-stepper-route-option-copy > strong {
+  margin-top: 5px;
+  font-size: 1.2rem;
+}
+
+.page-q-edition .cable-stepper-route-option-copy > small {
+  margin-top: 8px;
+  color: var(--ink-soft);
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+
+.page-q-edition .cable-stepper-route-option-copy > em {
+  align-self: end;
+  margin-top: 16px;
+  color: var(--accent-strong);
+  font-size: 0.82rem;
+  font-style: normal;
+  font-weight: 750;
+}
+
+.page-q-edition .cable-stepper-route-option[data-cable-route="on-off"] .cable-stepper-route-option-copy > em {
+  color: #1d4ed8;
+}
+
+.page-q-edition .cable-stepper-route-warning {
+  margin: 18px 0 0;
+  color: #9a3412;
+  font-size: 0.86rem;
+  font-weight: 700;
 }
 
 .page-q-edition .cable-stepper .cable-stepper-image,
@@ -1756,6 +1887,23 @@ kbd {
     width: 100%;
   }
 
+  .page-q-edition .cable-stepper-route-choice {
+    min-height: 0;
+    padding: 24px 18px;
+    border-radius: 18px;
+  }
+
+  .page-q-edition .cable-stepper-route-options {
+    grid-template-columns: 1fr;
+  }
+
+  .page-q-edition .cable-stepper-route-option {
+    grid-template-columns: 112px minmax(0, 1fr);
+    gap: 14px;
+    min-height: 0;
+    padding: 18px;
+  }
+
   .page-q-edition .cable-stepper-actions {
     grid-template-columns: 1fr 1fr;
   }
@@ -1826,7 +1974,8 @@ kbd {
 
   .page-q-edition .cable-stepper-progress span,
   .page-q-edition .cable-stepper-tab,
-  .page-q-edition .cable-stepper-button {
+  .page-q-edition .cable-stepper-button,
+  .page-q-edition .cable-stepper-route-option {
     transition: none;
   }
 

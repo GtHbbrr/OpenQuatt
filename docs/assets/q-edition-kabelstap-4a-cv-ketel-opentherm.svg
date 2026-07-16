@@ -29,10 +29,10 @@
 
   <rect x="520" y="124" width="390" height="238" rx="18" fill="#fff7ed"/>
   <text x="540" y="152" class="panel-kicker" fill="#c2410c">AANSLUITEN OP HCQ</text>
-  <text x="540" y="176" class="panel-title">OTB · OpenTherm boiler</text>
-  <use href="q-edition-kabels-stappen.svg#hcq-device" transform="translate(670 170) scale(.62)"/>
-  <path d="M803 294 H888" fill="none" stroke="#ea580c" stroke-width="5"/>
-  <path d="M803 301 H888" fill="none" stroke="#ea580c" stroke-width="5"/>
-  <text x="844" y="281" text-anchor="middle" class="route-label" fill="#c2410c">OTB</text>
+  <text x="540" y="176" class="panel-title">OTB · OpenTherm</text>
+  <use href="q-edition-kabels-stappen.svg#hcq-device" transform="translate(700 170) scale(.62)"/>
+  <path d="M833 294 H888" fill="none" stroke="#ea580c" stroke-width="5"/>
+  <path d="M833 301 H888" fill="none" stroke="#ea580c" stroke-width="5"/>
+  <text x="860" y="281" text-anchor="middle" class="route-label" fill="#c2410c">OTB</text>
   <text x="540" y="345" class="map-copy">Polariteit en adervolgorde maken niet uit.</text>
 </svg>

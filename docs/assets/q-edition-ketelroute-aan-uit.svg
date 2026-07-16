@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 112" role="img" aria-labelledby="title desc">
+  <title id="title">Aan-uitaansluiting op de CiC</title>
+  <desc id="desc">Twee blauwe aders aan de rechterkant van de CiC, onder het aparte afdekkapje.</desc>
+  <rect x="1" y="1" width="178" height="110" rx="15" fill="#f8fafc" stroke="#d8dee7" stroke-width="2"/>
+  <rect x="34" y="12" width="70" height="87" rx="11" fill="#e7e5e4" stroke="#a8a29e" stroke-width="2"/>
+  <path d="M48 30h39m-34-7v14m8-14v14m8-14v14m8-14v14" fill="none" stroke="#57534e" stroke-width="3" stroke-linecap="round"/>
+  <path d="M49 49h18m5 0 17-12" fill="none" stroke="#57534e" stroke-width="3" stroke-linecap="round"/>
+  <path d="M49 62h40" fill="none" stroke="#57534e" stroke-width="3" stroke-linecap="round"/>
+  <path d="M70 70c5 6 6 10 6 14a8 8 0 0 1-16 0c0-4 2-8 6-13 0 5 2 6 4 7 2-3 2-5 0-8Z" fill="#57534e"/>
+  <circle cx="108" cy="42" r="7" fill="#292524"/>
+  <circle cx="108" cy="78" r="7" fill="#292524"/>
+  <path d="M115 42h24c7 0 9 5 9 12v45" fill="none" stroke="#2563eb" stroke-width="5" stroke-linecap="round"/>
+  <path d="M115 78h16c7 0 9 5 9 12v9" fill="none" stroke="#2563eb" stroke-width="5" stroke-linecap="round"/>
+</svg>
