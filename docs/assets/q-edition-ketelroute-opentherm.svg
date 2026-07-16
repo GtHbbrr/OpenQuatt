@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 112" role="img" aria-labelledby="title desc">
+  <title id="title">OpenTherm-aansluiting op de CiC</title>
+  <desc id="desc">Twee oranje aders op de onderste aansluiting onder het vlam- en OT-symbool.</desc>
+  <rect x="1" y="1" width="178" height="110" rx="15" fill="#f8fafc" stroke="#d8dee7" stroke-width="2"/>
+  <rect x="37" y="13" width="106" height="61" rx="10" fill="#ffffff" stroke="#d6d3d1" stroke-width="2"/>
+  <path d="M90 25c7 9 9 14 9 21a11 11 0 0 1-22 0c0-6 3-11 8-18 0 7 3 9 5 10 3-4 3-8 0-13Z" fill="#57534e"/>
+  <text x="112" y="51" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="15" font-weight="800" fill="#57534e">OT</text>
+  <circle cx="74" cy="68" r="4" fill="#64748b"/>
+  <circle cx="106" cy="68" r="4" fill="#64748b"/>
+  <rect x="55" y="73" width="70" height="22" rx="8" fill="#20633f" stroke="#164e32" stroke-width="2"/>
+  <circle cx="74" cy="84" r="7" fill="#e7e5e4" stroke="#78716c" stroke-width="2"/>
+  <circle cx="106" cy="84" r="7" fill="#e7e5e4" stroke="#78716c" stroke-width="2"/>
+  <path d="M74 91v8c0 5 6 7 14 7h51" fill="none" stroke="#ea580c" stroke-width="5" stroke-linecap="round"/>
+  <path d="M106 91v4c0 4 5 6 13 6h20" fill="none" stroke="#ea580c" stroke-width="5" stroke-linecap="round"/>
+</svg>

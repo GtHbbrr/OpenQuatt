@@ -28,11 +28,11 @@
 
   <rect x="20" y="415" width="390" height="235" rx="18" fill="#fff7ed"/>
   <text x="40" y="443" class="panel-kicker" fill="#c2410c">AANSLUITEN OP HCQ</text>
-  <text x="40" y="467" class="panel-title">OTB · OpenTherm boiler</text>
-  <use href="q-edition-kabels-stappen.svg#hcq-device" transform="translate(145 472) scale(.56)"/>
-  <path d="M265 587 H386" fill="none" stroke="#ea580c" stroke-width="5"/>
-  <path d="M265 594 H386" fill="none" stroke="#ea580c" stroke-width="5"/>
-  <text x="330" y="575" text-anchor="middle" class="route-label" fill="#c2410c">OTB</text>
+  <text x="40" y="467" class="panel-title">OTB · OpenTherm</text>
+  <use href="q-edition-kabels-stappen.svg#hcq-device" transform="translate(230 472) scale(.56)"/>
+  <path d="M350 587 H386" fill="none" stroke="#ea580c" stroke-width="5"/>
+  <path d="M350 594 H386" fill="none" stroke="#ea580c" stroke-width="5"/>
+  <text x="368" y="575" text-anchor="middle" class="route-label" fill="#c2410c">OTB</text>
   <text x="40" y="630" class="copy">Polariteit en adervolgorde maken niet uit.</text>
   <text x="215" y="692" text-anchor="middle" class="copy">Gebruik alleen deze ketelroute.</text>
 </svg>

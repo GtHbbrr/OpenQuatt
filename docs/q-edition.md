@@ -22,7 +22,7 @@ De HCQ neemt de signaalkabels van de CiC over. Sluit dezelfde kabel nooit tegeli
 
 ### Interactief aansluiten: één stap tegelijk
 
-Gebruik de foto van je eigen CiC als uitgangspunt. De stappenhulp toont steeds één grote stap. Kies een stap bovenaan of gebruik **Vorige** en **Volgende**. Voor de CV-ketel gebruik je alleen **stap 4a** bij OpenTherm óf **stap 4b** bij aan/uit.
+Gebruik de foto van je eigen CiC als uitgangspunt. De stappenhulp toont steeds één grote stap. Kies een stap bovenaan of gebruik **Vorige** en **Volgende**. Bij stap 4 laat je de ketelkabel nog op de CiC zitten. Vergelijk de aansluiting met de twee voorbeelden en kies OpenTherm of aan/uit. Daarna toont de hulp alleen het bijbehorende aansluitschema.
 
 ![Kabels stap voor stap verplaatsen van Quatt CiC naar Heatpump Controller Q-edition](assets/q-edition-kabels-stappen.svg)
 
