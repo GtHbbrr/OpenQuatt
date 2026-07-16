@@ -320,6 +320,23 @@ const historyStorageModalScrollKeeper = createScrollKeeper({
 export const captureHistoryStorageModalScrollState = historyStorageModalScrollKeeper.capture;
 export const queueHistoryStorageModalScrollRestore = historyStorageModalScrollKeeper.queue;
 
+export function getSettingsBackupRestoreModalScrollerElement() {
+  if (!state.root) {
+    return null;
+  }
+  return state.root.querySelector("[data-oq-settings-backup-restore-scroller]");
+}
+
+const settingsBackupRestoreModalScrollKeeper = createScrollKeeper({
+  getScroller: getSettingsBackupRestoreModalScrollerElement,
+  getToken: () => state.settingsBackupRestoreScrollRestoreToken,
+  setToken: (token) => { state.settingsBackupRestoreScrollRestoreToken = token; },
+  isActive: () => state.systemModal === "settings-backup-restore",
+});
+
+export const captureSettingsBackupRestoreModalScrollState = settingsBackupRestoreModalScrollKeeper.capture;
+export const queueSettingsBackupRestoreModalScrollRestore = settingsBackupRestoreModalScrollKeeper.queue;
+
 export async function refreshWebServerLogHistory(options = {}) {
   if (state.nativeOpen || typeof window.fetch !== "function") {
     return;

@@ -15,6 +15,7 @@
 #include "esphome/core/hal.h"
 #include "esphome/core/helpers.h"
 #include "esphome/core/log.h"
+#include "esphome/components/network/util.h"
 
 namespace esphome {
 namespace openquatt_mqtt_config {
@@ -341,19 +342,28 @@ class MqttConfigHandler : public AsyncWebHandler {
 
       const std::string broker = request->arg("broker");
       const std::string port_arg = request->arg("port");
-      const std::string username = request->arg("username");
-      const std::string password = request->arg("password");
+      std::string username = request->arg("username");
+      std::string password = request->arg("password");
       const std::string clear_password_arg = request->arg("clear_password");
       const std::string enabled_arg = request->arg("enabled");
-      const bool clear_password =
+      bool clear_password =
           clear_password_arg == "true" || clear_password_arg == "1" || clear_password_arg == "on";
       const bool enabled = enabled_arg == "true" || enabled_arg == "1" || enabled_arg == "on";
+      const bool remove_config = !enabled && broker.empty();
 
       char *end = nullptr;
-      const unsigned long parsed_port = strtoul(port_arg.c_str(), &end, 10);
-      if (port_arg.empty() || end == nullptr || *end != '\0' || parsed_port == 0 || parsed_port > 65535) {
+      unsigned long parsed_port = 1883;
+      if (!port_arg.empty()) {
+        parsed_port = strtoul(port_arg.c_str(), &end, 10);
+      }
+      if ((enabled || !port_arg.empty()) && (end == nullptr || *end != '\0' || parsed_port == 0 || parsed_port > 65535)) {
         request->send(409, "application/json", R"({"ok":false,"error":"invalid_port"})");
         return;
+      }
+      if (remove_config) {
+        username.clear();
+        password.clear();
+        clear_password = true;
       }
       if (broker.size() > 64U) {
         request->send(409, "application/json", R"({"ok":false,"error":"invalid_broker"})");
@@ -490,9 +500,11 @@ void OpenQuattMqttConfig::setup() {
 
 OpenQuattMqttConfig::StatusSnapshot OpenQuattMqttConfig::get_status_snapshot() {
   StatusSnapshot snapshot;
-  snapshot.connected = this->connected_.load();
   this->lock_config_();
   snapshot.enabled = this->enabled_.load();
+  snapshot.connected = snapshot.enabled && this->connected_.load() && this->active_broker_ == this->broker_ &&
+                       this->active_port_ == this->port_ && this->active_username_ == this->username_ &&
+                       this->active_password_ == this->password_;
   snapshot.broker = this->broker_;
   snapshot.port = this->port_;
   snapshot.username = this->username_;
@@ -518,8 +530,22 @@ OpenQuattMqttConfig::StatusSnapshot OpenQuattMqttConfig::get_status_snapshot() {
 }
 
 void OpenQuattMqttConfig::loop() {
+  if (this->client_start_pending_.load() && network::is_connected()) {
+    this->request_client_start_();
+  }
+  if (this->preference_sync_pending_.exchange(false)) {
+    if (!global_preferences->sync()) {
+      ESP_LOGE(TAG, "Failed to sync pending MQTT configuration preferences");
+      this->preference_sync_pending_.store(true);
+    }
+  }
   if (this->clear_session_scoped_inputs_pending_.exchange(false)) {
     this->clear_session_scoped_inputs_();
+    this->force_publish_.store(true);
+  }
+  const uint8_t clear_input_mask = this->clear_input_mask_pending_.exchange(0);
+  if (clear_input_mask != 0U) {
+    this->clear_input_(clear_input_mask);
     this->force_publish_.store(true);
   }
   this->consume_pending_numeric_payloads_();
@@ -572,7 +598,7 @@ bool OpenQuattMqttConfig::set_runtime_config(const std::string &broker, uint16_t
     this->unlock_runtime_();
     return false;
   }
-  if (!this->save_storage_(storage)) {
+  if (!this->save_storage_(storage, false)) {
     this->unlock_runtime_();
     return false;
   }
@@ -616,7 +642,7 @@ bool OpenQuattMqttConfig::set_input_enabled(const std::string &key, bool enabled
   }
   storage.input_disabled_mask = input_disabled_mask & INPUT_MASK_ALL;
 
-  if (!this->save_storage_(storage)) {
+  if (!this->save_storage_(storage, false)) {
     this->unlock_runtime_();
     return false;
   }
@@ -668,7 +694,7 @@ bool OpenQuattMqttConfig::set_input_accept_retained(const std::string &key, bool
   }
   storage.retained_disabled_mask = retained_disabled_mask & STATEFUL_INPUT_MASK;
 
-  if (!this->save_storage_(storage)) {
+  if (!this->save_storage_(storage, false)) {
     this->unlock_runtime_();
     return false;
   }
@@ -677,7 +703,9 @@ bool OpenQuattMqttConfig::set_input_accept_retained(const std::string &key, bool
   this->retained_disabled_mask_.store(storage.retained_disabled_mask & STATEFUL_INPUT_MASK);
   this->config_source_ = "runtime";
   this->unlock_config_();
-  this->clear_input_(input_mask);
+  if (!accept_retained) {
+    this->clear_input_mask_pending_.fetch_or(input_mask);
+  }
   if (accept_retained) {
     this->resubscribe_inputs_.store(true);
   }
@@ -697,22 +725,26 @@ bool OpenQuattMqttConfig::load_storage_(Storage *storage) {
   return this->is_valid_storage_(*storage);
 }
 
-bool OpenQuattMqttConfig::save_storage_(const Storage &storage) {
+bool OpenQuattMqttConfig::save_storage_(const Storage &storage, bool sync) {
   if (!this->pref_.save(&storage)) {
     ESP_LOGE(TAG, "Failed to save MQTT configuration to preferences");
     return false;
+  }
+  if (!sync) {
+    this->preference_sync_pending_.store(true);
+    App.wake_loop_threadsafe();
+    return true;
   }
   if (!global_preferences->sync()) {
     ESP_LOGE(TAG, "Failed to sync MQTT configuration to preferences");
     return false;
   }
+  this->preference_sync_pending_.store(false);
   return true;
 }
 
 bool OpenQuattMqttConfig::apply_storage_(const Storage &storage, const char *source) {
   const bool enabled = storage.enabled != 0U;
-  this->stop_client_();
-
   bool clear_all_inputs = !enabled;
   this->lock_config_();
   const std::string previous_broker = this->broker_;
@@ -732,6 +764,10 @@ bool OpenQuattMqttConfig::apply_storage_(const Storage &storage, const char *sou
                      previous_port != this->port_ || previous_username != this->username_ ||
                      previous_password != this->password_;
   this->unlock_config_();
+  if (clear_all_inputs) {
+    this->mqtt_session_generation_.fetch_add(1);
+    this->clear_session_scoped_inputs_pending_.store(false);
+  }
   if (enabled) {
     if (clear_all_inputs) {
       this->clear_all_inputs_();
@@ -743,6 +779,7 @@ bool OpenQuattMqttConfig::apply_storage_(const Storage &storage, const char *sou
   }
 
   if (!enabled || broker_empty) {
+    this->client_start_pending_.store(false);
     if (enabled) {
       ESP_LOGW(TAG, "MQTT is enabled but no broker is configured; runtime connection is disabled");
     }
@@ -750,9 +787,9 @@ bool OpenQuattMqttConfig::apply_storage_(const Storage &storage, const char *sou
     return true;
   }
 
-  const bool started = this->start_client_();
+  this->request_client_start_();
   this->force_publish_.store(true);
-  return started;
+  return true;
 }
 
 bool OpenQuattMqttConfig::build_storage_(const std::string &broker, uint16_t port, const std::string &username,
@@ -828,31 +865,49 @@ bool OpenQuattMqttConfig::start_client_() {
   if (!enabled || broker_empty) {
     return true;
   }
+  if (this->mqtt_client_ != nullptr) {
+    return true;
+  }
+  if (!network::is_connected()) {
+    this->client_start_pending_.store(true);
+    return true;
+  }
 
   esp_mqtt_client_config_t mqtt_config{};
   this->lock_config_();
-  this->client_id_ = App.get_name() + std::string("-mqtt-ingress");
-  mqtt_config.broker.address.hostname = this->broker_.c_str();
+  this->active_broker_ = this->broker_;
+  this->active_username_ = this->username_;
+  this->active_password_ = this->password_;
+  this->active_client_id_ = App.get_name() + std::string("-mqtt-ingress");
+  this->active_port_ = this->port_;
+  mqtt_config.broker.address.hostname = this->active_broker_.c_str();
   mqtt_config.broker.address.port = this->port_;
   mqtt_config.broker.address.transport = MQTT_TRANSPORT_OVER_TCP;
-  mqtt_config.credentials.client_id = this->client_id_.c_str();
+  mqtt_config.credentials.client_id = this->active_client_id_.c_str();
   mqtt_config.session.keepalive = 30;
   mqtt_config.session.disable_clean_session = false;
   mqtt_config.task.stack_size = MQTT_TASK_STACK_SIZE;
 
-  if (!this->username_.empty()) {
-    mqtt_config.credentials.username = this->username_.c_str();
-    if (!this->password_.empty()) {
-      mqtt_config.credentials.authentication.password = this->password_.c_str();
+  if (!this->active_username_.empty()) {
+    mqtt_config.credentials.username = this->active_username_.c_str();
+    if (!this->active_password_.empty()) {
+      mqtt_config.credentials.authentication.password = this->active_password_.c_str();
     }
   }
-  const std::string log_broker = this->broker_;
+  const std::string log_broker = this->active_broker_;
   const uint16_t log_port = this->port_;
   this->unlock_config_();
 
   this->mqtt_client_ = esp_mqtt_client_init(&mqtt_config);
   if (this->mqtt_client_ == nullptr) {
     ESP_LOGE(TAG, "Failed to initialize MQTT ingress client");
+    this->lock_config_();
+    this->active_broker_.clear();
+    this->active_username_.clear();
+    this->active_password_.clear();
+    this->active_client_id_.clear();
+    this->active_port_ = 0;
+    this->unlock_config_();
     return false;
   }
 
@@ -862,6 +917,13 @@ bool OpenQuattMqttConfig::start_client_() {
     ESP_LOGE(TAG, "Failed to register MQTT ingress event handler: %s", esp_err_to_name(err));
     esp_mqtt_client_destroy(this->mqtt_client_);
     this->mqtt_client_ = nullptr;
+    this->lock_config_();
+    this->active_broker_.clear();
+    this->active_username_.clear();
+    this->active_password_.clear();
+    this->active_client_id_.clear();
+    this->active_port_ = 0;
+    this->unlock_config_();
     return false;
   }
 
@@ -870,6 +932,13 @@ bool OpenQuattMqttConfig::start_client_() {
     ESP_LOGE(TAG, "Failed to start MQTT ingress client: %s", esp_err_to_name(err));
     esp_mqtt_client_destroy(this->mqtt_client_);
     this->mqtt_client_ = nullptr;
+    this->lock_config_();
+    this->active_broker_.clear();
+    this->active_username_.clear();
+    this->active_password_.clear();
+    this->active_client_id_.clear();
+    this->active_port_ = 0;
+    this->unlock_config_();
     return false;
   }
 
@@ -886,7 +955,64 @@ void OpenQuattMqttConfig::stop_client_() {
   esp_mqtt_client_stop(this->mqtt_client_);
   esp_mqtt_client_destroy(this->mqtt_client_);
   this->mqtt_client_ = nullptr;
+  this->lock_config_();
+  this->active_broker_.clear();
+  this->active_username_.clear();
+  this->active_password_.clear();
+  this->active_client_id_.clear();
+  this->active_port_ = 0;
+  this->unlock_config_();
   this->connected_.store(false);
+}
+
+void OpenQuattMqttConfig::request_client_stop_() {
+  this->client_start_pending_.store(false);
+}
+
+void OpenQuattMqttConfig::request_client_start_() {
+  this->lock_config_();
+  const bool should_start = this->enabled_.load() && !this->broker_.empty();
+  this->unlock_config_();
+  if (!should_start) {
+    this->client_start_pending_.store(false);
+    return;
+  }
+  if (!network::is_connected()) {
+    this->client_start_pending_.store(true);
+    App.wake_loop_threadsafe();
+    return;
+  }
+  if (this->mqtt_client_ != nullptr) {
+    this->client_start_pending_.store(false);
+    return;
+  }
+  if (this->client_start_task_running_.exchange(true)) {
+    this->client_start_pending_.store(true);
+    return;
+  }
+  this->client_start_pending_.store(false);
+  const BaseType_t created = xTaskCreatePinnedToCore(&OpenQuattMqttConfig::start_client_task_, "oq_mqtt_start",
+                                                     MQTT_START_TASK_STACK_SIZE, this, 5, nullptr, tskNO_AFFINITY);
+  if (created != pdPASS) {
+    this->client_start_task_running_.store(false);
+    this->client_start_pending_.store(true);
+    ESP_LOGE(TAG, "Failed to create MQTT ingress start task");
+  }
+  App.wake_loop_threadsafe();
+}
+
+void OpenQuattMqttConfig::start_client_task_(void *arg) {
+  auto *self = static_cast<OpenQuattMqttConfig *>(arg);
+  if (self != nullptr) {
+    if (!self->start_client_()) {
+      ESP_LOGW(TAG, "MQTT ingress client start failed; retrying when the component loop runs again");
+      self->client_start_pending_.store(true);
+    }
+    self->client_start_task_running_.store(false);
+    self->force_publish_.store(true);
+    App.wake_loop_threadsafe();
+  }
+  vTaskDelete(nullptr);
 }
 
 void OpenQuattMqttConfig::set_numeric_input_topic_(NumericInputKind kind, const std::string &topic) {
@@ -1226,7 +1352,15 @@ void OpenQuattMqttConfig::mqtt_event_handler_(void *handler_args, esp_event_base
       self->clear_session_scoped_inputs_pending_.store(true);
       App.wake_loop_threadsafe();
       break;
-    case MQTT_EVENT_DATA:
+    case MQTT_EVENT_DATA: {
+      self->lock_config_();
+      const bool accept_data = self->enabled_.load() && self->active_broker_ == self->broker_ &&
+                               self->active_port_ == self->port_ && self->active_username_ == self->username_ &&
+                               self->active_password_ == self->password_;
+      self->unlock_config_();
+      if (!accept_data) {
+        break;
+      }
       if (event->topic != nullptr && event->data != nullptr && event->current_data_offset == 0 &&
           event->data_len == event->total_data_len) {
         const int numeric_input_index = self->find_numeric_input_index_by_topic_(event->topic, event->topic_len);
@@ -1254,6 +1388,7 @@ void OpenQuattMqttConfig::mqtt_event_handler_(void *handler_args, esp_event_base
         }
       }
       break;
+    }
     case MQTT_EVENT_ERROR:
       ESP_LOGW(TAG, "MQTT ingress client error");
       break;

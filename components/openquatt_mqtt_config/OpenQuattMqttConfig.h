@@ -14,6 +14,7 @@
 #include "mqtt_client.h"
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
+#include <freertos/task.h>
 
 namespace esphome {
 namespace openquatt_mqtt_config {
@@ -196,7 +197,7 @@ class OpenQuattMqttConfig : public Component {
                 "Retained policy must use the existing version 1 padding byte");
 
   bool load_storage_(Storage *storage);
-  bool save_storage_(const Storage &storage);
+  bool save_storage_(const Storage &storage, bool sync = true);
   bool apply_storage_(const Storage &storage, const char *source);
   bool build_storage_(const std::string &broker, uint16_t port, const std::string &username,
                       const std::string &password, bool enabled, uint8_t input_disabled_mask,
@@ -206,6 +207,9 @@ class OpenQuattMqttConfig : public Component {
   void rotate_csrf_token_();
   bool start_client_();
   void stop_client_();
+  void request_client_stop_();
+  void request_client_start_();
+  static void start_client_task_(void *arg);
   struct NumericInput {
     NumericInput(const char *key, const char *log_name, float min_value, float max_value)
         : key(key), log_name(log_name), min_value(min_value), max_value(max_value) {}
@@ -295,7 +299,8 @@ class OpenQuattMqttConfig : public Component {
 
   static constexpr uint32_t SENSOR_PUBLISH_INTERVAL_MS = 10000;
   static constexpr uint32_t NON_RETAINED_STATEFUL_STALE_MS = 30UL * 60UL * 1000UL;
-  static constexpr int MQTT_TASK_STACK_SIZE = 8192;
+  static constexpr int MQTT_TASK_STACK_SIZE = 12288;
+  static constexpr uint32_t MQTT_START_TASK_STACK_SIZE = 24576;
 
   esp_mqtt_client_handle_t mqtt_client_{nullptr};
   SemaphoreHandle_t config_lock_{nullptr};
@@ -304,6 +309,10 @@ class OpenQuattMqttConfig : public Component {
   std::atomic<bool> force_publish_{true};
   std::atomic<bool> resubscribe_inputs_{false};
   std::atomic<bool> clear_session_scoped_inputs_pending_{false};
+  std::atomic<bool> client_start_task_running_{false};
+  std::atomic<bool> client_start_pending_{false};
+  std::atomic<bool> preference_sync_pending_{false};
+  std::atomic<uint8_t> clear_input_mask_pending_{0};
   std::atomic<uint32_t> mqtt_session_generation_{0};
   std::atomic<uint8_t> input_disabled_mask_{0};
   std::atomic<uint8_t> retained_disabled_mask_{0};
@@ -330,7 +339,11 @@ class OpenQuattMqttConfig : public Component {
   uint16_t port_{1883};
   std::string username_;
   std::string password_;
-  std::string client_id_;
+  std::string active_broker_;
+  std::string active_username_;
+  std::string active_password_;
+  std::string active_client_id_;
+  uint16_t active_port_{0};
   std::atomic<bool> enabled_{false};
   std::string config_source_;
   std::string csrf_token_;

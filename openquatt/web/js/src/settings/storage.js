@@ -743,6 +743,7 @@ import { renderModalShell } from "../core/modal-shell.js";
       title: "Backup herstellen",
       copy: "Deze backup zet alleen de instellingen terug die OpenQuatt in de web-app beheert. Klap een sectie open om backup- en huidige waarden naast elkaar te vergelijken.",
       className: "oq-helper-modal--wide oq-helper-modal--scrollable",
+      sectionAttributes: "data-oq-settings-backup-restore-scroller",
       closeAction: "close-system-modal",
       closeLabel: "Sluit backup-popup",
       body: `

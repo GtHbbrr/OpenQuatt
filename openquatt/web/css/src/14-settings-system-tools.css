@@ -75,13 +75,28 @@
 }
 
 .oq-settings-backup-import-input {
+  box-sizing: border-box;
   display: block;
   width: 100%;
+  min-width: 0;
   padding: 12px;
   border-radius: 14px;
   border: 1px dashed var(--oq-helper-line);
   background: var(--oq-theme-surface-w8xo, rgba(255, 255, 255, 0.7));
   color: var(--oq-helper-faint);
+  font: inherit;
+  line-height: 1.35;
+}
+
+.oq-settings-backup-import-input::file-selector-button {
+  margin-right: 10px;
+  border: 1px solid var(--oq-helper-line);
+  border-radius: 8px;
+  background: var(--oq-helper-modal-panel-background);
+  color: var(--oq-theme-color-1w4r, var(--oq-helper-ink));
+  font: inherit;
+  font-weight: 700;
+  padding: 7px 10px;
 }
 
 .oq-settings-backup-error {

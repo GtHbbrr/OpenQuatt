@@ -12,7 +12,7 @@ import { getDeviceVersionLabel, getHeaderRenderSignature, renderDevPanel, render
 import { getMqttSensorsModalRenderSignature } from "../features/mqtt-actions.js";
 import { updateMqttState } from "../core/feature-state.js";
 import { captureQuickStartScrollState, queueQuickStartScrollRestore, renderQuickStartModal } from "../features/quickstart.js";
-import { captureCm100CommissioningScrollState, captureHistoryStorageModalScrollState, captureServiceTaskModalScrollState, captureWebServerLogScrollState, queueCm100CommissioningScrollRestore, queueHistoryStorageModalScrollRestore, queueServiceTaskModalScrollRestore, queueWebServerLogScrollRestore, syncWebServerLogStream } from "../features/webserver-logs.js";
+import { captureCm100CommissioningScrollState, captureHistoryStorageModalScrollState, captureServiceTaskModalScrollState, captureSettingsBackupRestoreModalScrollState, captureWebServerLogScrollState, queueCm100CommissioningScrollRestore, queueHistoryStorageModalScrollRestore, queueServiceTaskModalScrollRestore, queueSettingsBackupRestoreModalScrollRestore, queueWebServerLogScrollRestore, syncWebServerLogStream } from "../features/webserver-logs.js";
 import { renderSettingsGroupContent, renderSettingsGroupNav } from "../settings/core.js";
 import { renderEnergyView, renderResultsView } from "./energy.js";
 import { renderControlReplayView } from "../features/control-replay-view.js";
@@ -228,6 +228,9 @@ export function renderSettingsView() {
     const historyStorageModalScrollState = state.systemModal === "history-storage"
       ? captureHistoryStorageModalScrollState()
       : null;
+    const settingsBackupRestoreModalScrollState = state.systemModal === "settings-backup-restore"
+      ? captureSettingsBackupRestoreModalScrollState()
+      : null;
     const quickStartScrollState = state.quickStartModalOpen
       ? captureQuickStartScrollState()
       : null;
@@ -254,6 +257,7 @@ export function renderSettingsView() {
       queueCm100CommissioningScrollRestore(cm100CommissioningScrollState);
       queueServiceTaskModalScrollRestore(serviceTaskModalScrollState);
       queueHistoryStorageModalScrollRestore(historyStorageModalScrollState);
+      queueSettingsBackupRestoreModalScrollRestore(settingsBackupRestoreModalScrollState);
       queueQuickStartScrollRestore(quickStartScrollState);
       return;
     }
@@ -313,6 +317,7 @@ export function renderSettingsView() {
     queueCm100CommissioningScrollRestore(cm100CommissioningScrollState);
     queueServiceTaskModalScrollRestore(serviceTaskModalScrollState);
     queueHistoryStorageModalScrollRestore(historyStorageModalScrollState);
+    queueSettingsBackupRestoreModalScrollRestore(settingsBackupRestoreModalScrollState);
     queueQuickStartScrollRestore(quickStartScrollState);
     queueSettingsPageScrollRestore(settingsPageScrollState);
   }

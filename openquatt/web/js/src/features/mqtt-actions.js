@@ -322,9 +322,11 @@ import { render } from "../core/render-scheduler.js";
     const status = state.mqttStatus || {};
     const enabled = Boolean(state.mqttDraftEnabled);
     const broker = String(state.mqttDraftBroker || "").trim();
-    const port = Number(String(state.mqttDraftPort || "").trim());
-    const username = String(state.mqttDraftUsername || "").trim();
-    const clearPassword = Boolean(state.mqttDraftClearPassword);
+    const portText = String(state.mqttDraftPort || "").trim();
+    const port = portText ? Number(portText) : (enabled ? 0 : 1883);
+    const removeConfig = !enabled && !broker;
+    const username = removeConfig ? "" : String(state.mqttDraftUsername || "").trim();
+    const clearPassword = removeConfig || Boolean(state.mqttDraftClearPassword);
     const password = clearPassword ? "" : String(state.mqttDraftPassword || "");
 
     if (!status.csrf_token) {
@@ -332,7 +334,7 @@ import { render } from "../core/render-scheduler.js";
       render();
       return;
     }
-    if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    if ((enabled || portText) && (!Number.isInteger(port) || port < 1 || port > 65535)) {
       state.mqttError = "Vul een geldige poort in.";
       render();
       return;
@@ -371,7 +373,9 @@ import { render } from "../core/render-scheduler.js";
       await refreshMqttStatus({ force: true });
       state.mqttDraftPassword = "";
       state.mqttDraftClearPassword = false;
-      state.mqttNotice = enabled ? "MQTT inputbronnen staan aan." : "MQTT-configuratie opgeslagen.";
+      state.mqttNotice = enabled
+        ? "MQTT-configuratie opgeslagen. De MQTT-verbinding wordt gestart."
+        : "MQTT-configuratie opgeslagen.";
       state.mqttError = "";
       render();
     } catch (error) {
