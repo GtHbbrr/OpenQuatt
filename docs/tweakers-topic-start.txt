@@ -1,0 +1,138 @@
+[h1]OpenQuatt – lokale open-source besturing voor Quatt Hybrid[/h1]
+[img=400,134]https://tweakers.net/i/Br3fvza4W_rXhtuY2tP2jItLXJQ=/800x/filters:strip_exif()/f/image/IdJxPDpH9TsK3osVw0pAtPru.png?f=fotoalbum_large[/img]
+
+[quote]
+[b]Projectstatus[/b]
+OpenQuatt is momenteel een open-sourceproject op best-effortbasis. Ontwikkeling, documentatie en ondersteuning worden door de community geleverd op basis van beschikbare tijd. Er is geen gegarandeerde responstijd, individuele installatieservice of officiële Quatt-support.
+
+Voor gebruiksvragen en hulp bij diagnose kun je terecht in het [url=https://discord.com/channels/1176602554885492786/1464174190788874427]OpenQuatt Discord-kanaal[/url]. Een reproduceerbare bug meld je als [url=https://github.com/jeroen85/OpenQuatt/issues/new/choose]GitHub-issue[/url]. Ervaringen, ideeën en inhoudelijke discussie zijn natuurlijk welkom in dit topic.
+[/quote]
+
+[h2]Wat is OpenQuatt?[/h2]
+OpenQuatt is open-source ESPHome-firmware voor Quatt Hybrid-warmtepompen. Het draait op een aparte ESP32-controller en geeft je lokale controle, een uitgebreide lokale web-app en optionele Home Assistant-integratie bovenop de bestaande Quatt-installatie.
+
+De normale bediening werkt lokaal via [mono]http://openquatt.local[/mono]. Home Assistant is niet verplicht voor OpenQuatt zelf, maar wel aanbevolen voor dashboards, langere historie en automatisering.
+
+OpenQuatt is bedoeld voor mensen die graag begrijpen wat hun installatie doet, bewust instellingen willen beheren en niet voor elke uitlezing afhankelijk willen zijn van een clouddienst of gesloten app.
+
+[h2]Ondersteunde systemen[/h2]
+[list]
+[*] Quatt Hybrid [mono]Single[/mono] en [mono]Duo[/mono]
+[*] Quatt Hybrid V1, V1.5 en V2
+[*] Wi-Fi voor alle beschikbare hardwareprofielen
+[*] Wi-Fi en Ethernet voor de Heatpump Controller Q-edition
+[*] Verwarmen en, waar de installatie dat ondersteunt, koelen
+[*] Lokale bediening via de geïntegreerde web-app
+[*] Optionele integratie met Home Assistant
+[/list]
+
+OpenQuatt richt zich [b]niet[/b] op Quatt All-Electric, Quatt Chill of koppeling met Quatt HomeBattery.
+
+[h2]Ondersteunde hardware[/h2]
+[list]
+[*] [url=https://electropaultje.nl/product/heatpump-controller-q-edition/]Electropaultje Heatpump Controller Q-edition[/url] – aanbevolen voor nieuwe installaties en de primaire focus voor ontwikkeling, documentatie en support. Beschikbaar voor Single en Duo via Wi-Fi of Ethernet.
+[*] [url=https://www.waveshare.com/esp32-s3-relay-1ch.htm]Waveshare ESP32-S3-Relay-1CH[/url] – blijft beschikbaar, maar met limited/best-effort support.
+[*] [url=https://electropaultje.nl/product/heatpump-listener/]Electropaultje Heatpump Listener[/url] – blijft beschikbaar, maar met limited/best-effort support.
+[/list]
+
+Voor een nieuwe installatie is de Heatpump Controller Q-edition de voorkeursmodule. Deze module is specifiek voor OpenQuatt gemaakt. Wi-Fi en Ethernet zijn momenteel aparte firmware-builds; een Ethernet-build heeft geen automatische Wi-Fi-fallback of captive portal.
+
+[h2]Wat krijg je met OpenQuatt?[/h2]
+
+[h3]Lokale web-app[/h3]
+De web-app is het centrale punt voor beheer en diagnose. Je vindt er onder andere:
+[list]
+[*] een begeleide Quick Start voor de basisconfiguratie;
+[*] een live overzicht van de installatie;
+[*] energie, vermogen, COP en EER;
+[*] opgeslagen resultaten en historie;
+[*] een beslislog die laat zien waarom OpenQuatt bepaalde regelkeuzes maakt;
+[*] diagnosewaarden en korte trends;
+[*] instellingen voor verwarmen, koelen, bronnen en integraties;
+[*] firmware-updates;
+[*] backup en herstel van instellingen;
+[*] lokale toegangsbeveiliging.
+[/list]
+
+Nieuwsgierig zonder iets te installeren? Open de [url=https://jeroen85.github.io/OpenQuatt/demo/]live web-appdemo[/url]. De demo gebruikt gesimuleerde data, maar toont wel de actuele interface en navigatie.
+
+[h3]Verwarming en regeling[/h3]
+OpenQuatt heeft twee hoofdstrategieën:
+[list]
+[*] [mono]Power House[/mono] – de aanbevolen standaardstrategie. OpenQuatt schat de warmtevraag van de woning en stuurt daarop.
+[*] [mono]Water Temperature Control[/mono] – stooklijnregeling met verdere PID-afstelling voor gebruikers die bewust op watertemperatuur willen regelen.
+[/list]
+
+Daarnaast zijn er functies voor onder andere flowregeling, automatische flow-afstelling, stille uren, compressorlimieten, veilige watertemperaturen, koeling en dauwpuntbeveiliging. Welke opties zichtbaar zijn hangt af van de gekozen setup en strategie.
+
+[h3]Home Assistant[/h3]
+Home Assistant is optioneel voor OpenQuatt zelf en aanbevolen voor dashboards en automatisering. Er zijn aparte dashboards voor Single en Duo, met overzichten voor energie, flow, verwarming, koeling, warmtepompen, instellingen, service en diagnose.
+
+Gebruik Home Assistant vooral om dagelijks mee te kijken, grafieken te bewaren en automatiseringen te maken. Gebruik de OpenQuatt-web-app voor configuratie, firmware, instellingen, backup en eerste diagnose.
+
+[h3]Externe bronwaarden[/h3]
+OpenQuatt kan een beperkte set externe waarden gebruiken, bijvoorbeeld kamerwaarden, buitentemperatuur, dauwpunt en verwarmings- of koeltoestemming. Dat kan via Home Assistant en voor een beperkte set inputbronnen ook via MQTT.
+
+OpenQuatt biedt geen volledige MQTT-export. De MQTT-functionaliteit is gericht op expliciete inputbronnen met geldigheidscontrole en time-outs.
+
+[h2]Belangrijk om te weten[/h2]
+[list]
+[*] OpenQuatt is geen officieel Quatt-product en geen vervanging voor een vakbekwaam installateur.
+[*] Gebruik OpenQuatt bewust, wijzig één ding tegelijk en bewaar een backup van werkende instellingen.
+[*] Gebruik van OpenQuatt kan gevolgen hebben voor Quatts commerciële garantie. Raadpleeg de [url=https://www.quatt.io/algemene-voorwaarden]actuele Quatt-voorwaarden[/url]; wettelijke rechten staan daar los van.
+[*] Verwacht geen individuele support of vaste reactietermijn: dit blijft een open-sourceproject op best-effortbasis.
+[/list]
+
+Installatie, hardwarekeuze, bedrading en ingebruikname worden bewust niet in deze startpost herhaald. Gebruik daarvoor altijd de actuele documentatie via de links onderaan.
+
+[h2]Hulp vragen of een bug melden[/h2]
+Voor [b]gebruiksvragen en hulp bij diagnose[/b] gebruik je het [url=https://discord.com/channels/1176602554885492786/1464174190788874427]OpenQuatt Discord-kanaal[/url]. Vermeld daarbij minimaal:
+[list]
+[*] OpenQuatt-versie en gebruikte controller;
+[*] Quatt-generatie, Single of Duo, en Wi-Fi of Ethernet;
+[*] wat je verwachtte en wat er daadwerkelijk gebeurde;
+[*] relevante screenshots uit Diagnose of Beslislog;
+[*] welke instellingen of bedrading kort daarvoor zijn gewijzigd.
+[/list]
+
+Kun je het probleem betrouwbaar herhalen en lijkt het om een softwarefout te gaan? Maak dan een [url=https://github.com/jeroen85/OpenQuatt/issues/new/choose]GitHub-issue[/url] met duidelijke reproductiestappen.
+
+Deel nooit Wi-Fi-wachtwoorden, API-sleutels of andere geheime gegevens.
+
+[h2]Belangrijkste links[/h2]
+[list]
+[*] [url=https://jeroen85.github.io/OpenQuatt/]Projectpagina en documentatie[/url]
+[*] [url=https://jeroen85.github.io/OpenQuatt/install/]Web installer[/url]
+[*] [url=https://jeroen85.github.io/OpenQuatt/q-edition.html]Heatpump Controller Q-edition aansluithulp[/url]
+[*] [url=https://jeroen85.github.io/OpenQuatt/web-app.html]Handleiding voor de web-app[/url]
+[*] [url=https://jeroen85.github.io/OpenQuatt/dashboard/]Home Assistant-dashboard installeren[/url]
+[*] [url=https://jeroen85.github.io/OpenQuatt/problemen-oplossen.html]Problemen oplossen[/url]
+[*] [url=https://jeroen85.github.io/OpenQuatt/demo/]Live web-appdemo[/url]
+[*] [url=https://github.com/jeroen85/OpenQuatt/releases/latest]Laatste stabiele release[/url]
+[*] [url=https://github.com/jeroen85/OpenQuatt]Broncode op GitHub[/url]
+[*] [url=https://discord.com/channels/1176602554885492786/1464174190788874427]OpenQuatt Discord-kanaal[/url]
+[/list]
+
+[h2]Screenshots[/h2]
+Onderstaande beelden komen uit de publieke demo en gebruiken alleen gesimuleerde data. Klik op een screenshot voor het volledige formaat.
+
+[TABLE]
+ [TR]
+  [TD][b]Warmtepompen[/b]
+[url=https://jeroen85.github.io/OpenQuatt/assets/tweakers/openquatt-overview.jpg][img=440,248]https://jeroen85.github.io/OpenQuatt/assets/tweakers/openquatt-overview.jpg[/img][/url][/TD]
+  [TD][b]Energiehistorie[/b]
+[url=https://jeroen85.github.io/OpenQuatt/assets/tweakers/openquatt-energy.jpg][img=440,248]https://jeroen85.github.io/OpenQuatt/assets/tweakers/openquatt-energy.jpg[/img][/url][/TD]
+ [/TR]
+ [TR]
+  [TD][b]Vermogensbalans[/b]
+[url=https://jeroen85.github.io/OpenQuatt/assets/tweakers/openquatt-power-house.jpg][img=440,248]https://jeroen85.github.io/OpenQuatt/assets/tweakers/openquatt-power-house.jpg[/img][/url][/TD]
+  [TD][b]Beslislog[/b]
+[url=https://jeroen85.github.io/OpenQuatt/assets/tweakers/openquatt-decision-log.jpg][img=440,248]https://jeroen85.github.io/OpenQuatt/assets/tweakers/openquatt-decision-log.jpg[/img][/url][/TD]
+ [/TR]
+ [TR]
+  [TD][b]Weekresultaten[/b]
+[url=https://jeroen85.github.io/OpenQuatt/assets/tweakers/openquatt-results.jpg][img=440,248]https://jeroen85.github.io/OpenQuatt/assets/tweakers/openquatt-results.jpg[/img][/url][/TD]
+  [TD][b]Diagnose[/b]
+[url=https://jeroen85.github.io/OpenQuatt/assets/tweakers/openquatt-diagnosis.jpg][img=440,248]https://jeroen85.github.io/OpenQuatt/assets/tweakers/openquatt-diagnosis.jpg[/img][/url][/TD]
+ [/TR]
+[/TABLE]
