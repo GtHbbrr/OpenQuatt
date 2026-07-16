@@ -447,6 +447,32 @@ import { render } from "../core/render-scheduler.js";
 
     if (state.systemModal === "settings-backup-success") {
       const notice = state.controlNotice || "Backup hersteld.";
+      const result = state.settingsBackupRestoreResult || { applied: [], skipped: [], unknown: [], mqttIncluded: false };
+      const resultItems = [...result.skipped, ...result.unknown];
+      const resultDetails = resultItems.length ? `
+        <details class="oq-settings-backup-result-details" open>
+          <summary>
+            <span>
+              <strong>Niet toegepast</strong>
+              <em>${escapeHtml(`${result.skipped.length} overgeslagen · ${result.unknown.length} onbekend`)}</em>
+            </span>
+          </summary>
+          <div class="oq-settings-backup-result-list">
+            ${resultItems.map((item) => `
+              <div class="oq-settings-backup-result-item oq-settings-backup-result-item--${escapeHtml(item.severity || "warning")}">
+                <div>
+                  <strong>${escapeHtml(item.label || item.key)}</strong>
+                  <code>${escapeHtml(`${item.section || "Onbekend"} · ${item.key}`)}</code>
+                </div>
+                <div>
+                  <strong>${escapeHtml(item.reason || "Niet toegepast")}</strong>
+                  ${item.detail ? `<span>${escapeHtml(item.detail)}</span>` : ""}
+                </div>
+              </div>
+            `).join("")}
+          </div>
+        </details>
+      ` : "";
       return renderModalShell({
         modalId: "system",
         titleId: "oq-backup-success-modal-title",
@@ -454,9 +480,16 @@ import { render } from "../core/render-scheduler.js";
         title: "Backup hersteld",
         closeAction: "close-system-modal",
         closeLabel: "Sluit bevestiging",
+        className: "oq-helper-modal--wide oq-helper-modal--scrollable",
         bodyMarkup: `
           <p class="oq-helper-modal-copy">${escapeHtml(notice)}</p>
-          <p class="oq-helper-modal-copy">Je kunt nu terug naar het overzicht of OpenQuatt gewoon verder gebruiken.</p>
+          <div class="oq-settings-backup-result-summary">
+            <div><span>Toegepast</span><strong>${escapeHtml(String(result.applied.length))}</strong></div>
+            <div><span>Niet toegepast</span><strong>${escapeHtml(String(result.skipped.length))}</strong></div>
+            <div><span>Onbekend</span><strong>${escapeHtml(String(result.unknown.length))}</strong></div>
+          </div>
+          ${resultDetails}
+          ${result.mqttIncluded ? "" : `<p class="oq-settings-action-note oq-settings-action-note--warning">Deze backup bevatte geen MQTT-configuratie. Bestaande MQTT-instellingen en MQTT-afhankelijke bronselecties zijn behouden.</p>`}
           <div class="oq-helper-modal-actions">
             <button class="oq-helper-button oq-helper-button--primary" type="button" data-oq-action="close-system-modal">Gereed</button>
           </div>

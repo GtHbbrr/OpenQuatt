@@ -9,6 +9,7 @@ import { updateEnergyHistoryState } from "../core/feature-state.js";
 import { setEntityBackupValue } from "../core/entity-backup.js";
 import { formatValue, getEntityValue, normalizeDateTimeValue, normalizeTimeValue, parseLooseNumber } from "../core/entity-store.js";
 import { refreshEntities, syncEntities } from "../core/entity-sync.js";
+import { buildSettingsBackupMqttConfig, collectUnknownSettingsBackupItems, isSettingsBackupMqttSourceSelection, normalizeSettingsBackupMqttConfig, SETTINGS_BACKUP_MIN_SCHEMA_VERSION, SETTINGS_BACKUP_MQTT_INPUT_KEYS, SETTINGS_BACKUP_MQTT_RETAINED_KEYS, settingsBackupMqttNeedsPassword } from "../core/settings-backup-domain.js";
 import { DEFAULT_TREND_WINDOW_HOURS, state } from "../core/state.js";
 import { ENERGY_HISTORY_VIEW_KEYS, getSettingsStorageRefreshKeys, SETTINGS_STORAGE_KEYS, TREND_HISTORY_VIEW_KEYS } from "../core/storage-history-keys.js";
 import { setStorageHistoryControls } from "../core/storage-history-controls.js";
@@ -998,6 +999,7 @@ import { render } from "../core/render-scheduler.js";
 
   export function clearSettingsBackupDraft() {
     state.settingsBackupDraft = null;
+    state.settingsBackupMqttPassword = "";
     state.settingsBackupError = "";
     state.settingsBackupBusy = false;
   }
@@ -1047,7 +1049,7 @@ import { render } from "../core/render-scheduler.js";
     return text || undefined;
   }
 
-  export function buildSettingsBackupSnapshot() {
+  export function buildSettingsBackupSnapshot(mqtt = null) {
     const settings = {};
     SETTINGS_BACKUP_SECTIONS.forEach((section) => {
       const values = {};
@@ -1065,7 +1067,19 @@ import { render } from "../core/render-scheduler.js";
       exported_at: new Date().toISOString(),
       source: getSettingsBackupSourceMeta(),
       settings,
+      mqtt,
     };
+  }
+
+  export async function fetchSettingsBackupMqttStatus() {
+    const response = await fetch("/mqtt/status", { cache: "no-store" });
+    if (response.status === 404) {
+      return null;
+    }
+    if (!response.ok) {
+      throw new Error(`MQTT-status HTTP ${response.status}`);
+    }
+    return response.json();
   }
 
   export function getSettingsBackupFilename(snapshot = buildSettingsBackupSnapshot()) {
@@ -1267,16 +1281,18 @@ import { render } from "../core/render-scheduler.js";
     }
 
     const schemaVersion = Number(parsed.schema_version ?? parsed.schemaVersion ?? 0);
-    if (!Number.isInteger(schemaVersion) || schemaVersion < SETTINGS_BACKUP_SCHEMA_VERSION) {
+    if (!Number.isInteger(schemaVersion) || schemaVersion < SETTINGS_BACKUP_MIN_SCHEMA_VERSION || schemaVersion > SETTINGS_BACKUP_SCHEMA_VERSION) {
       throw new Error("Onbekende backupversie.");
     }
 
     const settings = parsed.settings && typeof parsed.settings === "object" ? parsed.settings : {};
+    const mqtt = schemaVersion >= 2 ? normalizeSettingsBackupMqttConfig(parsed.mqtt) : null;
     const snapshot = {
       schema_version: schemaVersion,
       exported_at: String(parsed.exported_at || ""),
       source: parsed.source && typeof parsed.source === "object" ? parsed.source : {},
       settings,
+      mqtt,
       file_name: fileName || "",
     };
     snapshot.summary = getSettingsBackupSelectionSummary(snapshot);
@@ -1291,7 +1307,8 @@ import { render } from "../core/render-scheduler.js";
 
     try {
       await refreshEntities(SETTINGS_BACKUP_KEYS, "all");
-      return buildSettingsBackupSnapshot();
+      const mqttStatus = await fetchSettingsBackupMqttStatus();
+      return buildSettingsBackupSnapshot(buildSettingsBackupMqttConfig(mqttStatus));
     } finally {
       state.settingsBackupBusy = false;
       render();
@@ -1321,6 +1338,8 @@ import { render } from "../core/render-scheduler.js";
 
     state.settingsBackupBusy = true;
     state.settingsBackupDraft = null;
+    state.settingsBackupMqttPassword = "";
+    state.settingsBackupRestoreResult = null;
     state.settingsBackupError = "";
     state.controlError = "";
     state.controlNotice = "";
@@ -1341,9 +1360,111 @@ import { render } from "../core/render-scheduler.js";
     }
   }
 
+  export function createSettingsBackupRestoreItem(key, section, reason, detail = "", severity = "warning") {
+    const mqttLabels = {
+      "mqtt.config": "MQTT-configuratie",
+    };
+    return {
+      key,
+      section,
+      label: mqttLabels[key] || (key.startsWith("mqtt.") ? key.replace(/^mqtt\./, "MQTT ").replaceAll("_", " ") : getSettingsBackupFieldLabel(key)),
+      reason,
+      detail,
+      severity,
+    };
+  }
+
+  export function getSettingsBackupUnknownItems(draft) {
+    return collectUnknownSettingsBackupItems(draft?.settings, SETTINGS_BACKUP_SECTIONS).map(({ section, key }) => ({
+      key,
+      section,
+      label: getSettingsBackupFieldLabel(key),
+      reason: "Onbekend veld",
+      detail: "Deze firmware kent dit veld niet; de waarde is niet toegepast.",
+      severity: "warning",
+    }));
+  }
+
+  export async function postSettingsBackupMqtt(path, csrfToken, values) {
+    const params = new URLSearchParams();
+    params.set("csrf_token", csrfToken);
+    Object.entries(values).forEach(([key, value]) => params.set(key, String(value)));
+    const response = await fetch(path, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8" },
+      body: params.toString(),
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok || payload?.ok === false) {
+      throw new Error(payload?.error || `HTTP ${response.status}`);
+    }
+  }
+
+  export async function prepareSettingsBackupMqttRestore(mqtt, password) {
+    if (!mqtt) {
+      return null;
+    }
+    if (settingsBackupMqttNeedsPassword(mqtt) && !password) {
+      throw new Error("MQTT-wachtwoord ontbreekt.");
+    }
+    const status = await fetchSettingsBackupMqttStatus();
+    const csrfToken = String(status?.csrf_token || "");
+    if (!status || !csrfToken) {
+      throw new Error("MQTT-configuratie is niet beschikbaar op deze firmware.");
+    }
+    await postSettingsBackupMqtt("/mqtt/save", csrfToken, {
+      enabled: false,
+      broker: mqtt.broker,
+      port: mqtt.port,
+      username: mqtt.username,
+      password: password || "",
+      clear_password: mqtt.password_was_set ? false : true,
+    });
+    return { csrfToken, mqtt };
+  }
+
+  export async function finishSettingsBackupMqttRestore(context, applied) {
+    if (!context) {
+      return;
+    }
+    const { csrfToken, mqtt } = context;
+    for (const key of SETTINGS_BACKUP_MQTT_INPUT_KEYS) {
+      await postSettingsBackupMqtt("/mqtt/input/save", csrfToken, {
+        input: key,
+        enabled: mqtt.input_enabled[key],
+      });
+      applied.push(`mqtt.input_enabled.${key}`);
+    }
+    for (const key of SETTINGS_BACKUP_MQTT_RETAINED_KEYS) {
+      await postSettingsBackupMqtt("/mqtt/input/retained/save", csrfToken, {
+        input: key,
+        accept_retained: mqtt.input_accept_retained[key],
+      });
+      applied.push(`mqtt.input_accept_retained.${key}`);
+    }
+    if (mqtt.enabled) {
+      await postSettingsBackupMqtt("/mqtt/save", csrfToken, {
+        enabled: true,
+        broker: mqtt.broker,
+        port: mqtt.port,
+        username: mqtt.username,
+        password: "",
+        clear_password: false,
+      });
+    }
+    applied.push("mqtt.config");
+  }
+
   export async function restoreSettingsBackup() {
     const draft = state.settingsBackupDraft;
     if (!draft || state.settingsBackupBusy) {
+      return;
+    }
+
+    const mqttPassword = String(state.settingsBackupMqttPassword || "");
+    if (settingsBackupMqttNeedsPassword(draft.mqtt) && !mqttPassword) {
+      state.settingsBackupError = "Vul het MQTT-wachtwoord in om deze backup te herstellen.";
+      render();
       return;
     }
 
@@ -1355,10 +1476,30 @@ import { render } from "../core/render-scheduler.js";
 
     const applied = [];
     const skipped = [];
+    const unknown = getSettingsBackupUnknownItems(draft);
+    const deferredMqttSources = [];
     let shouldCompleteSetup = false;
+    let mqttContext = null;
+    let mqttRestoreReady = false;
+    let mqttRestoreFailureDetail = draft.mqtt ? "" : "Backup bevat geen MQTT-configuratie.";
 
     try {
       await refreshEntities(SETTINGS_BACKUP_KEYS, "all");
+
+      if (draft.mqtt) {
+        try {
+          mqttContext = await prepareSettingsBackupMqttRestore(draft.mqtt, mqttPassword);
+        } catch (error) {
+          mqttRestoreFailureDetail = String(error?.message || error);
+          skipped.push(createSettingsBackupRestoreItem(
+            "mqtt.config",
+            "mqtt",
+            "MQTT niet voorbereid",
+            mqttRestoreFailureDetail,
+            "error",
+          ));
+        }
+      }
 
       for (const section of SETTINGS_BACKUP_SECTIONS) {
         const sectionValues = draft.settings?.[section.id] && typeof draft.settings[section.id] === "object"
@@ -1367,7 +1508,12 @@ import { render } from "../core/render-scheduler.js";
 
         for (const key of section.keys) {
           if (!Object.prototype.hasOwnProperty.call(sectionValues, key)) {
-            skipped.push(key);
+            skipped.push(createSettingsBackupRestoreItem(
+              key,
+              section.label,
+              "Ontbreekt in backup",
+              "De huidige firmwarewaarde of firmware-default is behouden.",
+            ));
             continue;
           }
 
@@ -1381,9 +1527,19 @@ import { render } from "../core/render-scheduler.js";
             continue;
           }
 
+          if (isSettingsBackupMqttSourceSelection(key, value)) {
+            deferredMqttSources.push({ key, value, section });
+            continue;
+          }
+
           const entity = ENTITY_DEFS[key];
           if (!entity || !hasEntity(key)) {
-            skipped.push(key);
+            skipped.push(createSettingsBackupRestoreItem(
+              key,
+              section.label,
+              "Niet beschikbaar",
+              "Deze instelling bestaat niet op de huidige installatie of firmware.",
+            ));
             continue;
           }
 
@@ -1391,33 +1547,139 @@ import { render } from "../core/render-scheduler.js";
             await setEntityBackupValue(key, value);
             applied.push(key);
           } catch (error) {
-            skipped.push(key);
+            skipped.push(createSettingsBackupRestoreItem(
+              key,
+              section.label,
+              "Schrijven mislukt",
+              String(error?.message || error),
+              "error",
+            ));
           }
         }
       }
 
-      const openquattEnabledValue = draft.settings?.operation?.openquattEnabled;
-      if (Object.prototype.hasOwnProperty.call(draft.settings?.operation || {}, "openquattEnabled") && hasEntity("openquattEnabled")) {
-        await setEntityBackupValue("openquattEnabled", openquattEnabledValue);
-        applied.push("openquattEnabled");
+      if (mqttContext) {
+        try {
+          await finishSettingsBackupMqttRestore(mqttContext, applied);
+          mqttRestoreReady = true;
+        } catch (error) {
+          mqttRestoreFailureDetail = String(error?.message || error);
+          skipped.push(createSettingsBackupRestoreItem(
+            "mqtt.config",
+            "mqtt",
+            "MQTT herstellen mislukt",
+            `${mqttRestoreFailureDetail} MQTT blijft uitgeschakeld.`,
+            "error",
+          ));
+        }
+      }
+
+      for (const { key, value, section } of deferredMqttSources) {
+        if (!mqttRestoreReady) {
+          skipped.push(createSettingsBackupRestoreItem(
+            key,
+            section.label,
+            "MQTT-bron niet toegepast",
+            `${mqttRestoreFailureDetail || "MQTT kon niet worden hersteld."} De huidige bronselectie is behouden.`,
+            "error",
+          ));
+          continue;
+        }
+
+        const entity = ENTITY_DEFS[key];
+        if (!entity || !hasEntity(key)) {
+          skipped.push(createSettingsBackupRestoreItem(
+            key,
+            section.label,
+            "Niet beschikbaar",
+            "Deze instelling bestaat niet op de huidige installatie of firmware.",
+          ));
+          continue;
+        }
+
+        try {
+          await setEntityBackupValue(key, value);
+          applied.push(key);
+        } catch (error) {
+          skipped.push(createSettingsBackupRestoreItem(
+            key,
+            section.label,
+            "Schrijven mislukt",
+            String(error?.message || error),
+            "error",
+          ));
+        }
+      }
+
+      const operationValues = draft.settings?.operation || {};
+      if (Object.prototype.hasOwnProperty.call(operationValues, "openquattEnabled")) {
+        if (!hasEntity("openquattEnabled")) {
+          skipped.push(createSettingsBackupRestoreItem(
+            "openquattEnabled",
+            "Bediening",
+            "Niet beschikbaar",
+            "De OpenQuatt-regeling kon niet naar de backupwaarde worden gezet.",
+          ));
+        } else {
+          try {
+            await setEntityBackupValue("openquattEnabled", operationValues.openquattEnabled);
+            applied.push("openquattEnabled");
+          } catch (error) {
+            skipped.push(createSettingsBackupRestoreItem(
+              "openquattEnabled",
+              "Bediening",
+              "Schrijven mislukt",
+              String(error?.message || error),
+              "error",
+            ));
+          }
+        }
       }
 
       if (shouldCompleteSetup && ENTITY_DEFS.apply) {
-        const response = await fetch(buildEntityPath("button", "Complete setup", "press"), { method: "POST" });
-        if (!response.ok) {
-          throw new Error(`Setup bevestigen mislukt (HTTP ${response.status}).`);
+        try {
+          const response = await fetch(buildEntityPath("button", "Complete setup", "press"), { method: "POST" });
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+          }
+          applied.push("setupComplete");
+        } catch (error) {
+          skipped.push(createSettingsBackupRestoreItem(
+            "setupComplete",
+            "Installatie",
+            "Setup bevestigen mislukt",
+            String(error?.message || error),
+            "error",
+          ));
         }
-        applied.push("setupComplete");
       } else if (Object.prototype.hasOwnProperty.call(draft.settings?.installation || {}, "setupComplete")) {
-        skipped.push("setupComplete");
+        skipped.push(createSettingsBackupRestoreItem(
+          "setupComplete",
+          "Installatie",
+          "Bewust niet toegepast",
+          "De setup stond in de backup niet als voltooid.",
+        ));
       }
 
+      try {
+        await syncEntities();
+      } catch (error) {
+        // Restore is complete; a later poll refreshes the displayed values.
+      }
+
+      state.settingsBackupRestoreResult = {
+        applied,
+        skipped,
+        unknown,
+        mqttIncluded: Boolean(draft.mqtt),
+        sourceSchemaVersion: draft.schema_version,
+      };
       state.systemModal = "settings-backup-success";
+      state.controlNotice = `Backup hersteld (${applied.length} toegepast${skipped.length ? `, ${skipped.length} niet toegepast` : ""}${unknown.length ? `, ${unknown.length} onbekend` : ""}).`;
       clearSettingsBackupDraft();
-      state.controlNotice = `Backup hersteld (${applied.length} toegepast${skipped.length ? `, ${skipped.length} overgeslagen` : ""}).`;
-      await syncEntities();
     } catch (error) {
       state.settingsBackupError = `Backup herstellen mislukt. ${error.message}`;
+      state.settingsBackupMqttPassword = "";
     } finally {
       state.settingsBackupBusy = false;
       render();
@@ -1713,6 +1975,9 @@ import { render } from "../core/render-scheduler.js";
     },
     "download-settings-backup": () => exportSettingsBackup(),
     "open-settings-backup-import": () => {
+      state.settingsBackupMqttPassword = "";
+      state.settingsBackupRestoreResult = null;
+      state.settingsBackupError = "";
       state.systemModal = "settings-backup-import";
       render();
     },

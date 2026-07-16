@@ -2,6 +2,7 @@ import { hasEntity, isEntityActive } from "../core/app-shared.js";
 import { ENTITY_DEFS, SETTINGS_BACKUP_KEYS, SETTINGS_BACKUP_SECTIONS } from "../core/config.js";
 import { parseEnergyHistoryDateKey, parseEnergyHistoryMetadata } from "../core/energy-history-domain.js";
 import { getEntityValue } from "../core/entity-store.js";
+import { settingsBackupMqttNeedsPassword } from "../core/settings-backup-domain.js";
 import { state } from "../core/state.js";
 import { getInstallationLabel, getInstallationTopology } from "../features/device-context.js";
 import { getFirmwareCurrentVersion } from "../features/firmware-update.js";
@@ -646,6 +647,10 @@ import { renderModalShell } from "../core/modal-shell.js";
               <span class="oq-settings-backup-stat-label">Secties</span>
               <strong class="oq-settings-backup-stat-value">${escapeHtml(String(sectionCount))}</strong>
             </div>
+            <div class="oq-settings-backup-stat">
+              <span class="oq-settings-backup-stat-label">MQTT</span>
+              <strong class="oq-settings-backup-stat-value">Zonder wachtwoord</strong>
+            </div>
           </div>
           <div class="oq-settings-backup-actions">
             <button
@@ -665,7 +670,7 @@ import { renderModalShell } from "../core/modal-shell.js";
               Backup herstellen
             </button>
           </div>
-          <p class="oq-settings-action-note">Ontbrekende velden houden hun firmware-default. Onbekende velden uit een backup worden overgeslagen.</p>
+          <p class="oq-settings-action-note">De MQTT-configuratie wordt meegenomen, maar het MQTT-wachtwoord nooit. Ontbrekende en onbekende velden worden na restore benoemd.</p>
           ${state.settingsBackupError ? `<p class="oq-settings-backup-error">${escapeHtml(state.settingsBackupError)}</p>` : ""}
         </div>
       `,
@@ -718,6 +723,13 @@ import { renderModalShell } from "../core/modal-shell.js";
       : "";
     const topologyMismatch = sourceTopology !== "Onbekend" && currentTopology && sourceTopology !== currentTopology;
     const installationMismatch = sourceInstallation !== "Onbekend" && sourceInstallation !== currentInstallation;
+    const mqtt = draft.mqtt;
+    const mqttNeedsPassword = settingsBackupMqttNeedsPassword(mqtt);
+    const mqttPasswordMissing = mqttNeedsPassword && !String(state.settingsBackupMqttPassword || "");
+    const mqttValue = mqtt ? (mqtt.enabled ? "Ingeschakeld" : "Uitgeschakeld") : "Niet in backup";
+    const mqttMeta = mqtt
+      ? `${mqtt.broker || "Geen broker"}:${mqtt.port} · ${mqtt.password_was_set ? "Wachtwoord niet opgeslagen" : "Geen wachtwoord ingesteld"}`
+      : "MQTT-configuratie en MQTT-afhankelijke bronselecties worden niet hersteld.";
     const warningText = topologyMismatch || installationMismatch
       ? "De backup lijkt van een andere installatie te komen. Je kunt nog steeds doorzetten, maar controleer de secties even goed."
       : summary.requiredMissing
@@ -755,7 +767,26 @@ import { renderModalShell } from "../core/modal-shell.js";
               <strong class="oq-helper-modal-value">${escapeHtml(`${summary.total} instellingen`)}</strong>
               <span class="oq-helper-modal-subvalue">${escapeHtml(summary.differenceCount ? `${summary.differenceCount} ${summary.differenceCount === 1 ? "verschil" : "verschillen"} · ${summary.currentPresent} op huidige installatie · ${summary.unknown} onbekend` : `Alles komt overeen · ${summary.currentPresent} op huidige installatie · ${summary.unknown} onbekend`)}</span>
             </div>
+            <div class="oq-helper-modal-row">
+              <span class="oq-helper-modal-label">MQTT-configuratie</span>
+              <strong class="oq-helper-modal-value">${escapeHtml(mqttValue)}</strong>
+              <span class="oq-helper-modal-subvalue">${escapeHtml(mqttMeta)}</span>
+            </div>
           </div>
+          ${mqttNeedsPassword ? `
+            <label class="oq-settings-backup-mqtt-password">
+              <span class="oq-helper-modal-label">MQTT-wachtwoord</span>
+              <input
+                class="oq-helper-input"
+                type="password"
+                autocomplete="current-password"
+                data-oq-backup-mqtt-password="true"
+                placeholder="Vul het MQTT-wachtwoord opnieuw in"
+                ${state.settingsBackupBusy ? "disabled" : ""}
+              >
+              <span class="oq-helper-modal-subvalue">Het wachtwoord stond bewust niet in de backup en wordt alleen voor deze restore gebruikt.</span>
+            </label>
+          ` : ""}
           <div class="oq-settings-backup-modal-sections">
             ${summary.sectionSummaries.map((section) => `
               <details class="oq-settings-backup-modal-section">
@@ -795,7 +826,7 @@ import { renderModalShell } from "../core/modal-shell.js";
           ${state.settingsBackupError ? `<p class="oq-settings-backup-error">${escapeHtml(state.settingsBackupError)}</p>` : ""}`,
       actions: `
         <button class="oq-helper-button oq-helper-button--ghost" type="button" data-oq-action="close-system-modal" ${state.settingsBackupBusy ? "disabled" : ""}>Annuleren</button>
-        <button class="oq-helper-button oq-helper-button--primary" type="button" data-oq-action="confirm-settings-backup-restore" ${state.settingsBackupBusy ? "disabled" : ""}>${state.settingsBackupBusy ? "Herstellen..." : "Herstellen"}</button>
+        <button class="oq-helper-button oq-helper-button--primary" type="button" data-oq-action="confirm-settings-backup-restore" ${state.settingsBackupBusy || mqttPasswordMissing ? "disabled" : ""}>${state.settingsBackupBusy ? "Herstellen..." : mqttPasswordMissing ? "Vul MQTT-wachtwoord in" : "Herstellen"}</button>
       `,
     });
   }

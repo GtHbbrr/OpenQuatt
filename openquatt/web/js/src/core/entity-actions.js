@@ -140,6 +140,18 @@ const actionDelegates = [
       return;
     }
 
+    if (event.target.dataset.oqBackupMqttPassword !== undefined) {
+      state.settingsBackupMqttPassword = String(event.target.value || "");
+      state.settingsBackupError = "";
+      const restoreButton = event.target.closest(".oq-helper-modal")?.querySelector('[data-oq-action="confirm-settings-backup-restore"]');
+      if (restoreButton) {
+        restoreButton.disabled = !state.settingsBackupMqttPassword;
+        restoreButton.textContent = state.settingsBackupMqttPassword ? "Herstellen" : "Vul MQTT-wachtwoord in";
+      }
+      event.target.closest(".oq-helper-modal")?.querySelector(".oq-settings-backup-error")?.remove();
+      return;
+    }
+
     const field = event.target.dataset.oqField;
     if (!field) {
       if (event.target.dataset.oqQuickstartCicUrl !== undefined) {

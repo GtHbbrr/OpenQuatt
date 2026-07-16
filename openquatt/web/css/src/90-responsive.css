@@ -167,6 +167,11 @@
     grid-template-columns: 1fr;
   }
 
+  .oq-settings-backup-result-summary,
+  .oq-settings-backup-result-item {
+    grid-template-columns: 1fr;
+  }
+
   .oq-settings-installation-summary button,
   .oq-settings-system-row button {
     width: 100%;

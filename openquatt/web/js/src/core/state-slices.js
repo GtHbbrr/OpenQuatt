@@ -130,6 +130,8 @@ export function createSettingsState() {
     settingsInteractionLock: false,
     settingsRenderSignature: "",
     settingsBackupDraft: null,
+    settingsBackupMqttPassword: "",
+    settingsBackupRestoreResult: null,
     settingsBackupError: "",
     settingsBackupBusy: false,
     pendingCommissioningCm100Start: false,
