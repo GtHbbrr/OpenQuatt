@@ -401,15 +401,6 @@ def main() -> int:
                 "Dashboard YAML changed; consider updating docs/dashboardoverzicht.md.",
                 severity="warning",
             )
-        if any_changed(changed, {"openquatt/oq_common.yaml"}) and not any_changed(changed, {"docs/dashboardoverzicht.md", "docs/instellingen-en-meetwaarden.md", "docs/verwarmen-en-koelen.md"}):
-            add(
-                findings,
-                "docs/dashboardoverzicht.md",
-                1,
-                "Service/debug entities changed; consider updating dashboard/settings/user docs.",
-                severity="warning",
-            )
-
         check_docs_impact(findings, changed, docs_impact_rules)
 
     if not findings:
