@@ -4,6 +4,11 @@
 
 OpenQuatt is open-source ESPHome-firmware voor Quatt Hybrid `Single`- en `Duo`-installaties. Het project geeft je lokaal inzicht, lokale controle, een uitgebreide web-app en optionele Home Assistant-integratie bovenop de bestaande Quatt-hardware.
 
+> [!IMPORTANT]
+> OpenQuatt is momenteel een **open-sourceproject op best-effortbasis**. Ontwikkeling, documentatie en ondersteuning worden door de community geleverd op basis van beschikbare tijd; er is geen gegarandeerde responstijd of individuele ondersteuning.
+>
+> Voor gebruiksvragen en hulp bij diagnose kun je terecht in het [OpenQuatt Discord-kanaal](https://discord.com/channels/1176602554885492786/1464174190788874427). Een reproduceerbare bug meld je als [GitHub-issue](https://github.com/jeroen85/OpenQuatt/issues/new/choose).
+
 > [!WARNING]
 > OpenQuatt is community-firmware voor gebruikers met enig technisch inzicht. Gebruik het bewust en test wijzigingen stap voor stap.
 >
