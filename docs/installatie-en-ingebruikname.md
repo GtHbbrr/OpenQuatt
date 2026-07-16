@@ -4,6 +4,8 @@ Deze handleiding beschrijft de eerste installatie van OpenQuatt. Heb je een modu
 
 Heb je de Heatpump Controller Q-edition, gebruik dan bij voorkeur de doorlopende handleiding [Heatpump Controller Q-edition aansluiten en in gebruik nemen](q-edition.md).
 
+> OpenQuatt is een open-sourceproject op best-effortbasis, zonder gegarandeerde responstijd of individuele ondersteuning. Voor gebruiksvragen en hulp bij diagnose kun je terecht in het [OpenQuatt Discord-kanaal](https://discord.com/channels/1176602554885492786/1464174190788874427). Een reproduceerbare bug meld je als [GitHub-issue](https://github.com/jeroen85/OpenQuatt/issues/new/choose).
+
 ## Installatieroute
 
 Voor een eerste installatie gebruik je de web installer uit de [README](../README.md). Daarmee stel je bij een voorgeïnstalleerde module alleen Wi-Fi in, of flash je zelf de juiste firmware. Bij Ethernet sluit je na het flashen de netwerkkabel aan.

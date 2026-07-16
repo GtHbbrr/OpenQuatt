@@ -13,6 +13,12 @@ import sys
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 GITHUB_REPO_URL = "https://github.com/jeroen85/OpenQuatt"
+SEARCH_ICON_HTML = (
+    '<svg class="search-icon-svg" viewBox="0 0 24 24" focusable="false" aria-hidden="true">'
+    '<circle cx="10.5" cy="10.5" r="6.5"></circle>'
+    '<path d="M15.5 15.5 21 21"></path>'
+    '</svg>'
+)
 
 
 @dataclass(frozen=True)
@@ -521,7 +527,7 @@ def render_template(rendered_page: RenderedPage, rendered_pages: list[RenderedPa
 
         <div class="site-header-actions">
           <button class="search-trigger" type="button" data-search-open aria-label="Zoeken" aria-haspopup="dialog" aria-expanded="false">
-            <span class="search-input-icon" aria-hidden="true">⌕</span>
+            <span class="search-input-icon" aria-hidden="true">{SEARCH_ICON_HTML}</span>
             <span class="search-trigger-label">Zoeken</span>
             <kbd aria-hidden="true">/</kbd>
           </button>
@@ -577,7 +583,7 @@ def render_template(rendered_page: RenderedPage, rendered_pages: list[RenderedPa
           <button class="search-close" type="button" data-search-close aria-label="Zoeken sluiten">×</button>
         </header>
         <label class="search-input-wrap">
-          <span class="search-input-icon" aria-hidden="true">⌕</span>
+          <span class="search-input-icon" aria-hidden="true">{SEARCH_ICON_HTML}</span>
           <span class="sr-only">Zoekterm</span>
           <input type="search" data-search-input autocomplete="off" placeholder="Bijvoorbeeld: flow, Quick Start of firmware-update" />
         </label>
