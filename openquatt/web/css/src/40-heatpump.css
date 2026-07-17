@@ -1115,7 +1115,7 @@
 }
 
 .oq-overview-boiler {
-  grid-column: 1 / -1;
+  grid-column: span 1;
   margin-top: 0;
 }
 

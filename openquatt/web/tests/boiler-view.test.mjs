@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 globalThis.__OQ_PREVIEW__ = false;
@@ -12,6 +13,7 @@ const {
 } = await import("../js/src/views/heatpump.js");
 const { renderSettingsOpenThermCicSection } = await import("../js/src/settings/integrations.js");
 const { INITIAL_SETTINGS_READY_KEY_MAP, SETTINGS_GROUP_KEY_MAP } = await import("../js/src/core/entity-sync.js");
+const heatPumpCss = await readFile(new URL("../css/src/40-heatpump.css", import.meta.url), "utf8");
 
 function status(overrides = {}) {
   return getBoilerStatusModel({
@@ -28,6 +30,13 @@ function status(overrides = {}) {
     ...overrides,
   });
 }
+
+test("boiler panel occupies exactly one heat-pump grid column", () => {
+  const rule = heatPumpCss.match(/\.oq-overview-boiler\s*\{([^}]*)\}/);
+  assert.ok(rule, "expected the boiler panel layout rule");
+  assert.match(rule[1], /grid-column:\s*span 1\s*;/);
+  assert.doesNotMatch(rule[1], /grid-column:\s*1\s*\/\s*-1\s*;/);
+});
 
 test("boiler status follows fault, link, DHW, flame and command priority", () => {
   assert.equal(status({ fault: true, dhwActive: true, flameOn: true }).code, "fault");
