@@ -61,13 +61,31 @@ jobs:
           cache: pip
           cache-dependency-path: .github/requirements-esphome.txt
 
+      - name: Install ESPHome
+        run: |
+          ESPHOME_VERSION="$(cat .github/requirements-esphome.txt | sed 's/^esphome==//')"
+          pip install --upgrade "esphome==${ESPHOME_VERSION}"
+          esphome version
+
+      - name: Resolve ESP-IDF version for cache key
+        id: idf_version
+        run: |
+          IDF_VERSION="$(python -c 'from esphome.components.esp32 import ESP_IDF_FRAMEWORK_VERSION_LOOKUP as versions; print(versions["recommended"])')"
+          echo "version=${IDF_VERSION}" >> "$GITHUB_OUTPUT"
+
       - name: Cache native ESP-IDF toolchain
+        if: ${{ github.event_name != 'pull_request' }}
         uses: actions/cache@v5
         with:
           path: ~/.cache/esphome/idf
-          key: ${{ runner.os }}-${{ runner.arch }}-esphome-idf-${{ hashFiles('.github/requirements-esphome.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-${{ runner.arch }}-esphome-idf-
+          key: ${{ runner.os }}-${{ runner.arch }}-esphome-idf-${{ steps.idf_version.outputs.version }}
+
+      - name: Restore native ESP-IDF toolchain
+        if: ${{ github.event_name == 'pull_request' }}
+        uses: actions/cache/restore@v5
+        with:
+          path: ~/.cache/esphome/idf
+          key: ${{ runner.os }}-${{ runner.arch }}-esphome-idf-${{ steps.idf_version.outputs.version }}
 
       - name: Make ccache available
         run: |
@@ -78,24 +96,28 @@ jobs:
           ccache --version
 
       - name: Cache compiler outputs
+        if: ${{ github.event_name != 'pull_request' }}
         uses: actions/cache@v5
         with:
-          path: ~/.cache/openquatt/ccache
-          key: ${{ runner.os }}-${{ runner.arch }}-openquatt-ccache-${{ hashFiles('.github/requirements-esphome.txt') }}-${{ github.sha }}
+          path: ~/.cache/openquatt/ccache/${{ matrix.target.id }}
+          key: ${{ runner.os }}-${{ runner.arch }}-openquatt-ccache-${{ matrix.target.id }}-${{ steps.idf_version.outputs.version }}-${{ github.sha }}
           restore-keys: |
-            ${{ runner.os }}-${{ runner.arch }}-openquatt-ccache-${{ hashFiles('.github/requirements-esphome.txt') }}-
+            ${{ runner.os }}-${{ runner.arch }}-openquatt-ccache-${{ matrix.target.id }}-${{ steps.idf_version.outputs.version }}-
 
-      - name: Install ESPHome
-        run: |
-          ESPHOME_VERSION="$(cat .github/requirements-esphome.txt | sed 's/^esphome==//')"
-          pip install --upgrade "esphome==${ESPHOME_VERSION}"
-          esphome version
+      - name: Restore compiler outputs
+        if: ${{ github.event_name == 'pull_request' }}
+        uses: actions/cache/restore@v5
+        with:
+          path: ~/.cache/openquatt/ccache/${{ matrix.target.id }}
+          key: ${{ runner.os }}-${{ runner.arch }}-openquatt-ccache-${{ matrix.target.id }}-${{ steps.idf_version.outputs.version }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-${{ runner.arch }}-openquatt-ccache-${{ matrix.target.id }}-${{ steps.idf_version.outputs.version }}-
 
       - name: Compile firmware
         run: |
           export ESPHOME_ESP_IDF_PREFIX="${HOME}/.cache/esphome/idf"
           export IDF_CCACHE_ENABLE=1
-          export CCACHE_DIR="${HOME}/.cache/openquatt/ccache"
+          export CCACHE_DIR="${HOME}/.cache/openquatt/ccache/${{ matrix.target.id }}"
           export CCACHE_MAXSIZE=2G
           export CCACHE_NOHASHDIR=true
           export CCACHE_DEPEND=1
@@ -116,7 +138,7 @@ jobs:
       - name: Show ccache statistics
         if: ${{ always() }}
         run: |
-          export CCACHE_DIR="${HOME}/.cache/openquatt/ccache"
+          export CCACHE_DIR="${HOME}/.cache/openquatt/ccache/${{ matrix.target.id }}"
           export CCACHE_MAXSIZE=2G
           ccache --show-stats
 
