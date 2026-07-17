@@ -235,6 +235,7 @@ modbus:
   - uart_id: uart_bus
     id: mod_bus
     send_wait_time: 100ms
+    turnaround_time: 100ms
 
 # ==============================================================================
 # SHARED RUNTIME STATE
