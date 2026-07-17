@@ -10,6 +10,8 @@
   backdrop-filter: blur(8px);
   overflow-y: auto;
   overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  overflow-anchor: none;
   -webkit-overflow-scrolling: touch;
 }
 

@@ -26,6 +26,7 @@ export async function copyTextToClipboard(text) {
     return true;
   }
 
+  const focusOrigin = document.activeElement;
   const textarea = document.createElement("textarea");
   textarea.value = text;
   textarea.setAttribute("readonly", "");
@@ -33,7 +34,7 @@ export async function copyTextToClipboard(text) {
   textarea.style.top = "-1000px";
   textarea.style.opacity = "0";
   document.body.appendChild(textarea);
-  textarea.focus();
+  textarea.focus({ preventScroll: true });
   textarea.select();
 
   let success = false;
@@ -41,6 +42,9 @@ export async function copyTextToClipboard(text) {
     success = document.execCommand("copy");
   } finally {
     document.body.removeChild(textarea);
+    if (focusOrigin?.isConnected && typeof focusOrigin.focus === "function") {
+      focusOrigin.focus({ preventScroll: true });
+    }
   }
   return success;
 }

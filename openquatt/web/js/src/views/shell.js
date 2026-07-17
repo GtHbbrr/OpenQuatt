@@ -3,6 +3,7 @@ import { LOGO_MARKUP } from "../core/embedded-assets.js";
 import { getSettingsRenderSignature } from "../core/render-signatures.js";
 import { escapeHtml } from "../core/html.js";
 import { renderModalShell, syncModalFocus } from "../core/modal-shell.js";
+import { captureModalContinuity, restoreModalContinuity } from "../core/modal-continuity.js";
 import { setRenderCallback } from "../core/render-scheduler.js";
 import { state } from "../core/state.js";
 import { clearLegacyMotionVariables, startMotionLoop, stopMotionLoop } from "../core/motion.js";
@@ -215,6 +216,7 @@ export function renderSettingsView() {
     }
 
     const focusedSettingsField = captureFocusedSettingsField();
+    const modalContinuity = captureModalContinuity(state.root);
 
     const webServerLogScrollState = state.systemModal === "webserver-logs"
       ? captureWebServerLogScrollState()
@@ -242,6 +244,7 @@ export function renderSettingsView() {
         ${renderNativeSurfaceShell()}
       `;
       syncModalFocus(state.root);
+      restoreModalContinuity(state.root, modalContinuity);
       state.renderedAppView = "native";
       state.renderedSettingsGroup = "";
       state.settingsRenderSignature = "";
@@ -296,6 +299,7 @@ export function renderSettingsView() {
       ${renderDeviceReconnectModal()}
     `;
     syncModalFocus(state.root);
+    restoreModalContinuity(state.root, modalContinuity);
     restoreFocusedSettingsField(focusedSettingsField);
     state.renderedAppView = state.appView;
     state.renderedSettingsGroup = state.appView === "settings" ? state.settingsGroup : "";

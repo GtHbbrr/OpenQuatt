@@ -75,8 +75,8 @@ export function renderModalShell({
   ].filter(Boolean).join(" ");
 
   return `
-    <div class="${backdropClasses}" data-oq-modal="${escapeHtml(resolvedModalId)}">
-      <section class="${modalClasses}" ${ariaAttributes}>
+    <div class="${backdropClasses}" data-oq-modal="${escapeHtml(resolvedModalId)}" data-oq-modal-scroll="backdrop">
+      <section class="${modalClasses}" ${ariaAttributes} data-oq-modal-scroll="dialog">
         ${headerMarkup || `<div class="oq-helper-modal-head">
           <div>
             <p class="oq-helper-modal-kicker">${escapeHtml(kicker)}</p>
