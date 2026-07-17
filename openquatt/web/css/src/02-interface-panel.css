@@ -404,6 +404,7 @@ esp-app.oq-native-app.oq-native-app--collapsed {
 .oq-helper-status-item--button {
   appearance: none;
   width: 100%;
+  color: inherit;
   text-align: left;
   cursor: pointer;
   outline: none;
