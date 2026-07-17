@@ -50,8 +50,17 @@ jobs:
       - name: Run web smoke checks
         run: npm run smoke:web
 
+  host-regression-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Compile and run host regression tests
+        run: ./scripts/run_host_regression_tests.sh
+
   validate-and-compile:
-    needs: [docs-consistency, validate-web-settings-backup]
+    needs: [docs-consistency, validate-web-settings-backup, host-regression-tests]
     uses: ./.github/workflows/esphome-build.yml
     with:
       artifact_suffix: firmware-${{ github.sha }}
