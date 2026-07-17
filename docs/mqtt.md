@@ -13,7 +13,7 @@ Gebruik voor normale monitoring en bediening bij voorkeur de web-app en, als je 
 
 ## Waar stel je MQTT in?
 
-Open de OpenQuatt web-app en ga naar **Instellingen -> Integratie -> MQTT inputbronnen**.
+Open de OpenQuatt web-app en ga naar **Instellingen → Bronnen / integraties → MQTT inputbronnen**.
 
 Daar stel je de broker in:
 
@@ -50,7 +50,7 @@ openquatt/openquatt/input/thermostat/heating_enable
 openquatt/openquatt/input/thermostat/cooling_enable
 ```
 
-De web-app toont de uiteindelijke topics bij **Instellingen -> Integratie -> MQTT sensoren**. Gebruik bij voorkeur die getoonde topics, omdat daar de actuele device-naam al in verwerkt is.
+Open in dezelfde sectie **MQTT sensoren → Details** om de uiteindelijke topics te bekijken. Gebruik bij voorkeur die getoonde topics, omdat daar de actuele device-naam al in verwerkt is.
 In hetzelfde scherm kun je per topic **Topic gebruiken** uitzetten als je maar een deel van de MQTT-bronnen wilt inzetten.
 
 ## Payload
@@ -105,7 +105,7 @@ Publiceer daarom periodiek, bijvoorbeeld elke minuut of telkens wanneer de bronw
 
 ## Bronselectie
 
-Ga in de web-app naar **Instellingen -> Bronnen / Sensorselectie**.
+Ga in de web-app naar **Instellingen → Bronnen / integraties → Sensorselectie**.
 
 Bij `Koelingsdauwpunt` kies je:
 

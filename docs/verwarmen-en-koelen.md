@@ -4,12 +4,13 @@ Deze pagina legt OpenQuatt uit in gewone taal. Het doel is niet dat je alle inte
 
 ## In een zin
 
-OpenQuatt zit tussen je thermostaat, je warmtepomp en Home Assistant:
+OpenQuatt zit tussen je thermostaat en je warmtepomp:
 
 - de thermostaat vraagt warmte of koeling;
 - de warmtepomp maakt die warmte of koeling;
 - OpenQuatt beslist hoe actief of terughoudend het systeem mag reageren;
-- Home Assistant laat zien wat er gebeurt en waar je iets kunt aanpassen.
+- de web-app laat zien wat er gebeurt en waar je iets kunt aanpassen;
+- Home Assistant kan daar optioneel een dashboard en automatisering aan toevoegen.
 
 ## Wat doet OpenQuatt precies?
 
@@ -20,7 +21,7 @@ Praktisch betekent dat:
 - OpenQuatt kijkt welke temperatuur- en flowwaarden het echt vertrouwt;
 - het voorkomt dat het systeem te agressief reageert op kleine schommelingen;
 - het houdt rekening met grenzen en beveiligingen;
-- het maakt gedrag zichtbaar in Home Assistant.
+- het maakt gedrag zichtbaar in de web-app en, als je die gebruikt, Home Assistant.
 
 ## Verwarmen: twee manieren van denken
 
@@ -105,33 +106,11 @@ Daarom werkt OpenQuatt bij koeling terughoudend:
 - de minimale veilige watertemperatuur moet bewaakt worden;
 - dauwpuntinformatie is normaal gesproken nodig.
 
-Standaard gebruikt OpenQuatt de kamerthermostaat om te bepalen of er echte koelvraag is. Koelvraag heeft dan een kleine hysterese rond het kamer-setpoint: de koelvraag start pas wanneer de kamertemperatuur meer dan `0,4°C` boven het setpoint zit. De koelvraag stopt weer zodra de kamer onder `setpoint + 0,1°C` komt. Dit voorkomt dat koeling steeds kort aan en uit schakelt rond het setpoint.
+Standaard gebruikt OpenQuatt de kamertemperatuur en het setpoint om vast te stellen of er echt koelvraag is. Een kleine marge voorkomt dat koeling steeds kort aan en uit schakelt rond het setpoint.
 
-Deze kamerlaag hoort bij deze runtime-instellingen:
+Bij koelvraag kijkt OpenQuatt vervolgens naar de watertemperatuur. De regeling start rustig, bouwt alleen op als dat nodig is en remt af of stopt wanneer de aanvoer dicht bij de veilige ondergrens komt.
 
-- `Cooling Room Request Required`
-- `Cooling Request On Delta`
-- `Cooling Request Off Delta`
-
-Als `Cooling Room Request Required` uit staat, telt koeltoestemming direct als koelvraag. De start- en stopmarge rond het kamer-setpoint worden dan niet gebruikt.
-
-Als er koelvraag is, stuurt OpenQuatt niet rechtstreeks op de kamertemperatuur. De kamerlaag bepaalt alleen of koeling nodig is. Daarna kijkt de waterregeling naar de aanvoertemperatuur.
-
-Daarbij gebruikt OpenQuatt twee afstanden:
-
-- `buffer gap`: hoeveel de aanvoer nog boven het koeldoel zit;
-- `dew gap`: hoeveel de aanvoer nog boven het echte dauwpunt zit.
-
-Het koeldoel is de hoogste waarde van:
-
-- `Cooling Minimum Supply Temp`;
-- de dauwpuntveilige of fallback-ondergrens.
-
-Zolang het water nog duidelijk warmer is dan dit doel, mag de regelaar meer koelvraag opbouwen tot `Cooling Demand Max`. Dicht bij het doel bouwt OpenQuatt terug. Als de ruimte nog koelvraag heeft en de veiligheidsruimte voldoende stabiel is, mag level 1 blijven draaien als rustige onderhoudsstand. Dat voorkomt dat de compressor telkens uitgaat zodra het water precies het target raakt.
-
-Een hogere `Cooling Demand Max` betekent niet dat OpenQuatt meteen hard gaat koelen. Een nieuwe koelrun start rustig op level 1. Pas als level 1 de aanvoer onvoldoende richting target trekt, mag de regelaar tijdelijk opschalen. Zodra de aanvoer duidelijk daalt, houdt OpenQuatt weer level 1 vast om doorschieten onder het target te voorkomen.
-
-Als level 1 nog steeds te veel koelt, of als de aanvoer te snel richting de veilige ondergrens zakt, stopt OpenQuatt alsnog. Na zo'n waterzijde-stop gebruikt `Cooling Restart Delta` hoeveel de aanvoer eerst weer boven het doel moet opwarmen voordat de watercyclus opnieuw mag starten.
+Wil je de exacte koelinstellingen, marges en begrenzingen begrijpen of wijzigen? Gebruik dan de technische naslag [Instellingen en meetwaarden](instellingen-en-meetwaarden.md#koeling).
 
 ### Waarom is dauwpunt zo belangrijk?
 
@@ -143,9 +122,7 @@ Daarom kijkt OpenQuatt bij koeling niet alleen naar comfort, maar ook naar veili
 - wat is dan de veilige ondergrens voor de watertemperatuur;
 - mag cooling op dit moment dus wel of niet vrijgegeven worden.
 
-Een dauwpunt kan uit Home Assistant komen of via MQTT worden aangeleverd. In de web-app kies je bij `Cooling Dew Point Source` tussen `Auto`, `Home Assistant` en `MQTT`. In `Auto` gebruikt OpenQuatt de hoogste geldige waarde, omdat dat voor koeling de veiligste keuze is.
-
-Een MQTT-dauwpunt blijft 15 minuten geldig. Zonder nieuwe MQTT-publicatie wordt die bron ongeldig en valt OpenQuatt terug op een andere geldige bron of blokkeert koeling volgens de gekozen beveiligingsmodus.
+Een dauwpunt kan uit Home Assistant of MQTT komen. In de web-app kies je de bron. Bij `Auto` gebruikt OpenQuatt de hoogste geldige dauwpuntwaarde, omdat die voor koeling de veiligste ondergrens geeft. Een externe waarde moet regelmatig worden bijgewerkt; bij een verouderde of ontbrekende waarde valt OpenQuatt terug op een andere geldige bron of blokkeert het koelen. Zie [MQTT inputbronnen](mqtt.md) voor de technische geldigheidsduur.
 
 ### Wat doet `Manual Cooling Enable`?
 
@@ -186,7 +163,8 @@ Voor de meeste gebruikers is deze volgorde beter:
 
 ## Verder lezen
 
-- Installeren en eerste controle: [Installatie en ingebruikname](installatie-en-ingebruikname.md)
-- Dashboard begrijpen: [Dashboard gebruiken](dashboardoverzicht.md)
+- Installatie- of beheerroute kiezen: [Kies je route](../README.md#kies-je-route)
+- OpenQuatt lokaal bedienen: [Web-app gebruiken](web-app.md)
+- Optioneel Home Assistant-dashboard: [Dashboard gebruiken](dashboardoverzicht.md)
 - Problemen oplossen: [Problemen oplossen](problemen-oplossen.md)
-- Technische verdieping: [Power House](power-house.md) en [Water Temperature Control](water-temperature-control.md)
+- Technische verdieping: [Instellingen en meetwaarden](instellingen-en-meetwaarden.md), [Power House](power-house.md) en [Water Temperature Control](water-temperature-control.md)

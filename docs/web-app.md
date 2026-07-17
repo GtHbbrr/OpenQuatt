@@ -1,6 +1,6 @@
 # Web-app gebruiken
 
-De OpenQuatt web-app is de lokale bedienings- en instellingenpagina van je OpenQuatt-module. Na de installer is dit de eerste plek waar je naartoe gaat: open `http://openquatt.local`, rond Quick Start af en voeg daarna pas Home Assistant toe.
+De OpenQuatt web-app is de lokale bedienings- en instellingenpagina van je OpenQuatt-module. Zodra de controller online is, is dit de eerste plek waar je naartoe gaat: open `http://openquatt.local` en rond Quick Start af. Home Assistant komt eventueel daarna.
 
 ## Wanneer gebruik je de web-app?
 
@@ -14,17 +14,18 @@ Gebruik de web-app voor alles wat direct op OpenQuatt zelf hoort:
 - backup en restore van OpenQuatt-instellingen;
 - web-login, API-beveiliging, logboek en herstarten.
 
-Home Assistant blijft de prettigste plek voor dagelijks meekijken en dashboards. De web-app is de plek waar je de module zelf inricht, beheert en veilig terugvindt als er iets niet klopt.
+De web-app blijft altijd de plek waar je OpenQuatt inricht, beheert en controleert als er iets niet klopt. Gebruik je Home Assistant, dan is dat daarnaast een prettige plek voor dagelijks meekijken, dashboards en automatisering.
 
 ## Wat doe je waar?
 
 | Plek | Gebruik je vooral voor |
 |---|---|
-| Installer | Eerste flash, keuze voor `Single` of `Duo`, hardwareprofiel en verbinding. |
+| Q-edition-handleiding | Een voorgeïnstalleerde Heatpump Controller Q aansluiten, online brengen en juist configureren. |
+| Installer | Een bestaande Waveshare- of Heatpump Listener-module flashen, Wi-Fi op een nieuwe HCQ instellen of een HCQ herstellen. |
 | Web-app | Quick Start, installatiekeuzes, instellingen, updates, backup en beveiliging. |
-| Home Assistant | Dagelijks meekijken, dashboards, bronselectie en optionele dynamische bronnen. |
+| Optioneel: Home Assistant | Dagelijks meekijken, dashboards, bronselectie en dynamische bronnen. |
 
-De normale volgorde is dus: installer, web-app, daarna Home Assistant.
+Kies bij een eerste installatie eerst de passende route in het [projectoverzicht](../README.md#kies-je-route). Beide installatieroutes komen uit bij de web-app; Home Assistant is geen onderdeel van de basisinstallatie.
 
 ## Openen
 
@@ -48,23 +49,27 @@ Wil je de interface eerst rustig bekijken zonder echte hardware, open dan de [we
 
 Na de eerste installatie opent de web-app Quick Start zolang de basisinstallatie nog niet is afgerond.
 
-Quick Start begint voor de Heatpump Controller Q met een controle van de firmware-setup. Daarna volgen de bestaande configuratiestappen:
+Quick Start begint op de Heatpump Controller Q met een controle van de firmware-setup. Op Waveshare en Heatpump Listener wordt deze eerste stap overgeslagen, omdat `Single` of `Duo` daar al vastligt in de geïnstalleerde firmware. Daarna volgen de configuratiestappen:
 
 | Stap | Wat kies je? | Waarom? |
 |---|---|---|
-| `Kies je setup` | `Single` of `Duo`, via `Wi-Fi` of `Ethernet` | Installeert zo nodig direct de passende Q-edition-firmware voordat je verder configureert. |
-| `Kies je Quatt Hybrid` | V1, V1.5 of V2 | OpenQuatt gebruikt hiermee de juiste basislogica. |
-| `Flowmeting configureren` | De flowbron voor jouw Quatt-versie en controller | Zorgt dat de regeling de juiste flowmeting gebruikt. |
-| `Thermostaatgegevens configureren` | Eén bron voor kamertemperatuur en kamer-setpoint | Voorkomt dat de regeling waarden uit verschillende bronnen combineert. |
-| `CV-ketel of boiler` | Wel of geen ondersteuning door de ketel of boiler | Bepaalt of OpenQuatt aanvullende warmte mag inzetten. |
-| `Kies de verwarmingsstrategie` | `Power House` of `Water Temperature Control` | Dit bepaalt hoe OpenQuatt warmtevraag maakt. |
-| `Werk de regeling uit` | Strategie-instellingen | Je ziet alleen velden die bij de gekozen strategie horen. |
-| `Flowregeling en afstelling` | Automatische flow of vaste pompstand, plus Kp/Ki | Hiermee blijft de waterdoorstroming beheersbaar. |
-| `Watertemperatuur beveiligen` | Maximale watertemperatuur | OpenQuatt regelt terug voordat water te warm wordt. |
-| `Stille uren en niveaus` | Tijdvenster en maximale compressorstand | Handig voor nacht of geluidsgevoelige momenten. |
-| `Bevestigen en afronden` | Controle en afronden | Daarna ziet OpenQuatt de basisconfiguratie als klaar. |
+| `Kies je setup` | `Single` of `Duo`, via `Wi-Fi` of `Ethernet` | Alleen op de HCQ; installeert zo nodig direct de passende firmware. |
+| `Kies je Quatt Hybrid` | V1, V1.5 of V2 | Selecteert de juiste basislogica voor jouw warmtepompgeneratie. |
+| `Flowmeting configureren` | De juiste flowbron | Zorgt dat de regeling de juiste meting gebruikt. |
+| `Thermostaatgegevens configureren` | Eén bron voor kamertemperatuur en setpoint | Voorkomt dat OpenQuatt waarden uit verschillende bronnen combineert. |
+| `CV-ketel of boiler` | Ondersteuning wel of niet toestaan | Bepaalt of OpenQuatt aanvullende warmte mag inzetten. |
+| `Kies de verwarmingsstrategie` | `Power House` of `Water Temperature Control` | Bepaalt hoe OpenQuatt warmtevraag maakt. |
+| `Werk de regeling uit` | Strategie-instellingen | Toont alleen de instellingen die bij de gekozen strategie horen. |
+| `Flowregeling en afstelling` | Automatische flow of vaste pompstand | Bepaalt hoe OpenQuatt de waterdoorstroming regelt. |
+| `Watertemperatuur beveiligen` | Maximale watertemperatuur | Laat OpenQuatt terugregelen voordat het water te warm wordt. |
+| `Stille uren en niveaus` | Tijdvenster en compressorlimieten | Begrenst de compressor bijvoorbeeld 's nachts. |
+| `Bevestigen en afronden` | Je keuzes controleren | Markeert de basisconfiguratie als klaar. |
+
+Gebruik je Waveshare of Heatpump Listener? Begin dan inhoudelijk bij **Kies je Quatt Hybrid**; Quick Start toont alleen de stappen die voor jouw hardware van toepassing zijn.
 
 Je hoeft niet meteen perfecte waardes te kiezen. Het doel van Quick Start is een veilige, begrijpelijke basis. Fijnregelen kan later.
+
+De installatie is klaar zodra Quick Start is afgerond, `openquatt.local` stabiel bereikbaar blijft en de belangrijkste warmtepompwaarden logisch worden bijgewerkt. Home Assistant en het dashboard zijn optionele vervolgstappen.
 
 ## Hoofdschermen
 
@@ -93,7 +98,7 @@ Let vooral op:
 - er is geen onverwachte override actief;
 - de gekozen strategie past bij wat je in huis verwacht.
 
-Zie je hier al vreemde waarden, ga dan niet meteen tunen. Controleer eerst de bronkeuze in Home Assistant of in de instellingen.
+Zie je hier al vreemde waarden, ga dan niet meteen tunen. Controleer eerst de bronkeuze onder **Instellingen → Bronnen / integraties → Sensorselectie** en, als je Home Assistant gebruikt, de aangeleverde Home Assistant-bronnen.
 
 ## Resultaten
 
@@ -112,7 +117,7 @@ Trendopslag kan onder `Instellingen -> Systeem` worden beheerd. Als trendopslag 
 
 OpenQuatt bewaart de korte trendhistorie in PSRAM en kan aanvullend tot 30 dagen trendhistorie in flash bewaren. Als je flashopslag uitzet, blijft bestaande flashhistorie staan; OpenQuatt stopt dan alleen met nieuwe trenddata naar flash schrijven. Alle ondersteunde OpenQuatt-profielen gebruiken PSRAM; ontbrekende PSRAM wijst dus op een hardware- of profielprobleem.
 
-Via `Instellingen -> Gegevens bewaren` zijn Diagnose, Beslislog en Energie afzonderlijk te beheren. De Beslislog bewaart maximaal zeven dagen exacte gebeurtenissen en redenen na een herstart. Nieuwe gebeurtenissen worden per uur gebundeld naar flash geschreven. Met `Nu opslaan` kunnen nog niet opgeslagen gebeurtenissen vóór een update of herstart alvast worden vastgelegd.
+Via `Instellingen → Systeem → Gegevens bewaren` zijn Diagnose, Beslislog en Energie afzonderlijk te beheren. De Beslislog bewaart maximaal zeven dagen exacte gebeurtenissen en redenen na een herstart. Nieuwe gebeurtenissen worden per uur gebundeld naar flash geschreven. Met `Nu opslaan` kunnen nog niet opgeslagen gebeurtenissen vóór een update of herstart alvast worden vastgelegd.
 
 ## Beslislog
 
@@ -193,6 +198,17 @@ Hier vind je beheerfuncties:
 - logboek;
 - herstarten.
 
+#### Debugopname voor support
+
+Bij een reproduceerbaar probleem kun je tijdelijk supportgegevens opnemen:
+
+1. Open **Instellingen → Systeem → Systeemstatus → Debugopname**.
+2. Start de opname voordat je het probleem opnieuw veroorzaakt. Gebruik rolling debug als het probleem maar af en toe optreedt.
+3. Stop de opname nadat het probleem zichtbaar is en download het supportbestand.
+4. Voeg het gedownloade `.oqdebug.json`-bestand toe aan je Discord-vraag of GitHub-issue.
+
+De opname wordt lokaal in het apparaatgeheugen opgeslagen en niets wordt automatisch verzonden. Deel het bestand alleen binnen het supportverzoek waarvoor je het hebt gemaakt.
+
 ## Backup en restore
 
 Maak een backup voordat je grotere wijzigingen doet of voordat je een factory-update uitvoert.
@@ -236,4 +252,4 @@ Als de web-app niet opent:
 
 Als Quick Start niet verschijnt terwijl je nog niet klaar bent, open `Instellingen -> Systeem -> Quick Start` en reset de setupstatus.
 
-Ga daarna verder met [Dashboard installeren](dashboard/README.md) en [Dashboard gebruiken](dashboardoverzicht.md).
+Wil je OpenQuatt ook aan Home Assistant toevoegen? Ga dan optioneel verder met [Dashboard installeren](dashboard/README.md) en [Dashboard gebruiken](dashboardoverzicht.md).

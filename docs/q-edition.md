@@ -2,14 +2,14 @@
 
 Van nieuwe controller naar een werkende OpenQuatt-installatie. De Heatpump Controller Q-edition (HCQ) wordt standaard geleverd met `Single` + `Wi-Fi` voorgeïnstalleerd. Je brengt hem eerst online; de web-app begeleidt je daarna bij de juiste configuratie voor jouw opstelling en netwerkverbinding.
 
-## De route in zes stappen
+## De hoofdroute in vier stappen
 
 1. Maak de CiC en Quatt-buitenunit(s) spanningsloos, verplaats de kabels en voer de eindcontrole uit.
-2. Voed de HCQ via USB en schakel daarna de Quatt-buitenunit(s) weer in.
-3. Stel Wi-Fi in via USB of het OpenQuatt access point.
-4. Open `openquatt.local`.
-5. Kies in **Quick Start → Kies je setup** de juiste configuratie en rond Quick Start af.
-6. Voeg OpenQuatt eventueel toe aan Home Assistant.
+2. Voed de HCQ, schakel de Quatt-buitenunit(s) weer in en stel Wi-Fi in.
+3. Open `openquatt.local` en controleer de basisverbinding.
+4. Kies in **Quick Start → Kies je setup** de juiste configuratie en rond Quick Start af.
+
+Daarna werkt OpenQuatt zelfstandig via de web-app. Home Assistant is een optionele vervolgstap voor dashboards en automatisering.
 
 ## 1. Controller aansluiten
 
@@ -73,6 +73,8 @@ Laat de USB-poort bereikbaar. Je hebt deze later ook nodig voor Wi-Fi provisioni
 
 Een Wi-Fi-build biedt twee routes. Op een computer is provisioning via USB meestal het handigst. Op een telefoon of tablet staat de route via het OpenQuatt access point daarom als eerste.
 
+Wil je de HCQ uiteindelijk via Ethernet gebruiken? Breng de geleverde `Single` + `Wi-Fi`-build ook dan eerst via deze stap online en sluit de netwerkkabel aan. In Quick Start kies je daarna de juiste `Single`- of `Duo`-Ethernetsetup; de web-app installeert dan de bijbehorende firmware.
+
 ### Route A: via USB
 
 Deze route schrijft alleen de Wi-Fi-gegevens naar de controller en flasht geen nieuwe firmware.
@@ -121,8 +123,9 @@ Controleer voordat je verdergaat:
 
 - de controller blijft online;
 - de firmwareversie wordt getoond;
-- warmtepompgegevens worden bijgewerkt;
-- aanvoertemperatuur, flow en buitentemperatuur aannemelijke waarden tonen.
+- ten minste de basisgegevens van de eerste warmtepomp worden bijgewerkt.
+
+Gebruik je een Duo-opstelling, of wijkt de gewenste setup af van de voorgeïnstalleerde `Single` + `Wi-Fi`-build? Controleer de tweede warmtepomp en alle meetwaarden pas volledig nadat je in de volgende stap de juiste setup hebt gekozen.
 
 Zie [Web-app gebruiken](web-app.md) voor bediening, updates, backups en beveiliging.
 
@@ -159,7 +162,16 @@ Volg de route die de web-app voor jouw installatie toont. De basisstappen zijn:
 10. **Stille uren en niveaus:** stel het stille venster en de compressorlimieten voor dag en nacht in.
 11. **Bevestigen en afronden:** controleer je keuzes en markeer Quick Start als voltooid.
 
-## 5. Configuratie later wijzigen
+## Je installatie is klaar wanneer
+
+- `openquatt.local` stabiel bereikbaar is;
+- Quick Start volledig is afgerond;
+- de warmtepompgegevens worden bijgewerkt;
+- aanvoertemperatuur, flow en buitentemperatuur aannemelijke waarden tonen.
+
+Vanaf dit punt kun je OpenQuatt zelfstandig via de web-app gebruiken. Home Assistant en het dashboard zijn optionele vervolgstappen.
+
+## Configuratie later wijzigen
 
 Heb je Quick Start al afgerond en verandert de installatie later, dan kun je dezelfde firmwarewissel alsnog via de web-app starten. Maak voor de zekerheid eerst een backup; de bestaande OpenQuatt-instellingen blijven tijdens de update of wissel behouden.
 
@@ -173,13 +185,14 @@ Open in de web-app **Instellingen → Systeem** en kies bij **Updates** voor **O
 > [!IMPORTANT]
 > Wi-Fi en Ethernet blijven aparte firmware-builds. Een Ethernet-build heeft geen Wi-Fi fallback of captive portal. De web-app voert zo'n wissel daarom uit als firmware-update en toont vooraf de bijbehorende controle.
 
-## 6. Toevoegen aan Home Assistant
+## Optioneel: toevoegen aan Home Assistant
 
 Home Assistant is optioneel voor OpenQuatt zelf en aanbevolen voor dashboards en automatisering. Zodra OpenQuatt en Home Assistant op hetzelfde netwerk zitten, wordt het ESPHome-apparaat meestal automatisch gevonden.
 
+Open de melding bij **Instellingen → Apparaten & diensten** en kies **Configureren**. Verschijnt er geen melding, kies dan **Integratie toevoegen → ESPHome** en vul `openquatt.local` of het IP-adres van OpenQuatt in.
+
 Gebruik de bestaande handleidingen voor de vervolgstappen:
 
-- [OpenQuatt toevoegen en de eerste waarden controleren](installatie-en-ingebruikname.md#daarna-home-assistant)
 - [Het juiste Single- of Duo-dashboard installeren](dashboard/README.md)
 - [Het dashboard gebruiken](dashboardoverzicht.md)
 

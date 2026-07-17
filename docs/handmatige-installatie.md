@@ -77,4 +77,4 @@ Loop vervolgens de Quick Start in de web-app door.
 - De browser sluiten voordat Wi-Fi is ingesteld.
 - Een Ethernet-bestand gebruiken op hardware zonder W5500 Ethernet-poort.
 
-Als je twijfelt, ga terug naar [Installatie en ingebruikname](installatie-en-ingebruikname.md) en gebruik de normale installer.
+Als je twijfelt, kies dan opnieuw je route in het [projectoverzicht](../README.md#kies-je-route) en gebruik de normale installer of Q-edition-handleiding.

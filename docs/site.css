@@ -1709,6 +1709,145 @@ kbd {
     grid-template-columns: 1fr;
   }
 
+  .page-index .prose > table:first-of-type {
+    display: block;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+  }
+
+  .page-index .prose > table:first-of-type thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .page-index .prose > table:first-of-type tbody {
+    display: grid;
+    gap: 12px;
+  }
+
+  .page-index .prose > table:first-of-type tr {
+    display: grid;
+    overflow: hidden;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: var(--panel);
+  }
+
+  .page-index .prose > table:first-of-type td {
+    display: block;
+    width: auto;
+    padding: 11px 14px;
+    border: 0;
+    border-top: 1px solid var(--line);
+    line-height: 1.55;
+  }
+
+  .page-index .prose > table:first-of-type td:first-child {
+    border-top: 0;
+    font-weight: 700;
+  }
+
+  .page-index .prose > table:first-of-type td::before {
+    display: block;
+    margin-bottom: 4px;
+    color: var(--ink-soft);
+    font-size: 0.68rem;
+    font-weight: 750;
+    letter-spacing: 0.07em;
+    line-height: 1.4;
+    text-transform: uppercase;
+  }
+
+  .page-index .prose > table:first-of-type td:nth-child(1)::before {
+    content: "Jouw situatie";
+  }
+
+  .page-index .prose > table:first-of-type td:nth-child(2)::before {
+    content: "Begin hier";
+  }
+
+  .page-index .prose > table:first-of-type td:nth-child(3)::before {
+    content: "Wat je gaat doen";
+  }
+
+  .page-web-app .prose > table:nth-of-type(2) {
+    display: block;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+  }
+
+  .page-web-app .prose > table:nth-of-type(2) thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .page-web-app .prose > table:nth-of-type(2) tbody {
+    display: grid;
+    gap: 12px;
+  }
+
+  .page-web-app .prose > table:nth-of-type(2) tr {
+    display: grid;
+    overflow: hidden;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: var(--panel);
+  }
+
+  .page-web-app .prose > table:nth-of-type(2) td {
+    display: block;
+    width: auto;
+    padding: 11px 14px;
+    border: 0;
+    border-top: 1px solid var(--line);
+    line-height: 1.55;
+  }
+
+  .page-web-app .prose > table:nth-of-type(2) td:first-child {
+    border-top: 0;
+    font-weight: 700;
+  }
+
+  .page-web-app .prose > table:nth-of-type(2) td::before {
+    display: block;
+    margin-bottom: 4px;
+    color: var(--ink-soft);
+    font-size: 0.68rem;
+    font-weight: 750;
+    letter-spacing: 0.07em;
+    line-height: 1.4;
+    text-transform: uppercase;
+  }
+
+  .page-web-app .prose > table:nth-of-type(2) td:nth-child(1)::before {
+    content: "Stap";
+  }
+
+  .page-web-app .prose > table:nth-of-type(2) td:nth-child(2)::before {
+    content: "Wat kies je?";
+  }
+
+  .page-web-app .prose > table:nth-of-type(2) td:nth-child(3)::before {
+    content: "Waarom?";
+  }
+
+  .prose :not(pre) > code {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
   .page-q-edition .doc-header {
     margin: -26px -8px 32px;
     padding: 36px 24px 40px;

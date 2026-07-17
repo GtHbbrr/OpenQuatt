@@ -1,6 +1,6 @@
 # Dashboard installeren
 
-In deze map staan de dashboardbestanden voor OpenQuatt in Home Assistant. Volg voor een nieuwe installatie deze volgorde:
+Op deze pagina vind je de dashboardbestanden voor OpenQuatt in Home Assistant. Volg voor een nieuwe installatie deze volgorde:
 
 1. Rond Quick Start af via `http://openquatt.local`.
 2. Voeg OpenQuatt via de ESPHome-integratie toe aan Home Assistant.
@@ -11,12 +11,14 @@ In deze map staan de dashboardbestanden voor OpenQuatt in Home Assistant. Volg v
 
 Kies het bestand dat past bij je opstelling en voorkeurstaal:
 
-- `openquatt_ha_dashboard_duo_nl.yaml`
-- `openquatt_ha_dashboard_duo_en.yaml`
-- `openquatt_ha_dashboard_single_nl.yaml`
-- `openquatt_ha_dashboard_single_en.yaml`
+- [Single · Nederlands](openquatt_ha_dashboard_single_nl.yaml)
+- [Single · Engels](openquatt_ha_dashboard_single_en.yaml)
+- [Duo · Nederlands](openquatt_ha_dashboard_duo_nl.yaml)
+- [Duo · Engels](openquatt_ha_dashboard_duo_en.yaml)
 
 Gebruik `duo` voor Duo en `single` voor Single. Kies daarna `nl` of `en`.
+
+Open het gekozen bestand, kopieer de volledige inhoud en plak die later in de **Raw configuration editor** van Home Assistant.
 
 ## OpenQuatt via ESPHome toevoegen aan Home Assistant
 
@@ -92,7 +94,7 @@ Pas niet de dashboard-YAML aan naar een specifieke area. Zo'n dashboard werkt da
 
 ## Optioneel: dynamische bronselectie via Home Assistant
 
-Gebruik `openquatt_ha_dynamic_sources_package.yaml` alleen als je tijdens runtime zelf Home Assistant-bronnen wilt kunnen aanwijzen zonder opnieuw te flashen.
+Gebruik [openquatt_ha_dynamic_sources_package.yaml](openquatt_ha_dynamic_sources_package.yaml) alleen als je tijdens runtime zelf Home Assistant-bronnen wilt kunnen aanwijzen zonder opnieuw te flashen.
 
 Dat pakket maakt extra helper-entiteiten aan, zoals:
 
@@ -125,7 +127,7 @@ De algemene dynamische bronnen publiceren stabiele proxy-entiteiten, bijvoorbeel
 
 ## Optioneel: dynamische koelbronnen via Home Assistant
 
-Gebruik `openquatt_ha_dynamic_cooling_package.yaml` als je voor koeling een of meer dauwpuntbronnen vanuit Home Assistant wilt gebruiken.
+Gebruik [openquatt_ha_dynamic_cooling_package.yaml](openquatt_ha_dynamic_cooling_package.yaml) als je voor koeling een of meer dauwpuntbronnen vanuit Home Assistant wilt gebruiken.
 
 Dit pakket is vooral nuttig als:
 

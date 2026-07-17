@@ -41,8 +41,8 @@ class RenderedPage:
 
 PAGES = [
     Page(PurePosixPath("README.md"), PurePosixPath("index.html"), "OpenQuatt", "Project", "Projectoverzicht, snelle start en hoofdroute."),
-    Page(PurePosixPath("docs/q-edition.md"), PurePosixPath("q-edition.html"), "Heatpump Controller Q-edition installeren", "Aan de slag", "Doorlopende route voor aansluiten, netwerk instellen, Quick Start en Home Assistant."),
-    Page(PurePosixPath("docs/installatie-en-ingebruikname.md"), PurePosixPath("installatie-en-ingebruikname.html"), "Installatie en ingebruikname", "Docs", "Installeren via de installer en daarna Quick Start in de web-app."),
+    Page(PurePosixPath("docs/q-edition.md"), PurePosixPath("q-edition.html"), "Heatpump Controller Q-edition aansluiten", "Aan de slag", "Doorlopende route voor aansluiten, netwerk instellen en Quick Start."),
+    Page(PurePosixPath("docs/installatie-en-ingebruikname.md"), PurePosixPath("installatie-en-ingebruikname.html"), "Andere modules installeren", "Andere hardware", "Een bestaande Waveshare- of Heatpump Listener-module installeren via de web installer."),
     Page(PurePosixPath("docs/web-app.md"), PurePosixPath("web-app.html"), "Web-app gebruiken", "Handleiding", "Quick Start, instellingen, updates, backup en beveiliging via openquatt.local."),
     Page(PurePosixPath("docs/dashboard/README.md"), PurePosixPath("dashboard/index.html"), "Dashboard installeren", "Docs", "Importeer het juiste dashboardbestand voor Single of Duo."),
     Page(PurePosixPath("docs/dashboardoverzicht.md"), PurePosixPath("dashboardoverzicht.html"), "Dashboard gebruiken", "Handleiding", "Dagelijkse controle en diagnosevolgorde in Home Assistant."),
@@ -67,15 +67,21 @@ SIDEBAR_GROUPS = [
             PurePosixPath("docs/q-edition.md"),
             PurePosixPath("docs/installatie-en-ingebruikname.md"),
             PurePosixPath("docs/web-app.md"),
-            PurePosixPath("docs/dashboard/README.md"),
         ],
     ),
     (
         "Dagelijks gebruik",
         "Begrijpen, volgen en rustig bijsturen.",
         [
-            PurePosixPath("docs/dashboardoverzicht.md"),
             PurePosixPath("docs/verwarmen-en-koelen.md"),
+        ],
+    ),
+    (
+        "Optioneel: Home Assistant",
+        "Dashboards toevoegen nadat OpenQuatt lokaal werkt.",
+        [
+            PurePosixPath("docs/dashboard/README.md"),
+            PurePosixPath("docs/dashboardoverzicht.md"),
         ],
     ),
     (
@@ -481,6 +487,7 @@ def render_template(rendered_page: RenderedPage, rendered_pages: list[RenderedPa
     asset_prefix = "./" if page.output.parent == PurePosixPath(".") else "../"
     install_href = rel_url(page.output, PurePosixPath("install/index.html"))
     q_edition_href = rel_url(page.output, PurePosixPath("q-edition.html"))
+    route_href = f"{rel_url(page.output, PurePosixPath('index.html'))}#kies-je-route"
     search_index_href = rel_url(page.output, PurePosixPath("search-index.json"))
     version_href = rel_url(page.output, PurePosixPath("firmware/main/version.json"))
     body_class = f"page-{slugify(page.output.stem, {})}"
@@ -490,8 +497,8 @@ def render_template(rendered_page: RenderedPage, rendered_pages: list[RenderedPa
     if page.source == PurePosixPath("README.md"):
         doc_actions = f"""
           <div class="doc-actions" aria-label="Snel starten">
-            <a class="doc-action doc-action-primary" href="{install_href}">Open installer</a>
-            <a class="doc-action" href="{q_edition_href}">Bekijk aansluithulp</a>
+            <a class="doc-action doc-action-primary" href="#kies-je-route">Kies je route</a>
+            <a class="doc-action" href="{q_edition_href}">Nieuwe HCQ aansluiten</a>
           </div>
         """
 
@@ -544,7 +551,7 @@ def render_template(rendered_page: RenderedPage, rendered_pages: list[RenderedPa
           <section class="sidebar-overview">
             <p class="sidebar-kicker">OpenQuatt Docs</p>
             <p class="sidebar-copy">Een korte route voor installeren, begrijpen en rustig bijsturen.</p>
-            <a class="sidebar-utility" href="{install_href}">Open webinstaller</a>
+            <a class="sidebar-utility" href="{route_href}">Kies je route</a>
             <p class="docs-version" data-docs-version>Docs vanaf main</p>
           </section>
           {build_sidebar(page)}

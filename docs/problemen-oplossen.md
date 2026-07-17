@@ -8,13 +8,17 @@ Controleer in deze volgorde:
 
 1. OpenQuatt is online.
 2. De web-app opent via `openquatt.local` of via het IP-adres.
-3. Home Assistant ziet het apparaat.
-4. De juiste dashboardvariant is gebruikt: `Single` of `Duo`.
-5. De gekozen bronwaarden lijken logisch.
-6. Flow en aanvoertemperatuur verversen.
-7. Er is geen handmatige override actief.
+3. De warmtepompgegevens worden bijgewerkt.
+4. De gekozen bronwaarden lijken logisch.
+5. Flow en aanvoertemperatuur verversen.
+6. Er is geen handmatige override actief.
 
 Als een stap niet klopt, los die eerst op voordat je naar tuning kijkt.
+
+Gebruik je Home Assistant? Controleer dan daarnaast:
+
+1. Home Assistant ziet het OpenQuatt-apparaat en de entiteiten ontvangen waarden.
+2. Je gebruikt de dashboardvariant die bij `Single` of `Duo` past.
 
 ## OpenQuatt is niet bereikbaar
 
@@ -57,6 +61,8 @@ Controleer:
 - `Single` of `Duo`;
 - voeding en massa;
 - of de gebruikte module past bij de installatie.
+
+Gebruik je een Heatpump Controller Q-edition? Maak voor een supportverzoek een scherpe foto van de verbinding tussen de HCQ en de warmtepomp. Zorg dat `M1`, de klemmarkeringen `GND/A/B`, de adervolgorde en de aangesloten Modbuskabel zichtbaar zijn. Maak niets los om de foto te nemen.
 
 Als de warmtepompdata ontbreekt, kunnen dashboard en regeling niet betrouwbaar verklaren wat er gebeurt.
 
@@ -182,9 +188,15 @@ Gebruik deze werkwijze:
 
 Begin bijna altijd met bronkeuze en flow. Strategie-instellingen komen daarna pas.
 
-## Vraag stellen of bug melden
+## Waar meld ik wat?
 
-Voor gebruiksvragen en hulp bij diagnose kun je terecht in het [OpenQuatt Discord-kanaal](https://discord.com/channels/1176602554885492786/1464174190788874427). Een reproduceerbare bug meld je als [GitHub-issue](https://github.com/jeroen85/OpenQuatt/issues/new/choose).
+| Situatie | Juiste route |
+|---|---|
+| Gebruiksvraag of hulp bij diagnose | Vraag het in het [OpenQuatt Discord-kanaal](https://discord.com/channels/1176602554885492786/1464174190788874427). |
+| Reproduceerbare fout in OpenQuatt | Meld die als [GitHub-issue](https://github.com/jeroen85/OpenQuatt/issues/new/choose). |
+| Fysiek probleem met de warmtepomp, lekkage of een mogelijk onveilige situatie | Stop en neem contact op met een vakbekwaam installateur of Quatt. |
+
+Twijfel je wat er gebeurt? Verander dan geen nieuwe instellingen, noteer de actuele toestand en verzamel eerst de informatie hieronder.
 
 Vermeld bij een hulpvraag of bugmelding:
 
@@ -192,7 +204,9 @@ Vermeld bij een hulpvraag of bugmelding:
 - Quatt-generatie, `Single` of `Duo`, en Wi-Fi of Ethernet;
 - wat je verwachtte en wat er daadwerkelijk gebeurde;
 - het tijdstip en de stappen om het probleem te herhalen;
-- relevante screenshots uit `Diagnose` of `Beslislog` en recente wijzigingen.
+- relevante screenshots uit `Diagnose` of `Beslislog` en recente wijzigingen;
+- bij een reproduceerbaar probleem: een [debugopname uit de web-app](web-app.md#debugopname-voor-support);
+- bij een ontbrekende warmtepompverbinding met de HCQ: een scherpe foto van `M1` en de Modbusverbinding met de warmtepomp.
 
 Deel nooit Wi-Fi-wachtwoorden, API-sleutels of andere geheimen.
 
