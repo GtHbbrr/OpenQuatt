@@ -1,0 +1,321 @@
+# ==============================================================================
+# OpenQuatt – OpenTherm Boiler (OTB) passive master and telemetry
+# ==============================================================================
+#
+# Q-hardware-only OpenTherm master. This phase deliberately keeps CH disabled
+# and TSet at 0 °C while proving the physical link and collecting boiler data.
+# DHW permission remains enabled so attaching a combi boiler for passive testing
+# does not disable normal tap-water operation.
+#
+# Active BoilerCommand transport is added in the CM3 strategy phase.
+# ==============================================================================
+
+globals:
+  - id: oq_otb_last_response_ms
+    type: uint32_t
+    restore_value: false
+    initial_value: '0'
+
+  - id: oq_otb_response_count
+    type: uint32_t
+    restore_value: false
+    initial_value: '0'
+
+  - id: oq_otb_last_response_id
+    type: int
+    restore_value: false
+    initial_value: '-1'
+
+  - id: oq_otb_link_available_state
+    type: bool
+    restore_value: false
+    initial_value: 'false'
+
+  - id: oq_otb_link_initialized
+    type: bool
+    restore_value: false
+    initial_value: 'false'
+
+opentherm:
+  - id: oq_otb_hub
+    in_pin: ${oq_ot_boiler_in_pin}
+    out_pin: ${oq_ot_boiler_out_pin}
+    ch_enable: false
+    dhw_enable: true
+    cooling_enable: false
+    otc_active: false
+    ch2_active: false
+    summer_mode_active: false
+    dhw_block: false
+    before_process_response:
+      then:
+        - lambda: |-
+            // Called only after the hub accepted a complete OpenTherm response.
+            id(oq_otb_last_response_ms) = millis();
+            id(oq_otb_response_count)++;
+            id(oq_otb_last_response_id) = x.id;
+
+number:
+  - platform: opentherm
+    opentherm_id: oq_otb_hub
+    t_set:
+      id: oq_otb_t_set_command
+      name: "OTB - Control Setpoint Command"
+      internal: true
+      entity_category: diagnostic
+      icon: mdi:thermostat
+      min_value: 0
+      max_value: 90
+      step: 0.1
+      initial_value: 0
+      restore_value: false
+
+binary_sensor:
+  - platform: template
+    id: otb_link_available
+    name: "OTB - Boiler Link Available"
+    icon: mdi:link-variant
+    device_class: connectivity
+    entity_category: diagnostic
+    web_server:
+      sorting_group_id: oq_boiler
+
+  - platform: opentherm
+    opentherm_id: oq_otb_hub
+    fault_indication:
+      id: otb_fault_indication
+      name: "OTB - Fault Indication"
+      entity_category: diagnostic
+      web_server:
+        sorting_group_id: oq_boiler
+    ch_active:
+      id: otb_ch_active
+      name: "OTB - Central Heating Active"
+      entity_category: diagnostic
+      web_server:
+        sorting_group_id: oq_boiler
+    dhw_active:
+      id: otb_dhw_active
+      name: "OTB - Domestic Hot Water Active"
+      entity_category: diagnostic
+      web_server:
+        sorting_group_id: oq_boiler
+    flame_on:
+      id: otb_flame_on
+      name: "OTB - Flame On"
+      entity_category: diagnostic
+      web_server:
+        sorting_group_id: oq_boiler
+    diagnostic_indication:
+      id: otb_diagnostic_indication
+      name: "OTB - Diagnostic Indication"
+      entity_category: diagnostic
+      web_server:
+        sorting_group_id: oq_boiler
+    dhw_present:
+      id: otb_dhw_present
+      name: "OTB - DHW Present"
+      entity_category: diagnostic
+      web_server:
+        sorting_group_id: oq_boiler
+    service_request:
+      id: otb_service_request
+      name: "OTB - Service Required"
+      entity_category: diagnostic
+      web_server:
+        sorting_group_id: oq_boiler
+    lockout_reset:
+      id: otb_lockout_reset
+      name: "OTB - Lockout Reset"
+      entity_category: diagnostic
+      web_server:
+        sorting_group_id: oq_boiler
+    low_water_pressure:
+      id: otb_low_water_pressure
+      name: "OTB - Low Water Pressure"
+      entity_category: diagnostic
+      web_server:
+        sorting_group_id: oq_boiler
+    flame_fault:
+      id: otb_flame_fault
+      name: "OTB - Flame Fault"
+      entity_category: diagnostic
+      web_server:
+        sorting_group_id: oq_boiler
+    air_pressure_fault:
+      id: otb_air_pressure_fault
+      name: "OTB - Air Pressure Fault"
+      entity_category: diagnostic
+      web_server:
+        sorting_group_id: oq_boiler
+    water_over_temp:
+      id: otb_water_over_temp
+      name: "OTB - Water Overtemperature"
+      entity_category: diagnostic
+      web_server:
+        sorting_group_id: oq_boiler
+
+sensor:
+  - platform: opentherm
+    opentherm_id: oq_otb_hub
+    rel_mod_level:
+      id: otb_relative_modulation
+      name: "OTB - Relative Modulation"
+      entity_category: diagnostic
+      web_server:
+        sorting_group_id: oq_boiler
+    ch_pressure:
+      id: otb_ch_pressure
+      name: "OTB - CH Water Pressure"
+      entity_category: diagnostic
+      web_server:
+        sorting_group_id: oq_boiler
+    t_boiler:
+      id: otb_boiler_water_temp
+      name: "OTB - Boiler Water Temperature"
+      entity_category: diagnostic
+      web_server:
+        sorting_group_id: oq_boiler
+    t_ret:
+      id: otb_return_water_temp
+      name: "OTB - Return Water Temperature"
+      entity_category: diagnostic
+      web_server:
+        sorting_group_id: oq_boiler
+    t_dhw:
+      id: otb_dhw_temp
+      name: "OTB - Domestic Hot Water Temperature"
+      entity_category: diagnostic
+      web_server:
+        sorting_group_id: oq_boiler
+    oem_fault_code:
+      id: otb_oem_fault_code
+      name: "OTB - OEM Fault Code"
+      entity_category: diagnostic
+      web_server:
+        sorting_group_id: oq_boiler
+    oem_diagnostic_code:
+      id: otb_oem_diagnostic_code
+      name: "OTB - OEM Diagnostic Code"
+      entity_category: diagnostic
+      web_server:
+        sorting_group_id: oq_boiler
+    max_capacity:
+      id: otb_max_capacity
+      name: "OTB - Maximum Boiler Capacity"
+      entity_category: diagnostic
+      disabled_by_default: true
+      web_server:
+        sorting_group_id: oq_boiler
+    min_mod_level:
+      id: otb_min_modulation
+      name: "OTB - Minimum Modulation"
+      entity_category: diagnostic
+      disabled_by_default: true
+      web_server:
+        sorting_group_id: oq_boiler
+    opentherm_version_device:
+      id: otb_opentherm_version
+      name: "OTB - OpenTherm Device Version"
+      entity_category: diagnostic
+      disabled_by_default: true
+      web_server:
+        sorting_group_id: oq_boiler
+    device_type:
+      id: otb_device_type
+      name: "OTB - Device Type"
+      entity_category: diagnostic
+      disabled_by_default: true
+      web_server:
+        sorting_group_id: oq_boiler
+    device_version:
+      id: otb_device_version
+      name: "OTB - Device Product Version"
+      entity_category: diagnostic
+      disabled_by_default: true
+      web_server:
+        sorting_group_id: oq_boiler
+
+  - platform: template
+    id: otb_last_response_age
+    name: "OTB - Last Response Age"
+    icon: mdi:timer-outline
+    unit_of_measurement: "s"
+    accuracy_decimals: 1
+    entity_category: diagnostic
+    update_interval: ${oq_otb_link_watch_s}s
+    web_server:
+      sorting_group_id: oq_boiler
+    lambda: |-
+      const uint32_t last_response_ms = id(oq_otb_last_response_ms);
+      if (last_response_ms == 0) return NAN;
+      return (float) ((uint32_t)(millis() - last_response_ms)) / 1000.0f;
+
+  - platform: template
+    id: otb_response_count
+    name: "OTB - Valid Response Count"
+    icon: mdi:counter
+    accuracy_decimals: 0
+    state_class: total_increasing
+    entity_category: diagnostic
+    update_interval: 5s
+    web_server:
+      sorting_group_id: oq_boiler
+    lambda: |-
+      return (float) id(oq_otb_response_count);
+
+  - platform: template
+    id: otb_last_response_id
+    name: "OTB - Last Response Message ID"
+    icon: mdi:identifier
+    accuracy_decimals: 0
+    entity_category: diagnostic
+    update_interval: 5s
+    web_server:
+      sorting_group_id: oq_boiler
+    lambda: |-
+      const int message_id = id(oq_otb_last_response_id);
+      return message_id >= 0 ? (float) message_id : NAN;
+
+interval:
+  - interval: ${oq_otb_link_watch_s}s
+    startup_delay: 2s
+    then:
+      - lambda: |-
+          // Phase 1: derive availability solely from complete accepted responses.
+          const uint32_t now_ms = millis();
+          const uint32_t last_response_ms = id(oq_otb_last_response_ms);
+          const bool available =
+              last_response_ms != 0 &&
+              (uint32_t)(now_ms - last_response_ms) <=
+                  (uint32_t) (${oq_otb_link_timeout_s} * 1000UL);
+          const bool link_changed =
+              !id(oq_otb_link_initialized) ||
+              available != id(oq_otb_link_available_state);
+          if (!link_changed) return;
+
+          id(oq_otb_link_initialized) = true;
+          id(oq_otb_link_available_state) = available;
+          id(otb_link_available).publish_state(available);
+          ESP_LOGI("quatt.otb", "Boiler OpenTherm link %s", available ? "available" : "unavailable");
+
+          // Phase 2: prevent stale operational values from looking current after link loss.
+          if (available) return;
+          id(otb_fault_indication).publish_state(false);
+          id(otb_ch_active).publish_state(false);
+          id(otb_dhw_active).publish_state(false);
+          id(otb_flame_on).publish_state(false);
+          id(otb_diagnostic_indication).publish_state(false);
+          id(otb_service_request).publish_state(false);
+          id(otb_lockout_reset).publish_state(false);
+          id(otb_low_water_pressure).publish_state(false);
+          id(otb_flame_fault).publish_state(false);
+          id(otb_air_pressure_fault).publish_state(false);
+          id(otb_water_over_temp).publish_state(false);
+          id(otb_relative_modulation).publish_state(NAN);
+          id(otb_ch_pressure).publish_state(NAN);
+          id(otb_boiler_water_temp).publish_state(NAN);
+          id(otb_return_water_temp).publish_state(NAN);
+          id(otb_dhw_temp).publish_state(NAN);
+          id(otb_oem_fault_code).publish_state(NAN);
+          id(otb_oem_diagnostic_code).publish_state(NAN);

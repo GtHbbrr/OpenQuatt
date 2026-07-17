@@ -321,6 +321,7 @@ NESTED_KEY_ORDER_RULES = {
         "oq_cic_compatibility",
         "oq_sensor_source_selects_opentherm",
         "oq_ot_slave",
+        "oq_boiler_opentherm",
     ),
 }
 
