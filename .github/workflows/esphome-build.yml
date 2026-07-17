@@ -61,13 +61,29 @@ jobs:
           cache: pip
           cache-dependency-path: .github/requirements-esphome.txt
 
-      - name: Cache PlatformIO
+      - name: Cache native ESP-IDF toolchain
         uses: actions/cache@v5
         with:
-          path: ~/.platformio
-          key: ${{ runner.os }}-platformio-${{ hashFiles('.github/requirements-esphome.txt') }}
+          path: ~/.cache/esphome/idf
+          key: ${{ runner.os }}-${{ runner.arch }}-esphome-idf-${{ hashFiles('.github/requirements-esphome.txt') }}
           restore-keys: |
-            ${{ runner.os }}-platformio-
+            ${{ runner.os }}-${{ runner.arch }}-esphome-idf-
+
+      - name: Make ccache available
+        run: |
+          if ! command -v ccache >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install --yes ccache
+          fi
+          ccache --version
+
+      - name: Cache compiler outputs
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/openquatt/ccache
+          key: ${{ runner.os }}-${{ runner.arch }}-openquatt-ccache-${{ hashFiles('.github/requirements-esphome.txt') }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-${{ runner.arch }}-openquatt-ccache-${{ hashFiles('.github/requirements-esphome.txt') }}-
 
       - name: Install ESPHome
         run: |
@@ -77,6 +93,13 @@ jobs:
 
       - name: Compile firmware
         run: |
+          export ESPHOME_ESP_IDF_PREFIX="${HOME}/.cache/esphome/idf"
+          export IDF_CCACHE_ENABLE=1
+          export CCACHE_DIR="${HOME}/.cache/openquatt/ccache"
+          export CCACHE_MAXSIZE=2G
+          export CCACHE_NOHASHDIR=true
+          export CCACHE_DEPEND=1
+          export CCACHE_BASEDIR="${GITHUB_WORKSPACE}/${{ matrix.target.build_path }}"
           EXTRA_ARGS=()
           if [[ -n "${{ inputs.project_version }}" ]]; then
             EXTRA_ARGS+=(-s project_version "${{ inputs.project_version }}")
@@ -90,8 +113,15 @@ jobs:
           fi
           esphome "${EXTRA_ARGS[@]}" compile "${{ matrix.target.config }}"
 
-      - name: Repair and validate factory binary
-        run: python3 scripts/repair_factory_bin.py "${{ matrix.target.build_path }}/.pioenvs/openquatt"
+      - name: Show ccache statistics
+        if: ${{ always() }}
+        run: |
+          export CCACHE_DIR="${HOME}/.cache/openquatt/ccache"
+          export CCACHE_MAXSIZE=2G
+          ccache --show-stats
+
+      - name: Validate and normalize firmware artifacts
+        run: python3 scripts/repair_factory_bin.py "${{ matrix.target.build_path }}/build" --normalize-app
 
       - name: Upload firmware artifacts
         if: ${{ inputs.include_firmware_bin }}
@@ -100,9 +130,9 @@ jobs:
           name: ${{ matrix.target.artifact_name }}-${{ inputs.artifact_suffix }}
           if-no-files-found: error
           path: |
-            ${{ matrix.target.build_path }}/.pioenvs/openquatt/firmware.bin
-            ${{ matrix.target.build_path }}/.pioenvs/openquatt/firmware.ota.bin
-            ${{ matrix.target.build_path }}/.pioenvs/openquatt/firmware.factory.bin
+            ${{ matrix.target.build_path }}/build/firmware.bin
+            ${{ matrix.target.build_path }}/build/firmware.ota.bin
+            ${{ matrix.target.build_path }}/build/firmware.factory.bin
 
       - name: Upload OTA/factory artifacts
         if: ${{ !inputs.include_firmware_bin && inputs.include_factory_bin }}
@@ -111,8 +141,8 @@ jobs:
           name: ${{ matrix.target.artifact_name }}-${{ inputs.artifact_suffix }}
           if-no-files-found: error
           path: |
-            ${{ matrix.target.build_path }}/.pioenvs/openquatt/firmware.ota.bin
-            ${{ matrix.target.build_path }}/.pioenvs/openquatt/firmware.factory.bin
+            ${{ matrix.target.build_path }}/build/firmware.ota.bin
+            ${{ matrix.target.build_path }}/build/firmware.factory.bin
 
       - name: Upload OTA artifacts
         if: ${{ !inputs.include_firmware_bin && !inputs.include_factory_bin }}
@@ -120,4 +150,4 @@ jobs:
         with:
           name: ${{ matrix.target.artifact_name }}-${{ inputs.artifact_suffix }}
           if-no-files-found: error
-          path: ${{ matrix.target.build_path }}/.pioenvs/openquatt/firmware.ota.bin
+          path: ${{ matrix.target.build_path }}/build/firmware.ota.bin

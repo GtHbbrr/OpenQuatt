@@ -29,7 +29,6 @@ modbus:
   - uart_id: cic_compat_uart_bus
     id: cic_compat_modbus
     role: server
-    send_wait_time: 50ms
 
 packages:
   oq_cic_compatibility: !include ../oq_cic_compatibility.yaml

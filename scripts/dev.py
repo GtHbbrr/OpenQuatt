@@ -15,16 +15,6 @@ from typing import Iterable, Sequence
 
 from build_targets import filter_targets, load_targets
 
-EFUSE_SOC_UTILITY_SOURCE = '"esp_efuse_utility.c"'
-EFUSE_SOC_UTILITY_RENAMED = '"esp_efuse_utility_esp32s3.c"'
-SYSTEM_TIME_SOURCE = '"src/system_time.c"'
-SYSTEM_TIME_RENAMED = '"src/esp_timer_system_time.c"'
-PHY_LIB_PRINTF_SOURCE = '"src/lib_printf.c"'
-PHY_LIB_PRINTF_RENAMED = '"src/phy_lib_printf.c"'
-HAL_TARGET_EFUSE_SOURCE = '"${target}/efuse_hal.c"'
-HAL_TARGET_EFUSE_RENAMED = '"${target}/efuse_hal_${target}.c"'
-
-
 def repo_root() -> Path:
     return Path(__file__).resolve().parent.parent
 
@@ -222,188 +212,6 @@ def format_duration(total_seconds: float) -> str:
     return f"{seconds}s"
 
 
-def framework_espidf_package_dirs(pio_core_dir: Path) -> list[Path]:
-    candidates = [
-        pio_core_dir / "packages" / "framework-espidf",
-        Path.home() / ".platformio" / "packages" / "framework-espidf",
-    ]
-    seen: set[Path] = set()
-    dirs: list[Path] = []
-    for candidate in candidates:
-        resolved = candidate.expanduser()
-        if resolved in seen:
-            continue
-        seen.add(resolved)
-        dirs.append(resolved)
-    return dirs
-
-
-def patch_framework_espidf_efuse_main_cmake(package_dir: Path) -> bool:
-    cmake_path = package_dir / "components" / "efuse" / "CMakeLists.txt"
-    if not cmake_path.is_file():
-        return False
-
-    text = cmake_path.read_text(encoding="utf-8")
-    updated = text
-    if 'src/esp_efuse_utility.c' not in updated and 'list(APPEND srcs "src/esp_efuse_api.c"\n                 "src/efuse_controller/keys/${type}/esp_efuse_api_key.c")' in updated:
-        updated = updated.replace(
-            'list(APPEND srcs "src/esp_efuse_api.c"\n                 "src/efuse_controller/keys/${type}/esp_efuse_api_key.c")',
-            'list(APPEND srcs "src/esp_efuse_api.c"\n                 "src/esp_efuse_utility.c"\n                 "src/efuse_controller/keys/${type}/esp_efuse_api_key.c")',
-            1,
-        )
-
-    if updated == text:
-        return False
-
-    cmake_path.write_text(updated, encoding="utf-8")
-    return True
-
-
-def patch_framework_espidf_efuse_sources(package_dir: Path) -> bool:
-    patched = False
-    for sources_path in package_dir.glob("components/efuse/*/sources.cmake"):
-        if not sources_path.is_file():
-            continue
-
-        text = sources_path.read_text(encoding="utf-8")
-        target_dir = sources_path.parent.name
-        if target_dir != "esp32s3" or EFUSE_SOC_UTILITY_SOURCE not in text:
-            continue
-
-        updated = text.replace(EFUSE_SOC_UTILITY_SOURCE, EFUSE_SOC_UTILITY_RENAMED, 1)
-        if updated != text:
-            sources_path.write_text(updated, encoding="utf-8")
-            renamed_path = sources_path.parent / "esp_efuse_utility_esp32s3.c"
-            original_path = sources_path.parent / "esp_efuse_utility.c"
-            if original_path.is_file() and not renamed_path.exists():
-                renamed_path.write_text(original_path.read_text(encoding="utf-8"), encoding="utf-8")
-            patched = True
-    return patched
-
-
-def patch_framework_espidf_system_time_source(package_dir: Path) -> bool:
-    cmake_path = package_dir / "components" / "esp_timer" / "CMakeLists.txt"
-    source_path = package_dir / "components" / "esp_timer" / "src" / "system_time.c"
-    renamed_path = source_path.with_name("esp_timer_system_time.c")
-    if not cmake_path.is_file() or not source_path.is_file():
-        return False
-
-    text = cmake_path.read_text(encoding="utf-8")
-    if SYSTEM_TIME_SOURCE not in text:
-        return False
-
-    if not renamed_path.exists():
-        renamed_path.write_text(source_path.read_text(encoding="utf-8"), encoding="utf-8")
-    cmake_path.write_text(text.replace(SYSTEM_TIME_SOURCE, SYSTEM_TIME_RENAMED, 1), encoding="utf-8")
-    return True
-
-
-def patch_framework_espidf_phy_lib_printf_source(package_dir: Path) -> bool:
-    cmake_path = package_dir / "components" / "esp_phy" / "CMakeLists.txt"
-    source_path = package_dir / "components" / "esp_phy" / "src" / "lib_printf.c"
-    renamed_path = source_path.with_name("phy_lib_printf.c")
-    if not cmake_path.is_file() or not source_path.is_file():
-        return False
-
-    text = cmake_path.read_text(encoding="utf-8")
-    if PHY_LIB_PRINTF_SOURCE not in text:
-        return False
-
-    if not renamed_path.exists():
-        renamed_path.write_text(source_path.read_text(encoding="utf-8"), encoding="utf-8")
-    cmake_path.write_text(text.replace(PHY_LIB_PRINTF_SOURCE, PHY_LIB_PRINTF_RENAMED, 1), encoding="utf-8")
-    return True
-
-
-def patch_framework_espidf_hal_target_efuse_source(package_dir: Path) -> bool:
-    cmake_path = package_dir / "components" / "hal" / "CMakeLists.txt"
-    hal_dir = package_dir / "components" / "hal"
-    if not cmake_path.is_file() or not hal_dir.is_dir():
-        return False
-
-    text = cmake_path.read_text(encoding="utf-8")
-    if HAL_TARGET_EFUSE_SOURCE not in text:
-        return False
-
-    patched = False
-    for source_path in hal_dir.glob("*/efuse_hal.c"):
-        renamed_path = source_path.with_name(f"efuse_hal_{source_path.parent.name}.c")
-        if not renamed_path.exists():
-            renamed_path.write_text(source_path.read_text(encoding="utf-8"), encoding="utf-8")
-            patched = True
-
-    cmake_path.write_text(text.replace(HAL_TARGET_EFUSE_SOURCE, HAL_TARGET_EFUSE_RENAMED, 1), encoding="utf-8")
-    return True
-
-
-def apply_framework_espidf_source_workarounds(pio_core_dir: Path) -> list[Path]:
-    patched: list[Path] = []
-    for package_dir in framework_espidf_package_dirs(pio_core_dir):
-        main_patched = patch_framework_espidf_efuse_main_cmake(package_dir)
-        sources_patched = patch_framework_espidf_efuse_sources(package_dir)
-        system_time_patched = patch_framework_espidf_system_time_source(package_dir)
-        phy_lib_printf_patched = patch_framework_espidf_phy_lib_printf_source(package_dir)
-        hal_patched = patch_framework_espidf_hal_target_efuse_source(package_dir)
-        if main_patched or sources_patched or system_time_patched or phy_lib_printf_patched or hal_patched:
-            patched.append(package_dir)
-    return patched
-
-
-def has_framework_espidf_efuse_workaround(package_dir: Path) -> bool:
-    cmake_path = package_dir / "components" / "efuse" / "CMakeLists.txt"
-    esp32s3_sources = package_dir / "components" / "efuse" / "esp32s3" / "sources.cmake"
-    renamed_source = package_dir / "components" / "efuse" / "esp32s3" / "esp_efuse_utility_esp32s3.c"
-    return (
-        cmake_path.is_file()
-        and 'src/esp_efuse_utility.c' in cmake_path.read_text(encoding="utf-8")
-        and esp32s3_sources.is_file()
-        and renamed_source.is_file()
-    )
-
-
-def has_framework_espidf_system_time_workaround(package_dir: Path) -> bool:
-    cmake_path = package_dir / "components" / "esp_timer" / "CMakeLists.txt"
-    renamed_source = package_dir / "components" / "esp_timer" / "src" / "esp_timer_system_time.c"
-    return (
-        cmake_path.is_file()
-        and SYSTEM_TIME_RENAMED in cmake_path.read_text(encoding="utf-8")
-        and renamed_source.is_file()
-    )
-
-
-def has_framework_espidf_phy_lib_printf_workaround(package_dir: Path) -> bool:
-    cmake_path = package_dir / "components" / "esp_phy" / "CMakeLists.txt"
-    renamed_source = package_dir / "components" / "esp_phy" / "src" / "phy_lib_printf.c"
-    return (
-        cmake_path.is_file()
-        and PHY_LIB_PRINTF_RENAMED in cmake_path.read_text(encoding="utf-8")
-        and renamed_source.is_file()
-    )
-
-
-def has_framework_espidf_hal_target_efuse_workaround(package_dir: Path) -> bool:
-    cmake_path = package_dir / "components" / "hal" / "CMakeLists.txt"
-    renamed_source = package_dir / "components" / "hal" / "esp32s3" / "efuse_hal_esp32s3.c"
-    return (
-        cmake_path.is_file()
-        and HAL_TARGET_EFUSE_RENAMED in cmake_path.read_text(encoding="utf-8")
-        and renamed_source.is_file()
-    )
-
-
-def has_framework_espidf_source_workaround(pio_core_dir: Path, duplicate_object: str) -> bool:
-    for package_dir in framework_espidf_package_dirs(pio_core_dir):
-        if duplicate_object == "esp_efuse_fields.c.o" and has_framework_espidf_efuse_workaround(package_dir):
-            return True
-        if duplicate_object == "efuse_hal.c.o" and has_framework_espidf_hal_target_efuse_workaround(package_dir):
-            return True
-        if duplicate_object == "system_time.c.o" and has_framework_espidf_system_time_workaround(package_dir):
-            return True
-        if duplicate_object == "lib_printf.c.o" and has_framework_espidf_phy_lib_printf_workaround(package_dir):
-            return True
-    return False
-
-
 def run_command(
     command: Sequence[str],
     *,
@@ -476,10 +284,36 @@ def run_logged(
     print(f"[ok] {label}")
 
 
-def resolve_command_root(root_dir: Path) -> tuple[Path, Path]:
-    pio_core_dir = root_dir / ".cache" / "platformio"
-    pio_core_dir.mkdir(parents=True, exist_ok=True)
-    return root_dir, pio_core_dir
+def default_native_idf_tools_dir() -> Path:
+    if sys.platform == "darwin":
+        cache_root = Path.home() / "Library" / "Caches"
+    elif os.name == "nt":
+        cache_root = Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData" / "Local"))
+    else:
+        cache_root = Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache"))
+    return cache_root / "esphome" / "idf"
+
+
+def configure_native_ccache(
+    env: dict[str, str],
+    native_idf_tools_dir: Path,
+) -> tuple[bool, str]:
+    explicit_setting = env.get("IDF_CCACHE_ENABLE")
+    if explicit_setting is not None and explicit_setting.strip().lower() in {"", "0", "false", "no", "off"}:
+        return False, "disabled by IDF_CCACHE_ENABLE"
+
+    ccache_executable = shutil.which("ccache", path=env.get("PATH"))
+    if ccache_executable is None:
+        if explicit_setting is not None:
+            raise SystemExit("IDF_CCACHE_ENABLE is set, but the ccache executable is not available in PATH.")
+        return False, "not installed"
+
+    env.setdefault("IDF_CCACHE_ENABLE", "1")
+    env.setdefault("CCACHE_DIR", str(native_idf_tools_dir / "ccache"))
+    env.setdefault("CCACHE_MAXSIZE", "2G")
+    env.setdefault("CCACHE_NOHASHDIR", "true")
+    env.setdefault("CCACHE_DEPEND", "1")
+    return True, f"{ccache_executable} (cache: {env['CCACHE_DIR']})"
 
 
 def build_pages_site(site_dir: Path, factory_dir: Path, helper_python: Sequence[str]) -> None:
@@ -591,7 +425,7 @@ def bootstrap_command(args: argparse.Namespace) -> int:
 def validate_command(args: argparse.Namespace) -> int:
     root_dir = repo_root()
     venv_dir = resolve_path(args.venv_dir)
-    command_root, pio_core_dir = resolve_command_root(root_dir)
+    command_root = root_dir
     log_dir = root_dir / ".tmp" / "validate_local_logs"
     helper_python = resolve_helper_python(venv_dir)
     esphome_command = resolve_esphome_command(venv_dir)
@@ -600,11 +434,13 @@ def validate_command(args: argparse.Namespace) -> int:
     log_dir.mkdir(parents=True, exist_ok=True)
 
     env = os.environ.copy()
-    env["PLATFORMIO_CORE_DIR"] = str(pio_core_dir)
-    env["PLATFORMIO_HOME_DIR"] = str(pio_core_dir)
+    env.setdefault("ESPHOME_ESP_IDF_PREFIX", str(default_native_idf_tools_dir()))
+    native_idf_tools_dir = Path(env["ESPHOME_ESP_IDF_PREFIX"]).expanduser()
+    ccache_enabled, ccache_status = configure_native_ccache(env, native_idf_tools_dir)
 
     print(f"Workspace root: {root_dir}")
-    print(f"PlatformIO core dir: {pio_core_dir}")
+    print(f"ESP-IDF tools dir: {native_idf_tools_dir}")
+    print(f"ccache: {ccache_status}")
     print(f"Log dir: {log_dir}")
     print(f"Parallel compile jobs: {args.jobs}")
 
@@ -646,113 +482,114 @@ def validate_command(args: argparse.Namespace) -> int:
         print("Validation complete.")
         return 0
 
-    patched_packages = apply_framework_espidf_source_workarounds(pio_core_dir)
-    for package_dir in patched_packages:
-        print(f"[fix] patched framework-espidf duplicate sources in {package_dir}")
-    if patched_packages:
-        shutil.rmtree(command_root / ".esphome" / "build", ignore_errors=True)
-
     compile_queue = list(args.configs)
-    packages_dir = pio_core_dir / "packages"
-    espressif_cache_dir = command_root / ".esphome" / ".espressif"
-    cold_platformio_cache = not packages_dir.exists() or not any(packages_dir.iterdir())
-    # ESPHome 2026.5 keeps managed components per build path. Only treat the
-    # legacy shared cache as cold when it is actually present.
-    cold_espressif_cache = espressif_cache_dir.exists() and not any(espressif_cache_dir.iterdir())
-    force_serial_compile = args.jobs > 1 and (cold_platformio_cache or cold_espressif_cache)
-    if force_serial_compile:
+    frameworks_dir = native_idf_tools_dir / "frameworks"
+    cold_native_idf_cache = not frameworks_dir.exists() or not any(frameworks_dir.iterdir())
+    if args.jobs > 1 and cold_native_idf_cache:
         print(
-            "Cold compile cache detected; running this validation sequentially once "
-            "to avoid ESP-IDF component-cache races."
+            "Cold native ESP-IDF cache detected; compiling the first target separately "
+            "before starting parallel target builds."
         )
-        shutil.rmtree(espressif_cache_dir, ignore_errors=True)
 
     def compile_one(config: str) -> tuple[str, int, Path]:
         log_path = log_dir / f"{config_log_stem(config)}.compile.log"
         label = f"compile {config}"
+        build_root = command_root / target_build_paths.get(config, f".esphome/build/{Path(config).stem}")
+        compile_env = env.copy()
+        if ccache_enabled:
+            compile_env.setdefault("CCACHE_BASEDIR", str(build_root.resolve()))
         print(f"[run] {label}", flush=True)
         exit_code = run_command(
             [*esphome_command, "compile", config],
             cwd=command_root,
-            env=env,
+            env=compile_env,
             log_path=log_path,
             check=False,
             heartbeat_label=label,
         )
         if exit_code != 0:
             tail = tail_lines(log_path, limit=160)
-            duplicate_object = next(
-                (
-                    object_name
-                    for object_name in ("esp_efuse_fields.c.o", "efuse_hal.c.o", "system_time.c.o", "lib_printf.c.o")
-                    if object_name in tail
-                ),
-                "",
+            tail_lower = tail.lower()
+            cmake_cache_mismatch = (
+                "does not match the source" in tail_lower
+                and "used to generate cache" in tail_lower
             )
-            source_duplicate = (
-                "Multiple ways to build the same target were specified for:" in tail
-                and bool(duplicate_object)
-            )
-            cache_race = (
-                ".esphome/.espressif/service_" in tail
-                and ("ArduinoJson" in tail or "idf_component_manager" in tail)
-            )
-            if source_duplicate:
-                patched = apply_framework_espidf_source_workarounds(pio_core_dir)
-                if patched or has_framework_espidf_source_workaround(pio_core_dir, duplicate_object):
-                    print(
-                        f"[retry] compile {config}: resetting build cache after framework-espidf "
-                        "duplicate-target failure."
-                    )
-                    build_root = command_root / target_build_paths.get(config, f".esphome/build/{Path(config).stem}")
-                    shutil.rmtree(build_root, ignore_errors=True)
-                    exit_code = run_command(
-                        [*esphome_command, "compile", config],
-                        cwd=command_root,
-                        env=env,
-                        log_path=log_path,
-                        check=False,
-                        heartbeat_label=label,
-                    )
-                    tail = tail_lines(log_path, limit=160)
-
-            if cache_race:
-                print(
-                    f"[retry] compile {config}: resetting ESP-IDF component cache after a generated-cache race."
+            retryable_failure = any(
+                marker in tail_lower
+                for marker in (
+                    "connection reset by peer",
+                    "failed to download",
+                    "temporary failure in name resolution",
+                    "timed out while downloading",
+                    "another process",
                 )
-                shutil.rmtree(espressif_cache_dir, ignore_errors=True)
+            ) or ("idf_component_manager" in tail_lower and "lock" in tail_lower)
+            retryable_failure = retryable_failure or (
+                "downloaded component" in tail_lower and "corrupted" in tail_lower
+            )
+            retryable_failure = retryable_failure or "does not contain a component" in tail_lower
+            if cmake_cache_mismatch:
+                print(
+                    f"[retry] compile {config}: resetting the native CMake build directory "
+                    "after the ESP-IDF cache location changed."
+                )
+                shutil.rmtree(build_root / "build", ignore_errors=True)
+            elif retryable_failure:
+                print(
+                    f"[retry] compile {config}: retrying after a transient native ESP-IDF failure."
+                )
+            if cmake_cache_mismatch or retryable_failure:
                 exit_code = run_command(
                     [*esphome_command, "compile", config],
                     cwd=command_root,
-                    env=env,
+                    env=compile_env,
                     log_path=log_path,
                     check=False,
                     heartbeat_label=label,
                 )
         if exit_code == 0:
-            build_dir = command_root / target_build_paths.get(config, f".esphome/build/{Path(config).stem}") / ".pioenvs" / "openquatt"
+            build_dir = build_root / "build"
+            artifact_log_path = log_dir / f"{config_log_stem(config)}.artifacts.log"
             exit_code = run_command(
-                [*helper_python, str(command_scripts_dir / "repair_factory_bin.py"), str(build_dir)],
+                [
+                    *helper_python,
+                    str(command_scripts_dir / "repair_factory_bin.py"),
+                    str(build_dir),
+                    "--normalize-app",
+                ],
                 cwd=command_root,
-                env=env,
-                log_path=log_path,
+                env=compile_env,
+                log_path=artifact_log_path,
                 check=False,
-                heartbeat_label=f"repair factory {config}",
+                heartbeat_label=f"validate artifacts {config}",
             )
+            if exit_code != 0:
+                log_path = artifact_log_path
         return config, exit_code, log_path
 
     results: list[tuple[str, int, Path]] = []
+    if compile_queue and args.jobs > 1 and cold_native_idf_cache:
+        results.append(compile_one(compile_queue.pop(0)))
+
     if compile_queue:
-        if args.jobs == 1 or force_serial_compile:
+        if args.jobs == 1:
             results = [compile_one(config) for config in compile_queue]
         else:
-            with concurrent.futures.ThreadPoolExecutor(max_workers=args.jobs) as executor:
-                futures = [executor.submit(compile_one, config) for config in compile_queue]
-                for future in concurrent.futures.as_completed(futures):
-                    results.append(future.result())
+            compile_groups: dict[Path, list[str]] = {}
+            for config in compile_queue:
+                compile_groups.setdefault(Path(config).parent, []).append(config)
 
-            order = {config: index for index, config in enumerate(compile_queue)}
-            results.sort(key=lambda item: order[item[0]])
+            def compile_group(configs: list[str]) -> list[tuple[str, int, Path]]:
+                return [compile_one(config) for config in configs]
+
+            worker_count = min(args.jobs, len(compile_groups))
+            with concurrent.futures.ThreadPoolExecutor(max_workers=worker_count) as executor:
+                futures = [executor.submit(compile_group, configs) for configs in compile_groups.values()]
+                for future in concurrent.futures.as_completed(futures):
+                    results.extend(future.result())
+
+    order = {config: index for index, config in enumerate(args.configs)}
+    results.sort(key=lambda item: order[item[0]])
 
     failures = 0
     for config, exit_code, log_path in results:

@@ -4,6 +4,8 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
+import shutil
+import struct
 from typing import Iterable
 
 ESP_IMAGE_MAGIC = 0xE9
@@ -69,7 +71,13 @@ def fallback_candidates(raw_path: str, build_dir: Path, role: str, offset: int) 
     if role == "otadata":
         candidates.append(build_dir / "ota_data_initial.bin")
     if role == "app" or (not role and is_app_image_name(raw_name)):
-        candidates.append(build_dir / "firmware.bin")
+        candidates.extend(
+            (
+                build_dir / "openquatt.bin",
+                build_dir / "firmware.bin",
+                build_dir / "firmware.ota.bin",
+            )
+        )
 
     return candidates
 
@@ -97,7 +105,9 @@ def has_esp_image_magic(path: Path) -> bool:
 
 def is_app_image_name(name: str) -> bool:
     normalized = name.lower()
-    return normalized == "firmware.bin" or normalized.startswith("openquatt_")
+    return normalized in {"openquatt.bin", "firmware.bin", "firmware.ota.bin"} or normalized.startswith(
+        "openquatt_"
+    )
 
 
 def resolve_flash_file(raw_path: str, build_dir: Path, role: str, offset: int) -> Path:
@@ -145,10 +155,9 @@ def collect_sections(build_dir: Path, flasher_args: dict) -> tuple[list[tuple[in
 
     if not sections:
         raise FactoryBinError(f"No flash sections found in {build_dir / 'flasher_args.json'}")
-    if "bootloader" not in role_offsets:
-        raise FactoryBinError("flasher_args.json does not describe a bootloader section")
-    if "app" not in role_offsets:
-        raise FactoryBinError("flasher_args.json does not describe an app section")
+    for required_role in ("bootloader", "partition-table", "app"):
+        if required_role not in role_offsets:
+            raise FactoryBinError(f"flasher_args.json does not describe a {required_role} section")
 
     return sorted(sections.items()), role_offsets
 
@@ -175,7 +184,37 @@ def read_bytes(path: Path, offset: int, size: int) -> bytes:
     return data
 
 
-def validate_factory_bin(output_path: Path, role_offsets: dict[str, int]) -> None:
+def parse_partition_table(path: Path) -> list[dict[str, int | str]]:
+    entries: list[dict[str, int | str]] = []
+    data = path.read_bytes()
+    entry_size = 32
+    for position in range(0, len(data), entry_size):
+        raw = data[position : position + entry_size]
+        if len(raw) < entry_size or raw[:2] in (b"\xff\xff", b"\xeb\xeb"):
+            break
+        magic, partition_type, subtype, offset, size, raw_label, flags = struct.unpack("<HBBII16sI", raw)
+        if magic != 0x50AA:
+            raise FactoryBinError(f"Invalid partition entry magic at {hex(position)} in {path}")
+        entries.append(
+            {
+                "type": partition_type,
+                "subtype": subtype,
+                "offset": offset,
+                "size": size,
+                "label": raw_label.split(b"\0", 1)[0].decode("utf-8", errors="replace"),
+                "flags": flags,
+            }
+        )
+    if not entries:
+        raise FactoryBinError(f"Partition table contains no entries: {path}")
+    return entries
+
+
+def validate_factory_bin(
+    output_path: Path,
+    role_offsets: dict[str, int],
+    sections: list[tuple[int, Path]],
+) -> tuple[str, int]:
     bootloader_offset = role_offsets["bootloader"]
     app_offset = role_offsets["app"]
 
@@ -193,14 +232,66 @@ def validate_factory_bin(output_path: Path, role_offsets: dict[str, int]) -> Non
             f"(got 0x{app_magic:02x})"
         )
 
-    partition_offset = role_offsets.get("partition-table")
-    if partition_offset is not None:
-        partition_magic = read_bytes(output_path, partition_offset, 2)
-        if partition_magic != PARTITION_TABLE_MAGIC:
+    partition_offset = role_offsets["partition-table"]
+    partition_magic = read_bytes(output_path, partition_offset, 2)
+    if partition_magic != PARTITION_TABLE_MAGIC:
+        raise FactoryBinError(
+            f"{output_path.name} has no partition table magic at {hex(partition_offset)} "
+            f"(got {partition_magic.hex()})"
+        )
+
+    section_by_offset = dict(sections)
+    for offset, source_path in sections:
+        expected = source_path.read_bytes()
+        actual = read_bytes(output_path, offset, len(expected))
+        if actual != expected:
             raise FactoryBinError(
-                f"{output_path.name} has no partition table magic at {hex(partition_offset)} "
-                f"(got {partition_magic.hex()})"
+                f"{output_path.name} does not contain {source_path.name} unchanged at {hex(offset)}"
             )
+
+    partition_path = section_by_offset[partition_offset]
+    app_path = section_by_offset[app_offset]
+    partition_entries = parse_partition_table(partition_path)
+    app_partition = next(
+        (
+            entry
+            for entry in partition_entries
+            if entry["type"] == 0x00 and entry["offset"] == app_offset
+        ),
+        None,
+    )
+    if app_partition is None:
+        raise FactoryBinError(
+            f"Partition table has no app partition at the flasher app offset {hex(app_offset)}"
+        )
+    app_partition_size = int(app_partition["size"])
+    if app_path.stat().st_size > app_partition_size:
+        raise FactoryBinError(
+            f"{app_path.name} ({app_path.stat().st_size} bytes) exceeds partition "
+            f"{app_partition['label']} ({app_partition_size} bytes)"
+        )
+    return str(app_partition["label"]), app_partition_size
+
+
+def normalize_app_artifact(
+    build_dir: Path,
+    sections: list[tuple[int, Path]],
+    role_offsets: dict[str, int],
+) -> Path:
+    app_path = dict(sections)[role_offsets["app"]]
+    ota_path = build_dir / "firmware.ota.bin"
+    factory_path = build_dir / "firmware.factory.bin"
+    elf_path = build_dir / "firmware.elf"
+    for required_path in (app_path, ota_path, factory_path, elf_path):
+        if not required_path.is_file():
+            raise FactoryBinError(f"Required native ESP-IDF artifact not found: {required_path}")
+    if app_path.read_bytes() != ota_path.read_bytes():
+        raise FactoryBinError(f"{ota_path.name} differs from native app image {app_path.name}")
+
+    normalized_path = build_dir / "firmware.bin"
+    if app_path.resolve() != normalized_path.resolve():
+        shutil.copy2(app_path, normalized_path)
+    return normalized_path
 
 
 def repair_factory_bin(build_dir: Path, output_name: str = "firmware.factory.bin") -> Path:
@@ -209,45 +300,53 @@ def repair_factory_bin(build_dir: Path, output_name: str = "firmware.factory.bin
     sections, role_offsets = collect_sections(build_dir, flasher_args)
     output_path = build_dir / output_name
     merge_sections(sections, output_path)
-    validate_factory_bin(output_path, role_offsets)
+    validate_factory_bin(output_path, role_offsets, sections)
     return output_path
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Repair and validate an ESPHome ESP-IDF factory binary.")
-    parser.add_argument("build_dir", help="Path to the .pioenvs/openquatt build directory.")
+    parser = argparse.ArgumentParser(
+        description="Validate native ESPHome ESP-IDF artifacts and optionally repair a legacy factory image."
+    )
+    parser.add_argument("build_dir", help="Path to the native <build_path>/build artifact directory.")
     parser.add_argument("--output-name", default="firmware.factory.bin", help="Factory binary filename to write.")
+    parser.add_argument(
+        "--repair-legacy",
+        action="store_true",
+        help="Rebuild the factory image from flasher_args.json before validating it.",
+    )
+    parser.add_argument(
+        "--normalize-app",
+        action="store_true",
+        help="Copy the native app image to firmware.bin after validating the artifact set.",
+    )
     args = parser.parse_args()
 
     try:
-        output_path = repair_factory_bin(Path(args.build_dir), args.output_name)
+        build_dir = Path(args.build_dir).resolve()
+        flasher_args = load_flasher_args(build_dir)
+        sections, role_offsets = collect_sections(build_dir, flasher_args)
+        output_path = build_dir / args.output_name
+        if args.repair_legacy:
+            merge_sections(sections, output_path)
+        if not output_path.is_file():
+            raise FactoryBinError(f"Factory binary not found: {output_path}")
+        app_partition, app_partition_size = validate_factory_bin(output_path, role_offsets, sections)
+        normalized_path = normalize_app_artifact(build_dir, sections, role_offsets) if args.normalize_app else None
     except FactoryBinError as exc:
         raise SystemExit(str(exc)) from exc
 
-    print(f"[ok] repaired factory binary: {output_path}")
+    action = "repaired and validated" if args.repair_legacy else "validated"
+    offsets = ", ".join(
+        f"{role}={hex(role_offsets[role])}" for role in ("bootloader", "partition-table", "app")
+    )
+    print(
+        f"[ok] {action} factory binary: {output_path} "
+        f"({offsets}, partition={app_partition}, size={app_partition_size})"
+    )
+    if normalized_path is not None:
+        print(f"[ok] normalized native app artifact: {normalized_path}")
     return 0
-
-
-def _register_platformio_action() -> None:
-    try:
-        Import("env")  # type: ignore[name-defined]  # noqa: F821
-    except NameError:
-        return
-
-    def repair_factory_bin_action(source, target, env):  # noqa: ANN001
-        build_dir = Path(env.subst("$BUILD_DIR"))
-        try:
-            output_path = repair_factory_bin(build_dir)
-        except FactoryBinError as exc:
-            print(f"Error repairing factory binary: {exc}")
-            env.Exit(1)
-            return
-        print(f"Repaired and validated factory binary: {output_path}")
-
-    env.AddPostAction("$BUILD_DIR/${PROGNAME}.bin", repair_factory_bin_action)  # noqa: F821
-
-
-_register_platformio_action()
 
 
 if __name__ == "__main__":
