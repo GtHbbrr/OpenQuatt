@@ -136,6 +136,8 @@ oq_cm3_promote_s: "300"                               # Required deficit duratio
 oq_cm3_demote_s: "120"                                # Required low-deficit duration for CM3 -> CM2 demotion [s].
 oq_cm3_min_run_s: "300"                               # Minimum dwell time in CM3 before demotion [s].
 oq_cm2_min_run_s: "120"                               # Minimum dwell time in CM2 before promotion [s].
+oq_cm3_curve_on_delta_c: "3.0"                        # Heating Curve target-minus-supply margin for CM2 -> CM3 [°C].
+oq_cm3_curve_off_delta_c: "1.0"                       # Heating Curve target-minus-supply margin for CM3 -> CM2 [°C].
 oq_cm0_sticky_wait_s: "86400"                         # Wait time in CM0 before sticky-pump run starts [s].
 oq_cm0_sticky_run_s: "60"                             # Duration of sticky-pump run in CM0 [s].
 oq_cm0_pump_stop_ipwm: "1000.0"                       # iPWM setpoint that forces pump off in CM0.
@@ -209,6 +211,10 @@ oq_boiler_loop_s: "5"                                 # Main interval for boiler
 oq_boiler_command_max_age_s: "15"                     # Fail-safe maximum age of the transport-neutral boiler command [s].
 oq_boiler_relay_min_on_s: "0"                         # R1 minimum on-time [s]; zero preserves existing relay behavior in foundation phase.
 oq_boiler_relay_min_off_s: "0"                        # R1 minimum off-time [s]; zero preserves existing relay behavior in foundation phase.
+oq_boiler_otb_min_on_s: "30"                          # OpenTherm minimum requested on-time [s]; safety trips override it.
+oq_boiler_otb_min_off_s: "120"                        # OpenTherm minimum requested off-time [s].
+oq_otb_supported: "false"                             # Compile-time availability of the boiler OpenTherm master transport.
+oq_otb_command_apply_s: "1"                           # Apply validated CH/TSet state to the OpenTherm master [s].
 
 # ----------------------------
 # OPEN THERM SLAVE

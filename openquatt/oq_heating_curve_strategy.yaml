@@ -930,6 +930,10 @@ interval:
             id(oq_strategy_requested_power_w) = NAN;
             id(oq_strategy_supply_target_temp) = id(oq_supply_target_temp).state;
             id(oq_strategy_heat_request_active) = id(oq_curve_heat_request_active);
+            id(oq_strategy_hp_expected_power_w) = NAN;
+            id(oq_strategy_hp_max_power_w) = NAN;
+            id(oq_strategy_hp_saturated) =
+                id(oq_curve_heat_request_active) && d_out >= demand_max;
 
             const int regime_code = id(oq_curve_regime_code);
             const char *phase_text =
@@ -969,7 +973,8 @@ interval:
               // Reset curve integral whenever curve mode is not in an active, heat-delivering state.
               if (id(oq_heat_mode_code) != 1) return false;
               if (id(oq_water_temp_hard_trip_active)) return true;
-              if (id(oq_control_mode_code) != 2) return true;
+              const int cm_code = id(oq_control_mode_code);
+              if (cm_code != 2 && cm_code != 3) return true;
               if (!id(oq_curve_heat_request_active)) return true;
               const float spw = id(oq_supply_target_temp).state;
               const float pv  = id(oq_system_supply_temp).state;

@@ -3,9 +3,10 @@
 # ==============================================================================
 #
 # Owns the transport-neutral command contract consumed by `oq_boiler_control`.
-# During the foundation phase this adapter intentionally reproduces the existing
-# CM3 and CM100 relay demand. Later work packages replace the legacy CM3 command
-# with strategy-derived requested power and target temperature.
+# CM3 commands are derived from the active heating strategy. Power House asks
+# for the remaining thermal power after the selected heat-pump levels; Heating
+# Curve forwards its supply target. CM100 remains an explicit commissioning
+# command. The selected transport is not considered here.
 #
 # This package never writes R1 or OpenTherm outputs.
 # ==============================================================================
@@ -51,16 +52,83 @@ interval:
     startup_delay: 4500ms
     then:
       - lambda: |-
-          // Phase 1: adapt the existing CM3/CM100 ownership into the shared contract.
+          // Phase 1: derive one transport-neutral command from CM3 or CM100.
           const int cm_code = id(oq_control_mode_code);
+          const uint32_t now_ms = millis();
           const bool commissioning_boiler_task =
               id(oq_commissioning_task_code) == oq_commissioning::TASK_BOILER_POWER_TEST;
-          const auto command = oq_boiler::make_legacy_command(
-              cm_code,
-              id(oq_commissioning_active),
-              commissioning_boiler_task,
-              id(oq_commissioning_boiler_request),
-              millis());
+          const bool commissioning_task_active =
+              cm_code == 100 &&
+              id(oq_commissioning_active) &&
+              commissioning_boiler_task;
+
+          oq_boiler::BoilerCommand command{
+              true,
+              false,
+              false,
+              NAN,
+              NAN,
+              oq_boiler::COMMAND_SOURCE_NONE,
+              now_ms,
+          };
+
+          if (cm_code == 3) {
+            command.demand_present = true;
+            const int strategy_code = id(oq_strategy_active_code);
+            if (strategy_code == 3) {
+              command.source = oq_boiler::COMMAND_SOURCE_POWER_HOUSE;
+              const float strategy_requested_w = id(oq_strategy_requested_power_w);
+              const float hp_expected_w = id(oq_strategy_hp_expected_power_w);
+              const float rated_boiler_w = id(oq_boiler_rated_heat_power).state;
+              command.valid =
+                  !isnan(strategy_requested_w) &&
+                  !isnan(hp_expected_w) &&
+                  !isnan(rated_boiler_w) &&
+                  rated_boiler_w > 0.0f;
+
+              if (command.valid) {
+                float remaining_power_w = strategy_requested_w - hp_expected_w;
+                remaining_power_w = fmaxf(0.0f, fminf(remaining_power_w, rated_boiler_w));
+                command.heat_request =
+                    id(oq_strategy_heat_request_active) && remaining_power_w > 0.5f;
+                command.requested_power_w = remaining_power_w;
+
+                if (command.heat_request) {
+                  const float flow_lph = id(flow_rate_selected).state;
+                  const float inlet_c = id(${secondary_water_out_temp_id}).state;
+                  float maximum_c = id(max_water_temp_limit_c).state;
+                  if (isnan(maximum_c)) maximum_c = 60.0f;
+                  maximum_c = fmaxf(25.0f, fminf(maximum_c, 75.0f));
+                  if (!isnan(flow_lph) && flow_lph >= ${oq_cm_min_flow_lph}) {
+                    const auto target = oq_boiler::target_from_power(
+                        remaining_power_w,
+                        rated_boiler_w,
+                        inlet_c,
+                        flow_lph,
+                        ${oq_water_cp_j_per_kgk},
+                        maximum_c);
+                    if (target.valid) {
+                      command.requested_power_w = target.requested_power_w;
+                      command.target_temperature_c = target.target_temperature_c;
+                    }
+                  }
+                }
+              }
+            } else if (strategy_code == 2) {
+              command.source = oq_boiler::COMMAND_SOURCE_HEATING_CURVE;
+              command.heat_request = id(oq_strategy_heat_request_active);
+              command.requested_power_w = NAN;
+              command.target_temperature_c = id(oq_strategy_supply_target_temp);
+            } else {
+              command.valid = false;
+            }
+          } else if (commissioning_task_active) {
+            command.demand_present = true;
+            command.heat_request = id(oq_commissioning_boiler_request);
+            command.requested_power_w = id(oq_boiler_rated_heat_power).state;
+            command.target_temperature_c = id(max_water_temp_limit_c).state;
+            command.source = oq_boiler::COMMAND_SOURCE_COMMISSIONING;
+          }
 
           // Phase 2: publish atomically before the controller interval evaluates it.
           id(oq_boiler_command_valid) = command.valid;
