@@ -9,6 +9,7 @@ web_server:
   port: 80
   version: 3
   auth:
+    type: digest
     username: ${web_auth_bootstrap_username}
     password: ${web_auth_bootstrap_password}
   css_include: ${oq_webserver_css_include}

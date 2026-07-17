@@ -3,10 +3,11 @@
 # ==============================================================================
 # Keep the public composition surface small. The bundle files group modules by
 # responsibility while preserving their intentional load order.
-oq_runtime_packages: !include packages/10_runtime.yaml
-oq_strategy_packages: !include packages/20_strategies.yaml
-oq_thermal_pipeline_packages: !include packages/30_thermal_pipeline.yaml
-oq_service_task_packages: !include packages/40_service_tasks.yaml
-oq_integration_packages: !include packages/50_integrations.yaml
-oq_ui_runtime_packages: !include packages/60_ui_runtime.yaml
-oq_heatpump1_package: !include packages/90_heatpump1.yaml
+packages:
+  oq_runtime_packages: !include packages/10_runtime.yaml
+  oq_strategy_packages: !include packages/20_strategies.yaml
+  oq_thermal_pipeline_packages: !include packages/30_thermal_pipeline.yaml
+  oq_service_task_packages: !include packages/40_service_tasks.yaml
+  oq_integration_packages: !include packages/50_integrations.yaml
+  oq_ui_runtime_packages: !include packages/60_ui_runtime.yaml
+  oq_heatpump1_package: !include packages/90_heatpump1.yaml

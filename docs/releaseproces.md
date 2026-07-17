@@ -46,7 +46,15 @@ Firmware should expose its channel explicitly via `release_channel` so Home Assi
 
 - CI/release build with a pinned ESPHome version from `/.github/requirements-esphome.txt`.
 - Keep release builds deterministic by updating this pin via PR (instead of using floating `latest`).
-- A scheduled canary workflow (`/.github/workflows/esphome-canary.yml`) validates compatibility against the latest ESPHome.
+
+## Deferred ESPHome Security Features
+
+ESPHome 2026.7 adds optional NVS HMAC encryption and OTA downgrade protection. OpenQuatt does not enable either feature as part of the compatibility migration:
+
+- NVS HMAC encryption requires provisioning an HMAC key in eFuse. Burning that key is irreversible, support differs across the ESP32 target matrix, and factory/recovery procedures have not yet been designed.
+- OTA downgrade protection is only effective for signed firmware. OpenQuatt release artifacts are not yet signed and there is no validated downgrade and recovery procedure for every hardware target.
+
+Treat both as separate hardware-security projects with their own provisioning, signing, recovery and hardware-validation plan.
 
 ## Release Versioning
 

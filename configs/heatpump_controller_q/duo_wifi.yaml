@@ -2,8 +2,6 @@
 # OpenQuatt - Electropaultje Heatpump Controller Q-edition / Duo / Wi-Fi
 # ==============================================================================
 substitutions:
-  <<: !include ../../openquatt/oq_substitutions_common.yaml
-  <<: !include ../../openquatt/topology/duo.yaml
   oq_hardware_profile: "heatpump_controller_q"
   oq_connection: "wifi"
   oq_hardware_build_flag: "-DOQ_HARDWARE_HEATPUMP_CONTROLLER_Q=1"
@@ -28,10 +26,12 @@ esphome:
   build_path: ../../../.esphome/build/heatpump_controller_q_duo_wifi
 
 packages:
+  openquatt_substitutions_common: !include ../../openquatt/oq_substitutions_common_package.yaml
+  openquatt_topology_duo_substitutions: !include ../../openquatt/topology/duo_package.yaml
   openquatt_profile_heatpump_controller_q: !include ../../openquatt/profiles/heatpump_controller_q.yaml
   openquatt_profile_heatpump_controller_q_cic_compatibility_duo: !include ../../openquatt/profiles/heatpump_controller_q_cic_compatibility_duo.yaml
   openquatt_base_common: !include ../../openquatt/base/common.yaml
   openquatt_connection_wifi: !include ../../openquatt/connection/wifi.yaml
   openquatt_connection_wifi_w5500_power_down: !include ../../openquatt/connection/wifi_w5500_power_down.yaml
-  <<: !include ../../openquatt/oq_packages_common.yaml
-  <<: !include ../../openquatt/topology/duo_packages.yaml
+  openquatt_packages_common: !include ../../openquatt/oq_packages_common.yaml
+  openquatt_topology_duo_packages: !include ../../openquatt/topology/duo_packages.yaml

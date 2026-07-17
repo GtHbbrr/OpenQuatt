@@ -79,13 +79,14 @@ void OpenQuattCIC::loop() {
 void OpenQuattCIC::dump_config() {
   ESP_LOGCONFIG(TAG, "OpenQuatt CIC");
   LOG_UPDATE_INTERVAL(this);
-  ESP_LOGCONFIG(TAG, "  Timeout: %u ms", this->timeout_ms_);
+  ESP_LOGCONFIG(TAG, "  Timeout: %u ms", static_cast<unsigned>(this->timeout_ms_));
   ESP_LOGCONFIG(TAG, "  Response buffer size: %u B", static_cast<unsigned>(this->response_buffer_size_));
   ESP_LOGCONFIG(TAG, "  Response buffer: %s",
                 !this->response_buffer_ ? "missing" : (this->response_buffer_.is_external() ? "PSRAM" : "internal"));
-  ESP_LOGCONFIG(TAG, "  Backoff start/max: %u / %u ms", this->backoff_start_ms_, this->backoff_max_ms_);
-  ESP_LOGCONFIG(TAG, "  Stale after: %u ms", this->stale_after_ms_);
-  ESP_LOGCONFIG(TAG, "  Feed error trip: %u", this->feed_error_trip_n_);
+  ESP_LOGCONFIG(TAG, "  Backoff start/max: %u / %u ms", static_cast<unsigned>(this->backoff_start_ms_),
+                static_cast<unsigned>(this->backoff_max_ms_));
+  ESP_LOGCONFIG(TAG, "  Stale after: %u ms", static_cast<unsigned>(this->stale_after_ms_));
+  ESP_LOGCONFIG(TAG, "  Feed error trip: %u", static_cast<unsigned>(this->feed_error_trip_n_));
 }
 
 bool OpenQuattCIC::start_fetch_(const std::string &url) {

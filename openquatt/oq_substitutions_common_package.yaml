@@ -1,0 +1,5 @@
+# ==============================================================================
+# OpenQuatt - Shared Substitutions Package
+# ==============================================================================
+substitutions:
+  <<: !include oq_substitutions_common.yaml

@@ -560,7 +560,7 @@ interval:
           auto transition_reason = [&](bool starting)->uint8_t {
             if (id(oq_control_mode_code) == 5) {
               return starting
-                  ? openquatt_decision_log::REASON_RUNTIME_LEAD
+                  ? static_cast<uint8_t>(openquatt_decision_log::REASON_RUNTIME_LEAD)
                   : source_stop_reason();
             }
             if (!starting) {

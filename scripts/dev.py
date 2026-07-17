@@ -15,6 +15,8 @@ from typing import Iterable, Sequence
 
 from build_targets import filter_targets, load_targets
 
+MIN_BOOTSTRAP_PYTHON = (3, 12)
+
 def repo_root() -> Path:
     return Path(__file__).resolve().parent.parent
 
@@ -119,7 +121,6 @@ def bootstrap_python_candidates(explicit_python: str) -> list[str]:
             "/usr/local/bin/python3",
             "/Library/Frameworks/Python.framework/Versions/3.13/bin/python3",
             "/Library/Frameworks/Python.framework/Versions/3.12/bin/python3",
-            "/Library/Frameworks/Python.framework/Versions/3.11/bin/python3",
             "/usr/bin/python3",
         ):
             add(candidate)
@@ -132,6 +133,26 @@ def bootstrap_python_candidates(explicit_python: str) -> list[str]:
 
 
 def can_create_bootstrap_venv(python_exe: str, root_dir: Path) -> tuple[bool, str]:
+    minimum = ".".join(str(part) for part in MIN_BOOTSTRAP_PYTHON)
+    version_check = subprocess.run(
+        [
+            python_exe,
+            "-c",
+            (
+                "import sys; "
+                "print('.'.join(str(part) for part in sys.version_info[:3])); "
+                f"raise SystemExit(0 if sys.version_info >= {MIN_BOOTSTRAP_PYTHON!r} else 1)"
+            ),
+        ],
+        cwd=root_dir,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    detected = version_check.stdout.strip() or "unknown"
+    if version_check.returncode != 0:
+        return False, f"Python {detected} is too old; ESPHome 2026.7 requires Python {minimum} or newer"
+
     with tempfile.TemporaryDirectory(prefix="openquatt-bootstrap-check-") as tmp_dir:
         probe_venv = Path(tmp_dir) / "venv"
         completed = subprocess.run(

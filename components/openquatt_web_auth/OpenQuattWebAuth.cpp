@@ -860,7 +860,8 @@ void OpenQuattWebAuth::rotate_csrf_token_() {
   const uint32_t part_b = esp_random();
   const uint32_t part_c = esp_random();
   const uint32_t part_d = esp_random();
-  std::snprintf(token, sizeof(token), "%08x%08x%08x%08x", part_a, part_b, part_c, part_d);
+  std::snprintf(token, sizeof(token), "%08x%08x%08x%08x", static_cast<unsigned>(part_a),
+                static_cast<unsigned>(part_b), static_cast<unsigned>(part_c), static_cast<unsigned>(part_d));
   this->csrf_token_ = token;
 }
 

@@ -4,8 +4,6 @@
 # Ethernet-only target for the Heatpump Controller Q W5500 port.
 # ==============================================================================
 substitutions:
-  <<: !include ../../openquatt/oq_substitutions_common.yaml
-  <<: !include ../../openquatt/topology/single.yaml
   oq_hardware_profile: "heatpump_controller_q"
   oq_connection: "eth"
   oq_hardware_build_flag: "-DOQ_HARDWARE_HEATPUMP_CONTROLLER_Q=1"
@@ -30,7 +28,9 @@ esphome:
   build_path: ../../../.esphome/build/heatpump_controller_q_single_eth
 
 packages:
+  openquatt_substitutions_common: !include ../../openquatt/oq_substitutions_common_package.yaml
+  openquatt_topology_single_substitutions: !include ../../openquatt/topology/single_package.yaml
   openquatt_profile_heatpump_controller_q: !include ../../openquatt/profiles/heatpump_controller_q.yaml
   openquatt_base_common: !include ../../openquatt/base/common.yaml
   openquatt_connection_eth: !include ../../openquatt/connection/eth.yaml
-  <<: !include ../../openquatt/oq_packages_common.yaml
+  openquatt_packages_common: !include ../../openquatt/oq_packages_common.yaml

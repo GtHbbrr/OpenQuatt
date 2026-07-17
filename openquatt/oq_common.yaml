@@ -1154,13 +1154,15 @@ text_sensor:
       // Format the most compact readable representation for the dashboard.
       char buffer[32];
       if (days > 0U) {
-        snprintf(buffer, sizeof(buffer), "%ud %uh %um", days, hours, minutes);
+        snprintf(buffer, sizeof(buffer), "%ud %uh %um", static_cast<unsigned>(days),
+                 static_cast<unsigned>(hours), static_cast<unsigned>(minutes));
       } else if (hours > 0U) {
-        snprintf(buffer, sizeof(buffer), "%uh %um", hours, minutes);
+        snprintf(buffer, sizeof(buffer), "%uh %um", static_cast<unsigned>(hours),
+                 static_cast<unsigned>(minutes));
       } else if (minutes > 0U) {
-        snprintf(buffer, sizeof(buffer), "%um", minutes);
+        snprintf(buffer, sizeof(buffer), "%um", static_cast<unsigned>(minutes));
       } else {
-        snprintf(buffer, sizeof(buffer), "%us", seconds);
+        snprintf(buffer, sizeof(buffer), "%us", static_cast<unsigned>(seconds));
       }
       return {buffer};
     web_server:

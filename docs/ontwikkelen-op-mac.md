@@ -6,7 +6,7 @@ De GitHub Actions blijven op Linux draaien; lokaal gebruik je dezelfde Python- e
 ## Setup
 
 1. Clone de repo in je normale home-directory.
-2. Zorg dat `python3` beschikbaar is.
+2. Zorg dat Python 3.12 of nieuwer als `python3` beschikbaar is.
 3. Maak de lokale ESPHome-omgeving aan:
 
 ```bash

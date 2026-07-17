@@ -11,7 +11,7 @@ esphome:
   project:
     name: ${project_name}
     version: ${project_version}
-  min_version: 2026.6.2
+  min_version: 2026.7.0
   name_add_mac_suffix: false
   includes:
     - ${oq_cpp_headers_dir}
@@ -76,7 +76,7 @@ esp32:
     type: esp-idf
     version: recommended
     sdkconfig_options:
-      COMPILER_OPTIMIZATION_SIZE: y
+      CONFIG_COMPILER_OPTIMIZATION_SIZE: y
       CONFIG_BT_ENABLED: n
       CONFIG_ESP_MAIN_TASK_STACK_SIZE: "8192"
       CONFIG_SPIRAM_USE_MALLOC: y

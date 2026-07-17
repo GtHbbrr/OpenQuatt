@@ -94,13 +94,10 @@ STRICT_TOP_LEVEL_ORDER_RULES = {
         "sensor",
     ),
     "openquatt/oq_packages_common.yaml": (
-        "oq_runtime_packages",
-        "oq_strategy_packages",
-        "oq_thermal_pipeline_packages",
-        "oq_service_task_packages",
-        "oq_integration_packages",
-        "oq_ui_runtime_packages",
-        "oq_heatpump1_package",
+        "packages",
+    ),
+    "openquatt/oq_substitutions_common_package.yaml": (
+        "substitutions",
     ),
     "openquatt/packages/10_runtime.yaml": (
         "packages",
@@ -138,8 +135,10 @@ STRICT_TOP_LEVEL_ORDER_RULES = {
         "monitoring_hp2_internal",
     ),
     "openquatt/topology/duo_packages.yaml": (
-        "heatpump2",
-        "hp2_odu_runtime_frequency_table",
+        "packages",
+    ),
+    "openquatt/topology/duo_package.yaml": (
+        "substitutions",
     ),
     "openquatt/topology/single.yaml": (
         "secondary_hp_id",
@@ -154,6 +153,9 @@ STRICT_TOP_LEVEL_ORDER_RULES = {
         "sensor_sources_duo_flow_internal",
         "ot_secondary_present",
         "monitoring_hp2_internal",
+    ),
+    "openquatt/topology/single_package.yaml": (
+        "substitutions",
     ),
     "openquatt/profiles/heatpump_controller_q_cic_compatibility.yaml": (
         "substitutions",
@@ -176,29 +178,92 @@ STRICT_TOP_LEVEL_ORDER_RULES = {
 }
 
 NESTED_KEY_ORDER_RULES = {
+    ("configs/waveshare/single_wifi.yaml", "packages"): (
+        "openquatt_substitutions_common",
+        "openquatt_topology_single_substitutions",
+        "openquatt_profile_waveshare",
+        "openquatt_base_common",
+        "openquatt_connection_wifi",
+        "openquatt_packages_common",
+    ),
+    ("configs/waveshare/duo_wifi.yaml", "packages"): (
+        "openquatt_substitutions_common",
+        "openquatt_topology_duo_substitutions",
+        "openquatt_profile_waveshare",
+        "openquatt_base_common",
+        "openquatt_connection_wifi",
+        "openquatt_packages_common",
+        "openquatt_topology_duo_packages",
+    ),
+    ("configs/heatpump_listener/single_wifi.yaml", "packages"): (
+        "openquatt_substitutions_common",
+        "openquatt_topology_single_substitutions",
+        "openquatt_profile_heatpump_listener",
+        "openquatt_base_common",
+        "openquatt_connection_wifi",
+        "oq_heatpump_listener_extras",
+        "openquatt_packages_common",
+    ),
+    ("configs/heatpump_listener/duo_wifi.yaml", "packages"): (
+        "openquatt_substitutions_common",
+        "openquatt_topology_duo_substitutions",
+        "openquatt_profile_heatpump_listener",
+        "openquatt_base_common",
+        "openquatt_connection_wifi",
+        "oq_heatpump_listener_extras",
+        "openquatt_packages_common",
+        "openquatt_topology_duo_packages",
+    ),
     ("configs/heatpump_controller_q/single_wifi.yaml", "packages"): (
+        "openquatt_substitutions_common",
+        "openquatt_topology_single_substitutions",
         "openquatt_profile_heatpump_controller_q",
         "openquatt_base_common",
         "openquatt_connection_wifi",
         "openquatt_connection_wifi_w5500_power_down",
+        "openquatt_packages_common",
     ),
     ("configs/heatpump_controller_q/single_eth.yaml", "packages"): (
+        "openquatt_substitutions_common",
+        "openquatt_topology_single_substitutions",
         "openquatt_profile_heatpump_controller_q",
         "openquatt_base_common",
         "openquatt_connection_eth",
+        "openquatt_packages_common",
     ),
     ("configs/heatpump_controller_q/duo_wifi.yaml", "packages"): (
+        "openquatt_substitutions_common",
+        "openquatt_topology_duo_substitutions",
         "openquatt_profile_heatpump_controller_q",
         "openquatt_profile_heatpump_controller_q_cic_compatibility_duo",
         "openquatt_base_common",
         "openquatt_connection_wifi",
         "openquatt_connection_wifi_w5500_power_down",
+        "openquatt_packages_common",
+        "openquatt_topology_duo_packages",
     ),
     ("configs/heatpump_controller_q/duo_eth.yaml", "packages"): (
+        "openquatt_substitutions_common",
+        "openquatt_topology_duo_substitutions",
         "openquatt_profile_heatpump_controller_q",
         "openquatt_profile_heatpump_controller_q_cic_compatibility_duo",
         "openquatt_base_common",
         "openquatt_connection_eth",
+        "openquatt_packages_common",
+        "openquatt_topology_duo_packages",
+    ),
+    ("openquatt/oq_packages_common.yaml", "packages"): (
+        "oq_runtime_packages",
+        "oq_strategy_packages",
+        "oq_thermal_pipeline_packages",
+        "oq_service_task_packages",
+        "oq_integration_packages",
+        "oq_ui_runtime_packages",
+        "oq_heatpump1_package",
+    ),
+    ("openquatt/topology/duo_packages.yaml", "packages"): (
+        "heatpump2",
+        "hp2_odu_runtime_frequency_table",
     ),
     ("openquatt/packages/10_runtime.yaml", "packages"): (
         "oq_common",

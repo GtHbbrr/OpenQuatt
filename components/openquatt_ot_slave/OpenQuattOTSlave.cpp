@@ -78,19 +78,6 @@ namespace esphome {
 	static constexpr unsigned long OT_BUS_IDLE_MIN_MS = 100;
 	static constexpr unsigned long OT_STARTUP_FORCE_MS = 5000;
 	static constexpr float SUPPORTED_OPENTHERM_VERSION = 2.2f;
-	static const char *message_type_to_string_(OpenThermMessageType type) {
-		switch (type) {
-			case OpenThermMessageType::READ_DATA: return "READ_DATA";
-			case OpenThermMessageType::WRITE_DATA: return "WRITE_DATA";
-			case OpenThermMessageType::INVALID_DATA: return "INVALID_DATA";
-			case OpenThermMessageType::RESERVED: return "RESERVED";
-			case OpenThermMessageType::READ_ACK: return "READ_ACK";
-			case OpenThermMessageType::WRITE_ACK: return "WRITE_ACK";
-			case OpenThermMessageType::DATA_INVALID: return "DATA_INVALID";
-			case OpenThermMessageType::UNKNOWN_DATA_ID: return "UNKNOWN_DATA_ID";
-			default: return "UNKNOWN";
-		}
-	}
 	static unsigned long now_millis() {
 		return static_cast<unsigned long>(esp_timer_get_time() / 1000ULL);
 	}
