@@ -602,7 +602,7 @@ import { escapeHtml } from "../core/html.js";
     const boilerConnection = boilerConnectionAvailable
       ? String(getEntityValue("boilerConnection") || "R1")
       : "R1";
-    const openthermBoilerSupported = hasEntity("otbLinkAvailable") || hasEntity("boilerProvidesDhw");
+    const openthermBoilerSupported = hasEntity("otbLinkAvailable");
     const boilerConnectionOptions = boilerConnectionAvailable
       ? getSelectEntityOptions(state.entities.boilerConnection || {})
           .filter((option) => option !== "OpenTherm" || openthermBoilerSupported)
@@ -619,8 +619,6 @@ import { escapeHtml } from "../core/html.js";
         <span class="oq-settings-select-caret" aria-hidden="true"></span>
       </label>
     ` : "";
-    const boilerProvidesDhw = hasEntity("boilerProvidesDhw") && isEntityActive("boilerProvidesDhw");
-    const boilerDhwBusy = state.loadingEntities || state.busyAction === "switch-boilerProvidesDhw";
     const boilerPowerMissingHint = "Deze firmware levert nog geen bewerkbare boilervermogensinstelling.";
     const boilerPowerControl = boilerPowerEntityAvailable
       ? renderNumberInputControl({
@@ -661,18 +659,6 @@ import { escapeHtml } from "../core/html.js";
               ? "Kies de aansluiting die fysiek met de ketel is verbonden. OpenQuatt gebruikt nooit beide routes tegelijk."
               : "Deze hardware ondersteunt alleen de aan/uit-aansluiting via R1.",
             boilerConnectionControl,
-            "oq-settings-field--compact",
-          ) : ""}
-
-          ${boilerPresent && boilerConnection === "OpenTherm" && hasEntity("boilerProvidesDhw") ? renderSettingsFieldCard(
-            "boilerProvidesDhw",
-            "Tapwater via de ketel",
-            "Laat dit aan voor een combiketel. Dit geeft tapwater alleen toestemming; het is geen tapwatervraag.",
-            `
-              <div class="oq-settings-compact-switch-field">
-                ${renderSettingsCompactSwitchControl("boilerProvidesDhw", "Tapwater via de ketel", boilerProvidesDhw, boilerDhwBusy, "Ja", "Nee")}
-              </div>
-            `,
             "oq-settings-field--compact",
           ) : ""}
 

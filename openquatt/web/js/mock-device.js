@@ -1498,7 +1498,6 @@
       state: "OpenTherm",
       option: ["R1", "OpenTherm"],
     });
-    setEntity("switch", "Boiler provides domestic hot water", { value: true, state: true });
     setEntity("switch", "Manual Cooling Enable", { value: false, state: false });
     setEntity("switch", "Cooling Room Request Required", { value: true, state: true });
     setEntity("switch", "CIC - Enable polling", { value: false, state: false });

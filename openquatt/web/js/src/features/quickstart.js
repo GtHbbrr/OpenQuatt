@@ -953,9 +953,6 @@ import { renderUsageTelemetryConsent, renderUsageTelemetryDisclosure } from "./u
                 ...(hasEntity("boilerConnection")
                   ? [["Ketelaansluiting", String(getEntityValue("boilerConnection") || "R1") === "OpenTherm" ? "OpenTherm (OTB)" : "Aan/uit (R1)"]]
                   : []),
-                ...(String(getEntityValue("boilerConnection") || "R1") === "OpenTherm" && hasEntity("boilerProvidesDhw")
-                  ? [["Tapwater via ketel", isEntityActive("boilerProvidesDhw") ? "Ja" : "Nee"]]
-                  : []),
                 ["Ingesteld ketelvermogen", formatValue("boilerRatedHeatPower")],
               ]
             : []),

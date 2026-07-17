@@ -28,7 +28,6 @@ import { render } from "../core/render-scheduler.js";
         ...base,
         "boilerCvAssistEnabled",
         "boilerConnection",
-        "boilerProvidesDhw",
         "boilerRatedHeatPower",
         "otbLinkAvailable",
       ])];
@@ -58,7 +57,6 @@ import { render } from "../core/render-scheduler.js";
         "hpGeneration",
         "boilerCvAssistEnabled",
         "boilerConnection",
-        "boilerProvidesDhw",
         "boilerRatedHeatPower",
         ...QUICK_START_FLOW_SOURCE_KEYS,
         ...QUICK_START_THERMOSTAT_SOURCE_KEYS,

@@ -87,14 +87,6 @@ switch:
       entity_category: diagnostic
       restore_mode: ALWAYS_OFF
       icon: mdi:radiator
-    dhw_enable:
-      id: oq_otb_dhw_enable
-      name: "Boiler provides domestic hot water"
-      entity_category: config
-      restore_mode: RESTORE_DEFAULT_ON
-      icon: mdi:water-boiler
-      web_server:
-        sorting_group_id: oq_boiler
 
 binary_sensor:
   - platform: template

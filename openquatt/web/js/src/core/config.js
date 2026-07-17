@@ -14,7 +14,7 @@
     ["generation", "Kies je Quatt Hybrid", "Geef hier aan welke Quatt Hybrid je hebt. Dan zet OpenQuatt de juiste regeling klaar."],
     ["flow-source", "Flowmeting configureren", "Controleer en activeer de flowbron die bij jouw Quatt-versie en controller hoort."],
     ["thermostat-source", "Thermostaatgegevens configureren", "Leg vast waar OpenQuatt de kamertemperatuur en het kamer-setpoint samen vandaan haalt."],
-    ["boiler", "CV-ketel of boiler", "Leg vast of er een ketel is, hoe die is aangesloten en of een OpenTherm-ketel tapwater levert.", "boilerCvAssistEnabled"],
+    ["boiler", "CV-ketel of boiler", "Leg vast of er een ketel is en hoe die fysiek is aangesloten.", "boilerCvAssistEnabled"],
     ["strategy", "Kies de verwarmingsstrategie", "Kies hier hoe OpenQuatt je verwarming regelt. Daarna lopen we samen de belangrijkste instellingen langs."],
     ["heating", "Werk de regeling uit", "Stel nu de gekozen regeling verder in. De inhoud hieronder past zich aan aan je keuze."],
     ["flow", "Flowregeling en afstelling", "Leg daarna vast hoe de pomp geregeld moet worden en welke waarden daarbij horen. De autotune staat later onder Instellingen → Installatie → Service & commissioning."],
@@ -106,7 +106,6 @@
     openquattEnabled: { domain: "switch", name: "OpenQuatt Enabled", optional: true },
     boilerCvAssistEnabled: { domain: "switch", name: "Boiler assist enabled", optional: true },
     boilerConnection: { domain: "select", name: "Boiler connection", optional: true },
-    boilerProvidesDhw: { domain: "switch", name: "Boiler provides domestic hot water", optional: true },
     manualCoolingEnable: { domain: "switch", name: "Manual Cooling Enable", optional: true },
     cicCompatibilityMode: { domain: "switch", name: "CiC Compatibility Mode", optional: true },
     silentModeOverride: { domain: "select", name: "Silent Mode Override", optional: true },
@@ -903,7 +902,7 @@
   ]);
   export const CIC_COMPATIBILITY_KEYS = ["cicCompatibilityMode"];
   export const OPENTHERM_SETTING_KEYS = ["otEnabled", "otLinkProblem"];
-  export const BOILER_SETTING_KEYS = ["boilerConnection", "boilerProvidesDhw"];
+  export const BOILER_SETTING_KEYS = ["boilerConnection"];
   export const CIC_POLLING_SETTING_KEYS = ["cicPollingEnabled", "cicFeedUrl", "cicDataStale"];
   export const OPENTHERM_DIAGNOSTIC_KEYS = [
     "otThermostatChEnable",
