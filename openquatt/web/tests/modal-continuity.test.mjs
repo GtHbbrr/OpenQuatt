@@ -12,7 +12,10 @@ class FakeElement {
     this.parentElement = null;
     this.scrollLeft = 0;
     this.scrollTop = 0;
+    this.scrollHeight = 0;
+    this.clientHeight = 0;
     this.disabled = false;
+    this.rect = { top: 0 };
     this.dataset = {};
     for (const [name, value] of this.attributeMap) {
       if (name.startsWith("data-")) {
@@ -41,6 +44,10 @@ class FakeElement {
 
   getAttribute(name) {
     return this.attributeMap.get(name) ?? null;
+  }
+
+  getBoundingClientRect() {
+    return this.rect;
   }
 
   matches(selector) {
@@ -168,4 +175,33 @@ test("modal continuity does not leak to a different system modal", (t) => {
 
   assert.equal(replacement.backdrop.scrollTop, 0);
   assert.equal(document.activeElement, replacement.closeButton);
+});
+
+test("modal continuity keeps the focused action visually anchored when content grows above it", (t) => {
+  const originalDocument = globalThis.document;
+  const originalWindow = globalThis.window;
+  globalThis.document = { activeElement: null };
+  globalThis.window = { requestAnimationFrame() {} };
+  t.after(() => {
+    globalThis.document = originalDocument;
+    globalThis.window = originalWindow;
+  });
+
+  const previous = createModal("oq-webserver-log-modal-title");
+  previous.dialog.scrollTop = 60;
+  previous.dialog.clientHeight = 670;
+  previous.dialog.scrollHeight = 730;
+  previous.infoButton.rect = { top: 648 };
+  document.activeElement = previous.infoButton;
+  const continuity = captureModalContinuity(previous.root);
+
+  const replacement = createModal("oq-webserver-log-modal-title");
+  replacement.dialog.clientHeight = 670;
+  replacement.dialog.scrollHeight = 804;
+  replacement.infoButton.rect = { top: 722 };
+  document.activeElement = replacement.closeButton;
+  restoreModalContinuity(replacement.root, continuity);
+
+  assert.equal(replacement.dialog.scrollTop, 134);
+  assert.equal(document.activeElement, replacement.infoButton);
 });

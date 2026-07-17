@@ -57,6 +57,15 @@ function findElementByIdentity(scope, identity) {
   return candidates[identity.index] || null;
 }
 
+function captureVisualAnchor(element, scope) {
+  if (!element || !scope?.contains(element) || typeof element.getBoundingClientRect !== "function") {
+    return null;
+  }
+  const rect = element.getBoundingClientRect();
+  const top = Number(rect?.top);
+  return Number.isFinite(top) ? { top } : null;
+}
+
 function captureScrollPositions(backdrop) {
   return [backdrop, ...backdrop.querySelectorAll("[data-oq-modal-scroll]")].map((element) => ({
     key: String(element.dataset?.oqModalScroll || "backdrop"),
@@ -81,6 +90,26 @@ function restoreScrollPositions(backdrop, positions) {
   });
 }
 
+function restoreVisualAnchor(backdrop, element, anchor) {
+  if (!backdrop || !element || !anchor || typeof element.getBoundingClientRect !== "function") {
+    return;
+  }
+  const currentTop = Number(element.getBoundingClientRect()?.top);
+  if (!Number.isFinite(currentTop)) {
+    return;
+  }
+  const delta = currentTop - anchor.top;
+  if (Math.abs(delta) < 0.5) {
+    return;
+  }
+  const scrollContainer = [backdrop, ...backdrop.querySelectorAll("[data-oq-modal-scroll]")]
+    .reverse()
+    .find((candidate) => candidate.contains(element) && Number(candidate.scrollHeight) > Number(candidate.clientHeight));
+  if (scrollContainer) {
+    scrollContainer.scrollTop += delta;
+  }
+}
+
 export function captureModalContinuity(root) {
   if (!root || typeof document === "undefined") {
     return null;
@@ -99,6 +128,7 @@ export function captureModalContinuity(root) {
   return {
     identity,
     focus: captureElementIdentity(document.activeElement, backdrop),
+    focusAnchor: captureVisualAnchor(document.activeElement, backdrop),
     scrollPositions: captureScrollPositions(backdrop),
   };
 }
@@ -110,20 +140,22 @@ export function restoreModalContinuity(root, continuity) {
     return;
   }
 
-  const applyScroll = () => {
+  const applyContinuity = () => {
     if (restoreToken !== token) {
       return;
     }
     const backdrop = findModalBackdrop(root, continuity.identity);
     restoreScrollPositions(backdrop, continuity.scrollPositions);
+    const focusTarget = findElementByIdentity(backdrop, continuity.focus);
+    restoreVisualAnchor(backdrop, focusTarget, continuity.focusAnchor);
   };
 
   const backdrop = findModalBackdrop(root, continuity.identity);
-  applyScroll();
+  applyContinuity();
   const focusTarget = findElementByIdentity(backdrop, continuity.focus);
   if (focusTarget && !focusTarget.disabled) {
     focusTarget.focus({ preventScroll: true });
-    applyScroll();
+    applyContinuity();
   }
-  window.requestAnimationFrame(applyScroll);
+  window.requestAnimationFrame(applyContinuity);
 }
