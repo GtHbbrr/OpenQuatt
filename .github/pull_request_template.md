@@ -1,7 +1,7 @@
 # Wat verandert deze PR?
 
 <!-- Korte samenvatting in 1-3 bullets. -->
-<!-- Noteer commando's zonder rtk-prefix: `npm ci`, niet `rtk npm ci`. -->
+<!-- Noteer reproduceerbare projectcommando's zonder persoonlijke shell-wrappers. -->
 
 - 
 
