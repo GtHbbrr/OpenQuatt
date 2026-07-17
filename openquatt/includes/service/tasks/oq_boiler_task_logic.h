@@ -347,6 +347,7 @@ class BoilerPowerTestRuntime {
     stable_flow_count_ = flow_stable_now ? stable_flow_count_ + 1 : 0;
     if (stable_flow_count_ >= cfg.stable_flow_samples &&
         (uint32_t)(now_ms - id(oq_commissioning_state_since_ms)) >= cfg.flow_settle_min_ms) {
+      id(oq_commissioning_boiler_request_updated_ms) = now_ms;
       id(oq_commissioning_boiler_request) = true;
       id(oq_commissioning_state_code) = STATE_BOILER_SETTLE;
       id(oq_commissioning_state_since_ms) = now_ms;

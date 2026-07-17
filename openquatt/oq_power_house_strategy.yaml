@@ -1126,6 +1126,10 @@ interval:
           id(oq_strategy_hp_max_power_w) = id(oq_P_hp_cap_w);
           id(oq_strategy_hp_saturated) =
               (f > 0) && !isnan(id(oq_P_deficit_w)) && id(oq_P_deficit_w) > 0.0f;
+          id(oq_strategy_output_valid) =
+              !isnan(P_req_total) && hp_expected_power_valid;
+          id(oq_strategy_output_source_code) = 3;
+          id(oq_strategy_output_updated_ms) = now_ms;
           id(oq_strategy_phase_text).publish_state((f > 0) ? "heat" : "idle");
 
           char debug_buf[160];

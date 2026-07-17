@@ -889,6 +889,7 @@ interval:
           // CM5 owns the thermal strategy interface while cooling is active, so the
           // curve path must go fully inactive there even when curve mode remains selected.
           const bool active = (id(oq_control_mode_code) != 5) && (id(oq_heat_mode_code) == 1);
+          const uint32_t now_ms = millis();
           const int demand_max = (int) ${oq_strategy_demand_max_f};
           auto clamp_demand = [&](int demand)->int {
             if (demand < 0) return 0;
@@ -934,6 +935,9 @@ interval:
             id(oq_strategy_hp_max_power_w) = NAN;
             id(oq_strategy_hp_saturated) =
                 id(oq_curve_heat_request_active) && d_out >= demand_max;
+            id(oq_strategy_output_valid) = !isnan(spw) && !isnan(pv);
+            id(oq_strategy_output_source_code) = 2;
+            id(oq_strategy_output_updated_ms) = now_ms;
 
             const int regime_code = id(oq_curve_regime_code);
             const char *phase_text =

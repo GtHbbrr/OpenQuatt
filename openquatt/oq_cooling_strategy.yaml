@@ -1452,6 +1452,9 @@ interval:
           id(oq_strategy_requested_power_w) = NAN;
           id(oq_strategy_supply_target_temp) = id(cooling_supply_target).state;
           id(oq_strategy_heat_request_active) = (f > 0);
+          id(oq_strategy_output_valid) = !isnan(id(cooling_supply_target).state);
+          id(oq_strategy_output_source_code) = 1;
+          id(oq_strategy_output_updated_ms) = now_ms;
           id(oq_strategy_phase_text).publish_state((f > 0) ? "cool" : "idle");
 
           char debug_buf[240];
