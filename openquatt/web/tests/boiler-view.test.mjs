@@ -179,6 +179,9 @@ test("integration diagnostics separates thermostat, boiler control, OTB and CiC"
     assert.match(html, /OpenTherm ketel \(OTB\)/);
     assert.match(html, /CiC-feed/);
     assert.match(html, /Waterdruk/);
+    assert.match(html, /De aansluiting van de cv-ketel/);
+    assert.match(html, /Instellingen → Installatie/);
+    assert.doesNotMatch(html, /thermostaatbus, ketelaansturing/);
   } finally {
     state.entities = previousEntities;
   }

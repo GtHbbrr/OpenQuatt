@@ -190,9 +190,12 @@ import { escapeHtml } from "../core/html.js";
     return renderSettingsSection(
       "Integratie",
       "OpenTherm en CiC",
-      "Configureer de thermostaatbus, ketelaansturing, externe CiC-feed en Quatt app-compatibiliteit.",
+      "Configureer de thermostaatbus, externe CiC-feed en Quatt app-compatibiliteit.",
       `
         <div class="oq-settings-integration-grid">
+          <p class="oq-settings-action-note oq-settings-integration-card--wide">
+            De aansluiting van de cv-ketel — OpenTherm of aan/uit via R1 — stel je in onder <strong>Instellingen → Installatie</strong>. Daarom wordt deze hier niet apart weergegeven.
+          </p>
           ${renderSettingsIntegrationSwitchCard("otEnabled", "OpenTherm-thermostaat", "Thermostaatbus voor warmtevraag en kamerwaarden.")}
           ${renderSettingsIntegrationSwitchCard("cicPollingEnabled", "CIC-polling", "JSON-feed uitlezen voor setpoint, kamerwaarden en flow.")}
           ${renderSettingsIntegrationSwitchCard("cicCompatibilityMode", "CiC-compatibiliteit", "Gegevens doorgeven zodat de Quatt app kan blijven meekijken.")}
