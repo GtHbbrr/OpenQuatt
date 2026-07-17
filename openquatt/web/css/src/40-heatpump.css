@@ -1115,7 +1115,32 @@
 }
 
 .oq-overview-boiler {
+  grid-column: 1 / -1;
   margin-top: 0;
+}
+
+.oq-overview-chip--danger {
+  border-color: rgba(248, 113, 113, 0.42);
+  background: rgba(127, 29, 29, 0.22);
+  color: #fecaca;
+}
+
+.oq-overview-chip--offline {
+  border-color: rgba(148, 163, 184, 0.34);
+  background: rgba(51, 65, 85, 0.26);
+  color: #cbd5e1;
+}
+
+.oq-overview-chip--waiting {
+  border-color: rgba(245, 158, 11, 0.34);
+  background: rgba(120, 53, 15, 0.2);
+  color: #fde68a;
+}
+
+.oq-overview-chip--dhw {
+  border-color: rgba(56, 189, 248, 0.36);
+  background: rgba(3, 105, 161, 0.2);
+  color: #bae6fd;
 }
 
 .oq-boiler-card {
@@ -1195,7 +1220,7 @@
 }
 
 .oq-boiler-card-flame {
-  opacity: 0.22;
+  opacity: 0.12;
   transform-origin: center;
 }
 
@@ -1203,9 +1228,18 @@
   fill: rgba(255, 255, 255, 0.74);
 }
 
-.oq-boiler-card.is-running .oq-boiler-card-flame {
+.oq-boiler-card.has-flame .oq-boiler-card-flame {
   opacity: 0.98;
   animation: oq-hp-pulse 1.8s ease-in-out infinite;
+}
+
+.oq-boiler-card.is-fault .oq-boiler-card-unit-shell {
+  stroke: rgba(248, 113, 113, 0.68);
+}
+
+.oq-boiler-card.is-offline .oq-boiler-card-unit-core {
+  filter: grayscale(1) brightness(0.58);
+  opacity: 0.62;
 }
 
 .oq-boiler-card.is-flowing .oq-hp-tech-pipe--return .oq-hp-tech-pipe-flow {
@@ -1292,8 +1326,96 @@
   border-color: rgba(148, 163, 184, 0.28);
 }
 
+.oq-boiler-summary-box--support[data-status="fault"] {
+  border-color: rgba(248, 113, 113, 0.36);
+  background: rgba(127, 29, 29, 0.16);
+}
+
+.oq-boiler-summary-box--support[data-status="dhw"] {
+  border-color: rgba(56, 189, 248, 0.34);
+  background: rgba(3, 105, 161, 0.14);
+}
+
+.oq-boiler-summary-box--support[data-status="starting"],
+.oq-boiler-summary-box--support[data-status="blocked"] {
+  border-color: rgba(245, 158, 11, 0.34);
+  background: rgba(120, 53, 15, 0.14);
+}
+
+.oq-boiler-telemetry {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.oq-boiler-telemetry-item {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 9px 11px;
+  border: 1px solid rgba(71, 85, 105, 0.34);
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.34);
+}
+
+.oq-boiler-telemetry-item span {
+  color: #93a4ba;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  line-height: 1.1;
+  text-transform: uppercase;
+}
+
+.oq-boiler-telemetry-item strong {
+  overflow: hidden;
+  color: #f8fafc;
+  font-size: 0.94rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.15;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.oq-boiler-telemetry-item--dhw {
+  border-color: rgba(56, 189, 248, 0.3);
+}
+
+.oq-boiler-status-detail {
+  margin: 0;
+  color: #aab7ca;
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.oq-boiler-status-detail[hidden] {
+  display: none;
+}
+
+.oq-overview-boiler--compact .oq-boiler-telemetry {
+  margin-top: 12px;
+}
+
+.oq-overview-boiler--compact .oq-boiler-telemetry-item {
+  border-color: var(--oq-overview-panel-border);
+  background: var(--oq-overview-chip-bg);
+}
+
+.oq-overview-boiler--compact .oq-boiler-telemetry-item span,
+.oq-overview-boiler--compact .oq-boiler-status-detail {
+  color: var(--oq-overview-muted);
+}
+
+.oq-overview-boiler--compact .oq-boiler-telemetry-item strong {
+  color: var(--oq-overview-title);
+}
+
 @media (max-width: 540px) {
   .oq-boiler-summary-grid {
     grid-template-columns: 1fr;
+  }
+
+  .oq-boiler-telemetry {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

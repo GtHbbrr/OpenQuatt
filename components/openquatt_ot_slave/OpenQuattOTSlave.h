@@ -50,16 +50,17 @@ namespace esphome {
 			void set_cooling_enable(bool bCoolingEnable) { m_master_state.cooling_enable = bCoolingEnable; }
 			void set_slave_fault(bool value) { m_slave_state.fault = value; }
 			void set_slave_ch_active(bool value) { m_slave_state.ch_active = value; }
+			void set_slave_dhw_active(bool value) { m_slave_state.dhw_active = value; }
 			void set_slave_flame_on(bool value) { m_slave_state.flame_on = value; }
 			void set_slave_cooling_active(bool value) { m_slave_state.cooling_active = value; }
 			void set_slave_diagnostic(bool value) { m_slave_state.diagnostic = value; }
-			void set_slave_t_boiler(float value) { m_slave_state.t_boiler = value; }
-			void set_slave_t_ret(float value) { m_slave_state.t_ret = value; }
+			void set_slave_t_boiler(float value) { m_slave_state.t_boiler = value; m_slave_state.t_boiler_valid = !std::isnan(value); }
+			void set_slave_t_ret(float value) { m_slave_state.t_ret = value; m_slave_state.t_ret_valid = !std::isnan(value); }
 			void set_slave_t_outside(float value) { m_slave_state.t_outside = value; }
 			void set_slave_max_t_set(float value) { m_slave_state.max_t_set = value; }
-			void set_slave_rel_mod_level(float value) { m_slave_state.rel_mod_level = value; }
-			void set_slave_ch_pressure(float value) { m_slave_state.ch_pressure = value; }
-			void set_slave_t_dhw(float value) { m_slave_state.t_dhw = value; }
+			void set_slave_rel_mod_level(float value) { m_slave_state.rel_mod_level = value; m_slave_state.rel_mod_level_valid = !std::isnan(value); }
+			void set_slave_ch_pressure(float value) { m_slave_state.ch_pressure = value; m_slave_state.ch_pressure_valid = !std::isnan(value); }
+			void set_slave_t_dhw(float value) { m_slave_state.t_dhw = value; m_slave_state.t_dhw_valid = !std::isnan(value); }
 			void set_slave_t_dhw_set(float value) { m_slave_state.t_dhw_set = value; }
 			void prepare_for_firmware_update();
 			
@@ -117,6 +118,7 @@ namespace esphome {
 				struct SlaveState {
 					bool fault = false;
 					bool ch_active = false;
+					bool dhw_active = false;
 					bool flame_on = false;
 					bool cooling_active = false;
 					bool diagnostic = false;
@@ -128,6 +130,11 @@ namespace esphome {
 					float ch_pressure = 1.5f;
 					float t_dhw = 40.0f;
 					float t_dhw_set = 40.0f;
+					bool t_boiler_valid = true;
+					bool t_ret_valid = true;
+					bool rel_mod_level_valid = true;
+					bool ch_pressure_valid = true;
+					bool t_dhw_valid = true;
 				};
 
 				uint8_t m_pinThermostatIn = 0;

@@ -1350,7 +1350,11 @@
     setNumber("HP deficit (W)", Math.max(0, strategyRequested - capacity), "W");
 
     const boilerAssistEnabled = isSwitchEnabled("Boiler assist enabled");
-    const boilerActive = boilerAssistEnabled && state.boiler === "on";
+    const boilerConnection = String(getEntity("select", "Boiler connection")?.value || "R1");
+    const openthermSelected = boilerConnection === "OpenTherm";
+    const otbLinkAvailable = openthermSelected && state.hardware === "heatpump_controller_q";
+    const boilerRequested = boilerAssistEnabled && state.boiler === "on";
+    const boilerActive = boilerRequested && (!openthermSelected || otbLinkAvailable);
     const boilerDelta = Number.isNaN(supplyTemp) || Number.isNaN(hpOutlet) ? 0 : supplyTemp - hpOutlet;
     const boilerHeat = boilerActive && !Number.isNaN(flowLph)
       ? Number(Math.max(0, (flowLph / 3600) * 4186 * boilerDelta).toFixed(1))
@@ -1381,6 +1385,34 @@
 
     setNumber("Boiler Heat Power", boilerHeat, "W");
     setBinary("Boiler active", boilerActive);
+    setBinary("Boiler command valid", true);
+    setBinary("Boiler command active", boilerActive);
+    setBinary("OTB - Boiler Link Available", otbLinkAvailable);
+    setBinary("OTB - Central Heating Active", otbLinkAvailable && boilerActive);
+    setBinary("OTB - Domestic Hot Water Active", false);
+    setBinary("OTB - Flame On", otbLinkAvailable && boilerActive);
+    setNumber("Boiler command target temperature", boilerRequested ? 45 : 0, "°C");
+    setNumber("Boiler command requested power", boilerRequested ? 1800 : 0, "W");
+    setNumber("Boiler command age", 0.2, "s");
+    setNumber("OTB - Control Setpoint Command", boilerRequested && otbLinkAvailable ? 45 : 0, "°C");
+    setNumber("OTB - Relative Modulation", otbLinkAvailable && boilerActive ? 42 : 0, "%");
+    setNumber("OTB - CH Water Pressure", 1.6, "bar");
+    setNumber("OTB - Boiler Water Temperature", otbLinkAvailable ? (boilerActive ? supplyTemp + 4.8 : supplyTemp) : 0, "°C");
+    setNumber("OTB - Return Water Temperature", otbLinkAvailable ? hpOutlet : 0, "°C");
+    setNumber("OTB - Last Response Age", otbLinkAvailable ? 0.4 : 14.2, "s");
+    setText("text_sensor", "Boiler command source", "Power House");
+    setText(
+      "text_sensor",
+      "Boiler block reason",
+      boilerRequested && openthermSelected && !otbLinkAvailable
+        ? "selected boiler transport unavailable"
+        : (boilerRequested ? "" : "no boiler heat request"),
+    );
+    const otbChCommand = getEntity("switch", "OTB - Central Heating Command");
+    if (otbChCommand) {
+      otbChCommand.value = otbLinkAvailable && boilerActive;
+      otbChCommand.state = otbChCommand.value;
+    }
     setNumber("System Heat Power", systemHeat, "W");
     setNumber("Heating Power Input", coolingScenario ? 0 : (Number.isNaN(totalPower) ? 0 : totalPower), "W");
     setNumber("Cooling Power Input", coolingScenario ? (Number.isNaN(totalPower) ? 0 : totalPower) : 0, "W");
@@ -1461,6 +1493,12 @@
     });
     setEntity("switch", "OpenQuatt Enabled", { value: true, state: true });
     setEntity("switch", "Boiler assist enabled", { value: true, state: true });
+    setEntity("select", "Boiler connection", {
+      value: "OpenTherm",
+      state: "OpenTherm",
+      option: ["R1", "OpenTherm"],
+    });
+    setEntity("switch", "Boiler provides domestic hot water", { value: true, state: true });
     setEntity("switch", "Manual Cooling Enable", { value: false, state: false });
     setEntity("switch", "Cooling Room Request Required", { value: true, state: true });
     setEntity("switch", "CIC - Enable polling", { value: false, state: false });
@@ -1715,6 +1753,24 @@
       ["Total Heat Power", 0, "W"],
       ["Total Cooling Power", 0, "W"],
       ["Boiler Heat Power", 0, "W"],
+      ["Boiler command target temperature", 0, "°C"],
+      ["Boiler command requested power", 0, "W"],
+      ["Boiler command age", 0.2, "s"],
+      ["OTB - Relative Modulation", 0, "%"],
+      ["OTB - CH Water Pressure", 1.6, "bar"],
+      ["OTB - Boiler Water Temperature", 35.2, "°C"],
+      ["OTB - Return Water Temperature", 29.5, "°C"],
+      ["OTB - Domestic Hot Water Temperature", 48.0, "°C"],
+      ["OTB - OEM Fault Code", 0, ""],
+      ["OTB - OEM Diagnostic Code", 0, ""],
+      ["OTB - Maximum Boiler Capacity", 24, "kW"],
+      ["OTB - Minimum Modulation", 18, "%"],
+      ["OTB - OpenTherm Device Version", 2.2, ""],
+      ["OTB - Device Type", 1, ""],
+      ["OTB - Device Product Version", 1, ""],
+      ["OTB - Last Response Age", 0.4, "s"],
+      ["OTB - Valid Response Count", 1842, ""],
+      ["OTB - Last Response Message ID", 25, ""],
       ["System Heat Power", 0, "W"],
       ["Strategy requested power", 0, "W"],
       ["HP capacity (W)", 0, "W"],
@@ -1829,6 +1885,8 @@
       ["Room Setpoint Effective Source", "OT thermostat"],
       ["Heating Enable Effective Source", "None"],
       ["Cooling Enable Effective Source", "HA input"],
+      ["Boiler command source", "Power House"],
+      ["Boiler block reason", "no boiler heat request"],
     ].forEach(([name, value]) => {
       setEntity("text_sensor", name, { state: value, value });
     });
@@ -1843,6 +1901,21 @@
       ["Cooling Request Active", false],
       ["Cooling Permitted", false],
       ["Boiler active", false],
+      ["Boiler command valid", true],
+      ["Boiler command active", false],
+      ["OTB - Boiler Link Available", true],
+      ["OTB - Fault Indication", false],
+      ["OTB - Central Heating Active", false],
+      ["OTB - Domestic Hot Water Active", false],
+      ["OTB - Flame On", false],
+      ["OTB - Diagnostic Indication", false],
+      ["OTB - DHW Present", true],
+      ["OTB - Service Required", false],
+      ["OTB - Lockout Reset", false],
+      ["OTB - Low Water Pressure", false],
+      ["OTB - Flame Fault", false],
+      ["OTB - Air Pressure Fault", false],
+      ["OTB - Water Overtemperature", false],
       ["Compressor cycling warning 2h", false],
       ["Compressor cycling warning 72h", false],
       ["Alternating compressor starts warning", false],

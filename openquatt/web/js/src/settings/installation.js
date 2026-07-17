@@ -598,6 +598,29 @@ import { escapeHtml } from "../core/html.js";
     const boilerMeta = getNumberMeta("boilerRatedHeatPower");
     const boilerValue = getInputDraftValue("boilerRatedHeatPower");
     const boilerBusy = state.loadingEntities || state.busyAction === "switch-boilerCvAssistEnabled";
+    const boilerConnectionAvailable = hasEntity("boilerConnection");
+    const boilerConnection = boilerConnectionAvailable
+      ? String(getEntityValue("boilerConnection") || "R1")
+      : "R1";
+    const openthermBoilerSupported = hasEntity("otbLinkAvailable") || hasEntity("boilerProvidesDhw");
+    const boilerConnectionOptions = boilerConnectionAvailable
+      ? getSelectEntityOptions(state.entities.boilerConnection || {})
+          .filter((option) => option !== "OpenTherm" || openthermBoilerSupported)
+      : [];
+    const boilerConnectionControl = boilerConnectionAvailable ? `
+      <label class="oq-settings-control oq-settings-control--select">
+        <select class="oq-helper-select" data-oq-field="boilerConnection" ${state.loadingEntities ? "disabled" : ""}>
+          ${boilerConnectionOptions.map((option) => `
+            <option value="${escapeHtml(option)}" ${option === boilerConnection ? "selected" : ""}>
+              ${escapeHtml(option === "OpenTherm" ? "OpenTherm (OTB)" : "Aan/uit (R1)")}
+            </option>
+          `).join("")}
+        </select>
+        <span class="oq-settings-select-caret" aria-hidden="true"></span>
+      </label>
+    ` : "";
+    const boilerProvidesDhw = hasEntity("boilerProvidesDhw") && isEntityActive("boilerProvidesDhw");
+    const boilerDhwBusy = state.loadingEntities || state.busyAction === "switch-boilerProvidesDhw";
     const boilerPowerMissingHint = "Deze firmware levert nog geen bewerkbare boilervermogensinstelling.";
     const boilerPowerControl = boilerPowerEntityAvailable
       ? renderNumberInputControl({
@@ -631,6 +654,28 @@ import { escapeHtml } from "../core/html.js";
             "oq-settings-field--compact",
           )}
 
+          ${boilerPresent && boilerConnectionAvailable ? renderSettingsFieldCard(
+            "boilerConnection",
+            "Ketelaansluiting",
+            openthermBoilerSupported
+              ? "Kies de aansluiting die fysiek met de ketel is verbonden. OpenQuatt gebruikt nooit beide routes tegelijk."
+              : "Deze hardware ondersteunt alleen de aan/uit-aansluiting via R1.",
+            boilerConnectionControl,
+            "oq-settings-field--compact",
+          ) : ""}
+
+          ${boilerPresent && boilerConnection === "OpenTherm" && hasEntity("boilerProvidesDhw") ? renderSettingsFieldCard(
+            "boilerProvidesDhw",
+            "Tapwater via de ketel",
+            "Laat dit aan voor een combiketel. Dit geeft tapwater alleen toestemming; het is geen tapwatervraag.",
+            `
+              <div class="oq-settings-compact-switch-field">
+                ${renderSettingsCompactSwitchControl("boilerProvidesDhw", "Tapwater via de ketel", boilerProvidesDhw, boilerDhwBusy, "Ja", "Nee")}
+              </div>
+            `,
+            "oq-settings-field--compact",
+          ) : ""}
+
           ${boilerPresent ? renderSettingsFieldCard(
             "boilerRatedHeatPower",
             "Ingesteld boilervermogen",
@@ -657,7 +702,7 @@ import { escapeHtml } from "../core/html.js";
       "Basis",
       "CV-ketel of boiler",
       boilerPresent
-        ? "Geef aan of OpenQuatt een CV-ketel of boiler als ondersteuning mag gebruiken en hoeveel effectief vermogen die functie heeft."
+        ? "Kies hoe de ketel is aangesloten en hoeveel effectief vermogen OpenQuatt als ondersteuning mag gebruiken."
         : "Geef aan of OpenQuatt een CV-ketel of boiler als ondersteuning mag gebruiken.",
       renderBoilerCvFields(),
     );

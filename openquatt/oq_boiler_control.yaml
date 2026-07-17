@@ -106,6 +106,13 @@ select:
             // Break-before-make: a transport change immediately drops both the
             // shared request and R1. The selected path may restart only after a
             // fresh controller evaluation.
+            if (x == "OpenTherm" && !${oq_otb_supported}) {
+              ESP_LOGW("quatt.boiler", "OpenTherm boiler transport is unsupported on this hardware; restoring R1");
+              auto call = id(oq_boiler_connection).make_call();
+              call.set_option("R1");
+              call.perform();
+              return;
+            }
             const uint32_t now_ms = millis();
             if (id(oq_boiler_output_request)) {
               id(oq_boiler_output_request) = false;
@@ -150,7 +157,86 @@ binary_sensor:
     lambda: |-
       return id(oq_boiler_transport_active);
 
+  - platform: template
+    id: boiler_command_valid
+    name: "Boiler command valid"
+    icon: mdi:check-decagram
+    entity_category: diagnostic
+    web_server:
+      sorting_group_id: oq_boiler
+    lambda: |-
+      // Report validity and freshness as one diagnostic contract.
+      return id(oq_boiler_command_valid) &&
+             oq_boiler::command_is_fresh(
+                 oq_boiler::BoilerCommand{
+                     id(oq_boiler_command_valid),
+                     id(oq_boiler_command_demand_present),
+                     id(oq_boiler_command_heat_request),
+                     id(oq_boiler_command_requested_power_w),
+                     id(oq_boiler_command_target_temperature_c),
+                     id(oq_boiler_command_source_code),
+                     id(oq_boiler_command_updated_ms),
+                 },
+                 millis(),
+                 (uint32_t) (${oq_boiler_command_max_age_s} * 1000UL));
+
+  - platform: template
+    id: boiler_command_active
+    name: "Boiler command active"
+    icon: mdi:radiator
+    device_class: heat
+    entity_category: diagnostic
+    web_server:
+      sorting_group_id: oq_boiler
+    lambda: |-
+      return id(oq_boiler_output_request);
+
 sensor:
+  - platform: template
+    id: boiler_command_target_temperature
+    name: "Boiler command target temperature"
+    icon: mdi:thermostat
+    unit_of_measurement: "°C"
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 1
+    entity_category: diagnostic
+    update_interval: 1s
+    web_server:
+      sorting_group_id: oq_boiler
+    lambda: |-
+      return id(oq_boiler_command_target_temperature_c);
+
+  - platform: template
+    id: boiler_command_requested_power
+    name: "Boiler command requested power"
+    icon: mdi:radiator
+    unit_of_measurement: "W"
+    device_class: power
+    state_class: measurement
+    accuracy_decimals: 0
+    entity_category: diagnostic
+    update_interval: 1s
+    web_server:
+      sorting_group_id: oq_boiler
+    lambda: |-
+      return id(oq_boiler_command_requested_power_w);
+
+  - platform: template
+    id: boiler_command_age
+    name: "Boiler command age"
+    icon: mdi:timer-outline
+    unit_of_measurement: "s"
+    accuracy_decimals: 1
+    entity_category: diagnostic
+    update_interval: 1s
+    web_server:
+      sorting_group_id: oq_boiler
+    lambda: |-
+      const uint32_t updated_ms = id(oq_boiler_command_updated_ms);
+      if (updated_ms == 0) return NAN;
+      return (float) ((uint32_t)(millis() - updated_ms)) / 1000.0f;
+
   - platform: template
     id: boiler_heat_power
     name: "Boiler Heat Power"
@@ -180,6 +266,39 @@ sensor:
       // Non-negative power (only added heat)
       const float heat_power_w = mass_flow_kgps * cp_j_per_kgk * delta_t_k;
       return (heat_power_w < 0.0f) ? 0.0f : heat_power_w;
+
+text_sensor:
+  - platform: template
+    id: boiler_command_source
+    name: "Boiler command source"
+    icon: mdi:source-branch
+    entity_category: diagnostic
+    update_interval: 1s
+    web_server:
+      sorting_group_id: oq_boiler
+    lambda: |-
+      switch (id(oq_boiler_command_source_code)) {
+        case oq_boiler::COMMAND_SOURCE_POWER_HOUSE:
+          return {"Power House"};
+        case oq_boiler::COMMAND_SOURCE_HEATING_CURVE:
+          return {"Heating Curve"};
+        case oq_boiler::COMMAND_SOURCE_COMMISSIONING:
+          return {"Commissioning"};
+        default:
+          return {"None"};
+      }
+
+  - platform: template
+    id: boiler_block_reason
+    name: "Boiler block reason"
+    icon: mdi:shield-alert-outline
+    entity_category: diagnostic
+    update_interval: 1s
+    web_server:
+      sorting_group_id: oq_boiler
+    lambda: |-
+      const char *reason = oq_boiler::block_reason_text(id(oq_boiler_block_reason_code));
+      return {reason[0] == '\0' ? "None" : reason};
 
 # ----------------------------
 # MAIN LOOP

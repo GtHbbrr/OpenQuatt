@@ -468,7 +468,7 @@ namespace esphome {
 			uint16_t status = master_status & 0xFF00;
 			status = message_data::write_flag8_lb_0(m_slave_state.fault, status);
 			status = message_data::write_flag8_lb_1(m_slave_state.ch_active, status);
-			status = message_data::write_flag8_lb_2(false, status);  // DHW mode
+			status = message_data::write_flag8_lb_2(m_slave_state.dhw_active, status);
 			status = message_data::write_flag8_lb_3(m_slave_state.flame_on, status);
 			status = message_data::write_flag8_lb_4(m_slave_state.cooling_active, status);
 			status = message_data::write_flag8_lb_5(false, status);  // CH2 mode
@@ -635,9 +635,12 @@ namespace esphome {
 						break;
 					case OpenThermMessageID::Tdhw:
 					case OpenThermMessageID::Tdhw2:
-						// Some thermostats probe DHW values even on CH-only systems.
-						// Return a conservative compatibility temperature rather than DATA_INVALID.
-						responseData = message_data::encode_f88(m_slave_state.t_dhw);
+						if (!m_slave_state.t_dhw_valid) {
+							responseType = OpenThermMessageType::DATA_INVALID;
+							responseData = 0x0000;
+						} else {
+							responseData = message_data::encode_f88(m_slave_state.t_dhw);
+						}
 						break;
 					case OpenThermMessageID::TrOverride:
 						// OpenQuatt does not drive a remote room-setpoint override, but some
@@ -646,7 +649,12 @@ namespace esphome {
 						responseData = message_data::encode_f88(0.0f);
 						break;
 					case OpenThermMessageID::RelModLevel:
-						responseData = message_data::encode_f88(m_slave_state.rel_mod_level);
+						if (!m_slave_state.rel_mod_level_valid) {
+							responseType = OpenThermMessageType::DATA_INVALID;
+							responseData = 0x0000;
+						} else {
+							responseData = message_data::encode_f88(m_slave_state.rel_mod_level);
+						}
 						break;
 					case OpenThermMessageID::Texhaust:
 						responseType = OpenThermMessageType::DATA_INVALID;
@@ -680,15 +688,28 @@ namespace esphome {
 						responseData = 0x1400;
 						break;
 					case OpenThermMessageID::CHPressure:
-						// OpenQuatt does not measure hydronic CH pressure, but a conservative
-						// fixed value is more compatible than DATA_INVALID for some thermostats.
-						responseData = message_data::encode_f88(m_slave_state.ch_pressure);
+						if (!m_slave_state.ch_pressure_valid) {
+							responseType = OpenThermMessageType::DATA_INVALID;
+							responseData = 0x0000;
+						} else {
+							responseData = message_data::encode_f88(m_slave_state.ch_pressure);
+						}
 						break;
 					case OpenThermMessageID::Tboiler:
-						responseData = message_data::encode_f88(m_slave_state.t_boiler);
+						if (!m_slave_state.t_boiler_valid) {
+							responseType = OpenThermMessageType::DATA_INVALID;
+							responseData = 0x0000;
+						} else {
+							responseData = message_data::encode_f88(m_slave_state.t_boiler);
+						}
 						break;
 					case OpenThermMessageID::Tret:
-						responseData = message_data::encode_f88(m_slave_state.t_ret);
+						if (!m_slave_state.t_ret_valid) {
+							responseType = OpenThermMessageType::DATA_INVALID;
+							responseData = 0x0000;
+						} else {
+							responseData = message_data::encode_f88(m_slave_state.t_ret);
+						}
 						break;
 					case OpenThermMessageID::Toutside:
 						if (std::isnan(m_slave_state.t_outside)) {
