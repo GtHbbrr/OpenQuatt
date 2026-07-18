@@ -100,6 +100,9 @@ const viewActionHandlers = {
   "toggle-storage-technical-details": (button, event) => {
     toggleDetails(event, button, ".oq-settings-storage-technical", "settingsStorageDetailsOpen");
   },
+  "toggle-storage-advanced": (button, event) => {
+    toggleDetails(event, button, ".oq-settings-storage-advanced", "settingsStorageAdvancedOpen");
+  },
   "open-cm100-commissioning-modal": () => openServiceSettings(),
   "open-installation-monitoring": () => openServiceSettings(),
   "open-service-task-modal": (button) => openServiceTask(button),

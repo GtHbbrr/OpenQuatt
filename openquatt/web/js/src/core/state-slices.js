@@ -60,6 +60,7 @@ export function createHistoryState(trendWindowHours) {
     energyHistoryExportBusy: false,
     energyHistoryExportError: "",
     energyHistoryExportNotice: "",
+    settingsStorageAdvancedOpen: false,
     settingsStorageDetailsOpen: false,
     settingsStoragePage: "overview",
     energyHistoryPeriodSelection: { day: "", week: "", month: "", year: "" },
