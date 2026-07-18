@@ -182,6 +182,11 @@ globals:
     restore_value: false
     initial_value: '0'
 
+  - id: oq_cooling_capacity_full_recovery_since_ms
+    type: uint32_t
+    restore_value: false
+    initial_value: '0'
+
   - id: oq_cooling_water_cycle_active
     type: bool
     restore_value: false
@@ -755,6 +760,7 @@ interval:
             id(oq_cooling_capacity_cap) = reset_capacity_cap;
             id(oq_cooling_capacity_last_change_ms) = 0;
             id(oq_cooling_capacity_recovery_since_ms) = 0;
+            id(oq_cooling_capacity_full_recovery_since_ms) = 0;
             return;
           }
 
@@ -797,6 +803,7 @@ interval:
             id(oq_cooling_capacity_cap) = 10;
             id(oq_cooling_capacity_last_change_ms) = 0;
             id(oq_cooling_capacity_recovery_since_ms) = 0;
+            id(oq_cooling_capacity_full_recovery_since_ms) = 0;
             id(oq_cooling_buffer_gap_rate_ref_ms) = 0;
             id(oq_cooling_pid_integral) = 0.0f;
             id(oq_cooling_pid_last_error_c) = buffer_gap_c;
@@ -988,6 +995,7 @@ interval:
           limiter_state.capacity_cap = id(oq_cooling_capacity_cap);
           limiter_state.capacity_last_change_ms = id(oq_cooling_capacity_last_change_ms);
           limiter_state.capacity_recovery_since_ms = id(oq_cooling_capacity_recovery_since_ms);
+          limiter_state.capacity_full_recovery_since_ms = id(oq_cooling_capacity_full_recovery_since_ms);
 
           oq_cooling::LimiterInput limiter_input;
           limiter_input.now_ms = now_ms;
@@ -1019,6 +1027,7 @@ interval:
           id(oq_cooling_capacity_cap) = limiter_state.capacity_cap;
           id(oq_cooling_capacity_last_change_ms) = limiter_state.capacity_last_change_ms;
           id(oq_cooling_capacity_recovery_since_ms) = limiter_state.capacity_recovery_since_ms;
+          id(oq_cooling_capacity_full_recovery_since_ms) = limiter_state.capacity_full_recovery_since_ms;
           id(oq_cooling_projected_gap_c) = limiter_output.projected_gap_c;
 
           const int allowed_max = limiter_output.allowed_max;

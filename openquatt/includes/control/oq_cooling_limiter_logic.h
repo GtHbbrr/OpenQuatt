@@ -57,6 +57,7 @@ struct LimiterState {
   int capacity_cap = 10;
   uint32_t capacity_last_change_ms = 0;
   uint32_t capacity_recovery_since_ms = 0;
+  uint32_t capacity_full_recovery_since_ms = 0;
 };
 
 struct LimiterInput {
@@ -147,6 +148,7 @@ inline void update_hysteretic_capacity_cap(const LimiterInput &in,
                                            LimiterOutput &out) {
   if (in.oil_return_mask_active) {
     state.capacity_recovery_since_ms = 0;
+    state.capacity_full_recovery_since_ms = 0;
     return;
   }
 
@@ -155,6 +157,7 @@ inline void update_hysteretic_capacity_cap(const LimiterInput &in,
     state.capacity_cap = capacity_demand_max;
     state.capacity_last_change_ms = 0;
     state.capacity_recovery_since_ms = 0;
+    state.capacity_full_recovery_since_ms = 0;
     return;
   }
 
@@ -166,6 +169,7 @@ inline void update_hysteretic_capacity_cap(const LimiterInput &in,
     current_cap = risk_cap;
     state.capacity_last_change_ms = in.now_ms;
     state.capacity_recovery_since_ms = 0;
+    state.capacity_full_recovery_since_ms = 0;
     out.clamp_integral_to_zero = true;
   } else if (risk_cap > current_cap && current_cap < capacity_demand_max) {
     const float dew_release_to2_gap_c = fmaxf(1.05f, hard_dew_restart_gap_c + 0.45f);
@@ -175,13 +179,30 @@ inline void update_hysteretic_capacity_cap(const LimiterInput &in,
         current_cap <= 1 ? dew_release_to2_gap_c :
         current_cap == 2 ? dew_release_to3_gap_c :
         dew_release_full_gap_c;
-    const bool recovery_ready =
+    const bool staged_recovery_ready =
         in.dew_gap_c >= required_dew_gap_c &&
         in.gap_rate_c_per_min >= tuning.capacity_recovery_min_rate_c_per_min;
+    const bool capacity_bound =
+        current_cap < in.demand_max && in.previous_limited_demand >= current_cap;
+    const bool adaptive_recovery_ready =
+        current_cap >= 3 &&
+        capacity_bound &&
+        in.gap_rate_c_per_min >= tuning.capacity_recovery_min_rate_c_per_min;
+    const bool recovery_ready = staged_recovery_ready || adaptive_recovery_ready;
+    const bool full_recovery_ready =
+        staged_recovery_ready && risk_cap >= capacity_demand_max && current_cap >= 3;
 
     if (recovery_ready) {
       if (state.capacity_recovery_since_ms == 0 || in.now_ms <= state.capacity_recovery_since_ms) {
         state.capacity_recovery_since_ms = in.now_ms;
+      }
+      if (full_recovery_ready) {
+        if (state.capacity_full_recovery_since_ms == 0 ||
+            in.now_ms <= state.capacity_full_recovery_since_ms) {
+          state.capacity_full_recovery_since_ms = in.now_ms;
+        }
+      } else {
+        state.capacity_full_recovery_since_ms = 0;
       }
       const bool hold_elapsed =
           state.capacity_last_change_ms == 0 ||
@@ -190,18 +211,30 @@ inline void update_hysteretic_capacity_cap(const LimiterInput &in,
       if (hold_elapsed && elapsed(in.now_ms, state.capacity_recovery_since_ms,
                                   tuning.capacity_recovery_stable_ms)) {
         const bool full_capacity_recovered =
-            risk_cap >= capacity_demand_max && current_cap >= 3;
-        current_cap = full_capacity_recovered
+            full_recovery_ready && elapsed(in.now_ms, state.capacity_full_recovery_since_ms,
+                                           tuning.capacity_recovery_stable_ms);
+        const int non_full_capacity_max =
+            current_cap >= 3 ? capacity_demand_max - 1 : capacity_demand_max;
+        const int next_cap = full_capacity_recovered
             ? capacity_demand_max
-            : std::min(capacity_demand_max, std::min(risk_cap, current_cap + 1));
-        state.capacity_last_change_ms = in.now_ms;
-        state.capacity_recovery_since_ms = 0;
+            : std::min(non_full_capacity_max, std::min(risk_cap, current_cap + 1));
+        if (next_cap > current_cap) {
+          current_cap = next_cap;
+          state.capacity_last_change_ms = in.now_ms;
+          state.capacity_recovery_since_ms = 0;
+          state.capacity_full_recovery_since_ms = 0;
+        }
       }
     } else {
       state.capacity_recovery_since_ms = 0;
+      state.capacity_full_recovery_since_ms = 0;
     }
   } else if (current_cap >= capacity_demand_max) {
     state.capacity_recovery_since_ms = 0;
+    state.capacity_full_recovery_since_ms = 0;
+  } else {
+    state.capacity_recovery_since_ms = 0;
+    state.capacity_full_recovery_since_ms = 0;
   }
 
   state.capacity_cap = current_cap;
