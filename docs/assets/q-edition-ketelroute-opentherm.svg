@@ -3,8 +3,11 @@
   <desc id="desc">Twee oranje aders op de onderste aansluiting onder het vlam- en OT-symbool.</desc>
   <rect x="1" y="1" width="178" height="110" rx="15" fill="#f8fafc" stroke="#d8dee7" stroke-width="2"/>
   <rect x="37" y="13" width="106" height="61" rx="10" fill="#ffffff" stroke="#d6d3d1" stroke-width="2"/>
-  <path d="M90 25c7 9 9 14 9 21a11 11 0 0 1-22 0c0-6 3-11 8-18 0 7 3 9 5 10 3-4 3-8 0-13Z" fill="#57534e"/>
-  <text x="112" y="51" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="15" font-weight="800" fill="#57534e">OT</text>
+  <g transform="translate(59 19) scale(.64)" color="#57534e">
+    <path fill="currentColor" fill-rule="evenodd" transform="matrix(.03945 0 0 -.03945 -1.49 57.46)" d="M459 1195c-62-50-79-72-139-180-32-57-52-181-48-304 2-77 0-105-10-109-6-2-12 1-12 6 0 5-9 19-20 32-11 13-25 42-30 64-6 23-15 51-20 64-6 13-10 37-10 54 0 31 0 31-27-8-176-252-110-610 133-725 309-146 649 79 646 427-2 169-64 280-220 391-76 54-75 53-123 113-57 71-68 122-43 208 9 32-3 27-77-33Zm237-443c310-225 5-701-348-544-80 35-113 82-57 82 56 0 150 73 205 160 29 45 29 45 32 1 2-23-2-57-7-74-14-39-9-43 23-20 90 64 132 215 96 338-24 82-24 85-3 85 11 0 38-13 59-28Z"/>
+    <ellipse cx="56.8" cy="34.8" rx="10.8" ry="13.4" fill="none" stroke="currentColor" stroke-width="3.2"/>
+    <path d="M75.8 21.2h18.4M85 21.2v27.2" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
   <circle cx="74" cy="68" r="4" fill="#64748b"/>
   <circle cx="106" cy="68" r="4" fill="#64748b"/>
   <rect x="55" y="73" width="70" height="22" rx="8" fill="#20633f" stroke="#164e32" stroke-width="2"/>

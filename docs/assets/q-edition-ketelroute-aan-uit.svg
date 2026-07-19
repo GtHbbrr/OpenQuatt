@@ -3,10 +3,17 @@
   <desc id="desc">Twee blauwe aders aan de rechterkant van de CiC, onder het aparte afdekkapje.</desc>
   <rect x="1" y="1" width="178" height="110" rx="15" fill="#f8fafc" stroke="#d8dee7" stroke-width="2"/>
   <rect x="34" y="12" width="70" height="87" rx="11" fill="#e7e5e4" stroke="#a8a29e" stroke-width="2"/>
-  <path d="M48 30h39m-34-7v14m8-14v14m8-14v14m8-14v14" fill="none" stroke="#57534e" stroke-width="3" stroke-linecap="round"/>
-  <path d="M49 49h18m5 0 17-12" fill="none" stroke="#57534e" stroke-width="3" stroke-linecap="round"/>
-  <path d="M49 62h40" fill="none" stroke="#57534e" stroke-width="3" stroke-linecap="round"/>
-  <path d="M70 70c5 6 6 10 6 14a8 8 0 0 1-16 0c0-4 2-8 6-13 0 5 2 6 4 7 2-3 2-5 0-8Z" fill="#57534e"/>
+  <g transform="translate(45 18) scale(.75)" color="#57534e">
+    <g fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M7 12h7M50 12h7"/>
+      <rect x="14" y="6" width="36" height="12" rx="1"/>
+      <path d="M23 6v12M32 6v12M41 6v12"/>
+      <path d="M8 32h10l17-11M44 32h12"/>
+    </g>
+    <circle cx="18" cy="32" r="2.8" fill="currentColor"/>
+    <circle cx="44" cy="32" r="2.8" fill="currentColor"/>
+    <path fill="currentColor" fill-rule="evenodd" transform="matrix(.01046 0 0 -.01046 24.87 58.51)" d="M690 1733c-24-21-68-60-99-86-88-76-169-231-196-372-9-49-20-107-24-127-4-20-5-42-1-49 14-22 10-239-5-239-24 0-72 68-89 126-10 33-21 73-27 90-5 17-9 49-9 72 0 22-4 43-9 47-24 14-117-160-153-290-32-112-30-366 2-440 70-159 80-175 154-247 190-185 482-222 726-91 303 162 429 538 292 868-40 96-213 273-320 329-49 25-166 169-179 219-12 48-14 155-5 190 14 49 0 48-58 0Zm282-663c233-154 255-494 45-694-143-135-381-173-545-85-111 59-133 102-58 113 25 4 61 18 81 32 20 13 42 24 49 24 25 0 166 170 166 201 0 5 10 9 21 9 21 0 22-3 15-72-4-40-14-83-22-96-24-37-10-37 43 0 134 94 192 318 130 502-14 44-24 83-21 88 10 17 52 7 96-22Z"/>
+  </g>
   <circle cx="108" cy="42" r="7" fill="#292524"/>
   <circle cx="108" cy="78" r="7" fill="#292524"/>
   <path d="M115 42h24c7 0 9 5 9 12v45" fill="none" stroke="#2563eb" stroke-width="5" stroke-linecap="round"/>
