@@ -508,6 +508,7 @@ import { escapeHtml } from "../core/html.js";
       measurementRows = [],
       activeCopy = "",
       rows = [],
+      warning = "",
     }) => {
       const mainSelect = select && select.when !== false
         ? renderSourceSelect(select.key, select)
@@ -523,7 +524,7 @@ import { escapeHtml } from "../core/html.js";
       const secondaryWarning = secondaries.map((item) => item.warning).find(Boolean) || "";
       const bodyRows = rows.filter(Boolean).join("");
       const controlsMarkup = `${mainSelect.markup}${secondaryMarkup}`;
-      const warning = mainSelect.warning || secondaryWarning;
+      const warningCopy = mainSelect.warning || secondaryWarning || warning;
       const groupedMarkup = [
         renderSourceGroup({
           title: "Configuratie",
@@ -533,7 +534,7 @@ import { escapeHtml } from "../core/html.js";
             <div class="oq-settings-source-controls">
               ${controlsMarkup}
             </div>
-            ${warning ? `<p class="oq-settings-source-warning">${escapeHtml(warning)}</p>` : ""}
+            ${warningCopy ? `<p class="oq-settings-source-warning">${escapeHtml(warningCopy)}</p>` : ""}
           ` : "",
         }),
         renderSourceGroup({ title: "Actief", icon: "target", rows: activeRows, copy: activeCopy, className: "oq-settings-source-group--active" }),
@@ -554,7 +555,7 @@ import { escapeHtml } from "../core/html.js";
                 ${controlsMarkup}
               </div>
             ` : ""}
-            ${warning ? `<p class="oq-settings-source-warning">${escapeHtml(warning)}</p>` : ""}
+            ${warningCopy ? `<p class="oq-settings-source-warning">${escapeHtml(warningCopy)}</p>` : ""}
             ${bodyRows ? `<div class="oq-settings-source-rows">${bodyRows}</div>` : ""}
           `}
         </article>
@@ -563,6 +564,7 @@ import { escapeHtml } from "../core/html.js";
     const currentWaterSupplySource = String(getEntityValue("waterSupplySource") || "");
     const currentFlowSource = String(getEntityValue("flowSource") || "");
     const currentQFlowSource = String(getEntityValue("qFlowSource") || "");
+    const currentOutsideTempSource = String(getEntityValue("outsideTempSource") || "").trim();
     const heatingEnableSourceDisabled = String(getEntityValue("heatingEnableSource") || "").trim() === "Disabled";
     const heatingEnableSourceLabel = formattedSourceValue("heatingEnableSource", { optionLabels: { Disabled: "Niet gebruiken" } });
     const coolingEnableSourceDisabled = String(getEntityValue("coolingEnableSource") || "").trim() === "Disabled";
@@ -672,6 +674,9 @@ import { escapeHtml } from "../core/html.js";
         key: "outside-temperature",
         title: "Buitentemperatuur",
         icon: "sun",
+        warning: currentOutsideTempSource === "MQTT"
+          ? "Na een (her)start is de MQTT-buitentemperatuur pas geldig na een nieuwe live publicatie. Tot die tijd ontbreekt de buitentemperatuur en kan OpenQuatt naar CM98 (antivriescirculatie) gaan. De wachttijd hangt af van het publicatie-interval. Overweeg daarom Auto; dan kan OpenQuatt tijdens het wachten een andere geldige buitentemperatuurbron gebruiken."
+          : "",
         select: {
           key: "outsideTempSource",
           label: "Buiten bron",

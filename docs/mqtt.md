@@ -119,6 +119,8 @@ In `Auto` is de hoogste geldige dauwpuntwaarde bewust leidend, omdat die voor ko
 
 Bij `Buitentemperatuur` gebruikt `Auto` de laagste geldige waarde uit buitenunit, Home Assistant en MQTT. Dat houdt verwarming en vorstbeveiliging conservatief. Bij `Kamertemperatuur` en `Kamer setpoint` kies je MQTT expliciet als bron.
 
+Kies je `MQTT` expliciet als buitentemperatuurbron, dan is die bron na een (her)start pas geldig zodra OpenQuatt een nieuwe live publicatie ontvangt. Tot die tijd ontbreekt de buitentemperatuur en kan de regeling naar `CM98` (antivriescirculatie) gaan. De wachttijd hangt af van het publicatie-interval van de zender. Overweeg daarom `Auto`; dan kan OpenQuatt tijdens het wachten een andere geldige buitentemperatuurbron gebruiken.
+
 Bij `Warmtetoestemming` en `Koeltoestemming` kun je MQTT ook expliciet als bron kiezen. Een MQTT-enable telt alleen mee als de waarde recent en geldig is. Handmatige koeltoestemming blijft daarnaast een override.
 
 ## Voorbeeld

@@ -89,3 +89,18 @@ test("MQTT verdwijnt uit alle bronselecties en metingen wanneer de integratie ui
   assert.match(disabledCurrentMarkup, /Huidige bron niet beschikbaar: MQTT staat uit/);
   assert.doesNotMatch(disabledCurrentMarkup, /MQTT-topic staat uit/);
 });
+
+test("MQTT als buitentemperatuurbron waarschuwt voor ontbrekende opstartwaarde en CM98", () => {
+  setSourceSelectionState(true);
+  state.entities.outsideTempSource.value = "MQTT";
+
+  const mqttMarkup = renderSettingsSensorSelectionSection();
+  assert.match(mqttMarkup, /Na een \(her\)start is de MQTT-buitentemperatuur pas geldig na een nieuwe live publicatie\./);
+  assert.match(mqttMarkup, /kan OpenQuatt naar CM98 \(antivriescirculatie\) gaan/);
+  assert.match(mqttMarkup, /De wachttijd hangt af van het publicatie-interval\./);
+  assert.match(mqttMarkup, /Overweeg daarom Auto; dan kan OpenQuatt tijdens het wachten een andere geldige buitentemperatuurbron gebruiken\./);
+
+  state.entities.outsideTempSource.value = "Outdoor unit";
+  const outdoorUnitMarkup = renderSettingsSensorSelectionSection();
+  assert.doesNotMatch(outdoorUnitMarkup, /kan OpenQuatt naar CM98 \(antivriescirculatie\) gaan/);
+});
