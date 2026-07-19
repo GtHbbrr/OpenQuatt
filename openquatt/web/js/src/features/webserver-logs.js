@@ -48,6 +48,10 @@ export function getWebServerLogHistoryUrl() {
   return `${getBasePath()}/openquatt/logs/recent`;
 }
 
+export function getWebServerLogClearUrl() {
+  return `${getBasePath()}/openquatt/logs/clear`;
+}
+
 export function isWebServerLogHistoryEnabled() {
   const entity = state.entities?.webServerLogHistoryEnabled;
   if (!entity) {
@@ -343,6 +347,8 @@ export async function refreshWebServerLogHistory(options = {}) {
   }
 
   const scrollState = options.scrollState || captureWebServerLogScrollState();
+  const replaceEntries = options.replaceEntries === true || state.webServerLogHistoryNeedsReconcile === true;
+  const entriesBeforeRequest = replaceEntries ? new Set(state.webServerLogEntries) : null;
   const requestToken = Number(state.webServerLogHistoryRequestToken || 0) + 1;
   state.webServerLogHistoryRequestToken = requestToken;
   state.webServerLogHistoryLoading = true;
@@ -363,12 +369,25 @@ export async function refreshWebServerLogHistory(options = {}) {
       return;
     }
 
+    state.webServerLogCsrfToken = String(payload.csrf_token || "");
     const recentEntries = normalizeRecentWebServerLogPayload(payload);
+    const liveEntries = replaceEntries
+      ? state.webServerLogEntries.filter((entry) => !entriesBeforeRequest.has(entry))
+      : [];
+    if (replaceEntries) {
+      state.webServerLogEntries = [];
+      state.webServerLogRecentTail = [];
+      state.webServerLogRecentAnchorAt = 0;
+    }
     state.webServerLogHistoryLoaded = true;
+    state.webServerLogHistoryNeedsReconcile = false;
     if (recentEntries.length > 0) {
       mergeWebServerLogEntries(recentEntries, { prepend: true });
       state.webServerLogRecentTail = recentEntries.slice(-4).map((entry) => String(entry.raw ?? entry.text ?? ""));
       state.webServerLogRecentAnchorAt = Date.now();
+    }
+    if (liveEntries.length > 0) {
+      mergeWebServerLogEntries(liveEntries);
     }
   } catch (error) {
     if (state.systemModal === "webserver-logs" && state.webServerLogHistoryRequestToken === requestToken) {
@@ -470,6 +489,7 @@ export function clearWebServerLogOutput() {
     webServerLogHistoryError: "",
     webServerLogHistoryLoading: false,
     webServerLogHistoryLoaded: false,
+    webServerLogHistoryNeedsReconcile: false,
     webServerLogCopyMessage: "",
     webServerLogCopyError: "",
     webServerLogHistoryRequestToken: state.webServerLogHistoryRequestToken + 1,
@@ -482,10 +502,92 @@ export function clearWebServerLogOutput() {
   }
 }
 
+export async function clearWebServerLogHistory() {
+  if (state.busyAction) {
+    return false;
+  }
+
+  if (state.nativeOpen || isWebServerLogDemoMode()) {
+    clearWebServerLogOutput();
+    return true;
+  }
+
+  if (typeof window.fetch !== "function") {
+    state.webServerLogHistoryError = "De RAM-logbuffer kan niet vanuit deze browser worden geleegd.";
+    render();
+    return false;
+  }
+
+  const csrfToken = String(state.webServerLogCsrfToken || "");
+  if (!csrfToken) {
+    state.webServerLogHistoryError = "De beveiligingstoken voor de RAM-logbuffer ontbreekt. Open het logboek opnieuw.";
+    render();
+    return false;
+  }
+
+  state.busyAction = "clear-webserver-log-history";
+  state.webServerLogHistoryError = "";
+  closeWebServerLogStream();
+  render();
+
+  let cleared = false;
+  try {
+    let activeCsrfToken = csrfToken;
+    let csrfRefreshed = false;
+    while (true) {
+      const body = new URLSearchParams();
+      body.set("csrf_token", activeCsrfToken);
+      const response = await window.fetch(getWebServerLogClearUrl(), { method: "POST", body });
+
+      if (response.status === 403 && !csrfRefreshed) {
+        csrfRefreshed = true;
+        updateWebServerLogState({
+          webServerLogCsrfToken: "",
+          webServerLogHistoryLoaded: false,
+          webServerLogHistoryRequestToken: state.webServerLogHistoryRequestToken + 1,
+        });
+        await refreshWebServerLogHistory();
+        activeCsrfToken = String(state.webServerLogCsrfToken || "");
+        if (activeCsrfToken) {
+          continue;
+        }
+      }
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      break;
+    }
+    clearWebServerLogOutput();
+    cleared = true;
+  } catch (error) {
+    updateWebServerLogState({
+      webServerLogHistoryLoaded: false,
+      webServerLogHistoryNeedsReconcile: true,
+    });
+    state.webServerLogHistoryError = `De RAM-logbuffer kon niet worden geleegd (${error instanceof Error ? error.message : "onbekende fout"}).`;
+  } finally {
+    state.busyAction = "";
+    if (state.systemModal === "webserver-logs") {
+      render();
+    }
+  }
+
+  const clearError = state.webServerLogHistoryError;
+  if (state.systemModal === "webserver-logs") {
+    await refreshWebServerLogHistory();
+    if (clearError) {
+      state.webServerLogHistoryError = clearError;
+      render();
+    }
+  }
+  return cleared;
+}
+
 export function resetWebServerLogRecoveryState() {
   const scrollState = captureWebServerLogScrollState();
   closeWebServerLogStream();
-  updateWebServerLogState({ webServerLogEnabled: null, webServerLogConnected: false });
+  updateWebServerLogState({ webServerLogEnabled: null, webServerLogConnected: false, webServerLogCsrfToken: "" });
   clearWebServerLogOutput();
   if (state.systemModal === "webserver-logs") {
     void refreshWebServerLogHistory({ scrollState });
@@ -498,7 +600,8 @@ export function syncWebServerLogStream() {
     return;
   }
 
-  const shouldConnect = state.mounted && !state.nativeOpen && state.systemModal === "webserver-logs";
+  const shouldConnect = state.mounted && !state.nativeOpen && state.systemModal === "webserver-logs" &&
+    state.busyAction !== "clear-webserver-log-history";
   if (!shouldConnect) {
     closeWebServerLogStream();
     return;
@@ -825,7 +928,7 @@ export function renderWebServerLogStatusBanner() {
 
 export function renderWebServerLogHistoryControls() {
   const enabled = isWebServerLogHistoryEnabled();
-  const busy = state.loadingEntities || state.busyAction === "switch-webServerLogHistoryEnabled";
+  const busy = state.loadingEntities || Boolean(state.busyAction);
   const label = getWebServerLogHistoryStatusLabel();
   const copy = getWebServerLogHistoryInfoCopy();
   const loggerLevelControl = renderWebServerLoggerLevelControl();
@@ -862,7 +965,7 @@ export function renderWebServerLoggerLevelControl() {
 
   const options = getWebServerLoggerLevelOptions(entity);
   const value = getWebServerLoggerLevelValue(entity);
-  const busy = state.loadingEntities || state.busyAction === "save-debugLevel";
+  const busy = state.loadingEntities || Boolean(state.busyAction);
 
   return `
     ${renderSettingsSystemRow({
@@ -921,7 +1024,7 @@ export async function copyWebServerLogOutput() {
 
 const webServerLogActionHandlers = {
   "open-webserver-log-modal": () => openWebServerLogsModal(),
-  "clear-webserver-log-output": () => clearWebServerLogOutput(),
+  "clear-webserver-log-output": () => clearWebServerLogHistory(),
   "copy-webserver-log-output": () => copyWebServerLogOutput(),
 };
 
@@ -931,6 +1034,9 @@ export function handleWebServerLogAction(action) {
 
 export function renderWebServerLogsModal() {
   const demoMode = isWebServerLogDemoMode();
+  const clearBusy = state.busyAction === "clear-webserver-log-history";
+  const clearDisabled = Boolean(state.busyAction) || state.webServerLogHistoryLoading ||
+    (!demoMode && !state.nativeOpen && !state.webServerLogCsrfToken);
   return renderModalShell({
     id: "system",
     titleId: "oq-webserver-log-modal-title",
@@ -952,7 +1058,7 @@ export function renderWebServerLogsModal() {
         </div>`,
     actions: `
       <button class="oq-helper-button oq-helper-button--ghost" type="button" data-oq-action="copy-webserver-log-output" ${state.webServerLogEntries.length === 0 ? "disabled" : ""}>Kopieer log</button>
-      <button class="oq-helper-button oq-helper-button--ghost" type="button" data-oq-action="clear-webserver-log-output">Legen</button>
+      <button class="oq-helper-button oq-helper-button--ghost" type="button" data-oq-action="clear-webserver-log-output" ${clearDisabled ? "disabled" : ""}>${clearBusy ? "Legen..." : "Legen"}</button>
       <button class="oq-helper-button oq-helper-button--primary" type="button" data-oq-action="close-system-modal">Gereed</button>
     `,
   });

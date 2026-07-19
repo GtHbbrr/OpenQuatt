@@ -3,8 +3,11 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <string>
 
 #include <esp_http_server.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/semphr.h>
 
 #include "PsramBuffer.h"
 #include "esphome/components/switch/switch.h"
@@ -29,6 +32,7 @@ class OpenQuattLogHistory : public Component {
 
   void set_enabled(bool enabled);
   void clear_history();
+  const std::string &get_csrf_token() const { return this->csrf_token_; }
   void write_recent_logs(httpd_req_t *req) const;
 
  protected:
@@ -51,6 +55,8 @@ class OpenQuattLogHistory : public Component {
   size_t head_{0};
   size_t count_{0};
   uint32_t next_seq_{1};
+  std::string csrf_token_;
+  SemaphoreHandle_t history_mutex_{nullptr};
 
 #ifdef USE_ESP32_CRASH_HANDLER
   bool pending_crash_report_{false};
@@ -68,6 +74,9 @@ class OpenQuattLogHistory : public Component {
   uint64_t current_epoch_offset_ms_() const;
   void sync_time_state_();
   void rebase_history_(uint32_t offset_s);
+  void rotate_csrf_token_();
+  bool lock_history_() const;
+  void unlock_history_() const;
 
 #ifdef USE_ESP32_CRASH_HANDLER
   void load_crash_time_breadcrumb_();
@@ -77,7 +86,7 @@ class OpenQuattLogHistory : public Component {
 #endif
 
   void on_log_(uint8_t level, const char *tag, const char *message, size_t message_len);
-  void push_entry_(const LogEntry &entry);
+  void push_entry_locked_(const LogEntry &entry);
   static uint8_t normalize_level_(uint8_t level);
   static const char *level_to_string_(uint8_t level);
   static void copy_sanitized_log_line_(const char *message, size_t message_len, char *out, size_t out_size);

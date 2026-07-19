@@ -1,10 +1,12 @@
 #include "OpenQuattLogHistory.h"
 
 #include <algorithm>
+#include <array>
 #include <cinttypes>
 #include <cstdio>
 #include <cstring>
 
+#include "esp_random.h"
 #include "esphome/core/defines.h"
 #ifdef USE_ESP32_CRASH_HANDLER
 #include <esp_attr.h>
@@ -27,6 +29,54 @@ static constexpr uint32_t MIN_VALID_EPOCH_S = 1704067200UL;  // 2024-01-01 00:00
 static constexpr uint32_t MAX_VALID_EPOCH_S = 2082758400UL;  // 2036-01-01 00:00:00 UTC
 
 static bool epoch_is_sane(uint32_t epoch_s) { return epoch_s >= MIN_VALID_EPOCH_S && epoch_s < MAX_VALID_EPOCH_S; }
+
+static std::string base64_encode_bytes_(const uint8_t *data, size_t length) {
+  static constexpr char TABLE[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+  std::string out;
+  out.reserve(((length + 2U) / 3U) * 4U);
+
+  for (size_t index = 0; index < length; index += 3U) {
+    const uint32_t byte_a = data[index];
+    const uint32_t byte_b = index + 1U < length ? data[index + 1U] : 0U;
+    const uint32_t byte_c = index + 2U < length ? data[index + 2U] : 0U;
+    const uint32_t triple = (byte_a << 16U) | (byte_b << 8U) | byte_c;
+
+    out.push_back(TABLE[(triple >> 18U) & 0x3FU]);
+    out.push_back(TABLE[(triple >> 12U) & 0x3FU]);
+    out.push_back(index + 1U < length ? TABLE[(triple >> 6U) & 0x3FU] : '=');
+    out.push_back(index + 2U < length ? TABLE[triple & 0x3FU] : '=');
+  }
+
+  return out;
+}
+
+static void fill_random_token_(std::array<uint8_t, 32> *token) {
+  if (token == nullptr) {
+    return;
+  }
+  for (size_t index = 0; index < token->size(); index += sizeof(uint32_t)) {
+    const uint32_t random = esp_random();
+    for (size_t byte_index = 0; byte_index < sizeof(uint32_t) && index + byte_index < token->size(); ++byte_index) {
+      (*token)[index + byte_index] = static_cast<uint8_t>(random >> (byte_index * 8U));
+    }
+  }
+}
+
+static bool header_matches_host_(const std::string &header_value, const std::string &host) {
+  if (host.empty() || header_value.empty()) {
+    return false;
+  }
+
+  size_t authority_start = 0;
+  const size_t scheme_pos = header_value.find("://");
+  if (scheme_pos != std::string::npos) {
+    authority_start = scheme_pos + 3U;
+  }
+  const size_t authority_end = header_value.find_first_of("/?#", authority_start);
+  const std::string authority = header_value.substr(
+      authority_start, authority_end == std::string::npos ? std::string::npos : authority_end - authority_start);
+  return authority == host;
+}
 
 #ifdef USE_ESP32_CRASH_HANDLER
 static constexpr uint32_t CRASH_TIME_BREADCRUMB_MAGIC = 0x4F514348UL;  // OQCH
@@ -241,13 +291,52 @@ class OpenQuattLogHistoryRequestHandler : public AsyncWebHandler {
  public:
   explicit OpenQuattLogHistoryRequestHandler(OpenQuattLogHistory *parent) : parent_(parent) {}
 
+  bool passes_same_origin_(AsyncWebServerRequest *request) const {
+    const auto host = request->get_header("Host");
+    if (!host.has_value() || host->empty()) {
+      return false;
+    }
+
+    const auto origin = request->get_header("Origin");
+    if (origin.has_value() && !header_matches_host_(origin.value(), host.value())) {
+      return false;
+    }
+
+    const auto referer = request->get_header("Referer");
+    if (referer.has_value() && !header_matches_host_(referer.value(), host.value())) {
+      return false;
+    }
+
+    return true;
+  }
+
+  bool passes_csrf_(AsyncWebServerRequest *request) const {
+    const std::string csrf_token = request->arg("csrf_token");
+    return !csrf_token.empty() && csrf_token == this->parent_->get_csrf_token();
+  }
+
   bool canHandle(AsyncWebServerRequest *request) const override {
     char url_buf[AsyncWebServerRequest::URL_BUF_SIZE];
     request->url_to(url_buf);
-    return url_path_matches(url_buf, "/openquatt/logs/recent") && request->method() == HTTP_GET;
+    if (url_path_matches(url_buf, "/openquatt/logs/recent")) {
+      return request->method() == HTTP_GET;
+    }
+    return url_path_matches(url_buf, "/openquatt/logs/clear") && request->method() == HTTP_POST;
   }
 
   void handleRequest(AsyncWebServerRequest *request) override {
+    char url_buf[AsyncWebServerRequest::URL_BUF_SIZE];
+    request->url_to(url_buf);
+    if (url_path_matches(url_buf, "/openquatt/logs/clear")) {
+      if (!this->passes_same_origin_(request) || !this->passes_csrf_(request)) {
+        request->send(403, "application/json", R"({"ok":false,"error":"forbidden"})");
+        return;
+      }
+      this->parent_->clear_history();
+      request->send(200, "application/json", R"({"ok":true})");
+      return;
+    }
+
     httpd_req_t *req = *request;
     httpd_resp_set_status(req, HTTPD_200);
     httpd_resp_set_type(req, "application/json; charset=utf-8");
@@ -417,7 +506,7 @@ void OpenQuattLogHistory::split_log_fields_(const char *raw, const char **tag_st
   }
 }
 
-void OpenQuattLogHistory::push_entry_(const LogEntry &entry) {
+void OpenQuattLogHistory::push_entry_locked_(const LogEntry &entry) {
   if (!this->entries_) {
     return;
   }
@@ -435,7 +524,7 @@ void OpenQuattLogHistory::push_entry_(const LogEntry &entry) {
 }
 
 void OpenQuattLogHistory::rebase_history_(uint32_t offset_s) {
-  if (offset_s == 0) {
+  if (offset_s == 0 || !this->lock_history_()) {
     return;
   }
 
@@ -443,6 +532,7 @@ void OpenQuattLogHistory::rebase_history_(uint32_t offset_s) {
     const size_t entry_index = (this->head_ + index) % ENTRY_CAPACITY;
     this->entries_[entry_index].timestamp_s += offset_s;
   }
+  this->unlock_history_();
 }
 
 void OpenQuattLogHistory::sync_time_state_() {
@@ -562,7 +652,6 @@ void OpenQuattLogHistory::on_log_(uint8_t level, const char *tag, const char *me
   LogEntry entry{};
   // The API uses this compact sequence only for relative ordering; wrapping at
   // uint16_t is intentional.
-  entry.seq = static_cast<uint16_t>(this->next_seq_++);
   entry.timestamp_s = static_cast<uint32_t>(this->current_time_ms_() / 1000ULL);
   entry.level = normalize_level_(level);
   copy_sanitized_log_line_(message, message_len, entry.raw, sizeof(entry.raw));
@@ -573,16 +662,37 @@ void OpenQuattLogHistory::on_log_(uint8_t level, const char *tag, const char *me
   }
 
   (void) tag;
-  this->push_entry_(entry);
+  if (!this->lock_history_()) {
+    return;
+  }
+  entry.seq = static_cast<uint16_t>(this->next_seq_++);
+  this->push_entry_locked_(entry);
+  this->unlock_history_();
 }
 
 void OpenQuattLogHistory::set_enabled(bool enabled) { this->enabled_ = enabled; }
 
 void OpenQuattLogHistory::clear_history() {
+  if (!this->lock_history_()) {
+    return;
+  }
   this->head_ = 0;
   this->count_ = 0;
   this->next_seq_ = 1;
+  this->unlock_history_();
 }
+
+void OpenQuattLogHistory::rotate_csrf_token_() {
+  std::array<uint8_t, 32> token_bytes{};
+  fill_random_token_(&token_bytes);
+  this->csrf_token_ = base64_encode_bytes_(token_bytes.data(), token_bytes.size());
+}
+
+bool OpenQuattLogHistory::lock_history_() const {
+  return this->history_mutex_ != nullptr && xSemaphoreTake(this->history_mutex_, portMAX_DELAY) == pdTRUE;
+}
+
+void OpenQuattLogHistory::unlock_history_() const { xSemaphoreGive(this->history_mutex_); }
 
 void OpenQuattLogHistory::setup() {
   if (logger::global_logger == nullptr) {
@@ -593,6 +703,11 @@ void OpenQuattLogHistory::setup() {
     ESP_LOGE(TAG, "global_web_server_base is unavailable");
     return;
   }
+  this->history_mutex_ = xSemaphoreCreateMutex();
+  if (this->history_mutex_ == nullptr) {
+    ESP_LOGE(TAG, "Failed to allocate log history mutex");
+    return;
+  }
 
   if (this->enabled_switch_ != nullptr) {
     this->enabled_ = this->enabled_switch_->state;
@@ -601,6 +716,7 @@ void OpenQuattLogHistory::setup() {
   if (!this->entries_.allocate(ENTRY_CAPACITY)) {
     ESP_LOGE(TAG, "Failed to allocate log history buffer in PSRAM");
   }
+  this->rotate_csrf_token_();
 
   logger::global_logger->add_log_callback(this, [](void *self, uint8_t level, const char *tag, const char *message,
                                                    size_t message_len) {
@@ -628,11 +744,17 @@ void OpenQuattLogHistory::loop() {
 }
 
 void OpenQuattLogHistory::dump_config() {
+  size_t entry_count = 0;
+  if (this->lock_history_()) {
+    entry_count = this->count_;
+    this->unlock_history_();
+  }
+
   ESP_LOGCONFIG(TAG, "OpenQuatt log history");
   ESP_LOGCONFIG(TAG, "  Enabled switch: %s", this->enabled_switch_ == nullptr ? "<missing>" : "configured");
   ESP_LOGCONFIG(TAG, "  Clock: %s", this->clock_ == nullptr ? "<missing>" : "configured");
   ESP_LOGCONFIG(TAG, "  Enabled: %s", YESNO(this->enabled_));
-  ESP_LOGCONFIG(TAG, "  Entries: %u / %u", static_cast<unsigned>(this->count_), static_cast<unsigned>(ENTRY_CAPACITY));
+  ESP_LOGCONFIG(TAG, "  Entries: %u / %u", static_cast<unsigned>(entry_count), static_cast<unsigned>(ENTRY_CAPACITY));
   ESP_LOGCONFIG(TAG, "  History buffer: %s", !this->entries_ ? "missing" : (this->entries_.is_external() ? "PSRAM" : "internal"));
 #ifdef USE_ESP32_CRASH_HANDLER
   ESP_LOGCONFIG(TAG, "  Pending crash report: %s", YESNO(this->pending_crash_report_));
@@ -644,8 +766,39 @@ void OpenQuattLogHistory::write_recent_logs(httpd_req_t *req) const {
     return;
   }
 
+  size_t snapshot_capacity = 0;
+  if (!this->lock_history_()) {
+    ESP_LOGW(TAG, "Failed to lock recent log history");
+    httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Unable to lock recent logs");
+    return;
+  }
+  snapshot_capacity = this->count_;
+  this->unlock_history_();
+
+  PsramBuffer<LogEntry> snapshot;
+  if (!snapshot.allocate(snapshot_capacity)) {
+    ESP_LOGW(TAG, "Failed to allocate recent log snapshot");
+    httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Unable to snapshot recent logs");
+    return;
+  }
+
+  if (!this->lock_history_()) {
+    ESP_LOGW(TAG, "Failed to lock recent log history");
+    httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Unable to lock recent logs");
+    return;
+  }
+  const size_t snapshot_count = std::min(this->count_, snapshot_capacity);
+  const size_t start_offset = this->count_ - snapshot_count;
+  for (size_t index = 0; index < snapshot_count; ++index) {
+    const size_t entry_index = (this->head_ + start_offset + index) % ENTRY_CAPACITY;
+    snapshot[index] = this->entries_[entry_index];
+  }
+  this->unlock_history_();
+
   ChunkedJsonWriter writer(req);
   if (!writer.write_literal("{\"enabled\":") || !writer.write_literal(this->enabled_ ? "true" : "false") ||
+      !writer.write_literal(",\"csrf_token\":") ||
+      !writer.write_json_string(this->csrf_token_.c_str(), this->csrf_token_.size()) ||
       !writer.write_literal(",\"entries\":[")) {
     ESP_LOGW(TAG, "Failed to start recent log response");
     return;
@@ -676,15 +829,14 @@ void OpenQuattLogHistory::write_recent_logs(httpd_req_t *req) const {
     return true;
   };
 
-  for (size_t index = 0; index < this->count_; ++index) {
+  for (size_t index = 0; index < snapshot_count; ++index) {
     if (index > 0) {
       if (!writer.write_char(',')) {
         ESP_LOGW(TAG, "Failed to stream recent log separator");
         return;
       }
     }
-    const size_t entry_index = (this->head_ + index) % ENTRY_CAPACITY;
-    if (!write_json_entry(this->entries_[entry_index])) {
+    if (!write_json_entry(snapshot[index])) {
       ESP_LOGW(TAG, "Failed to stream recent log entry");
       return;
     }
