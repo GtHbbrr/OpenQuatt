@@ -21,12 +21,13 @@ openquatt_usage_telemetry:
   username: "${usage_telemetry_username}"
   password: "${usage_telemetry_password}"
   topic: "${usage_telemetry_topic}"
-  default_enabled: true
   setup_complete_sensor: oq_setup_complete_sensor
+  choice_configured:
+    id: oq_usage_telemetry_choice_configured
+    name: "Usage statistics choice configured"
+    internal: true
+    entity_category: diagnostic
   interval: 1h
-  initial_delay_min: 15min
-  initial_delay_max: 60min
-  jitter: 15min
   firmware_version: "${project_version}"
   release_channel: "${release_channel}"
   hardware_profile: "${oq_hardware_profile}"

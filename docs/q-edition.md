@@ -160,7 +160,7 @@ Volg de route die de web-app voor jouw installatie toont. De basisstappen zijn:
 8. **Flowregeling en afstelling:** leg vast hoe de pomp geregeld moet worden en welke waarden daarbij horen.
 9. **Watertemperatuur beveiligen:** controleer de normale bovengrens en de tripgrens.
 10. **Stille uren en niveaus:** stel het stille venster en de compressorlimieten voor dag en nacht in.
-11. **Gebruiksstatistieken:** controleer of OpenQuatt beperkte technische systeemstatus en aan/uit-statussen van functies mag blijven delen; dit staat standaard aan en kan hier worden uitgezet.
+11. **Gebruiksstatistieken:** controleer of OpenQuatt beperkte technische systeemstatus en aan/uit-statussen van functies mag delen; tijdens een nieuwe Quick Start staat dit standaard aan en kan het hier worden uitgezet. Wifi-gegevens, gebruikersnamen en wachtwoorden worden nooit meegestuurd.
 12. **Bevestigen en afronden:** controleer je keuzes en markeer Quick Start als voltooid.
 
 ## Je installatie is klaar wanneer

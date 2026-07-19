@@ -12,6 +12,64 @@ import { updateFirmwareState } from "./feature-state.js";
 import { stopLoginAuthStatusPolling } from "../features/security-actions.js";
 import { refreshSettingsStorageStateSoon, SETTINGS_STORAGE_KEYS } from "../features/storage-history.js";
 import { clearWebServerLogOutput, refreshWebServerLogHistory } from "../features/webserver-logs.js";
+import { isUsageTelemetryChoiceConfirmed } from "./usage-telemetry-domain.js";
+
+async function commitUsageTelemetrySwitch(entity, enabled) {
+  const key = "usageTelemetryEnabled";
+  const previousEntity = state.entities[key] ? { ...state.entities[key] } : null;
+  state.busyAction = `switch-${key}`;
+  state.controlNotice = "";
+  state.controlError = "";
+  render();
+
+  try {
+    const action = enabled ? "turn_on" : "turn_off";
+    const response = await fetch(buildEntityPath(entity.domain, entity.name, action), { method: "POST" });
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    await refreshEntities([key, "usageTelemetryChoiceConfigured"], "all");
+    if (!isUsageTelemetryChoiceConfirmed({
+      telemetryValue: getEntityValue(key),
+      choiceValue: getEntityValue("usageTelemetryChoiceConfigured"),
+      expectedEnabled: enabled,
+    })) {
+      throw new Error("de controller heeft de opgeslagen keuze niet bevestigd");
+    }
+    state.controlNotice = `${entity.name} ${enabled ? "ingeschakeld" : "uitgeschakeld"}.`;
+  } catch (error) {
+    let disabledConfirmed = false;
+    try {
+      const response = await fetch(buildEntityPath(entity.domain, entity.name, "turn_off"), { method: "POST" });
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      await refreshEntities([key, "usageTelemetryChoiceConfigured"], "all");
+      disabledConfirmed = isUsageTelemetryChoiceConfirmed({
+        telemetryValue: getEntityValue(key),
+        choiceValue: getEntityValue("usageTelemetryChoiceConfigured"),
+        expectedEnabled: false,
+      });
+    } catch (_disableError) {
+      // Report an unknown state instead of presenting an unverified privacy choice.
+    }
+    if (disabledConfirmed) {
+      state.controlNotice = enabled
+        ? "Inschakelen kon niet worden bevestigd. Delen is veilig uitgeschakeld."
+        : "Delen is uitgeschakeld.";
+    } else {
+      if (previousEntity) {
+        state.entities[key] = previousEntity;
+      } else {
+        delete state.entities[key];
+      }
+      state.controlError = `De keuze kon niet veilig worden bevestigd. Controleer de verbinding en probeer opnieuw (${error.message}).`;
+    }
+  } finally {
+    state.busyAction = "";
+    render();
+  }
+}
 
 export async function commitSelect(key, option) {
   const entity = ENTITY_DEFS[key];
@@ -82,6 +140,10 @@ export async function commitSelect(key, option) {
 export async function commitSwitch(key, enabled) {
   const entity = ENTITY_DEFS[key];
   if (!entity) {
+    return;
+  }
+  if (key === "usageTelemetryEnabled") {
+    await commitUsageTelemetrySwitch(entity, enabled);
     return;
   }
 

@@ -185,7 +185,7 @@ import { fetchWithTimeout } from "./browser-utils.js";
     heating: ["strategy"],
     cooling: ["manualCoolingEnable", "coolingWithoutDewPointMode"],
     integrations: ["otEnabled", "cicPollingEnabled", "flowSource"],
-    system: ["setupComplete", "projectVersionText", "releaseChannelText", "firmwareUpdateChannel", "statusLedsEnabled", "usageTelemetryEnabled"],
+    system: ["setupComplete", "projectVersionText", "releaseChannelText", "firmwareUpdateChannel", "statusLedsEnabled", "usageTelemetryEnabled", "usageTelemetryChoiceConfigured"],
   };
 
   export const SETTINGS_GROUP_KEY_MAP = {
@@ -248,6 +248,7 @@ import { fetchWithTimeout } from "./browser-utils.js";
       "releaseChannelText",
       "statusLedsEnabled",
       "usageTelemetryEnabled",
+      "usageTelemetryChoiceConfigured",
       ...SETTINGS_STORAGE_KEYS,
       "webServerLogHistoryEnabled",
       "debugLevel",
@@ -319,7 +320,7 @@ import { fetchWithTimeout } from "./browser-utils.js";
   export const OVERVIEW_BULK_FOLLOWUP_DELAY_MS = 3500;
 
   export function getPrimeBaseKeys() {
-    return ["setupComplete", "strategy", "usageTelemetryEnabled", ...HEADER_ENTITY_KEYS];
+    return ["setupComplete", "strategy", "usageTelemetryEnabled", "usageTelemetryChoiceConfigured", ...HEADER_ENTITY_KEYS];
   }
 
   export function getEnergyViewEntityKeys() {

@@ -20,7 +20,7 @@
     ["flow", "Flowregeling en afstelling", "Leg daarna vast hoe de pomp geregeld moet worden en welke waarden daarbij horen. De autotune staat later onder Instellingen → Installatie → Service & commissioning."],
     ["water", "Watertemperatuur beveiligen", "Controleer de normale bovengrens en de tripgrens voor het watercircuit."],
     ["silent", "Stille uren en niveaus", "Stel daarna het stille venster en de compressorlimieten voor dag en nacht in."],
-    ["usage-telemetry", "Gebruiksstatistieken", "Controleer of OpenQuatt beperkte technische gebruiksstatistieken mag blijven delen. Delen staat standaard aan.", "usageTelemetryEnabled"],
+    ["usage-telemetry", "Gebruiksstatistieken", "Kies of OpenQuatt beperkte technische gebruiksstatistieken mag delen. Tijdens een nieuwe Quick Start staat delen standaard aan.", "usageTelemetryEnabled"],
     ["confirm", "Bevestigen en afronden", "Controleer nog één keer je keuzes. Met afronden markeer je Quick Start als voltooid."],
   ].map(([id, title, copy, optionalEntity], index) => ({ id, kicker: `Stap ${index + 1}`, title, copy, ...(optionalEntity ? { optionalEntity } : {}) }));
 
@@ -99,6 +99,7 @@
     espInternalTemp: { domain: "sensor", name: "ESP Internal Temperature", optional: true },
     statusLedsEnabled: { domain: "switch", name: "Status LEDs enabled", optional: true },
     usageTelemetryEnabled: { domain: "switch", name: "Usage statistics", optional: true },
+    usageTelemetryChoiceConfigured: { domain: "binary_sensor", name: "Usage statistics choice configured", optional: true },
     hpGeneration: { domain: "select", name: "Quatt Hybrid version" },
     strategy: { domain: "select", name: "Heating Control Mode" },
     openquattEnabled: { domain: "switch", name: "OpenQuatt Enabled", optional: true },
@@ -1201,6 +1202,7 @@
     "strategy",
     "openquattEnabled",
     "usageTelemetryEnabled",
+    "usageTelemetryChoiceConfigured",
     "boilerCvAssistEnabled",
     "openquattResumeAt",
     "manualCoolingEnable",
@@ -1280,6 +1282,7 @@
     "strategy",
     "openquattEnabled",
     "usageTelemetryEnabled",
+    "usageTelemetryChoiceConfigured",
     "boilerCvAssistEnabled",
     "openquattResumeAt",
     "manualCoolingEnable",

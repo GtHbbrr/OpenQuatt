@@ -1466,6 +1466,7 @@
     setEntity("switch", "CIC - Enable polling", { value: false, state: false });
     setEntity("switch", "Status LEDs enabled", { value: true, state: true });
     setEntity("switch", "Usage statistics", { value: false, state: false });
+    setEntity("binary_sensor", "Usage statistics choice configured", { value: false, state: false });
     setEntity("text", "CIC - Feed URL", { value: "http://192.168.2.117:8080/beta/feed/data.json", state: "http://192.168.2.117:8080/beta/feed/data.json" });
     setEntity("switch", "OpenTherm Enabled", { value: false, state: false });
     setEntity("switch", "CiC Compatibility Mode", { value: false, state: false });
@@ -3407,6 +3408,9 @@
     }
     entity.value = Boolean(enabled);
     entity.state = Boolean(enabled);
+    if (name === "Usage statistics") {
+      setEntity("binary_sensor", "Usage statistics choice configured", { value: true, state: true });
+    }
     if (name === "Quick flow test") {
       handleButtonPress(enabled ? "Quick Flow Test Start" : "Quick Flow Test Abort");
       updateSummary();

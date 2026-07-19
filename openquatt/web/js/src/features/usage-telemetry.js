@@ -2,10 +2,42 @@ import { renderOqIcon } from "../core/config.js";
 import { escapeHtml } from "../core/html.js";
 import { renderSettingsCompactSwitchControl } from "../settings/controls.js";
 
+const USAGE_TELEMETRY_EXAMPLE_JSON = JSON.stringify({
+  schema_version: 1,
+  message_id: "c8272f30-b64d-4af0-a13c-bf8e0cbde842",
+  installation_id: "7df1c1f8-fc47-4ac8-b0d7-94d8c42d772f",
+  uptime_s: 86420,
+  firmware_version: "v0.44.0",
+  release_channel: "main",
+  hardware_profile: "heatpump_controller_q",
+  hardware_revision: "1.0 (batch 42)",
+  topology: "duo",
+  connection: "wifi",
+  heap_free_b: 178432,
+  heap_min_free_b: 151008,
+  heap_largest_block_b: 98304,
+  psram_free_b: 7023616,
+  loop_time_ms: 14,
+  esp_internal_temp_c: 47.8,
+  wifi_rssi_dbm: -61,
+  reset_reason: "power_on",
+  cic_polling_enabled: true,
+  cic_compatibility_enabled: false,
+  ot_thermostat_enabled: true,
+  boiler_assist_enabled: true,
+  boiler_connection: "on_off",
+  mqtt_inputs_enabled: false,
+  trend_ram_enabled: true,
+  trend_flash_enabled: false,
+  decision_log_flash_enabled: false,
+  energy_history_flash_enabled: true,
+  ram_log_history_enabled: true,
+}, null, 2);
+
 export function renderUsageTelemetryConsent({ enabled, busy, settings = false }) {
   const scheduleCopy = settings
-    ? "Wanneer delen aanstaat, verstuurt OpenQuatt na een willekeurige startvertraging en daarna ongeveer elk uur een bericht via MQTT."
-    : "Pas na het afronden, met een willekeurige startvertraging, en daarna ongeveer elk uur via MQTT.";
+    ? "Na inschakelen verstuurt OpenQuatt vrijwel direct en daarna ongeveer elk uur technische gegevens naar de OpenQuatt-loggingserver."
+    : "Na het afronden verstuurt OpenQuatt vrijwel direct en daarna ongeveer elk uur technische gegevens naar de OpenQuatt-loggingserver.";
   return `
     <div class="oq-usage-consent${enabled ? " is-enabled" : ""}${settings ? " oq-usage-consent--settings" : ""}">
       <div class="oq-usage-consent-copy">
@@ -56,12 +88,18 @@ export function renderUsageTelemetryDisclosure({ collapsible = false, idPrefix =
         </div>
         <ul>
           <li><strong>Identiteit</strong><span>Geen MAC-adres of netwerkadres</span></li>
+          <li><strong>Wifi en toegang</strong><span>Nooit een wifi-netwerknaam, wifi-wachtwoord, gebruikersnaam, ander wachtwoord of inloggegevens</span></li>
           <li><strong>Installatiegedrag</strong><span>Geen verwarmingsmetingen of regelwaarden</span></li>
           <li><strong>Lokale data</strong><span>Geen ingestelde temperaturen, grenzen, MQTT-topics of logs</span></li>
         </ul>
       </section>
     </div>
-    <p class="oq-usage-network-note">${renderOqIcon("server", "oq-usage-network-note-icon")} De MQTT-broker kan, zoals iedere internetdienst, technisch wel het bron-IP-adres zien.</p>
+    <details class="oq-usage-payload-example">
+      <summary>Voorbeeld van het verzonden bericht (JSON)</summary>
+      <p>Voorbeeldwaarden; de velden en vorm komen overeen met het werkelijke bericht.</p>
+      <pre><code>${escapeHtml(USAGE_TELEMETRY_EXAMPLE_JSON)}</code></pre>
+    </details>
+    <p class="oq-usage-network-note">${renderOqIcon("server", "oq-usage-network-note-icon")} De OpenQuatt-loggingserver kan, zoals iedere internetdienst, technisch wel het bron-IP-adres zien. OpenQuatt slaat dit IP-adres niet op.</p>
   `;
 
   if (collapsible) {

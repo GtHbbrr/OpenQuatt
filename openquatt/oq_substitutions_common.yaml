@@ -67,7 +67,7 @@ usage_telemetry_port: "1883"                          # Plain MQTT port for the 
 usage_telemetry_tls: "false"                          # Temporary until the central broker exposes MQTT/TLS.
 usage_telemetry_username: "openquatt"                 # Shared central broker username.
 usage_telemetry_password: "openquatt"                 # Shared central broker password; not strong device authentication.
-usage_telemetry_topic: "devices"                      # Base topic for devices/<installation-id>/telemetry.
+usage_telemetry_topic: "openquatt/devices"            # Base topic for openquatt/devices/<installation-id>/telemetry.
 
 # ----------------------------
 # HARDWARE

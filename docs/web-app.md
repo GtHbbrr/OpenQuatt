@@ -63,7 +63,7 @@ Quick Start begint op de Heatpump Controller Q met een controle van de firmware-
 | `Flowregeling en afstelling` | Automatische flow of vaste pompstand | Bepaalt hoe OpenQuatt de waterdoorstroming regelt. |
 | `Watertemperatuur beveiligen` | Maximale watertemperatuur | Laat OpenQuatt terugregelen voordat het water te warm wordt. |
 | `Stille uren en niveaus` | Tijdvenster en compressorlimieten | Begrenst de compressor bijvoorbeeld 's nachts. |
-| `Gebruiksstatistieken` | Wel of niet beperkte technische systeemstatus en feature-instellingen delen | Delen staat standaard aan en kan tijdens Quick Start worden uitgezet. |
+| `Gebruiksstatistieken` | Wel of niet beperkte technische systeemstatus en feature-instellingen delen | Tijdens een nieuwe Quick Start staat delen standaard aan en kan het hier worden uitgezet. |
 | `Bevestigen en afronden` | Je keuzes controleren | Markeert de basisconfiguratie als klaar. |
 
 Gebruik je Waveshare of Heatpump Listener? Begin dan inhoudelijk bij **Kies je Quatt Hybrid**; Quick Start toont alleen de stappen die voor jouw hardware van toepassing zijn.
@@ -202,9 +202,9 @@ Hier vind je beheerfuncties:
 
 #### Gebruiksstatistieken en privacy
 
-Delen staat standaard aan en de opt-out verschijnt tijdens Quick Start, vóór het afronden. Je kunt de keuze later wijzigen via **Instellingen → Systeem → Gebruiksstatistieken**. De eerste verzendtimer start pas nadat Quick Start is afgerond. Als delen dan nog aan staat, verstuurt OpenQuatt na een willekeurige startvertraging en daarna ongeveer elk uur één klein MQTT-bericht. Door de willekeurige spreiding ligt het werkelijke interval tussen ongeveer 45 en 75 minuten. De huidige centrale brokerverbinding op poort 1883 gebruikt nog geen TLS; credentials en payload zijn onderweg daarom niet versleuteld. De gedeelde brokercredential beperkt alleen de toegang en bewijst niet dat een bericht authentiek van een specifieke controller komt; de ontvanger moet deze gegevens daarom als niet-vertrouwd behandelen.
+Tijdens een nieuwe Quick Start staat delen standaard aan en verschijnt de opt-out vóór het afronden. De keuze wordt pas opgeslagen wanneer die stap werkelijk wordt geopend. Je kunt de keuze later wijzigen via **Instellingen → Systeem → Gebruiksstatistieken**. Zolang Quick Start niet is afgerond, wordt niets verzonden. Daarna, of wanneer je delen later zelf aanzet, verstuurt OpenQuatt vrijwel direct en vervolgens ongeveer elk uur één klein bericht naar de centrale OpenQuatt-loggingserver.
 
-Bij een upgrade van een installatie die Quick Start al had afgerond, ontbreekt nog een opgeslagen telemetrykeuze. Zo'n bestaande installatie start daarom eenmalig met delen uit; de gebruiker kan delen later onder **Instellingen → Systeem → Gebruiksstatistieken** aanzetten. Alleen nieuwe installaties die Quick Start nog moeten doorlopen gebruiken de standaard-aan opt-out.
+Een ontbrekende telemetrykeuze geldt nooit als toestemming. Bestaande installaties starten na de introductie van deze functie daarom met delen uit, ook wanneer hun oude Quick Start-status ontbreekt. Als correctie op de eerste telemetryversie wordt de oude opslagindeling eenmalig naar uit gemigreerd; het willekeurige installatie-ID blijft behouden. Ook wie delen in die korte eerste versie bewust had aangezet, moet het daardoor eenmalig opnieuw inschakelen. Nieuwe installaties krijgen de standaard-aan opt-out alleen wanneer ze de gebruiksstatistiekenstap van Quick Start werkelijk openen.
 
 Het bericht bevat uitsluitend:
 
@@ -224,11 +224,11 @@ Het bericht bevat uitsluitend:
 
 Een niet-ondersteunde functie, tijdelijk nog niet geïnitialiseerde keuze of niet-beschikbare sensor krijgt de waarde `null`; `false` betekent dat de functie beschikbaar maar uitgeschakeld is. Zo is de Wi-Fi-signaalsterkte bij Ethernet `null`. `boiler_connection` is alleen `null` wanneer de OTB-select bestaat maar tijdelijk nog geen geldige toestand heeft, of een onbekende optie bevat.
 
-Het bericht bevat geen MAC-adres, lokaal IP-adres, SSID, MQTT-brokergegevens, credentials, topics, ontvangen MQTT-waarden, ingestelde temperaturen of grenzen, verwarmingsmetingen, regelwaarden of loginhoud. De MQTT-broker ziet bij een netwerkverbinding technisch wel het bron-IP-adres, maar dit staat niet in de payload.
+Het bericht bevat nooit een MAC-adres, lokaal IP-adres, wifi-netwerknaam, wifi-wachtwoord, gebruikersnaam, ander wachtwoord of andere inloggegevens. Ook MQTT-servergegevens, topics, ontvangen MQTT-waarden, ingestelde temperaturen of grenzen, verwarmingsmetingen, regelwaarden en loginhoud gaan niet mee. De OpenQuatt-loggingserver ziet bij een netwerkverbinding technisch wel het bron-IP-adres, maar dit staat niet in de payload en OpenQuatt slaat het niet op. In de web-app staat onder **Wat gaat er mee?** een uitklapbaar voorbeeld van de volledige JSON-vorm.
 
 Wanneer delen voor het eerst actief wordt, maakt de controller met de hardware-randomgenerator een UUIDv4 aan en bewaart die lokaal. Een UUIDv4 heeft 122 willekeurige bits; zelfs bij één miljoen installaties is de kans op minstens één dubbel ID kleiner dan ongeveer `10^-25`. Dit ID blijft gelijk na een OTA-update en wanneer je delen tijdelijk uitzet. Een fabrieksreset maakt een nieuw ID. De keuze en het ID worden niet via een instellingenbackup naar een andere controller gekopieerd. Uitzetten stopt nieuwe berichten direct; er wordt geen wachtrij voor later opgeslagen. Na een mislukte verzending maakt iedere retry een verse momentopname, maar behoudt binnen dezelfde retryreeks het `message_id` zodat een verloren QoS 1-bevestiging kan worden gededupliceerd.
 
-De statistiekenclient staat los van de configureerbare [MQTT inputbronnen](mqtt.md): hij publiceert alleen dit ene bericht, subscribed nergens op en schakelt ESPHome MQTT-discovery, entiteitspublicaties en logexport niet in. Het JSON-bericht wordt met QoS 1 retained gepubliceerd op `devices/<installation-id>/telemetry`, zodat de broker per installatie alleen de laatste payload bewaart. Een build zonder geconfigureerde centrale broker maakt ook wanneer delen aanstaat geen externe verbinding.
+De statistiekenclient staat los van de configureerbare [MQTT inputbronnen](mqtt.md): hij publiceert alleen dit ene bericht, subscribed nergens op en schakelt ESPHome MQTT-discovery, entiteitspublicaties en logexport niet in. Het JSON-bericht wordt met QoS 1 retained gepubliceerd op `openquatt/devices/<installation-id>/telemetry`, zodat de loggingserver per installatie alleen de laatste payload bewaart. Een build zonder geconfigureerde centrale loggingserver maakt ook wanneer delen aanstaat geen externe verbinding.
 
 #### Debugopname voor support
 

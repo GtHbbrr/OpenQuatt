@@ -378,6 +378,17 @@ async function checkMockFixtureContracts() {
   assertContains(buildSource, "ENTITY_DEFS", "Canonical mock entity source");
   assertContains(mockSource, "__OQ_MOCK_ENTITY_DEFS__", "Generated mock entity definitions");
   assertContains(mockSource, 'setEntity("switch", "Usage statistics"', "Usage telemetry mock switch");
+  assertContains(
+    mockSource,
+    'setEntity("binary_sensor", "Usage statistics choice configured", { value: false, state: false })',
+    "Usage telemetry mock initial choice",
+  );
+  assertContains(mockSource, 'if (name === "Usage statistics")', "Usage telemetry mock switch handling");
+  assertContains(
+    mockSource,
+    'setEntity("binary_sensor", "Usage statistics choice configured", { value: true, state: true })',
+    "Usage telemetry mock persisted choice",
+  );
   assertContains(mockSource, "mockFixtures.hp2Entities", "HP2 mock fixtures");
   assertContains(mockSource, 'renderDevControlOptions("scenario")', "Scenario control fixtures");
   const scriptOrder = [

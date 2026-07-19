@@ -709,15 +709,31 @@ import { renderUsageTelemetryConsent, renderUsageTelemetryDisclosure } from "./u
 
   export function renderUsageTelemetryWorkspace() {
     const enabled = isEntityActive("usageTelemetryEnabled");
-    const busy = state.loadingEntities || state.busyAction === "switch-usageTelemetryEnabled";
+    const choiceConfigured = isEntityActive("usageTelemetryChoiceConfigured");
+    const busy = state.loadingEntities || Boolean(state.busyAction);
     return `
       <section class="oq-helper-panel">
         <p class="oq-helper-label">${escapeHtml(getQuickStepKicker("usage-telemetry"))}</p>
         <h2 class="oq-helper-section-title">Gebruiksstatistieken</h2>
-        <p class="oq-helper-section-copy">OpenQuatt deelt standaard beperkte technische statistieken. Wil je dit niet, zet delen hier uit. Je kunt de keuze later altijd wijzigen.</p>
+        <p class="oq-helper-section-copy">Bij een nieuwe Quick Start staat het delen van beperkte technische statistieken standaard aan. Wil je dit niet, zet delen hier uit. Je kunt de keuze later altijd wijzigen.</p>
         ${renderUsageTelemetryConsent({ enabled, busy })}
         ${renderUsageTelemetryDisclosure()}
-        ${renderQuickStartStepNav()}
+        ${state.controlNotice ? `<p class="oq-helper-notice">${escapeHtml(state.controlNotice)}</p>` : ""}
+        ${state.controlError ? `<p class="oq-helper-error">${escapeHtml(state.controlError)}</p>` : ""}
+        ${state.controlError ? `
+          <div class="oq-helper-actions">
+            <button class="oq-helper-button" type="button" data-oq-action="retry-usage-telemetry-choice" ${busy ? "disabled" : ""}>Keuze opnieuw opslaan</button>
+          </div>
+        ` : ""}
+        ${!choiceConfigured && !busy ? `
+          <div class="oq-helper-actions">
+            <button class="oq-helper-button oq-helper-button--ghost" type="button" data-oq-action="confirm-no-usage-telemetry">Niet delen bevestigen</button>
+          </div>
+        ` : ""}
+        ${renderQuickStartStepNav({
+          nextDisabled: busy || !choiceConfigured || Boolean(state.controlError),
+          nextDisabledLabel: busy || !choiceConfigured ? "Keuze opslaan..." : "Controleer keuze",
+        })}
       </section>
     `;
   }

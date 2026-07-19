@@ -181,22 +181,36 @@ void OpenQuattUsageTelemetry::setup() {
   this->pref_ = global_preferences->make_preference<Storage>(STORAGE_KEY, true);
   Storage storage{};
   if (!this->load_storage_(&storage)) {
-    const bool setup_state_known = this->setup_complete_sensor_ != nullptr && this->setup_complete_sensor_->has_state();
-    const bool fresh_install = setup_state_known && !this->setup_complete_sensor_->state;
     storage.magic = STORAGE_MAGIC;
     storage.version = STORAGE_VERSION;
-    storage.enabled = this->default_enabled_ && fresh_install ? 1U : 0U;
+    storage.enabled = 0;
+    storage.choice_configured = 0;
     storage.installation_id_present = 0;
+    storage.reserved.fill(0);
     storage.installation_id.fill(0);
-    const bool initialized = (storage.enabled == 0U || this->ensure_installation_id_(&storage)) &&
-                             this->save_storage_(storage);
+
+    StorageV1 legacy_storage{};
+    const bool migrated_legacy = this->load_legacy_storage_(&legacy_storage);
+    if (migrated_legacy) {
+      // Storage v1 could not distinguish a deliberate opt-in from the old
+      // default-on migration. Reset it once, preserving only the anonymous ID.
+      storage.choice_configured = 1;
+      storage.installation_id_present = legacy_storage.installation_id_present;
+      storage.installation_id = legacy_storage.installation_id;
+    }
+
+    const bool initialized = this->save_storage_(storage);
     if (!initialized) {
       ESP_LOGE(TAG, "Failed to initialize usage telemetry preferences; usage statistics remain disabled");
       storage.enabled = 0;
+      storage.choice_configured = 0;
       storage.installation_id_present = 0;
+      storage.reserved.fill(0);
       storage.installation_id.fill(0);
-    } else if (this->default_enabled_ && !fresh_install) {
-      ESP_LOGI(TAG, "No usage telemetry preference found for an existing or unknown setup; defaulting to disabled");
+    } else if (migrated_legacy) {
+      ESP_LOGI(TAG, "Migrated legacy usage telemetry preference to disabled");
+    } else {
+      ESP_LOGI(TAG, "No usage telemetry choice found; remaining disabled until onboarding records a choice");
     }
   }
 
@@ -250,7 +264,7 @@ void OpenQuattUsageTelemetry::dump_config() {
   if (!this->tls_ && this->is_configured()) {
     ESP_LOGW(TAG, "Usage statistics transport is not encrypted");
   }
-  ESP_LOGCONFIG(TAG, "  Default on for new installations: %s", YESNO(this->default_enabled_));
+  ESP_LOGCONFIG(TAG, "  Choice configured: %s", YESNO(this->choice_configured_.load()));
   ESP_LOGCONFIG(TAG, "  Quick Start complete: %s", YESNO(this->is_setup_complete_()));
   ESP_LOGCONFIG(TAG, "  Publish interval: %" PRIu32 " seconds", this->interval_ms_ / 1000U);
   ESP_LOGCONFIG(TAG, "  Installation ID present: %s", YESNO(!this->installation_id_.empty()));
@@ -258,18 +272,19 @@ void OpenQuattUsageTelemetry::dump_config() {
 
 void OpenQuattUsageTelemetry::write_state(bool state) {
   const bool current_state = this->enabled_.load();
-  if (state == current_state) {
-    this->publish_state(current_state);
-    return;
-  }
-
   Storage storage{};
   if (!this->load_storage_(&storage)) {
     storage.magic = STORAGE_MAGIC;
     storage.version = STORAGE_VERSION;
     storage.enabled = current_state ? 1U : 0U;
+    storage.choice_configured = this->choice_configured_.load() ? 1U : 0U;
     storage.installation_id_present = this->installation_id_.empty() ? 0U : 1U;
+    storage.reserved.fill(0);
     storage.installation_id = this->installation_id_bytes_;
+  }
+  if (state == current_state && storage.choice_configured != 0U) {
+    this->publish_state(current_state);
+    return;
   }
 
   if (state && !this->ensure_installation_id_(&storage)) {
@@ -278,6 +293,7 @@ void OpenQuattUsageTelemetry::write_state(bool state) {
     return;
   }
   storage.enabled = state ? 1U : 0U;
+  storage.choice_configured = 1U;
   if (!this->save_storage_(storage)) {
     ESP_LOGE(TAG, "Could not persist usage statistics preference");
     this->publish_state(current_state);
@@ -310,14 +326,28 @@ bool OpenQuattUsageTelemetry::load_storage_(Storage *storage) {
     return false;
   }
   if (storage->magic != STORAGE_MAGIC || storage->version != STORAGE_VERSION || storage->enabled > 1U ||
-      storage->installation_id_present > 1U) {
+      storage->choice_configured > 1U || storage->installation_id_present > 1U) {
     return false;
   }
   const bool id_present = uuid_is_present_(storage->installation_id);
-  if ((storage->installation_id_present != 0U) != id_present || (storage->enabled != 0U && !id_present)) {
+  if ((storage->installation_id_present != 0U) != id_present ||
+      (storage->enabled != 0U && (storage->choice_configured == 0U || !id_present))) {
     return false;
   }
   return true;
+}
+
+bool OpenQuattUsageTelemetry::load_legacy_storage_(StorageV1 *storage) {
+  if (storage == nullptr || global_preferences == nullptr) {
+    return false;
+  }
+  auto legacy_pref = global_preferences->make_preference<StorageV1>(STORAGE_KEY, true);
+  if (!legacy_pref.load(storage) || storage->magic != STORAGE_MAGIC || storage->version != 1U ||
+      storage->enabled > 1U || storage->installation_id_present > 1U) {
+    return false;
+  }
+  const bool id_present = uuid_is_present_(storage->installation_id);
+  return (storage->installation_id_present != 0U) == id_present && (storage->enabled == 0U || id_present);
 }
 
 bool OpenQuattUsageTelemetry::save_storage_(const Storage &storage) {
@@ -351,21 +381,23 @@ void OpenQuattUsageTelemetry::apply_storage_(const Storage &storage) {
     this->installation_id_ = storage.installation_id_present != 0U ? format_uuid_(storage.installation_id) : "";
   }
   const bool enabled = storage.enabled != 0U && !this->installation_id_.empty();
+  const bool choice_configured = storage.choice_configured != 0U;
   this->enabled_.store(enabled);
+  this->choice_configured_.store(choice_configured);
   this->publish_state(enabled);
+  if (this->choice_configured_sensor_ != nullptr) {
+    this->choice_configured_sensor_->publish_state(choice_configured);
+  }
 }
 
 void OpenQuattUsageTelemetry::schedule_initial_publish_() {
-  this->next_publish_ms_ = millis() + this->random_delay_(this->initial_delay_min_ms_, this->initial_delay_max_ms_);
+  // Keep zero as the unscheduled sentinel while allowing a newly recorded
+  // opt-in to publish on the next loop iteration.
+  this->next_publish_ms_ = millis() + 1U;
 }
 
 void OpenQuattUsageTelemetry::schedule_regular_publish_() {
-  int64_t delay_ms = this->interval_ms_;
-  if (this->jitter_ms_ > 0U) {
-    const uint32_t spread = (this->jitter_ms_ * 2U) + 1U;
-    delay_ms += static_cast<int64_t>(random_uint32() % spread) - static_cast<int64_t>(this->jitter_ms_);
-  }
-  this->next_publish_ms_ = millis() + static_cast<uint32_t>(std::max<int64_t>(1000, delay_ms));
+  this->next_publish_ms_ = millis() + this->interval_ms_;
 }
 
 void OpenQuattUsageTelemetry::schedule_retry_() {
@@ -374,7 +406,7 @@ void OpenQuattUsageTelemetry::schedule_retry_() {
   for (uint8_t i = 1; i < this->consecutive_failures_ && delay_ms < RETRY_MAX_MS; i++) {
     delay_ms = std::min<uint32_t>(delay_ms * 2U, RETRY_MAX_MS);
   }
-  this->next_publish_ms_ = millis() + delay_ms + this->random_delay_(0U, RETRY_JITTER_MS);
+  this->next_publish_ms_ = millis() + delay_ms;
 }
 
 void OpenQuattUsageTelemetry::start_publish_session_() {
@@ -581,13 +613,6 @@ std::string OpenQuattUsageTelemetry::read_hardware_revision_() const {
 #else
   return "";
 #endif
-}
-
-uint32_t OpenQuattUsageTelemetry::random_delay_(uint32_t min_ms, uint32_t max_ms) const {
-  if (max_ms <= min_ms) {
-    return min_ms;
-  }
-  return min_ms + (random_uint32() % (max_ms - min_ms + 1U));
 }
 
 bool OpenQuattUsageTelemetry::time_reached_(uint32_t now_ms, uint32_t target_ms) {

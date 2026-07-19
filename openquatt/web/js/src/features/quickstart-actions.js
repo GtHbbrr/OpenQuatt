@@ -5,11 +5,12 @@ import { setEntityBackupValue } from "../core/entity-backup.js";
 import { getEntityValue } from "../core/entity-store.js";
 import { refreshEntities } from "../core/entity-sync.js";
 import { state } from "../core/state.js";
+import { isUsageTelemetryChoiceConfirmed, shouldInitializeQuickStartUsageTelemetryChoice } from "../core/usage-telemetry-domain.js";
 import { getQuickStartFlowSourceModel, getQuickStartThermostatSourceModel } from "./quickstart.js";
 import { render } from "../core/render-scheduler.js";
 
   export function getQuickStartStepHydrationKeys(stepId = state.currentStep) {
-    const base = ["setupComplete", "strategy", "usageTelemetryEnabled", ...HEADER_ENTITY_KEYS];
+    const base = ["setupComplete", "strategy", "usageTelemetryEnabled", "usageTelemetryChoiceConfigured", ...HEADER_ENTITY_KEYS];
     if (stepId === "setup") {
       return [...new Set([...base, ...FIRMWARE_MODAL_KEYS])];
     }
@@ -41,7 +42,7 @@ import { render } from "../core/render-scheduler.js";
       return [...new Set([...base, ...SILENT_SETTING_KEYS])];
     }
     if (stepId === "usage-telemetry") {
-      return [...new Set([...base, "usageTelemetryEnabled"])];
+      return [...new Set([...base, "usageTelemetryEnabled", "usageTelemetryChoiceConfigured"])];
     }
     if (stepId === "confirm") {
       return [...new Set([
@@ -72,6 +73,55 @@ import { render } from "../core/render-scheduler.js";
       }
     } catch (_error) {
       // A normal poll will retry; keep step navigation responsive.
+    }
+  }
+
+  export async function initializeQuickStartUsageTelemetryChoice() {
+    if (!shouldInitializeQuickStartUsageTelemetryChoice({
+      stepId: state.currentStep,
+      telemetryAvailable: hasEntity("usageTelemetryEnabled"),
+      choiceAvailable: hasEntity("usageTelemetryChoiceConfigured"),
+      choiceValue: getEntityValue("usageTelemetryChoiceConfigured"),
+    })) {
+      return;
+    }
+
+    state.busyAction = "switch-usageTelemetryEnabled";
+    state.controlNotice = "";
+    state.controlError = "";
+    render();
+
+    try {
+      await setQuickStartSwitch("usageTelemetryEnabled", true);
+      await refreshEntities(["usageTelemetryEnabled", "usageTelemetryChoiceConfigured"], "all");
+      if (!isUsageTelemetryChoiceConfirmed({
+        telemetryValue: getEntityValue("usageTelemetryEnabled"),
+        choiceValue: getEntityValue("usageTelemetryChoiceConfigured"),
+        expectedEnabled: true,
+      })) {
+        throw new Error("De controller heeft de keuze niet bevestigd.");
+      }
+    } catch (error) {
+      let disabledConfirmed = false;
+      try {
+        await setQuickStartSwitch("usageTelemetryEnabled", false);
+        await refreshEntities(["usageTelemetryEnabled", "usageTelemetryChoiceConfigured"], "all");
+        disabledConfirmed = isUsageTelemetryChoiceConfirmed({
+          telemetryValue: getEntityValue("usageTelemetryEnabled"),
+          choiceValue: getEntityValue("usageTelemetryChoiceConfigured"),
+          expectedEnabled: false,
+        });
+      } catch (_disableError) {
+        // Keep navigation blocked when the privacy-safe fallback cannot be confirmed.
+      }
+      if (disabledConfirmed) {
+        state.controlNotice = "De standaardkeuze kon niet worden ingeschakeld. Delen is bevestigd uitgeschakeld; je kunt doorgaan of het opnieuw inschakelen.";
+      } else {
+        state.controlError = `De keuze kon niet veilig worden bevestigd. Controleer de verbinding en probeer opnieuw. ${error.message}`;
+      }
+    } finally {
+      state.busyAction = "";
+      render();
     }
   }
 

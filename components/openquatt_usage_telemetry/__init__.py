@@ -17,12 +17,9 @@ CONF_TLS = "tls"
 CONF_USERNAME = "username"
 CONF_PASSWORD = "password"
 CONF_TOPIC = "topic"
-CONF_DEFAULT_ENABLED = "default_enabled"
 CONF_SETUP_COMPLETE_SENSOR = "setup_complete_sensor"
+CONF_CHOICE_CONFIGURED = "choice_configured"
 CONF_INTERVAL = "interval"
-CONF_INITIAL_DELAY_MIN = "initial_delay_min"
-CONF_INITIAL_DELAY_MAX = "initial_delay_max"
-CONF_JITTER = "jitter"
 CONF_FIRMWARE_VERSION = "firmware_version"
 CONF_RELEASE_CHANNEL = "release_channel"
 CONF_HARDWARE_PROFILE = "hardware_profile"
@@ -50,10 +47,6 @@ OpenQuattUsageTelemetry = openquatt_usage_telemetry_ns.class_(
 
 
 def validate_config(config):
-    if config[CONF_INITIAL_DELAY_MAX] < config[CONF_INITIAL_DELAY_MIN]:
-        raise cv.Invalid("initial_delay_max must be greater than or equal to initial_delay_min")
-    if config[CONF_JITTER] >= config[CONF_INTERVAL]:
-        raise cv.Invalid("jitter must be shorter than interval")
     if config[CONF_PASSWORD] and not config[CONF_USERNAME]:
         raise cv.Invalid("username is required when password is configured")
     return config
@@ -76,12 +69,9 @@ CONFIG_SCHEMA = cv.All(
                 cv.All(cv.string_strict, cv.Length(max=192))
             ),
             cv.Required(CONF_TOPIC): cv.All(cv.publish_topic, cv.Length(max=128)),
-            cv.Optional(CONF_DEFAULT_ENABLED, default=True): cv.boolean,
             cv.Required(CONF_SETUP_COMPLETE_SENSOR): cv.use_id(binary_sensor.BinarySensor),
+            cv.Required(CONF_CHOICE_CONFIGURED): binary_sensor.binary_sensor_schema(),
             cv.Optional(CONF_INTERVAL, default="1h"): cv.positive_time_period_milliseconds,
-            cv.Optional(CONF_INITIAL_DELAY_MIN, default="15min"): cv.positive_time_period_milliseconds,
-            cv.Optional(CONF_INITIAL_DELAY_MAX, default="60min"): cv.positive_time_period_milliseconds,
-            cv.Optional(CONF_JITTER, default="15min"): cv.positive_time_period_milliseconds,
             cv.Required(CONF_FIRMWARE_VERSION): cv.All(cv.string_strict, cv.Length(max=32)),
             cv.Required(CONF_RELEASE_CHANNEL): cv.All(cv.string_strict, cv.Length(max=16)),
             cv.Required(CONF_HARDWARE_PROFILE): cv.All(cv.string_strict, cv.Length(max=32)),
@@ -127,13 +117,11 @@ async def to_code(config):
     cg.add(var.set_username(config[CONF_USERNAME]))
     cg.add(var.set_password(config[CONF_PASSWORD]))
     cg.add(var.set_topic(config[CONF_TOPIC]))
-    cg.add(var.set_default_enabled(config[CONF_DEFAULT_ENABLED]))
     setup_complete_sensor = await cg.get_variable(config[CONF_SETUP_COMPLETE_SENSOR])
     cg.add(var.set_setup_complete_sensor(setup_complete_sensor))
+    choice_configured_sensor = await binary_sensor.new_binary_sensor(config[CONF_CHOICE_CONFIGURED])
+    cg.add(var.set_choice_configured_sensor(choice_configured_sensor))
     cg.add(var.set_interval_ms(config[CONF_INTERVAL].total_milliseconds))
-    cg.add(var.set_initial_delay_min_ms(config[CONF_INITIAL_DELAY_MIN].total_milliseconds))
-    cg.add(var.set_initial_delay_max_ms(config[CONF_INITIAL_DELAY_MAX].total_milliseconds))
-    cg.add(var.set_jitter_ms(config[CONF_JITTER].total_milliseconds))
     cg.add(var.set_firmware_version(config[CONF_FIRMWARE_VERSION]))
     cg.add(var.set_release_channel(config[CONF_RELEASE_CHANNEL]))
     cg.add(var.set_hardware_profile(config[CONF_HARDWARE_PROFILE]))
