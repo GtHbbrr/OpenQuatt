@@ -3,8 +3,8 @@
 # ==============================================================================
 #
 # Goal:
-#   Expose one heat pump's runtime values as a read-only Modbus server for the
-#   CiC on the dedicated compatibility bus.
+#   Expose one heat pump's runtime values as a Modbus server for the CiC on the
+#   dedicated compatibility bus.
 #
 # Required vars:
 #   - cic_compat_hp_id
@@ -29,18 +29,24 @@ modbus_server:
           const auto compressor_level = id(${cic_compat_hp_id}_compressor_level).current_option();
           if (!id(cic_compatibility_enable).state || compressor_level.empty()) return 0;
           return static_cast<uint16_t>(atoi(compressor_level.c_str()));
+        write_lambda: |-
+          return true;
       - address: 2006
         value_type: U_WORD
         read_lambda: |-
           id(cic_compatibility_last_request_ms) = millis();
           if (!id(cic_compatibility_enable).state) return 0;
           return id(${cic_compat_hp_id}_low_noise_mode).current_option() == "On" ? 1 : 0;
+        write_lambda: |-
+          return true;
       - address: 2010
         value_type: U_WORD
         read_lambda: |-
           id(cic_compatibility_last_request_ms) = millis();
           if (!id(cic_compatibility_enable).state) return 0;
           return id(${cic_compat_hp_id}_set_pump_mode).current_option() == "On" ? 4096 : 0;
+        write_lambda: |-
+          return true;
       - address: 2015
         value_type: U_WORD
         read_lambda: |-
@@ -48,6 +54,8 @@ modbus_server:
           if (!id(cic_compatibility_enable).state) return 0;
           const float v = id(${cic_compat_hp_id}_pump_speed).state;
           return isnan(v) ? 0 : static_cast<uint16_t>(lroundf(v));
+        write_lambda: |-
+          return true;
       - address: 3999
         value_type: U_WORD
         read_lambda: |-
@@ -57,6 +65,8 @@ modbus_server:
           if (working_mode == "Cooling") return 1;
           if (working_mode == "Heating") return 2;
           return 0;
+        write_lambda: |-
+          return true;
       - address: 2099
         value_type: U_WORD
         read_lambda: |-
@@ -251,6 +261,11 @@ modbus_server:
           if (!id(cic_compatibility_enable).state) return 0;
           const float v = id(${cic_compat_hp_id}_flow).state;
           return isnan(v) ? 0 : static_cast<uint16_t>(lroundf(v / 0.618f));
+      - address: 11006
+        value_type: U_WORD
+        read_lambda: |-
+          id(cic_compatibility_last_request_ms) = millis();
+          return 0;
       - address: 11160
         value_type: U_WORD
         read_lambda: |-

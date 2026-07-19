@@ -3,12 +3,12 @@
 # ==============================================================================
 #
 # Goal:
-#   Expose a read-only, CiC-facing Modbus compatibility layer so OpenQuatt can
-#   keep Quatt app/cloud telemetry alive via `ODU -> OpenQuatt -> CiC`.
+#   Expose a CiC-facing Modbus compatibility layer so OpenQuatt can keep Quatt
+#   app/cloud telemetry alive via `ODU -> OpenQuatt -> CiC`.
 #
 # Notes:
-#   - This mode is intentionally read-only; no CiC writes are mapped back into
-#     OpenQuatt control entities.
+#   - Known CiC writes are acknowledged but ignored; no CiC writes are mapped
+#     back into OpenQuatt control entities.
 #   - Default state is OFF. When disabled, the compatibility register map stays
 #     inert and only returns empty/default values.
 #
