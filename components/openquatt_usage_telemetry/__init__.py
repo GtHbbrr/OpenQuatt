@@ -1,0 +1,173 @@
+import esphome.codegen as cg
+import esphome.config_validation as cv
+from esphome.components import binary_sensor, openquatt_mqtt_config, select, sensor, switch
+from esphome.components.esp32 import (
+    add_idf_sdkconfig_option,
+    add_idf_component,
+    idf_version,
+    include_builtin_idf_component,
+)
+from esphome.const import ENTITY_CATEGORY_CONFIG
+from esphome.core import CORE
+
+
+CONF_BROKER = "broker"
+CONF_PORT = "port"
+CONF_TLS = "tls"
+CONF_USERNAME = "username"
+CONF_PASSWORD = "password"
+CONF_TOPIC = "topic"
+CONF_DEFAULT_ENABLED = "default_enabled"
+CONF_SETUP_COMPLETE_SENSOR = "setup_complete_sensor"
+CONF_INTERVAL = "interval"
+CONF_INITIAL_DELAY_MIN = "initial_delay_min"
+CONF_INITIAL_DELAY_MAX = "initial_delay_max"
+CONF_JITTER = "jitter"
+CONF_FIRMWARE_VERSION = "firmware_version"
+CONF_RELEASE_CHANNEL = "release_channel"
+CONF_HARDWARE_PROFILE = "hardware_profile"
+CONF_TOPOLOGY = "topology"
+CONF_CONNECTION = "connection"
+CONF_LOOP_TIME_SENSOR = "loop_time_sensor"
+CONF_INTERNAL_TEMPERATURE_SENSOR = "internal_temperature_sensor"
+CONF_WIFI_SIGNAL_SENSOR = "wifi_signal_sensor"
+CONF_CIC_POLLING_SWITCH = "cic_polling_switch"
+CONF_CIC_COMPATIBILITY_SWITCH = "cic_compatibility_switch"
+CONF_OT_THERMOSTAT_SWITCH = "ot_thermostat_switch"
+CONF_BOILER_ASSIST_SWITCH = "boiler_assist_switch"
+CONF_BOILER_CONNECTION_SELECT = "boiler_connection_select"
+CONF_MQTT_CONFIG = "mqtt_config"
+CONF_TREND_RAM_SWITCH = "trend_ram_switch"
+CONF_TREND_FLASH_SWITCH = "trend_flash_switch"
+CONF_DECISION_LOG_FLASH_SWITCH = "decision_log_flash_switch"
+CONF_ENERGY_HISTORY_FLASH_SWITCH = "energy_history_flash_switch"
+CONF_RAM_LOG_HISTORY_SWITCH = "ram_log_history_switch"
+
+openquatt_usage_telemetry_ns = cg.esphome_ns.namespace("openquatt_usage_telemetry")
+OpenQuattUsageTelemetry = openquatt_usage_telemetry_ns.class_(
+    "OpenQuattUsageTelemetry", switch.Switch, cg.Component
+)
+
+
+def validate_config(config):
+    if config[CONF_INITIAL_DELAY_MAX] < config[CONF_INITIAL_DELAY_MIN]:
+        raise cv.Invalid("initial_delay_max must be greater than or equal to initial_delay_min")
+    if config[CONF_JITTER] >= config[CONF_INTERVAL]:
+        raise cv.Invalid("jitter must be shorter than interval")
+    if config[CONF_PASSWORD] and not config[CONF_USERNAME]:
+        raise cv.Invalid("username is required when password is configured")
+    return config
+
+
+CONFIG_SCHEMA = cv.All(
+    switch.switch_schema(
+        OpenQuattUsageTelemetry,
+        icon="mdi:chart-box-outline",
+        entity_category=ENTITY_CATEGORY_CONFIG,
+        default_restore_mode="DISABLED",
+    )
+    .extend(
+        {
+            cv.Optional(CONF_BROKER, default=""): cv.All(cv.string_strict, cv.Length(max=128)),
+            cv.Optional(CONF_PORT, default=8883): cv.port,
+            cv.Optional(CONF_TLS, default=True): cv.boolean,
+            cv.Optional(CONF_USERNAME, default=""): cv.All(cv.string_strict, cv.Length(max=96)),
+            cv.Optional(CONF_PASSWORD, default=""): cv.sensitive(
+                cv.All(cv.string_strict, cv.Length(max=192))
+            ),
+            cv.Required(CONF_TOPIC): cv.All(cv.publish_topic, cv.Length(max=128)),
+            cv.Optional(CONF_DEFAULT_ENABLED, default=True): cv.boolean,
+            cv.Required(CONF_SETUP_COMPLETE_SENSOR): cv.use_id(binary_sensor.BinarySensor),
+            cv.Optional(CONF_INTERVAL, default="1h"): cv.positive_time_period_milliseconds,
+            cv.Optional(CONF_INITIAL_DELAY_MIN, default="15min"): cv.positive_time_period_milliseconds,
+            cv.Optional(CONF_INITIAL_DELAY_MAX, default="60min"): cv.positive_time_period_milliseconds,
+            cv.Optional(CONF_JITTER, default="15min"): cv.positive_time_period_milliseconds,
+            cv.Required(CONF_FIRMWARE_VERSION): cv.All(cv.string_strict, cv.Length(max=32)),
+            cv.Required(CONF_RELEASE_CHANNEL): cv.All(cv.string_strict, cv.Length(max=16)),
+            cv.Required(CONF_HARDWARE_PROFILE): cv.All(cv.string_strict, cv.Length(max=32)),
+            cv.Required(CONF_TOPOLOGY): cv.All(cv.string_strict, cv.Length(max=16)),
+            cv.Required(CONF_CONNECTION): cv.All(cv.string_strict, cv.Length(max=16)),
+            cv.Required(CONF_LOOP_TIME_SENSOR): cv.use_id(sensor.Sensor),
+            cv.Required(CONF_INTERNAL_TEMPERATURE_SENSOR): cv.use_id(sensor.Sensor),
+            cv.Optional(CONF_WIFI_SIGNAL_SENSOR): cv.use_id(sensor.Sensor),
+            cv.Required(CONF_CIC_POLLING_SWITCH): cv.use_id(switch.Switch),
+            cv.Optional(CONF_CIC_COMPATIBILITY_SWITCH): cv.use_id(switch.Switch),
+            cv.Optional(CONF_OT_THERMOSTAT_SWITCH): cv.use_id(switch.Switch),
+            cv.Required(CONF_BOILER_ASSIST_SWITCH): cv.use_id(switch.Switch),
+            cv.Optional(CONF_BOILER_CONNECTION_SELECT): cv.use_id(select.Select),
+            cv.Required(CONF_MQTT_CONFIG): cv.use_id(openquatt_mqtt_config.OpenQuattMqttConfig),
+            cv.Required(CONF_TREND_RAM_SWITCH): cv.use_id(switch.Switch),
+            cv.Required(CONF_TREND_FLASH_SWITCH): cv.use_id(switch.Switch),
+            cv.Required(CONF_DECISION_LOG_FLASH_SWITCH): cv.use_id(switch.Switch),
+            cv.Required(CONF_ENERGY_HISTORY_FLASH_SWITCH): cv.use_id(switch.Switch),
+            cv.Required(CONF_RAM_LOG_HISTORY_SWITCH): cv.use_id(switch.Switch),
+        }
+    )
+    .extend(cv.COMPONENT_SCHEMA),
+    validate_config,
+)
+
+
+async def to_code(config):
+    if CORE.is_esp32:
+        if idf_version() >= cv.Version(6, 0, 0):
+            add_idf_component(name="espressif/mqtt", ref="1.0.0")
+        else:
+            include_builtin_idf_component("mqtt")
+        add_idf_sdkconfig_option("CONFIG_MBEDTLS_CERTIFICATE_BUNDLE", True)
+        add_idf_sdkconfig_option("CONFIG_MBEDTLS_CERTIFICATE_BUNDLE_DEFAULT_FULL", True)
+
+    cg.add_global(openquatt_usage_telemetry_ns.using)
+    var = await switch.new_switch(config)
+    await cg.register_component(var, config)
+
+    cg.add(var.set_broker(config[CONF_BROKER]))
+    cg.add(var.set_port(config[CONF_PORT]))
+    cg.add(var.set_tls(config[CONF_TLS]))
+    cg.add(var.set_username(config[CONF_USERNAME]))
+    cg.add(var.set_password(config[CONF_PASSWORD]))
+    cg.add(var.set_topic(config[CONF_TOPIC]))
+    cg.add(var.set_default_enabled(config[CONF_DEFAULT_ENABLED]))
+    setup_complete_sensor = await cg.get_variable(config[CONF_SETUP_COMPLETE_SENSOR])
+    cg.add(var.set_setup_complete_sensor(setup_complete_sensor))
+    cg.add(var.set_interval_ms(config[CONF_INTERVAL].total_milliseconds))
+    cg.add(var.set_initial_delay_min_ms(config[CONF_INITIAL_DELAY_MIN].total_milliseconds))
+    cg.add(var.set_initial_delay_max_ms(config[CONF_INITIAL_DELAY_MAX].total_milliseconds))
+    cg.add(var.set_jitter_ms(config[CONF_JITTER].total_milliseconds))
+    cg.add(var.set_firmware_version(config[CONF_FIRMWARE_VERSION]))
+    cg.add(var.set_release_channel(config[CONF_RELEASE_CHANNEL]))
+    cg.add(var.set_hardware_profile(config[CONF_HARDWARE_PROFILE]))
+    cg.add(var.set_topology(config[CONF_TOPOLOGY]))
+    cg.add(var.set_connection(config[CONF_CONNECTION]))
+    loop_time_sensor = await cg.get_variable(config[CONF_LOOP_TIME_SENSOR])
+    cg.add(var.set_loop_time_sensor(loop_time_sensor))
+    internal_temperature_sensor = await cg.get_variable(config[CONF_INTERNAL_TEMPERATURE_SENSOR])
+    cg.add(var.set_internal_temperature_sensor(internal_temperature_sensor))
+    if wifi_signal_sensor_id := config.get(CONF_WIFI_SIGNAL_SENSOR):
+        wifi_signal_sensor = await cg.get_variable(wifi_signal_sensor_id)
+        cg.add(var.set_wifi_signal_sensor(wifi_signal_sensor))
+    cic_polling_switch = await cg.get_variable(config[CONF_CIC_POLLING_SWITCH])
+    cg.add(var.set_cic_polling_switch(cic_polling_switch))
+    if cic_compatibility_switch_id := config.get(CONF_CIC_COMPATIBILITY_SWITCH):
+        cic_compatibility_switch = await cg.get_variable(cic_compatibility_switch_id)
+        cg.add(var.set_cic_compatibility_switch(cic_compatibility_switch))
+    if ot_thermostat_switch_id := config.get(CONF_OT_THERMOSTAT_SWITCH):
+        ot_thermostat_switch = await cg.get_variable(ot_thermostat_switch_id)
+        cg.add(var.set_ot_thermostat_switch(ot_thermostat_switch))
+    boiler_assist_switch = await cg.get_variable(config[CONF_BOILER_ASSIST_SWITCH])
+    cg.add(var.set_boiler_assist_switch(boiler_assist_switch))
+    if boiler_connection_select_id := config.get(CONF_BOILER_CONNECTION_SELECT):
+        boiler_connection_select = await cg.get_variable(boiler_connection_select_id)
+        cg.add(var.set_boiler_connection_select(boiler_connection_select))
+    mqtt_config = await cg.get_variable(config[CONF_MQTT_CONFIG])
+    cg.add(var.set_mqtt_config(mqtt_config))
+    trend_ram_switch = await cg.get_variable(config[CONF_TREND_RAM_SWITCH])
+    cg.add(var.set_trend_ram_switch(trend_ram_switch))
+    trend_flash_switch = await cg.get_variable(config[CONF_TREND_FLASH_SWITCH])
+    cg.add(var.set_trend_flash_switch(trend_flash_switch))
+    decision_log_flash_switch = await cg.get_variable(config[CONF_DECISION_LOG_FLASH_SWITCH])
+    cg.add(var.set_decision_log_flash_switch(decision_log_flash_switch))
+    energy_history_flash_switch = await cg.get_variable(config[CONF_ENERGY_HISTORY_FLASH_SWITCH])
+    cg.add(var.set_energy_history_flash_switch(energy_history_flash_switch))
+    ram_log_history_switch = await cg.get_variable(config[CONF_RAM_LOG_HISTORY_SWITCH])
+    cg.add(var.set_ram_log_history_switch(ram_log_history_switch))

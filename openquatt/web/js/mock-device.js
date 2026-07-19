@@ -1465,6 +1465,7 @@
     setEntity("switch", "Cooling Room Request Required", { value: true, state: true });
     setEntity("switch", "CIC - Enable polling", { value: false, state: false });
     setEntity("switch", "Status LEDs enabled", { value: true, state: true });
+    setEntity("switch", "Usage statistics", { value: false, state: false });
     setEntity("text", "CIC - Feed URL", { value: "http://192.168.2.117:8080/beta/feed/data.json", state: "http://192.168.2.117:8080/beta/feed/data.json" });
     setEntity("switch", "OpenTherm Enabled", { value: false, state: false });
     setEntity("switch", "CiC Compatibility Mode", { value: false, state: false });

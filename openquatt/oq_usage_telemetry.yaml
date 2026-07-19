@@ -1,0 +1,44 @@
+# ==============================================================================
+# OpenQuatt - Optional Usage Statistics
+# ==============================================================================
+# Dedicated outbound-only MQTT client. This intentionally does not enable
+# ESPHome's global MQTT component and therefore does not export component state,
+# discovery messages or logs.
+# ==============================================================================
+
+external_components:
+  - source:
+      type: local
+      path: ${external_components_path}
+    components: [openquatt_usage_telemetry]
+
+openquatt_usage_telemetry:
+  id: oq_usage_telemetry
+  name: "Usage statistics"
+  broker: "${usage_telemetry_broker}"
+  port: ${usage_telemetry_port}
+  tls: ${usage_telemetry_tls}
+  username: "${usage_telemetry_username}"
+  password: "${usage_telemetry_password}"
+  topic: "${usage_telemetry_topic}"
+  default_enabled: true
+  setup_complete_sensor: oq_setup_complete_sensor
+  interval: 1h
+  initial_delay_min: 15min
+  initial_delay_max: 60min
+  jitter: 15min
+  firmware_version: "${project_version}"
+  release_channel: "${release_channel}"
+  hardware_profile: "${oq_hardware_profile}"
+  topology: "${oq_topology}"
+  connection: "${oq_connection}"
+  loop_time_sensor: oq_loop_time
+  internal_temperature_sensor: oq_esp_internal_temperature
+  cic_polling_switch: cic_enable
+  boiler_assist_switch: oq_boiler_assist_enabled
+  mqtt_config: oq_mqtt_config
+  trend_ram_switch: oq_trend_history_enabled_switch
+  trend_flash_switch: oq_trend_history_flash_switch
+  decision_log_flash_switch: oq_decision_log_flash_switch
+  energy_history_flash_switch: oq_lifetime_energy_history_switch
+  ram_log_history_switch: oq_ram_log_history_switch

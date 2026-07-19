@@ -11,6 +11,8 @@ OpenQuatt heeft geen volledige MQTT-export. De firmware gebruikt wel een kleine 
 
 Gebruik voor normale monitoring en bediening bij voorkeur de web-app en, als je die gebruikt, Home Assistant via de native ESPHome API.
 
+De [keuze voor gebruiksstatistieken](web-app.md#gebruiksstatistieken-en-privacy) gebruikt een aparte outbound-only MQTT-client. De huidige standaardconfiguratie gebruikt poort 1883 zonder TLS. Die client deelt geen entiteiten, discovery-berichten of logs en gebruikt niet de brokerconfiguratie van deze MQTT inputbronnen. De telemetrypayload vermeldt alleen of MQTT inputbronnen als geheel aanstaan; brokergegevens, credentials, topics en ontvangen waarden gaan niet mee.
+
 ## Waar stel je MQTT in?
 
 Open de OpenQuatt web-app en ga naar **Instellingen → Bronnen / integraties → MQTT inputbronnen**.

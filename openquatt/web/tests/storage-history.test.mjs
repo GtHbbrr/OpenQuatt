@@ -3,7 +3,16 @@ import test from "node:test";
 
 globalThis.__OQ_PREVIEW__ = false;
 
-const { parseDecisionLogStorageMetadata } = await import("../js/src/features/storage-history.js");
+const { isUsageTelemetrySetupCompletionSafe, parseDecisionLogStorageMetadata, shouldDisableUsageTelemetryForSetupRestore } = await import("../js/src/features/storage-history.js");
+
+test("completed backup restore disables telemetry only for incomplete setup", () => {
+  assert.equal(shouldDisableUsageTelemetryForSetupRestore(true, false), true);
+  assert.equal(shouldDisableUsageTelemetryForSetupRestore(true, true), false);
+  assert.equal(shouldDisableUsageTelemetryForSetupRestore(false, false), false);
+  assert.equal(isUsageTelemetrySetupCompletionSafe(true, false, false), false);
+  assert.equal(isUsageTelemetrySetupCompletionSafe(true, false, true), true);
+  assert.equal(isUsageTelemetrySetupCompletionSafe(true, true, false), true);
+});
 
 test("decision log storage metadata normalizes firmware values", () => {
   const metadata = parseDecisionLogStorageMetadata({

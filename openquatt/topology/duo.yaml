@@ -2,6 +2,7 @@
 # OpenQuatt - Topology Substitutions: Duo
 # ==============================================================================
 secondary_hp_id: "hp2"
+oq_topology: "duo"
 secondary_outside_is_distinct: "1"
 flow_secondary_enabled: "1"
 flow_mismatch_internal: "false"

@@ -63,6 +63,7 @@ Quick Start begint op de Heatpump Controller Q met een controle van de firmware-
 | `Flowregeling en afstelling` | Automatische flow of vaste pompstand | Bepaalt hoe OpenQuatt de waterdoorstroming regelt. |
 | `Watertemperatuur beveiligen` | Maximale watertemperatuur | Laat OpenQuatt terugregelen voordat het water te warm wordt. |
 | `Stille uren en niveaus` | Tijdvenster en compressorlimieten | Begrenst de compressor bijvoorbeeld 's nachts. |
+| `Gebruiksstatistieken` | Wel of niet beperkte technische systeemstatus en feature-instellingen delen | Delen staat standaard aan en kan tijdens Quick Start worden uitgezet. |
 | `Bevestigen en afronden` | Je keuzes controleren | Markeert de basisconfiguratie als klaar. |
 
 Gebruik je Waveshare of Heatpump Listener? Begin dan inhoudelijk bij **Kies je Quatt Hybrid**; Quick Start toont alleen de stappen die voor jouw hardware van toepassing zijn.
@@ -193,10 +194,41 @@ Hier vind je beheerfuncties:
 - opslag voor Diagnose, Beslislog en Energie;
 - firmware-updates en updatekanaal;
 - web-login en API-beveiliging;
+- de keuze voor gebruiksstatistieken;
 - backup en restore;
 - systeemstatus;
 - logboek;
 - herstarten.
+
+#### Gebruiksstatistieken en privacy
+
+Delen staat standaard aan en de opt-out verschijnt tijdens Quick Start, vóór het afronden. Je kunt de keuze later wijzigen via **Instellingen → Systeem → Gebruiksstatistieken**. De eerste verzendtimer start pas nadat Quick Start is afgerond. Als delen dan nog aan staat, verstuurt OpenQuatt na een willekeurige startvertraging en daarna ongeveer elk uur één klein MQTT-bericht. Door de willekeurige spreiding ligt het werkelijke interval tussen ongeveer 45 en 75 minuten. De huidige centrale brokerverbinding op poort 1883 gebruikt nog geen TLS; credentials en payload zijn onderweg daarom niet versleuteld. De gedeelde brokercredential beperkt alleen de toegang en bewijst niet dat een bericht authentiek van een specifieke controller komt; de ontvanger moet deze gegevens daarom als niet-vertrouwd behandelen.
+
+Bij een upgrade van een installatie die Quick Start al had afgerond, ontbreekt nog een opgeslagen telemetrykeuze. Zo'n bestaande installatie start daarom eenmalig met delen uit; de gebruiker kan delen later onder **Instellingen → Systeem → Gebruiksstatistieken** aanzetten. Alleen nieuwe installaties die Quick Start nog moeten doorlopen gebruiken de standaard-aan opt-out.
+
+Het bericht bevat uitsluitend:
+
+- een willekeurig installatie-ID;
+- uptime;
+- firmwareversie en releasekanaal;
+- hardwareprofiel en, als beschikbaar, hardwarerevisie;
+- `Single` of `Duo` en `Wi-Fi` of `Ethernet`;
+- vrij heapgeheugen, het minimum sinds de start, het grootste vrije heapblok en vrij PSRAM;
+- maximale looptijd van de firmwareloop, ESP-chiptemperatuur en reden van de laatste herstart;
+- bij Wi-Fi: de signaalsterkte in dBm;
+- of CiC-polling, CiC-compatibiliteitsmodus en de OpenTherm-thermostaatkoppeling aanstaan;
+- `boiler_assist_enabled`: of CV-ketel-/boilerondersteuning aanstaat;
+- `boiler_connection`: `on_off` voor de `R1`-aansluiting en `opentherm` voor OTB; firmware zonder OTB-keuze rapporteert automatisch `on_off`;
+- of MQTT inputbronnen als geheel aanstaan;
+- of RAM-trends, flashtrends, beslisloghistorie, lifetime-energiehistorie en RAM-loghistorie aanstaan.
+
+Een niet-ondersteunde functie, tijdelijk nog niet geïnitialiseerde keuze of niet-beschikbare sensor krijgt de waarde `null`; `false` betekent dat de functie beschikbaar maar uitgeschakeld is. Zo is de Wi-Fi-signaalsterkte bij Ethernet `null`. `boiler_connection` is alleen `null` wanneer de OTB-select bestaat maar tijdelijk nog geen geldige toestand heeft, of een onbekende optie bevat.
+
+Het bericht bevat geen MAC-adres, lokaal IP-adres, SSID, MQTT-brokergegevens, credentials, topics, ontvangen MQTT-waarden, ingestelde temperaturen of grenzen, verwarmingsmetingen, regelwaarden of loginhoud. De MQTT-broker ziet bij een netwerkverbinding technisch wel het bron-IP-adres, maar dit staat niet in de payload.
+
+Wanneer delen voor het eerst actief wordt, maakt de controller met de hardware-randomgenerator een UUIDv4 aan en bewaart die lokaal. Een UUIDv4 heeft 122 willekeurige bits; zelfs bij één miljoen installaties is de kans op minstens één dubbel ID kleiner dan ongeveer `10^-25`. Dit ID blijft gelijk na een OTA-update en wanneer je delen tijdelijk uitzet. Een fabrieksreset maakt een nieuw ID. De keuze en het ID worden niet via een instellingenbackup naar een andere controller gekopieerd. Uitzetten stopt nieuwe berichten direct; er wordt geen wachtrij voor later opgeslagen. Na een mislukte verzending maakt iedere retry een verse momentopname, maar behoudt binnen dezelfde retryreeks het `message_id` zodat een verloren QoS 1-bevestiging kan worden gededupliceerd.
+
+De statistiekenclient staat los van de configureerbare [MQTT inputbronnen](mqtt.md): hij publiceert alleen dit ene bericht, subscribed nergens op en schakelt ESPHome MQTT-discovery, entiteitspublicaties en logexport niet in. Het JSON-bericht wordt met QoS 1 retained gepubliceerd op `devices/<installation-id>/telemetry`, zodat de broker per installatie alleen de laatste payload bewaart. Een build zonder geconfigureerde centrale broker maakt ook wanneer delen aanstaat geen externe verbinding.
 
 #### Debugopname voor support
 

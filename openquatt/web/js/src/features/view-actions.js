@@ -97,6 +97,9 @@ const viewActionHandlers = {
   "toggle-odu-runtime-frequency-details": (button, event) => {
     toggleDetails(event, button, ".oq-settings-odu-runtime-details", "oduRuntimeFrequencyDetailsOpen");
   },
+  "toggle-usage-telemetry-details": (button, event) => {
+    toggleDetails(event, button, ".oq-usage-disclosure--collapsible", "usageTelemetryDetailsOpen");
+  },
   "toggle-storage-technical-details": (button, event) => {
     toggleDetails(event, button, ".oq-settings-storage-technical", "settingsStorageDetailsOpen");
   },

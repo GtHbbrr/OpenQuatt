@@ -9,7 +9,7 @@ import { getQuickStartFlowSourceModel, getQuickStartThermostatSourceModel } from
 import { render } from "../core/render-scheduler.js";
 
   export function getQuickStartStepHydrationKeys(stepId = state.currentStep) {
-    const base = ["setupComplete", "strategy", ...HEADER_ENTITY_KEYS];
+    const base = ["setupComplete", "strategy", "usageTelemetryEnabled", ...HEADER_ENTITY_KEYS];
     if (stepId === "setup") {
       return [...new Set([...base, ...FIRMWARE_MODAL_KEYS])];
     }
@@ -39,6 +39,9 @@ import { render } from "../core/render-scheduler.js";
     }
     if (stepId === "silent") {
       return [...new Set([...base, ...SILENT_SETTING_KEYS])];
+    }
+    if (stepId === "usage-telemetry") {
+      return [...new Set([...base, "usageTelemetryEnabled"])];
     }
     if (stepId === "confirm") {
       return [...new Set([

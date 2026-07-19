@@ -14,6 +14,7 @@ import { renderSettingsCoolingSection } from "./cooling.js";
 import { renderSettingsFlowSection, renderSettingsHeatingSection } from "./heating.js";
 import { renderSettingsBoilerCvSection, renderSettingsCompressorSection, renderSettingsDiagnosticsSection, renderSettingsGenerationSection, renderSettingsInstallationMonitoringSection, renderSettingsOduRuntimeFrequencySection, renderSettingsQuickStartSection } from "./installation.js";
 import { renderSettingsMqttSection, renderSettingsOpenThermCicSection, renderSettingsSensorSelectionSection } from "./integrations.js";
+import { renderSettingsPrivacySection } from "./privacy.js";
 import { getApiSecurityStatusDetail, getApiSecurityStatusLabel, renderSettingsAccessSecuritySection } from "./security.js";
 import { renderSettingsServiceSection } from "./service.js";
 import { renderSettingsSilentSection } from "./silent.js";
@@ -74,6 +75,7 @@ import { escapeHtml } from "../core/html.js";
                 renderSettingsQuickStartSection(),
                 renderSettingsTrendSection(),
                 renderSettingsAccessSecuritySection(),
+                renderSettingsPrivacySection(),
                 renderSettingsBackupSection(),
                 renderSettingsDiagnosticsSection(),
               ];

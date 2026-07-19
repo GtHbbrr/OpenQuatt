@@ -50,6 +50,10 @@ packages:
     vars:
       ot_secondary_present: "${ot_secondary_present}"
 
+openquatt_usage_telemetry:
+  cic_compatibility_switch: cic_compatibility_enable
+  ot_thermostat_switch: oq_ot_slave_enabled
+
 psram:
   mode: octal
   speed: 80MHz

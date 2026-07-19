@@ -2,6 +2,7 @@
 # OpenQuatt - Topology Substitutions: Single
 # ==============================================================================
 secondary_hp_id: "hp1"
+oq_topology: "single"
 secondary_outside_is_distinct: "0"
 flow_secondary_enabled: "0"
 flow_mismatch_internal: "true"

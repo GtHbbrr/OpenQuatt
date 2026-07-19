@@ -13,6 +13,7 @@ import { renderBoilerCvFields, renderHpGenerationField } from "../settings/insta
 import { renderSilentSettingsGrid } from "../settings/silent.js";
 import { renderWaterSettingsFields } from "../settings/water.js";
 import { escapeHtml } from "../core/html.js";
+import { renderUsageTelemetryConsent, renderUsageTelemetryDisclosure } from "./usage-telemetry.js";
 
   export function getQuickStartSetupModel() {
     const currentTopology = getInstallationTopology();
@@ -706,6 +707,21 @@ import { escapeHtml } from "../core/html.js";
     `;
   }
 
+  export function renderUsageTelemetryWorkspace() {
+    const enabled = isEntityActive("usageTelemetryEnabled");
+    const busy = state.loadingEntities || state.busyAction === "switch-usageTelemetryEnabled";
+    return `
+      <section class="oq-helper-panel">
+        <p class="oq-helper-label">${escapeHtml(getQuickStepKicker("usage-telemetry"))}</p>
+        <h2 class="oq-helper-section-title">Gebruiksstatistieken</h2>
+        <p class="oq-helper-section-copy">OpenQuatt deelt standaard beperkte technische statistieken. Wil je dit niet, zet delen hier uit. Je kunt de keuze later altijd wijzigen.</p>
+        ${renderUsageTelemetryConsent({ enabled, busy })}
+        ${renderUsageTelemetryDisclosure()}
+        ${renderQuickStartStepNav()}
+      </section>
+    `;
+  }
+
   export function renderConfirmWorkspace() {
     return `
       <section class="oq-helper-panel">
@@ -760,6 +776,9 @@ import { escapeHtml } from "../core/html.js";
     }
     if (activeStep === "silent") {
       return renderSilentWorkspace();
+    }
+    if (activeStep === "usage-telemetry") {
+      return renderUsageTelemetryWorkspace();
     }
     if (activeStep === "confirm") {
       return renderConfirmWorkspace();
@@ -930,6 +949,10 @@ import { escapeHtml } from "../core/html.js";
       ["Maximaal niveau overdag", formatValue("dayMax")],
     ];
 
+    const usageTelemetryLines = hasEntity("usageTelemetryEnabled")
+      ? [["Technische gebruiksstatistieken", isEntityActive("usageTelemetryEnabled") ? "Delen" : "Niet delen"]]
+      : [];
+
     const renderReviewList = (lines) => `
       <div class="oq-helper-review-list">
         ${lines
@@ -963,6 +986,7 @@ import { escapeHtml } from "../core/html.js";
         ${renderReviewCard("Flowregeling", flowLines)}
         ${boilerLines.length ? renderReviewCard("CV-ketel / boiler", boilerLines) : ""}
         ${renderReviewCard("Stille uren", silentLines)}
+        ${usageTelemetryLines.length ? renderReviewCard("Gebruiksstatistieken", usageTelemetryLines) : ""}
       </div>
     `;
   }

@@ -21,12 +21,16 @@ improv_serial:
 
 sensor:
   - platform: wifi_signal
+    id: oq_wifi_signal
     name: WiFi Signal
     icon: mdi:wifi-arrow-left-right
     update_interval: 300s
     entity_category: diagnostic
     web_server:
       sorting_group_id: oq_system_diagnostics
+
+openquatt_usage_telemetry:
+  wifi_signal_sensor: oq_wifi_signal
 
 text_sensor:
   - platform: wifi_info

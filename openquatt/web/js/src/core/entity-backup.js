@@ -80,3 +80,37 @@ export async function setEntityBackupValue(key, value) {
 
   throw new Error(`${entity.name} kan niet worden hersteld.`);
 }
+
+export function getEntityBackupSwitchState(payload) {
+  if (typeof payload?.value === "boolean") {
+    return payload.value;
+  }
+  const raw = String(payload?.state ?? payload?.value ?? "").trim().toLowerCase();
+  if (["on", "true", "1"].includes(raw)) {
+    return true;
+  }
+  if (["off", "false", "0"].includes(raw)) {
+    return false;
+  }
+  return null;
+}
+
+export async function verifyEntityBackupSwitchState(key, expected) {
+  const entity = ENTITY_DEFS[key];
+  if (!entity || entity.domain !== "switch") {
+    throw new Error(`Onbekende schakelaar ${key}.`);
+  }
+
+  const response = await fetch(buildEntityPath(entity.domain, entity.name), {
+    cache: "no-store",
+    headers: { "Cache-Control": "no-store" },
+  });
+  if (!response.ok) {
+    throw new Error(`Controleren mislukt: HTTP ${response.status}`);
+  }
+  const actual = getEntityBackupSwitchState(await response.json());
+  if (actual === null) {
+    throw new Error(`${entity.name} gaf geen geldige status terug.`);
+  }
+  return actual === Boolean(expected);
+}

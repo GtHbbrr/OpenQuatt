@@ -117,6 +117,224 @@
   line-height: 1.6;
 }
 
+.oq-usage-consent {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 20px;
+  margin-top: 20px;
+  padding: 18px 20px;
+  border: 1px solid var(--oq-helper-line);
+  border-radius: var(--oq-helper-radius-lg);
+  background: var(--oq-settings-subpanel-background);
+  transition: border-color 160ms ease, background 160ms ease, box-shadow 160ms ease;
+}
+
+.oq-usage-consent.is-enabled {
+  border-color: rgba(234, 88, 12, 0.28);
+  background: var(--oq-settings-choice-active-background);
+  box-shadow: var(--oq-settings-choice-active-shadow);
+}
+
+.oq-usage-consent-copy {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+
+.oq-usage-consent-icon {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border-radius: 14px;
+  background: var(--oq-helper-accent-soft);
+  color: var(--oq-helper-accent-deep);
+}
+
+.oq-usage-consent-icon-svg {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.oq-usage-consent-kicker {
+  display: block;
+  margin-bottom: 3px;
+  color: var(--oq-helper-accent-deep);
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.oq-usage-consent h3,
+.oq-usage-disclosure h3,
+.oq-usage-disclosure h4 {
+  margin: 0;
+  color: var(--oq-helper-ink);
+}
+
+.oq-usage-consent h3 {
+  font-size: 1.05rem;
+  line-height: 1.25;
+}
+
+.oq-usage-consent-copy p {
+  margin: 4px 0 0;
+  color: var(--oq-helper-soft);
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.oq-usage-consent-action {
+  min-width: 170px;
+}
+
+.oq-usage-consent-action .oq-settings-compact-switch-row {
+  justify-content: flex-end;
+}
+
+.oq-usage-disclosure {
+  margin-top: 18px;
+  padding-inline: 4px;
+}
+
+.oq-usage-disclosure-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 0 2px 12px;
+  border-bottom: 1px solid var(--oq-helper-line);
+}
+
+.oq-usage-disclosure-head h3 {
+  font-size: 1rem;
+}
+
+.oq-usage-disclosure-head > span {
+  color: var(--oq-helper-faint);
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.oq-usage-disclosure-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.oq-usage-disclosure-column {
+  min-width: 0;
+  padding: 16px 22px 14px 2px;
+}
+
+.oq-usage-disclosure-column + .oq-usage-disclosure-column {
+  padding-right: 2px;
+  padding-left: 22px;
+  border-left: 1px solid var(--oq-helper-line);
+}
+
+.oq-usage-disclosure-column-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.oq-usage-disclosure-column-head h4 {
+  font-size: 0.84rem;
+  letter-spacing: 0.01em;
+}
+
+.oq-usage-disclosure-column-icon {
+  display: grid;
+  width: 26px;
+  height: 26px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 9px;
+  background: var(--oq-helper-card-muted);
+  color: var(--oq-helper-faint);
+}
+
+.oq-usage-disclosure-column-icon.is-included {
+  background: var(--oq-helper-accent-soft);
+  color: var(--oq-helper-accent-deep);
+}
+
+.oq-usage-disclosure-icon-svg,
+.oq-usage-network-note-icon {
+  width: 15px;
+  height: 15px;
+  flex: 0 0 auto;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.oq-usage-disclosure-column ul {
+  display: grid;
+  gap: 9px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.oq-usage-disclosure-column li {
+  display: grid;
+  grid-template-columns: minmax(88px, 0.45fr) minmax(0, 1fr);
+  gap: 10px;
+  font-size: 0.84rem;
+  line-height: 1.35;
+}
+
+.oq-usage-disclosure-column li strong {
+  color: var(--oq-helper-ink);
+  font-weight: 700;
+}
+
+.oq-usage-disclosure-column li span {
+  color: var(--oq-helper-soft);
+}
+
+.oq-usage-network-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  padding: 12px 2px 0;
+  border-top: 1px solid var(--oq-helper-line);
+  color: var(--oq-helper-faint);
+  font-size: 0.76rem;
+  line-height: 1.45;
+}
+
+.oq-usage-settings {
+  display: grid;
+  gap: 14px;
+}
+
+.oq-usage-settings .oq-usage-consent {
+  margin-top: 0;
+}
+
+.oq-usage-disclosure--collapsible {
+  margin-top: 0;
+  padding-inline: 0;
+}
+
+.oq-usage-disclosure--collapsible .oq-usage-network-note {
+  padding-bottom: 0;
+}
+
 .oq-helper-panel-note {
   margin: 8px 0 0;
   color: var(--oq-helper-soft);

@@ -129,6 +129,7 @@ export function createSettingsState() {
     installationMonitoringDetailsOpen: false,
     integrationDiagnosticsOpen: false,
     oduRuntimeFrequencyDetailsOpen: false,
+    usageTelemetryDetailsOpen: false,
     installationMonitoringProblemSignature: "",
     settingsInteractionLock: false,
     settingsRenderSignature: "",
