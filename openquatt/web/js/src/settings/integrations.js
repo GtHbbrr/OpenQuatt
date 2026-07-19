@@ -178,8 +178,12 @@ import { escapeHtml } from "../core/html.js";
       mqttHeatingEnable: "heating_enable",
       mqttCoolingEnable: "cooling_enable",
     };
+    const mqttAvailable = state.mqttStatus?.enabled !== false;
     const getMqttTopicKey = (config = {}) => config.mqttTopicKey || mqttTopicKeyByValueKey[config.valueKey] || "";
     const isMqttInputTopicEnabled = (topicKey = "") => {
+      if (!mqttAvailable) {
+        return false;
+      }
       if (!topicKey) {
         return true;
       }
@@ -188,6 +192,12 @@ import { escapeHtml } from "../core/html.js";
         return inputEnabled[topicKey] !== false;
       }
       return true;
+    };
+    const getMqttUnavailableSourceReason = (topicKey = "") => {
+      if (!mqttAvailable) {
+        return "MQTT staat uit";
+      }
+      return isMqttInputTopicEnabled(topicKey) ? "" : "MQTT-topic staat uit";
     };
     const isMqttOption = (option) => /\bMQTT\b/i.test(String(option || ""));
     const isSourceAvailable = (option, config = {}) => {
@@ -227,8 +237,8 @@ import { escapeHtml } from "../core/html.js";
       if (option === "CIC or HA input" && !cicAvailable && !hasHaSource(config)) {
         return "CIC en HA ontbreken";
       }
-      if (isMqttOption(option) && !isMqttInputTopicEnabled(getMqttTopicKey(config))) {
-        return "MQTT-topic staat uit";
+      if (isMqttOption(option)) {
+        return getMqttUnavailableSourceReason(getMqttTopicKey(config));
       }
       if (option === "Flowmeter HP2" && !hasEntity("hp2Flow")) {
         return "HP2-flow ontbreekt";
@@ -292,8 +302,9 @@ import { escapeHtml } from "../core/html.js";
     };
     const getOutsideTempUsedSource = () => {
       const source = String(getEntityValue("outsideTempSource") || "").trim();
-      if (source === "MQTT" && !isMqttInputTopicEnabled("outside_temperature")) {
-        return "MQTT-topic staat uit";
+      const mqttUnavailableReason = getMqttUnavailableSourceReason("outside_temperature");
+      if (source === "MQTT" && mqttUnavailableReason) {
+        return mqttUnavailableReason;
       }
       if (source !== "Auto") {
         return formatSettingsOptionLabel(source);
@@ -347,8 +358,9 @@ import { escapeHtml } from "../core/html.js";
         return isValidNumericSource("coolingDewPointHa", "coolingDewPointHaValid") ? "HA-invoer" : "HA-invoer ontbreekt";
       }
       if (source === "MQTT") {
-        if (!isMqttInputTopicEnabled("cooling_dew_point")) {
-          return "MQTT-topic staat uit";
+        const mqttUnavailableReason = getMqttUnavailableSourceReason("cooling_dew_point");
+        if (mqttUnavailableReason) {
+          return mqttUnavailableReason;
         }
         return isValidNumericSource("mqttCoolingDewPoint", "mqttCoolingDewPointValid") ? "MQTT" : "MQTT ontbreekt of verouderd";
       }
@@ -451,7 +463,11 @@ import { escapeHtml } from "../core/html.js";
       const currentHidden = current && hiddenOptions.has(current);
       const availableOptions = allOptions.filter((option) => !hiddenOptions.has(option) && isSourceAvailable(option, config));
       const currentUnavailable = current && !isSourceAvailable(current, config);
-      const hideUnavailableCurrent = current === "HA input" && config.keepUnavailableCurrent !== true;
+      const hideUnavailableCurrent = (
+        isMqttOption(current) && !mqttAvailable
+      ) || (
+        current === "HA input" && config.keepUnavailableCurrent !== true
+      );
       const renderOptions = currentHidden && !availableOptions.includes(current)
         ? [current, ...availableOptions]
         : currentUnavailable && !hideUnavailableCurrent && !availableOptions.includes(current)
@@ -461,6 +477,9 @@ import { escapeHtml } from "../core/html.js";
         const displayLabel = formatSourceOptionLabel(option, config);
         return `<option value="${escapeHtml(option)}" ${option === current ? "selected" : ""}>${escapeHtml(displayLabel)}</option>`;
       }).join("");
+      const unavailableCurrentPlaceholder = currentUnavailable && hideUnavailableCurrent
+        ? '<option value="" selected disabled>Kies een beschikbare bron</option>'
+        : "";
       return {
         markup: `
           <label class="oq-settings-source-select">
@@ -469,7 +488,7 @@ import { escapeHtml } from "../core/html.js";
               ${config.infoCopy ? renderSettingsInfoToggle(config.infoId || key, config.infoTitle || config.label || "Bron", config.infoCopy) : ""}
             </span>
             <select class="oq-helper-select" data-oq-field="${escapeHtml(key)}" ${state.loadingEntities ? "disabled" : ""}>
-              ${optionMarkup}
+              ${unavailableCurrentPlaceholder}${optionMarkup}
             </select>
           </label>
         `,
@@ -554,6 +573,13 @@ import { escapeHtml } from "../core/html.js";
     };
     const coolingEnableSourceLabel = formattedSourceValue("coolingEnableSource", { optionLabels: coolingEnableSourceLabels });
     const coolingEnableEffectiveSource = formattedEffectivePermissionSourceValue("coolingEnableEffectiveSource");
+    const outsideTemperatureAutoInfo = mqttAvailable
+      ? hasValidHaSource("outsideTempHa", "outsideTempHaValid")
+        ? "Auto gebruikt de laagste geldige buitentemperatuurbron. Zijn buitenunit, HA-invoer en MQTT geldig, dan kiest OpenQuatt de laagste waarde. Is er maar een bron geldig, dan wordt die gebruikt."
+        : "Auto gebruikt de laagste geldige buitentemperatuurbron."
+      : hasValidHaSource("outsideTempHa", "outsideTempHaValid")
+        ? "Auto gebruikt de laagste geldige buitentemperatuurbron van de buitenunit en HA-invoer. Is er maar een bron geldig, dan wordt die gebruikt."
+        : "Auto gebruikt de laagste geldige buitentemperatuurbron.";
     const sourceCards = [
       renderSourceCard({
         key: "room-temperature",
@@ -652,9 +678,7 @@ import { escapeHtml } from "../core/html.js";
           haKeys: ["outsideTempHa", "outsideTempHaValid"],
           mqttTopicKey: "outside_temperature",
           infoId: "outsideTempSource-auto-info",
-          infoCopy: hasValidHaSource("outsideTempHa", "outsideTempHaValid")
-            ? "Auto gebruikt de laagste geldige buitentemperatuurbron. Zijn buitenunit, HA-invoer en MQTT geldig, dan kiest OpenQuatt de laagste waarde. Is er maar een bron geldig, dan wordt die gebruikt."
-            : "Auto gebruikt de laagste geldige buitentemperatuurbron.",
+          infoCopy: outsideTemperatureAutoInfo,
         },
         activeRows: [
           renderSourceRow({ label: "Waarde", key: "outsideTempSelected" }),
@@ -742,7 +766,9 @@ import { escapeHtml } from "../core/html.js";
           haKeys: ["coolingDewPointHa", "coolingDewPointHaValid"],
           mqttTopicKey: "cooling_dew_point",
           infoId: "coolingDewPointSource-info",
-          infoCopy: "Auto gebruikt de hoogste geldige waarde als Home Assistant en MQTT tegelijk geldig zijn. Kies Home Assistant of MQTT om die bron expliciet te vereisen.",
+          infoCopy: mqttAvailable
+            ? "Auto gebruikt de hoogste geldige waarde als Home Assistant en MQTT tegelijk geldig zijn. Kies Home Assistant of MQTT om die bron expliciet te vereisen."
+            : "Auto gebruikt een geldige Home Assistant-waarde wanneer die beschikbaar is. Kies Home Assistant om die bron expliciet te vereisen.",
         },
         activeRows: [
           renderSourceRow({ label: "Waarde", key: "coolingDewPointSelected" }),
