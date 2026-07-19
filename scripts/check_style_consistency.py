@@ -177,6 +177,7 @@ STRICT_TOP_LEVEL_ORDER_RULES = {
         "select",
         "spi",
         "sensor",
+        "interval",
     ),
 }
 
