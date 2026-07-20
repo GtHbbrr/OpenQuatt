@@ -53,7 +53,7 @@ Draadkleuren in de schema's en stappenhulp zijn illustratief. De klemmarkeringen
 - **M1** is de primaire Modbuspoort voor de Quatt-buitenunit(s). Deze verbinding is nodig voor de normale regeling.
 - **M2** is de optionele Modbuspoort voor CiC-compatibiliteit. Verbind M2 alleen met de vrijgekomen Modbuspoort van de CiC als de Quatt app moet blijven meekijken.
 - **R2** is een tweede potentiaalvrij wisselrelais met `NC`, `COM` en `NO`. Momenteel zijn er geen functies aan R2 gekoppeld; laat deze aansluiting vrij.
-- **T** is een 1-Wire-aansluiting voor een optionele Dallas/DS18B20-temperatuursensor: `+5V`, `GND` en `DATA`.
+- **T** is een 1-Wire-aansluiting voor een optionele Dallas/DS18B20-temperatuursensor: `+3.3V`, `GND` en `DATA`.
 
 ### Aansluitingen op de HCQ
 
