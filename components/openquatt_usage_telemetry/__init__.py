@@ -1,6 +1,6 @@
 import esphome.codegen as cg
 import esphome.config_validation as cv
-from esphome.components import binary_sensor, openquatt_mqtt_config, select, sensor, switch
+from esphome.components import binary_sensor, openquatt_mqtt_config, select, sensor, switch, time
 from esphome.components.esp32 import (
     add_idf_sdkconfig_option,
     add_idf_component,
@@ -17,6 +17,7 @@ CONF_TLS = "tls"
 CONF_USERNAME = "username"
 CONF_PASSWORD = "password"
 CONF_TOPIC = "topic"
+CONF_CLOCK = "clock"
 CONF_SETUP_COMPLETE_SENSOR = "setup_complete_sensor"
 CONF_CHOICE_CONFIGURED = "choice_configured"
 CONF_INTERVAL = "interval"
@@ -69,6 +70,7 @@ CONFIG_SCHEMA = cv.All(
                 cv.All(cv.string_strict, cv.Length(max=192))
             ),
             cv.Required(CONF_TOPIC): cv.All(cv.publish_topic, cv.Length(max=128)),
+            cv.Required(CONF_CLOCK): cv.use_id(time.RealTimeClock),
             cv.Required(CONF_SETUP_COMPLETE_SENSOR): cv.use_id(binary_sensor.BinarySensor),
             cv.Required(CONF_CHOICE_CONFIGURED): binary_sensor.binary_sensor_schema(),
             cv.Optional(CONF_INTERVAL, default="1h"): cv.positive_time_period_milliseconds,
@@ -117,6 +119,8 @@ async def to_code(config):
     cg.add(var.set_username(config[CONF_USERNAME]))
     cg.add(var.set_password(config[CONF_PASSWORD]))
     cg.add(var.set_topic(config[CONF_TOPIC]))
+    clock = await cg.get_variable(config[CONF_CLOCK])
+    cg.add(var.set_clock(clock))
     setup_complete_sensor = await cg.get_variable(config[CONF_SETUP_COMPLETE_SENSOR])
     cg.add(var.set_setup_complete_sensor(setup_complete_sensor))
     choice_configured_sensor = await binary_sensor.new_binary_sensor(config[CONF_CHOICE_CONFIGURED])

@@ -549,7 +549,19 @@ void OpenQuattUsageTelemetry::build_payload_() {
   this->payload_ += this->payload_message_id_;
   this->payload_ += R"(","installation_id":")";
   this->payload_ += this->installation_id_;
-  this->payload_ += R"(","uptime_s":)";
+  this->payload_ += '"';
+  append_json_key_(this->payload_, "timestamp_s");
+  if (this->clock_ == nullptr) {
+    this->payload_ += "null";
+  } else {
+    const auto now = this->clock_->now();
+    if (now.is_valid()) {
+      this->payload_ += std::to_string(static_cast<uint64_t>(now.timestamp));
+    } else {
+      this->payload_ += "null";
+    }
+  }
+  this->payload_ += R"(,"uptime_s":)";
   this->payload_ += std::to_string(uptime_s);
   this->payload_ += R"(,"firmware_version":")";
   this->payload_ += json_escape_(this->firmware_version_);

@@ -12,6 +12,7 @@
 #include "esphome/components/select/select.h"
 #include "esphome/components/sensor/sensor.h"
 #include "esphome/components/switch/switch.h"
+#include "esphome/components/time/real_time_clock.h"
 #include "esphome/core/component.h"
 #include "esphome/core/preferences.h"
 #include "mqtt_client.h"
@@ -30,6 +31,7 @@ class OpenQuattUsageTelemetry : public switch_::Switch, public Component {
   void set_username(const std::string &username) { this->username_ = username; }
   void set_password(const std::string &password) { this->password_ = password; }
   void set_topic(const std::string &topic) { this->topic_ = topic; }
+  void set_clock(time::RealTimeClock *clock) { this->clock_ = clock; }
   void set_setup_complete_sensor(binary_sensor::BinarySensor *sensor) { this->setup_complete_sensor_ = sensor; }
   void set_choice_configured_sensor(binary_sensor::BinarySensor *sensor) { this->choice_configured_sensor_ = sensor; }
   void set_interval_ms(uint32_t interval_ms) { this->interval_ms_ = interval_ms; }
@@ -128,6 +130,7 @@ class OpenQuattUsageTelemetry : public switch_::Switch, public Component {
   std::string username_;
   std::string password_;
   std::string topic_;
+  time::RealTimeClock *clock_{nullptr};
   binary_sensor::BinarySensor *setup_complete_sensor_{nullptr};
   binary_sensor::BinarySensor *choice_configured_sensor_{nullptr};
   uint32_t interval_ms_{60UL * 60UL * 1000UL};

@@ -102,6 +102,7 @@ test("usage telemetry disclosure matches the hourly payload scope", async () => 
   assert.match(disclosureSource, /Nooit een wifi-netwerknaam, wifi-wachtwoord, gebruikersnaam, ander wachtwoord of inloggegevens/);
   assert.match(disclosureSource, /Voorbeeld van het verzonden bericht \(JSON\)/);
   assert.match(disclosureSource, /schema_version/);
+  assert.match(disclosureSource, /timestamp_s/);
   assert.match(disclosureSource, /oq-usage-disclosure--collapsible/);
   assert.match(disclosureSource, /data-oq-action="toggle-usage-telemetry-details"/);
   assert.match(disclosureSource, /technisch wel het bron-IP-adres zien/);

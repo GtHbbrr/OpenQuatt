@@ -21,6 +21,7 @@ openquatt_usage_telemetry:
   username: "${usage_telemetry_username}"
   password: "${usage_telemetry_password}"
   topic: "${usage_telemetry_topic}"
+  clock: oq_time
   setup_complete_sensor: oq_setup_complete_sensor
   choice_configured:
     id: oq_usage_telemetry_choice_configured
