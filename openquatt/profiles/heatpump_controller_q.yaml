@@ -57,6 +57,7 @@ packages:
 openquatt_usage_telemetry:
   cic_compatibility_switch: cic_compatibility_enable
   ot_thermostat_switch: oq_ot_slave_enabled
+  boiler_connection_select: oq_boiler_connection
 
 psram:
   mode: octal
