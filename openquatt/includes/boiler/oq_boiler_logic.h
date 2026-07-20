@@ -244,6 +244,10 @@ inline ControllerDecision evaluate(const BoilerCommand &command,
     decision.force_off = true;
     decision.block_reason = BLOCK_SUPPLY_UNAVAILABLE;
   } else if (!command.demand_present) {
+    // Losing the owning control context (for example CM3 -> CM5) is not a
+    // normal anti-cycling stop. Withdraw heat immediately, even inside the
+    // configured minimum on-time.
+    decision.force_off = true;
     decision.block_reason = BLOCK_NO_HEAT_REQUEST;
   } else if (!input.transport_settled) {
     decision.force_off = true;

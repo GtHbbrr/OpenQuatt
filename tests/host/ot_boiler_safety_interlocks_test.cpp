@@ -91,5 +91,16 @@ int main() {
   assert(decision.output_active);
   assert(decision.block_reason == oq_boiler::BLOCK_NONE);
 
+  // A control-mode ownership change must override minimum on-time. Otherwise
+  // an OTB request could continue briefly after entering cooling or off mode.
+  auto no_owner_command = command;
+  no_owner_command.demand_present = false;
+  input.output_active = true;
+  input.output_last_change_ms = 1499;
+  decision = oq_boiler::evaluate(no_owner_command, input);
+  assert(decision.force_off);
+  assert(!decision.output_active);
+  assert(decision.block_reason == oq_boiler::BLOCK_NO_HEAT_REQUEST);
+
   return 0;
 }
