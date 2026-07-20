@@ -229,6 +229,7 @@ oq_ot_response_enabled_default: "true"                # Allow the OT slave to an
 # ----------------------------
 oq_otb_link_watch_s: "1"                              # OTB link/freshness evaluation interval [s].
 oq_otb_link_timeout_s: "10"                           # Maximum age of the last valid boiler response [s].
+oq_otb_field_timeout_s: "10"                          # Maximum age of one repeating boiler telemetry field [s].
 
 # ----------------------------
 # CIC FEED

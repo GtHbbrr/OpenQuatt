@@ -20,22 +20,15 @@ esphome:
           call.perform();
           id(oq_boiler_transport_active) = false;
 
+logger:
+  on_message:
+    level: WARN
+    then:
+      - lambda: |-
+          oq_otb::telemetry_state.record_log_message(
+              millis(), tag, message);
+
 globals:
-  - id: oq_otb_last_response_ms
-    type: uint32_t
-    restore_value: false
-    initial_value: '0'
-
-  - id: oq_otb_response_count
-    type: uint32_t
-    restore_value: false
-    initial_value: '0'
-
-  - id: oq_otb_last_response_id
-    type: int
-    restore_value: false
-    initial_value: '-1'
-
   - id: oq_otb_link_initialized
     type: bool
     restore_value: false
@@ -45,6 +38,10 @@ opentherm:
   - id: oq_otb_hub
     in_pin: ${oq_ot_boiler_in_pin}
     out_pin: ${oq_ot_boiler_out_pin}
+    # Q-duo HIL: synchronous request handling eliminated simulator-side RX
+    # decode failures and master response timeouts. It does increase the
+    # observed main-loop duration; real-boiler timing remains a release gate.
+    sync_mode: true
     # The runtime switch is default-off and owns the actual STATUS bit. The hub
     # gate must be true or ESPHome would mask that switch permanently.
     ch_enable: true
@@ -57,10 +54,74 @@ opentherm:
     before_process_response:
       then:
         - lambda: |-
-            // Called only after the hub accepted a complete OpenTherm response.
-            id(oq_otb_last_response_ms) = millis();
-            id(oq_otb_response_count)++;
-            id(oq_otb_last_response_id) = x.id;
+            // Called only after the hub accepted a complete OpenTherm frame.
+            // A negative acknowledgement still proves that the link is alive,
+            // but its zero payload is not a measurement. Invalidate the affected
+            // entities and hide the frame from ESPHome's payload-only processor.
+            const uint8_t response_id = x.id;
+            const uint8_t response_type = x.type;
+            oq_otb::telemetry_state.record_response(
+                millis(), response_id, response_type);
+
+            const bool acknowledged =
+                response_type == esphome::opentherm::MessageType::READ_ACK ||
+                response_type == esphome::opentherm::MessageType::WRITE_ACK;
+            if (acknowledged) return;
+
+            switch (response_id) {
+              case esphome::opentherm::MessageId::STATUS:
+                id(otb_fault_indication).invalidate_state();
+                id(otb_ch_active).invalidate_state();
+                id(otb_dhw_active).invalidate_state();
+                id(otb_flame_on).invalidate_state();
+                id(otb_diagnostic_indication).invalidate_state();
+                id(oq_boiler_transport_active) = false;
+                break;
+              case esphome::opentherm::MessageId::DEVICE_CONFIG:
+                id(otb_dhw_present).invalidate_state();
+                break;
+              case esphome::opentherm::MessageId::FAULT_FLAGS:
+                id(otb_service_request).invalidate_state();
+                id(otb_lockout_reset).invalidate_state();
+                id(otb_low_water_pressure).invalidate_state();
+                id(otb_flame_fault).invalidate_state();
+                id(otb_air_pressure_fault).invalidate_state();
+                id(otb_water_over_temp).invalidate_state();
+                id(otb_oem_fault_code).publish_state(NAN);
+                break;
+              case esphome::opentherm::MessageId::MAX_BOILER_CAPACITY:
+                id(otb_max_capacity).publish_state(NAN);
+                id(otb_min_modulation).publish_state(NAN);
+                break;
+              case esphome::opentherm::MessageId::MODULATION_LEVEL:
+                id(otb_relative_modulation).publish_state(NAN);
+                break;
+              case esphome::opentherm::MessageId::CH_WATER_PRESSURE:
+                id(otb_ch_pressure).publish_state(NAN);
+                break;
+              case esphome::opentherm::MessageId::FEED_TEMP:
+                id(otb_boiler_water_temp).publish_state(NAN);
+                break;
+              case esphome::opentherm::MessageId::DHW_TEMP:
+                id(otb_dhw_temp).publish_state(NAN);
+                break;
+              case esphome::opentherm::MessageId::RETURN_WATER_TEMP:
+                id(otb_return_water_temp).publish_state(NAN);
+                break;
+              case esphome::opentherm::MessageId::OEM_DIAGNOSTIC:
+                id(otb_oem_diagnostic_code).publish_state(NAN);
+                break;
+              case esphome::opentherm::MessageId::OT_VERSION_DEVICE:
+                id(otb_opentherm_version).publish_state(NAN);
+                break;
+              case esphome::opentherm::MessageId::VERSION_DEVICE:
+                id(otb_device_type).publish_state(NAN);
+                id(otb_device_version).publish_state(NAN);
+                break;
+              default:
+                break;
+            }
+            x.id = 0xFF;
 
 number:
   - platform: opentherm
@@ -265,9 +326,9 @@ sensor:
     web_server:
       sorting_group_id: oq_boiler
     lambda: |-
-      const uint32_t last_response_ms = id(oq_otb_last_response_ms);
-      if (last_response_ms == 0) return NAN;
-      return (float) ((uint32_t)(millis() - last_response_ms)) / 1000.0f;
+      if (oq_otb::telemetry_state.accepted_response_count() == 0) return NAN;
+      return (float) ((uint32_t) (
+          millis() - oq_otb::telemetry_state.last_response_ms())) / 1000.0f;
 
   - platform: template
     id: otb_response_count
@@ -280,7 +341,150 @@ sensor:
     web_server:
       sorting_group_id: oq_boiler
     lambda: |-
-      return (float) id(oq_otb_response_count);
+      return (float) oq_otb::telemetry_state.acknowledged_response_count();
+
+  - platform: template
+    id: otb_complete_response_count
+    name: "OTB - Complete Response Count"
+    icon: mdi:counter
+    accuracy_decimals: 0
+    state_class: total_increasing
+    entity_category: diagnostic
+    disabled_by_default: true
+    update_interval: 5s
+    web_server:
+      sorting_group_id: oq_boiler
+    lambda: |-
+      return (float) oq_otb::telemetry_state.accepted_response_count();
+
+  - platform: template
+    id: otb_data_invalid_response_count
+    name: "OTB - DATA_INVALID Response Count"
+    icon: mdi:alert-circle-outline
+    accuracy_decimals: 0
+    state_class: total_increasing
+    entity_category: diagnostic
+    disabled_by_default: true
+    update_interval: 5s
+    web_server:
+      sorting_group_id: oq_boiler
+    lambda: |-
+      return (float) oq_otb::telemetry_state.data_invalid_response_count();
+
+  - platform: template
+    id: otb_unknown_data_id_response_count
+    name: "OTB - UNKNOWN_DATAID Response Count"
+    icon: mdi:help-circle-outline
+    accuracy_decimals: 0
+    state_class: total_increasing
+    entity_category: diagnostic
+    disabled_by_default: true
+    update_interval: 5s
+    web_server:
+      sorting_group_id: oq_boiler
+    lambda: |-
+      return (float) oq_otb::telemetry_state.unknown_data_id_response_count();
+
+  - platform: template
+    id: otb_unexpected_response_type_count
+    name: "OTB - Unexpected Response Type Count"
+    icon: mdi:message-alert-outline
+    accuracy_decimals: 0
+    state_class: total_increasing
+    entity_category: diagnostic
+    disabled_by_default: true
+    update_interval: 5s
+    web_server:
+      sorting_group_id: oq_boiler
+    lambda: |-
+      return (float) oq_otb::telemetry_state.unexpected_response_type_count();
+
+  - platform: template
+    id: otb_transport_error_count
+    name: "OTB - Transport Error Count"
+    icon: mdi:alert-octagon-outline
+    accuracy_decimals: 0
+    state_class: total_increasing
+    entity_category: diagnostic
+    disabled_by_default: true
+    update_interval: 5s
+    web_server:
+      sorting_group_id: oq_boiler
+    lambda: |-
+      return (float) oq_otb::telemetry_state.transport_error_count();
+
+  - platform: template
+    id: otb_protocol_error_count
+    name: "OTB - Protocol Error Count"
+    icon: mdi:pulse
+    accuracy_decimals: 0
+    state_class: total_increasing
+    entity_category: diagnostic
+    disabled_by_default: true
+    update_interval: 5s
+    web_server:
+      sorting_group_id: oq_boiler
+    lambda: |-
+      return (float) oq_otb::telemetry_state.protocol_error_count();
+
+  - platform: template
+    id: otb_response_timeout_count
+    name: "OTB - Response Timeout Count"
+    icon: mdi:timer-alert-outline
+    accuracy_decimals: 0
+    state_class: total_increasing
+    entity_category: diagnostic
+    disabled_by_default: true
+    update_interval: 5s
+    web_server:
+      sorting_group_id: oq_boiler
+    lambda: |-
+      return (float) oq_otb::telemetry_state.response_timeout_count();
+
+  - platform: template
+    id: otb_no_transition_count
+    name: "OTB - NO_TRANSITION Count"
+    icon: mdi:chart-timeline-variant-shimmer
+    accuracy_decimals: 0
+    state_class: total_increasing
+    entity_category: diagnostic
+    disabled_by_default: true
+    update_interval: 5s
+    web_server:
+      sorting_group_id: oq_boiler
+    lambda: |-
+      return (float) oq_otb::telemetry_state.no_transition_count();
+
+  - platform: template
+    id: otb_no_change_too_long_count
+    name: "OTB - NO_CHANGE_TOO_LONG Count"
+    icon: mdi:chart-timeline-variant-shimmer
+    accuracy_decimals: 0
+    state_class: total_increasing
+    entity_category: diagnostic
+    disabled_by_default: true
+    update_interval: 5s
+    web_server:
+      sorting_group_id: oq_boiler
+    lambda: |-
+      return (float) oq_otb::telemetry_state.no_change_too_long_count();
+
+  - platform: template
+    id: otb_last_transport_error_age
+    name: "OTB - Last Transport Error Age"
+    icon: mdi:timer-alert-outline
+    unit_of_measurement: "s"
+    accuracy_decimals: 1
+    entity_category: diagnostic
+    disabled_by_default: true
+    update_interval: 5s
+    web_server:
+      sorting_group_id: oq_boiler
+    lambda: |-
+      if (oq_otb::telemetry_state.transport_error_count() == 0) return NAN;
+      return (float) ((uint32_t) (
+          millis() - oq_otb::telemetry_state.last_transport_error_ms())) /
+          1000.0f;
 
   - platform: template
     id: otb_last_response_id
@@ -292,8 +496,33 @@ sensor:
     web_server:
       sorting_group_id: oq_boiler
     lambda: |-
-      const int message_id = id(oq_otb_last_response_id);
+      const int message_id = oq_otb::telemetry_state.last_response_id();
       return message_id >= 0 ? (float) message_id : NAN;
+
+text_sensor:
+  - platform: template
+    id: otb_last_response_type
+    name: "OTB - Last Response Type"
+    icon: mdi:message-text-outline
+    entity_category: diagnostic
+    disabled_by_default: true
+    update_interval: 5s
+    web_server:
+      sorting_group_id: oq_boiler
+    lambda: |-
+      return {oq_otb::telemetry_state.last_response_type_name()};
+
+  - platform: template
+    id: otb_last_transport_error
+    name: "OTB - Last Transport Error"
+    icon: mdi:alert-decagram-outline
+    entity_category: diagnostic
+    disabled_by_default: true
+    update_interval: 5s
+    web_server:
+      sorting_group_id: oq_boiler
+    lambda: |-
+      return {oq_otb::telemetry_state.last_transport_error_name()};
 
 interval:
   - interval: ${oq_otb_command_apply_s}s
@@ -312,11 +541,16 @@ interval:
           const float flow_lph = id(flow_rate_selected).state;
           const bool flow_valid =
               !isnan(flow_lph) && flow_lph >= ${oq_cm_min_flow_lph};
+          const bool status_fresh =
+              oq_otb::telemetry_state.field_is_fresh(
+                  oq_otb::FIELD_STATUS, millis(),
+                  (uint32_t) (${oq_otb_field_timeout_s} * 1000UL));
           const bool command_active =
               opentherm_selected &&
               !id(oq_runtime_polling_paused).state &&
               !id(oq_boiler_runtime_pause_state) &&
               id(oq_otb_link_available_state) &&
+              status_fresh &&
               id(oq_boiler_output_request) &&
               target_valid &&
               flow_valid;
@@ -349,13 +583,73 @@ interval:
     startup_delay: 2s
     then:
       - lambda: |-
-          // Phase 1: derive availability solely from complete accepted responses.
+          // Overall link freshness cannot prove that every rotating data ID is
+          // still current. Expire repeating fields independently so one healthy
+          // response type cannot keep another field looking valid forever.
+          if (!id(oq_otb_link_available_state)) return;
           const uint32_t now_ms = millis();
-          const uint32_t last_response_ms = id(oq_otb_last_response_ms);
+          const uint32_t max_age_ms =
+              (uint32_t) (${oq_otb_field_timeout_s} * 1000UL);
+          auto field_is_stale = [&](oq_otb::Field field) -> bool {
+            return !oq_otb::telemetry_state.field_is_fresh(
+                field, now_ms, max_age_ms);
+          };
+          auto invalidate_sensor = [](auto *value) {
+            if (value->has_state() && !isnan(value->state)) {
+              value->publish_state(NAN);
+            }
+          };
+
+          if (field_is_stale(oq_otb::FIELD_STATUS)) {
+            id(otb_fault_indication).invalidate_state();
+            id(otb_ch_active).invalidate_state();
+            id(otb_dhw_active).invalidate_state();
+            id(otb_flame_on).invalidate_state();
+            id(otb_diagnostic_indication).invalidate_state();
+            id(oq_boiler_transport_active) = false;
+          }
+          if (field_is_stale(oq_otb::FIELD_FAULT_FLAGS)) {
+            id(otb_service_request).invalidate_state();
+            id(otb_lockout_reset).invalidate_state();
+            id(otb_low_water_pressure).invalidate_state();
+            id(otb_flame_fault).invalidate_state();
+            id(otb_air_pressure_fault).invalidate_state();
+            id(otb_water_over_temp).invalidate_state();
+            invalidate_sensor(id(otb_oem_fault_code));
+          }
+          if (field_is_stale(oq_otb::FIELD_RELATIVE_MODULATION)) {
+            invalidate_sensor(id(otb_relative_modulation));
+          }
+          if (field_is_stale(oq_otb::FIELD_CH_WATER_PRESSURE)) {
+            invalidate_sensor(id(otb_ch_pressure));
+          }
+          if (field_is_stale(oq_otb::FIELD_BOILER_WATER_TEMPERATURE)) {
+            invalidate_sensor(id(otb_boiler_water_temp));
+          }
+          if (field_is_stale(oq_otb::FIELD_RETURN_WATER_TEMPERATURE)) {
+            invalidate_sensor(id(otb_return_water_temp));
+          }
+          if (field_is_stale(oq_otb::FIELD_DHW_TEMPERATURE)) {
+            invalidate_sensor(id(otb_dhw_temp));
+          }
+          if (field_is_stale(oq_otb::FIELD_OEM_DIAGNOSTIC)) {
+            invalidate_sensor(id(otb_oem_diagnostic_code));
+          }
+
+  - interval: ${oq_otb_link_watch_s}s
+    startup_delay: 2s
+    then:
+      - lambda: |-
+          // Phase 1: require recent complete frames and a fresh mandatory STATUS.
+          const uint32_t now_ms = millis();
+          // STATUS (ID 0) is mandatory and control-critical. Optional fields
+          // may be unsupported without taking down the link, but an invalid or
+          // stale STATUS response means the transport is not safe to actuate.
           const bool available =
-              last_response_ms != 0 &&
-              (uint32_t)(now_ms - last_response_ms) <=
-                  (uint32_t) (${oq_otb_link_timeout_s} * 1000UL);
+              oq_otb::telemetry_state.transport_is_available(
+                  now_ms,
+                  (uint32_t) (${oq_otb_link_timeout_s} * 1000UL),
+                  (uint32_t) (${oq_otb_field_timeout_s} * 1000UL));
           const bool link_changed =
               !id(oq_otb_link_initialized) ||
               available != id(oq_otb_link_available_state);
@@ -396,17 +690,17 @@ interval:
 
           // Phase 2: prevent stale operational values from looking current after link loss.
           if (available) return;
-          id(otb_fault_indication).publish_state(false);
-          id(otb_ch_active).publish_state(false);
-          id(otb_dhw_active).publish_state(false);
-          id(otb_flame_on).publish_state(false);
-          id(otb_diagnostic_indication).publish_state(false);
-          id(otb_service_request).publish_state(false);
-          id(otb_lockout_reset).publish_state(false);
-          id(otb_low_water_pressure).publish_state(false);
-          id(otb_flame_fault).publish_state(false);
-          id(otb_air_pressure_fault).publish_state(false);
-          id(otb_water_over_temp).publish_state(false);
+          id(otb_fault_indication).invalidate_state();
+          id(otb_ch_active).invalidate_state();
+          id(otb_dhw_active).invalidate_state();
+          id(otb_flame_on).invalidate_state();
+          id(otb_diagnostic_indication).invalidate_state();
+          id(otb_service_request).invalidate_state();
+          id(otb_lockout_reset).invalidate_state();
+          id(otb_low_water_pressure).invalidate_state();
+          id(otb_flame_fault).invalidate_state();
+          id(otb_air_pressure_fault).invalidate_state();
+          id(otb_water_over_temp).invalidate_state();
           id(otb_relative_modulation).publish_state(NAN);
           id(otb_ch_pressure).publish_state(NAN);
           id(otb_boiler_water_temp).publish_state(NAN);
