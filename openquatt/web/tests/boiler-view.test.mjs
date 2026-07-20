@@ -16,6 +16,7 @@ const { ENTITY_DEFS } = await import("../js/src/core/config.js");
 const { INITIAL_SETTINGS_READY_KEY_MAP, SETTINGS_GROUP_KEY_MAP } = await import("../js/src/core/entity-sync.js");
 const heatPumpCss = await readFile(new URL("../css/src/40-heatpump.css", import.meta.url), "utf8");
 const boilerOpenThermYaml = await readFile(new URL("../../oq_boiler_opentherm.yaml", import.meta.url), "utf8");
+const otSlaveYaml = await readFile(new URL("../../oq_ot_slave.yaml", import.meta.url), "utf8");
 const quickStartSource = await readFile(new URL("../js/src/features/quickstart.js", import.meta.url), "utf8");
 
 function status(overrides = {}) {
@@ -204,4 +205,12 @@ test("DHW permission stays enabled without a user-facing setting", () => {
   assert.equal(SETTINGS_GROUP_KEY_MAP.installation.includes("boilerProvidesDhw"), false);
   assert.ok(SETTINGS_GROUP_KEY_MAP.integrations.includes("otbDhwActive"));
   assert.ok(SETTINGS_GROUP_KEY_MAP.integrations.includes("otbDhwPresent"));
+});
+
+test("thermostat slave uses real OTB flame state without changing R1 compatibility", () => {
+  assert.match(
+    otSlaveYaml,
+    /const bool slave_flame_on\s*=\s*\n\s*otb_selected \? boiler_flame_on : ch_active;/,
+  );
+  assert.match(otSlaveYaml, /set_slave_flame_on\(slave_flame_on\);/);
 });

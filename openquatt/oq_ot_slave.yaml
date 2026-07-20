@@ -195,6 +195,11 @@ interval:
                     otb_available && id(otb_dhw_active).has_state() && id(otb_dhw_active).state;
                 const bool boiler_flame_on =
                     otb_available && id(otb_flame_on).has_state() && id(otb_flame_on).state;
+                // Preserve the established composite heat-source indication
+                // for R1 installations. With OTB selected, expose only the
+                // boiler's real flame state instead of inventing one from HP activity.
+                const bool slave_flame_on =
+                    otb_selected ? boiler_flame_on : ch_active;
 
                 const bool hp1_fault = is_active_problem(id(hp1_ot_fault_active));
                 const bool hp2_fault =
@@ -212,7 +217,7 @@ interval:
 
                 id(oq_ot_slave_hub).set_slave_ch_active(ch_active);
                 id(oq_ot_slave_hub).set_slave_dhw_active(boiler_dhw_active);
-                id(oq_ot_slave_hub).set_slave_flame_on(boiler_flame_on);
+                id(oq_ot_slave_hub).set_slave_flame_on(slave_flame_on);
                 id(oq_ot_slave_hub).set_slave_cooling_active(cooling_active);
                 id(oq_ot_slave_hub).set_slave_fault(id(oq_ot_fault_active));
                 id(oq_ot_slave_hub).set_slave_diagnostic(id(oq_ot_diagnostic_active));
