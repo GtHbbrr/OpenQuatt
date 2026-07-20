@@ -16,6 +16,7 @@ const { ENTITY_DEFS } = await import("../js/src/core/config.js");
 const { INITIAL_SETTINGS_READY_KEY_MAP, SETTINGS_GROUP_KEY_MAP } = await import("../js/src/core/entity-sync.js");
 const heatPumpCss = await readFile(new URL("../css/src/40-heatpump.css", import.meta.url), "utf8");
 const boilerOpenThermYaml = await readFile(new URL("../../oq_boiler_opentherm.yaml", import.meta.url), "utf8");
+const quickStartSource = await readFile(new URL("../js/src/features/quickstart.js", import.meta.url), "utf8");
 
 function status(overrides = {}) {
   return getBoilerStatusModel({
@@ -197,6 +198,7 @@ test("settings hydration loads boiler setup and diagnostics before rendering", (
 test("DHW permission stays enabled without a user-facing setting", () => {
   assert.match(boilerOpenThermYaml, /^    dhw_enable: true$/m);
   assert.doesNotMatch(boilerOpenThermYaml, /^    dhw_enable:\n\s+id: oq_otb_dhw_enable$/m);
+  assert.doesNotMatch(quickStartSource, /tapwater levert/i);
   assert.equal(Object.hasOwn(ENTITY_DEFS, "boilerProvidesDhw"), false);
   assert.equal(INITIAL_SETTINGS_READY_KEY_MAP.installation.includes("boilerProvidesDhw"), false);
   assert.equal(SETTINGS_GROUP_KEY_MAP.installation.includes("boilerProvidesDhw"), false);
