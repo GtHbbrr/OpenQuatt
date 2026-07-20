@@ -314,6 +314,8 @@ interval:
               !isnan(flow_lph) && flow_lph >= ${oq_cm_min_flow_lph};
           const bool command_active =
               opentherm_selected &&
+              !id(oq_runtime_polling_paused).state &&
+              !id(oq_boiler_runtime_pause_state) &&
               id(oq_otb_link_available_state) &&
               id(oq_boiler_output_request) &&
               target_valid &&
