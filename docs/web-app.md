@@ -209,6 +209,7 @@ Een ontbrekende telemetrykeuze geldt nooit als toestemming. Bestaande installati
 Het bericht bevat uitsluitend:
 
 - een willekeurig installatie-ID;
+- de Unix-timestamp van de momentopname in seconden, of `null` zolang de klok nog niet is gesynchroniseerd;
 - uptime;
 - firmwareversie en releasekanaal;
 - hardwareprofiel en, als beschikbaar, hardwarerevisie;

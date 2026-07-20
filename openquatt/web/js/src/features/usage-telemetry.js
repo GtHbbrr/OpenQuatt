@@ -6,6 +6,7 @@ const USAGE_TELEMETRY_EXAMPLE_JSON = JSON.stringify({
   schema_version: 1,
   message_id: "c8272f30-b64d-4af0-a13c-bf8e0cbde842",
   installation_id: "7df1c1f8-fc47-4ac8-b0d7-94d8c42d772f",
+  timestamp_s: 1784527200,
   uptime_s: 86420,
   firmware_version: "v0.44.0",
   release_channel: "main",
@@ -74,7 +75,7 @@ export function renderUsageTelemetryDisclosure({ collapsible = false, idPrefix =
           <h4 id="${includedTitleId}">In het bericht</h4>
         </div>
         <ul>
-          <li><strong>Installatie</strong><span>Willekeurig ID en uptime</span></li>
+          <li><strong>Installatie</strong><span>Willekeurig ID, tijdstip en uptime</span></li>
           <li><strong>Software</strong><span>Versie en releasekanaal</span></li>
           <li><strong>Platform</strong><span>Hardware, opstelling, verbinding en wifi-signaal</span></li>
           <li><strong>Systeemstatus</strong><span>Geheugen, looptijd, chiptemperatuur en herstartreden</span></li>
