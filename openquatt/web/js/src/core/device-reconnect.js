@@ -3,6 +3,89 @@ import { render } from "./render-scheduler.js";
 import { updateFirmwareState } from "./feature-state.js";
 
 export const DEVICE_RECONNECT_RECOVERY_CLEAR_DELAY_MS = 1500;
+export const OTA_REFRESH_DELAY_MS = 1500;
+
+function getOtaEvidence() {
+  const uptime = state.entities.uptime;
+  const version = state.entities.projectVersionText;
+  return [
+    // ESPHome's numeric value is unrounded; the display state is quantized and includes the unit.
+    +(uptime?.value ?? uptime?.state) * (String(uptime?.state || uptime?.uom).endsWith("s") ? 1000 : 3600000),
+    version?.state || version?.value || "",
+  ];
+}
+
+export function armOtaRefresh() {
+  clearOtaRefresh();
+  state.ota.on = true;
+  state.ota.base = [...getOtaEvidence(), performance.now()];
+}
+
+export function clearOtaRefresh() {
+  const refresh = state.ota;
+  if (refresh.id) {
+    window.clearTimeout(refresh.id);
+    refresh.id = null;
+  }
+  refresh.on = false;
+  refresh.ok = 0;
+  refresh.wait = false;
+  refresh.base = null;
+}
+
+export function awaitOtaEvidence(timeoutMs = 300000) {
+  const refresh = state.ota;
+  if (!refresh.on) {
+    return;
+  }
+  if (refresh.id) {
+    window.clearTimeout(refresh.id);
+  }
+  refresh.wait = true;
+  refresh.id = window.setTimeout(() => {
+    refresh.id = null;
+    if (refresh.wait) {
+      clearOtaRefresh();
+    }
+  }, timeoutMs);
+}
+
+export function reconcileOtaEvidence() {
+  const refresh = state.ota;
+  if (!refresh.on || !refresh.wait) {
+    return;
+  }
+
+  const evidence = getOtaEvidence();
+  if (
+    evidence[0] < refresh.base[0]
+    // A low post-boot uptime proves its boot happened after the OTA request.
+    || (isNaN(refresh.base[0]) && evidence[0] + 1000 <= performance.now() - refresh.base[2])
+    || refresh.ok === 2
+    || (refresh.base[1] && evidence[1] && evidence[1] !== refresh.base[1])
+  ) {
+    scheduleOtaRefresh();
+  }
+}
+
+export function scheduleOtaRefresh(delayMs = OTA_REFRESH_DELAY_MS) {
+  const refresh = state.ota;
+  if (!refresh.on || (refresh.id && !refresh.wait)) {
+    return;
+  }
+
+  if (refresh.id) {
+    window.clearTimeout(refresh.id);
+  }
+  refresh.wait = false;
+  refresh.id = window.setTimeout(() => {
+    if (!refresh.on) {
+      return;
+    }
+    clearOtaRefresh();
+    window.location.reload();
+  }, delayMs);
+}
 
 export function clearDeviceReconnectRecoveryTimer() {
   if (!state.deviceReconnectRecoveryTimer) {
@@ -44,7 +127,6 @@ export function markDeviceReconnectRecovered() {
   state.deviceReconnectRecoveryStartedAt = Date.now();
   state.deviceReconnectLastError = "";
   state.entitySyncFailureCount = 0;
-
   const recoveryStartedAt = state.deviceReconnectRecoveryStartedAt;
   state.deviceReconnectRecoveryTimer = window.setTimeout(() => {
     if (state.deviceReconnectMode && Number(state.deviceReconnectRecoveryStartedAt || 0) === recoveryStartedAt) {

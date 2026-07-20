@@ -48,6 +48,8 @@ export const state = {
   deviceReconnectRecoveryStartedAt: 0,
   deviceReconnectRecoveryTimer: null,
   deviceReconnectLastError: "",
+  // OTA refresh lifecycle: ok 0=unconfirmed, 1=accepted, 2=accepted with a later outage.
+  ota: { on: false, ok: 0, id: null, wait: false, base: null },
   firmwareOtaQuietUntil: 0,
   firmwareOtaQuietTimer: null,
   entitySyncFailureCount: 0,

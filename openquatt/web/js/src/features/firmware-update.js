@@ -2,7 +2,7 @@ import { hasEntity } from "../core/app-shared.js";
 import { FIRMWARE_MODAL_KEYS, FIRMWARE_OTA_START_QUIET_MS, FIRMWARE_RELEASE_URLS } from "../core/config.js";
 import { getEntityValue } from "../core/entity-store.js";
 import { refreshEntities } from "../core/entity-sync.js";
-import { beginDeviceReconnect, getDeviceReconnectCopy, getDeviceReconnectStatusCopy, getDeviceReconnectStatusLabel, getDeviceReconnectTitle } from "../core/device-reconnect.js";
+import { awaitOtaEvidence, beginDeviceReconnect, clearOtaRefresh, getDeviceReconnectCopy, getDeviceReconnectStatusCopy, getDeviceReconnectStatusLabel, getDeviceReconnectTitle, scheduleOtaRefresh } from "../core/device-reconnect.js";
 import { startEntityPolling, stopEntityPolling } from "../core/entity-polling-controls.js";
 import { isFirmwareOtaQuietActive } from "../core/firmware-quiet.js";
 import { updateFirmwareState } from "../core/feature-state.js";
@@ -287,6 +287,15 @@ import { render } from "../core/render-scheduler.js";
       && !isFirmwareUpdateChecking()
       && !isFirmwareProgressActive()
       && !isFirmwareUpdateAvailable();
+  }
+
+  export function isFirmwareInstallCompletionConfirmed() {
+    if (state.updateInstallMode === "" || state.updateInstallMode === "test-firmware") {
+      return Boolean(state.ota.id && !state.ota.wait);
+    }
+    return !isFirmwareProgressActive()
+      && !isFirmwareUpdateInstalling()
+      && hasInstalledFirmwareTargetVersion();
   }
 
   export function isFirmwareUpdateJustCompleted() {
@@ -805,7 +814,10 @@ import { render } from "../core/render-scheduler.js";
       await wait(attempt === 0 ? initialDelayMs : pollDelayMs);
       try {
         const statusEntityBeforePoll = state.entities.firmwareUpdateStatus;
-        await refreshEntities(FIRMWARE_MODAL_KEYS, "all", { forceMissing: true });
+        const installPollKeys = state.ota.wait
+          ? [...FIRMWARE_MODAL_KEYS, "uptime"]
+          : FIRMWARE_MODAL_KEYS;
+        await refreshEntities(installPollKeys, "all", { forceMissing: true });
         const livePhase = getFirmwareProgressPhase();
         if (state.entities.firmwareUpdateStatus !== statusEntityBeforePoll) {
           state.updateInstallStatusPollObserved = true;
@@ -829,6 +841,7 @@ import { render } from "../core/render-scheduler.js";
             && !isFirmwareProgressActive()
             && !isFirmwareUpdateInstalling()
           ) {
+            scheduleOtaRefresh();
             return true;
           }
         } else if (state.updateInstallMode === "topology-switch") {
@@ -839,6 +852,7 @@ import { render } from "../core/render-scheduler.js";
             && !isFirmwareProgressActive()
             && !isFirmwareUpdateInstalling()
           ) {
+            scheduleOtaRefresh();
             return true;
           }
         } else if (state.updateInstallMode === "build-switch") {
@@ -852,17 +866,16 @@ import { render } from "../core/render-scheduler.js";
             && !isFirmwareProgressActive()
             && !isFirmwareUpdateInstalling()
           ) {
+            scheduleOtaRefresh();
             return true;
           }
-        } else if (
-          hasInstalledFirmwareTargetVersion()
-          || isFirmwareInstallSettled()
-          || (isFirmwareEffectivelyCurrent() && !isFirmwareProgressActive() && !isFirmwareUpdateInstalling())
-        ) {
-            return true;
+        } else if (isFirmwareInstallCompletionConfirmed()) {
+          scheduleOtaRefresh();
+          return true;
         }
       } catch (error) {
         if (error?.firmwareInstallTerminal) {
+          clearOtaRefresh();
           throw error;
         }
         if (!waitingForReconnect) {
@@ -873,6 +886,7 @@ import { render } from "../core/render-scheduler.js";
       }
     }
 
+    awaitOtaEvidence();
     return false;
   }
 

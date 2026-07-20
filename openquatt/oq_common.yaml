@@ -1007,7 +1007,7 @@ sensor:
       sorting_group_id: oq_system_diagnostics
 
   - platform: uptime
-    name: Uptime
+    name: Uptime raw
     id: uptime_sensor
     internal: true
     icon: mdi:timer-outline
