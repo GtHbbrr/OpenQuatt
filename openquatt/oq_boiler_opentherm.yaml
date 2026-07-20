@@ -63,10 +63,8 @@ opentherm:
             oq_otb::telemetry_state.record_response(
                 millis(), response_id, response_type);
 
-            const bool acknowledged =
-                response_type == esphome::opentherm::MessageType::READ_ACK ||
-                response_type == esphome::opentherm::MessageType::WRITE_ACK;
-            if (acknowledged) return;
+            if (oq_otb::telemetry_state.response_payload_is_usable(
+                    response_id, response_type)) return;
 
             switch (response_id) {
               case esphome::opentherm::MessageId::STATUS:

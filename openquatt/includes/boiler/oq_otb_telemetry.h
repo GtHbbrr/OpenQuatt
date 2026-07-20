@@ -86,6 +86,17 @@ class TelemetryState {
     return state.valid && (uint32_t) (now_ms - state.last_valid_ms) <= max_age_ms;
   }
 
+  bool response_payload_is_usable(uint8_t message_id, uint8_t message_type) const {
+    // Every field tracked by this helper is requested as READ_DATA. A
+    // syntactically valid WRITE_ACK for such an ID must not reach ESPHome's
+    // payload processors as if it were a valid measurement.
+    if (field_index_for_message_id(message_id) >= 0) {
+      return message_type == MESSAGE_TYPE_READ_ACK;
+    }
+    return message_type == MESSAGE_TYPE_READ_ACK ||
+           message_type == MESSAGE_TYPE_WRITE_ACK;
+  }
+
   bool transport_is_available(
       uint32_t now_ms, uint32_t response_max_age_ms,
       uint32_t status_max_age_ms) const {

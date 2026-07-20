@@ -11,6 +11,12 @@ int main() {
   assert(state.last_response_id() == -1);
   assert(strcmp(state.last_response_type_name(), "Never") == 0);
   assert(!state.field_is_valid(oq_otb::FIELD_CH_WATER_PRESSURE));
+  assert(state.response_payload_is_usable(
+      18, oq_otb::MESSAGE_TYPE_READ_ACK));
+  assert(!state.response_payload_is_usable(
+      18, oq_otb::MESSAGE_TYPE_WRITE_ACK));
+  assert(state.response_payload_is_usable(
+      1, oq_otb::MESSAGE_TYPE_WRITE_ACK));
 
   // Optional negative acknowledgements do not take down the transport, but
   // the mandatory STATUS field must be valid and fresh for safe actuation.
