@@ -56,6 +56,11 @@ int main() {
   assert(!oq_boiler::settle_period_elapsed(true, 5, UINT32_MAX - 5, 20));
   assert(oq_boiler::settle_period_elapsed(true, 20, UINT32_MAX - 5, 20));
 
+  // The command lease must accommodate the slowest (60 s) strategy cadence
+  // with scheduler margin, while still expiring if that strategy stops.
+  assert(oq_boiler::command_is_fresh(command, 76000, 75000));
+  assert(!oq_boiler::command_is_fresh(command, 76001, 75000));
+
   auto input = safe_input(1500);
   input.transport_settled = false;
   input.output_active = true;

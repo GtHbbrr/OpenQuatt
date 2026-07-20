@@ -198,6 +198,12 @@ class BoilerPowerTestRuntime {
     }
     if (!guards_ok()) return;
 
+    // Renew the authorization only from this guarded originating state machine.
+    // The dispatcher deliberately cannot make a commissioning command fresh.
+    if (id(oq_commissioning_boiler_request)) {
+      id(oq_commissioning_boiler_request_updated_ms) = now_ms;
+    }
+
     switch (id(oq_commissioning_state_code)) {
       case STATE_FLOW_SETTLE:
         run_flow_settle(cfg, now_ms, flow_lph, flow_stable_now);
