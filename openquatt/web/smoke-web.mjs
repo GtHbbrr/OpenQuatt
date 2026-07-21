@@ -298,6 +298,7 @@ async function checkWriteActionContracts() {
   const firmwareActions = await source("js/src/features/firmware-actions.js");
   const debugRecording = await source("js/src/features/debug-recording.js");
   const systemActions = await source("js/src/features/system-actions.js");
+  const webServerLogs = await source("js/src/features/webserver-logs.js");
 
   assertContains(securityActions, 'fetch("/api-security/enable"', "API security enable");
   assertContains(securityActions, 'fetch("/api-security/rotate"', "API security rotate");
@@ -313,6 +314,7 @@ async function checkWriteActionContracts() {
   assertContains(entityWriteActions, "export async function commitOpenQuattRegulationResumeNow", "OpenQuatt resume write helper");
   assertContains(namedButtonActions, 'ODU_RUNTIME_FREQUENCY_BUTTON_KEYS.has(buttonKey)', "ODU runtime named buttons");
   assertContains(entityWriteActions, "ODU_RUNTIME_FREQUENCY_BUTTON_KEYS.has(key)", "ODU runtime named button write helper");
+  assertContains(webServerLogs, "kan DEBUG zoveel logging produceren dat de web-app en Home Assistant traag of onbereikbaar worden.", "Debug logger safety warning");
 }
 
 async function checkStateSliceContracts() {

@@ -661,7 +661,8 @@ select:
       sorting_group_id: oq_system_diagnostics
     entity_category: diagnostic
     optimistic: true
-    restore_value: true
+    # Always recover to INFO after a reboot; DEBUG can overwhelm busy Duo installations.
+    restore_value: false
     options: [NONE, ERROR, WARN, INFO, CONFIG, DEBUG]
     initial_option: INFO
     on_value:
