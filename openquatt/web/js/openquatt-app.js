@@ -373,7 +373,7 @@
       ${a}
     </div>
   `}function Rv(){let e=Pl();if(!e)return"";let t=Xp(e),r=ov(e),n=o.loadingEntities||!!o.busyAction;return`
-    ${Ie({dataValue:"debugLevel",label:"Logger level",value:r||"Onbekend",note:"Past het runtime logniveau aan voor nieuwe firmwaremeldingen.",action:`<label class="oq-webserver-log-level-control" aria-label="Logger level">
+    ${Ie({dataValue:"debugLevel",label:"Logger level",value:r||"Onbekend",note:"DEBUG is tijdelijk en wordt na een herstart teruggezet naar INFO. Bij veel Modbusverkeer kan DEBUG zoveel logging produceren dat de web-app en Home Assistant traag of onbereikbaar worden.",action:`<label class="oq-webserver-log-level-control" aria-label="Logger level">
         <select class="oq-helper-select" data-oq-field="debugLevel" ${n?"disabled":""}>
           ${t.map(a=>`<option value="${s(a)}" ${a===r?"selected":""}>${s(a)}</option>`).join("")}
         </select>
