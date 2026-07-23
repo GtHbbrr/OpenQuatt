@@ -220,6 +220,13 @@ void OpenQuattUsageTelemetry::setup() {
 }
 
 void OpenQuattUsageTelemetry::loop() {
+  if (this->cleanup_task_complete_.exchange(false)) {
+    this->complete_publish_session_();
+  }
+  if (this->finishing_session_.load()) {
+    return;
+  }
+
   if (this->session_active_.load()) {
     if (this->start_task_running_.load()) {
       return;
@@ -427,6 +434,15 @@ void OpenQuattUsageTelemetry::start_publish_session_() {
   }
 
   this->boot_publish_pending_ = false;
+
+  // Reserve the cleanup worker before MQTT/TLS can consume the remaining heap.
+  // If this allocation fails, no client resources exist yet and retrying is safe.
+  if (!this->prepare_cleanup_task_()) {
+    this->start_task_running_.store(false);
+    this->schedule_retry_();
+    return;
+  }
+
   if (this->payload_.empty()) {
     this->build_payload_();
   }
@@ -434,6 +450,8 @@ void OpenQuattUsageTelemetry::start_publish_session_() {
   this->publish_failed_.store(false);
   this->pending_message_id_.store(-1);
   this->finishing_session_.store(false);
+  this->cleanup_task_complete_.store(false);
+  this->cleanup_succeeded_.store(false);
   this->session_started_ms_ = millis();
   this->session_active_.store(true);
 
@@ -507,25 +525,41 @@ bool OpenQuattUsageTelemetry::start_client_() {
 }
 
 void OpenQuattUsageTelemetry::finish_publish_session_(bool succeeded) {
-  if (!this->session_active_.load() || this->start_task_running_.load()) {
+  if (!this->session_active_.load() || this->start_task_running_.load() ||
+      this->finishing_session_.exchange(true)) {
     return;
   }
-  this->finishing_session_.store(true);
+  this->cleanup_succeeded_.store(succeeded);
+  xTaskNotifyGive(this->cleanup_task_handle_.load());
+}
 
-  if (this->runtime_lock_ != nullptr && xSemaphoreTake(this->runtime_lock_, portMAX_DELAY) == pdTRUE) {
-    if (this->mqtt_client_ != nullptr) {
-      esp_mqtt_client_stop(this->mqtt_client_);
-      esp_mqtt_client_destroy(this->mqtt_client_);
-      this->mqtt_client_ = nullptr;
-    }
-    xSemaphoreGive(this->runtime_lock_);
+bool OpenQuattUsageTelemetry::prepare_cleanup_task_() {
+  if (this->cleanup_task_running_.exchange(true)) {
+    return false;
   }
+
+  TaskHandle_t task_handle = nullptr;
+  const BaseType_t created = xTaskCreatePinnedToCore(&OpenQuattUsageTelemetry::cleanup_client_task_,
+                                                     "oq_usage_cleanup", MQTT_CLEANUP_TASK_STACK_SIZE, this, 4,
+                                                     &task_handle, tskNO_AFFINITY);
+  if (created != pdPASS || task_handle == nullptr) {
+    this->cleanup_task_running_.store(false);
+    ESP_LOGE(TAG, "Failed to create usage telemetry MQTT cleanup task");
+    return false;
+  }
+  this->cleanup_task_handle_.store(task_handle);
+  return true;
+}
+
+void OpenQuattUsageTelemetry::complete_publish_session_() {
+  const bool succeeded = this->cleanup_succeeded_.load();
 
   this->session_active_.store(false);
   this->publish_succeeded_.store(false);
   this->publish_failed_.store(false);
   this->pending_message_id_.store(-1);
   this->finishing_session_.store(false);
+  this->cleanup_succeeded_.store(false);
 
   if (!this->enabled_.load()) {
     this->payload_.clear();
@@ -669,6 +703,29 @@ void OpenQuattUsageTelemetry::start_client_task_(void *arg) {
     }
     self->start_task_running_.store(false);
     App.wake_loop_threadsafe();
+  }
+  vTaskDelete(nullptr);
+}
+
+void OpenQuattUsageTelemetry::cleanup_client_task_(void *arg) {
+  auto *self = static_cast<OpenQuattUsageTelemetry *>(arg);
+  while (self != nullptr) {
+    ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+    esp_mqtt_client_handle_t client = nullptr;
+    if (self->runtime_lock_ != nullptr && xSemaphoreTake(self->runtime_lock_, portMAX_DELAY) == pdTRUE) {
+      client = self->mqtt_client_;
+      self->mqtt_client_ = nullptr;
+      xSemaphoreGive(self->runtime_lock_);
+    }
+    if (client != nullptr) {
+      esp_mqtt_client_stop(client);
+      esp_mqtt_client_destroy(client);
+    }
+    self->cleanup_task_handle_.store(nullptr);
+    self->cleanup_task_running_.store(false);
+    self->cleanup_task_complete_.store(true);
+    App.wake_loop_threadsafe();
+    break;
   }
   vTaskDelete(nullptr);
 }

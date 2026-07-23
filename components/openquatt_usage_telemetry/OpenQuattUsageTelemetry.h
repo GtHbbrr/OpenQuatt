@@ -82,6 +82,7 @@ class OpenQuattUsageTelemetry : public switch_::Switch, public Component {
   static constexpr uint32_t RETRY_MIN_MS = 5UL * 60UL * 1000UL;
   static constexpr uint32_t RETRY_MAX_MS = 60UL * 60UL * 1000UL;
   static constexpr uint32_t MQTT_START_TASK_STACK_SIZE = 24576;
+  static constexpr uint32_t MQTT_CLEANUP_TASK_STACK_SIZE = 6144;
   static constexpr int MQTT_TASK_STACK_SIZE = 12288;
 
   struct StorageV1 {
@@ -118,12 +119,15 @@ class OpenQuattUsageTelemetry : public switch_::Switch, public Component {
   void start_publish_session_();
   bool start_client_();
   void finish_publish_session_(bool succeeded);
+  bool prepare_cleanup_task_();
+  void complete_publish_session_();
   void build_payload_();
   std::string read_hardware_revision_() const;
   static bool time_reached_(uint32_t now_ms, uint32_t target_ms);
   static std::string format_uuid_(const std::array<uint8_t, 16> &bytes);
   static std::string random_message_id_();
   static void start_client_task_(void *arg);
+  static void cleanup_client_task_(void *arg);
   static void mqtt_event_handler_(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data);
 
   std::string broker_;
@@ -169,6 +173,9 @@ class OpenQuattUsageTelemetry : public switch_::Switch, public Component {
   std::atomic<bool> session_active_{false};
   std::atomic<bool> finishing_session_{false};
   std::atomic<bool> start_task_running_{false};
+  std::atomic<bool> cleanup_task_running_{false};
+  std::atomic<bool> cleanup_task_complete_{false};
+  std::atomic<bool> cleanup_succeeded_{false};
   std::atomic<bool> publish_succeeded_{false};
   std::atomic<bool> publish_failed_{false};
   std::atomic<int> pending_message_id_{-1};
@@ -176,6 +183,7 @@ class OpenQuattUsageTelemetry : public switch_::Switch, public Component {
   uint32_t next_publish_ms_{0};
   uint8_t consecutive_failures_{0};
   bool boot_publish_pending_{false};
+  std::atomic<TaskHandle_t> cleanup_task_handle_{nullptr};
 };
 
 }  // namespace openquatt_usage_telemetry
