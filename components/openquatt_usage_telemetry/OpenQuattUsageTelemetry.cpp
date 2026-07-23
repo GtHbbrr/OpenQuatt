@@ -391,9 +391,9 @@ void OpenQuattUsageTelemetry::apply_storage_(const Storage &storage) {
 }
 
 void OpenQuattUsageTelemetry::schedule_initial_publish_() {
-  // Keep zero as the unscheduled sentinel while allowing a newly recorded
-  // opt-in to publish on the next loop iteration.
-  this->next_publish_ms_ = millis() + 1U;
+  // Avoid overlapping the MQTT client and its worker stacks with the first
+  // full sensor/API publication wave after boot.
+  this->next_publish_ms_ = millis() + INITIAL_PUBLISH_DELAY_MS;
 }
 
 void OpenQuattUsageTelemetry::schedule_regular_publish_() {

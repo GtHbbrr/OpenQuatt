@@ -77,6 +77,7 @@ class OpenQuattUsageTelemetry : public switch_::Switch, public Component {
 
   static constexpr uint32_t STORAGE_MAGIC = 0x4F515553;
   static constexpr uint16_t STORAGE_VERSION = 2;
+  static constexpr uint32_t INITIAL_PUBLISH_DELAY_MS = 90UL * 1000UL;
   static constexpr uint32_t SESSION_TIMEOUT_MS = 30000;
   static constexpr uint32_t RETRY_MIN_MS = 5UL * 60UL * 1000UL;
   static constexpr uint32_t RETRY_MAX_MS = 60UL * 60UL * 1000UL;
