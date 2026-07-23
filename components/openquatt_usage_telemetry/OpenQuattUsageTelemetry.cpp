@@ -215,9 +215,8 @@ void OpenQuattUsageTelemetry::setup() {
   }
 
   this->apply_storage_(storage);
-  if (this->enabled_.load() && this->is_setup_complete_()) {
-    this->schedule_initial_publish_();
-  }
+  this->boot_publish_pending_ = this->enabled_.load();
+  this->next_publish_ms_ = 0;
 }
 
 void OpenQuattUsageTelemetry::loop() {
@@ -242,13 +241,17 @@ void OpenQuattUsageTelemetry::loop() {
 
   if (!this->enabled_.load() || !this->is_setup_complete_() || !this->is_configured() ||
       !network::is_connected()) {
-    if (!this->is_setup_complete_()) {
+    if (this->boot_publish_pending_) {
       this->next_publish_ms_ = 0;
     }
     return;
   }
   if (this->next_publish_ms_ == 0U) {
-    this->schedule_initial_publish_();
+    if (this->boot_publish_pending_) {
+      this->schedule_initial_publish_();
+    } else {
+      this->schedule_immediate_publish_();
+    }
   }
   if (time_reached_(millis(), this->next_publish_ms_)) {
     this->start_publish_session_();
@@ -304,14 +307,17 @@ void OpenQuattUsageTelemetry::write_state(bool state) {
   if (state) {
     this->consecutive_failures_ = 0;
     if (this->is_setup_complete_()) {
-      this->schedule_initial_publish_();
+      this->boot_publish_pending_ = false;
+      this->schedule_immediate_publish_();
     } else {
+      this->boot_publish_pending_ = true;
       this->next_publish_ms_ = 0;
     }
     if (!this->is_configured()) {
       ESP_LOGW(TAG, "Usage statistics were enabled, but no telemetry broker is configured in this build");
     }
   } else {
+    this->boot_publish_pending_ = false;
     this->next_publish_ms_ = 0;
     if (!this->session_active_.load()) {
       this->payload_.clear();
@@ -392,8 +398,14 @@ void OpenQuattUsageTelemetry::apply_storage_(const Storage &storage) {
 
 void OpenQuattUsageTelemetry::schedule_initial_publish_() {
   // Avoid overlapping the MQTT client and its worker stacks with the first
-  // full sensor/API publication wave after boot.
+  // full sensor/API publication wave after connectivity becomes available.
   this->next_publish_ms_ = millis() + INITIAL_PUBLISH_DELAY_MS;
+}
+
+void OpenQuattUsageTelemetry::schedule_immediate_publish_() {
+  // Defer to the next loop iteration so a runtime opt-in does not start MQTT
+  // work inside the switch write callback.
+  this->next_publish_ms_ = millis() + 1U;
 }
 
 void OpenQuattUsageTelemetry::schedule_regular_publish_() {
@@ -414,6 +426,7 @@ void OpenQuattUsageTelemetry::start_publish_session_() {
     return;
   }
 
+  this->boot_publish_pending_ = false;
   if (this->payload_.empty()) {
     this->build_payload_();
   }

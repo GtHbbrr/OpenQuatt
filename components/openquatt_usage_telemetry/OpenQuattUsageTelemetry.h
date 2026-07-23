@@ -112,6 +112,7 @@ class OpenQuattUsageTelemetry : public switch_::Switch, public Component {
   bool is_setup_complete_() const;
   void apply_storage_(const Storage &storage);
   void schedule_initial_publish_();
+  void schedule_immediate_publish_();
   void schedule_regular_publish_();
   void schedule_retry_();
   void start_publish_session_();
@@ -174,6 +175,7 @@ class OpenQuattUsageTelemetry : public switch_::Switch, public Component {
   uint32_t session_started_ms_{0};
   uint32_t next_publish_ms_{0};
   uint8_t consecutive_failures_{0};
+  bool boot_publish_pending_{false};
 };
 
 }  // namespace openquatt_usage_telemetry
