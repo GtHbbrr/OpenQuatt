@@ -1,4 +1,6 @@
+import { hasEntity } from "../core/app-shared.js";
 import { renderOqIcon } from "../core/config.js";
+import { getEntityValue } from "../core/entity-store.js";
 import { escapeHtml } from "../core/html.js";
 import { renderSettingsCompactSwitchControl } from "../settings/controls.js";
 
@@ -39,6 +41,10 @@ export function renderUsageTelemetryConsent({ enabled, busy, settings = false })
   const scheduleCopy = settings
     ? "Na inschakelen verstuurt OpenQuatt vrijwel direct en daarna ongeveer elk uur technische gegevens naar de OpenQuatt-loggingserver."
     : "Na het afronden verstuurt OpenQuatt vrijwel direct en daarna ongeveer elk uur technische gegevens naar de OpenQuatt-loggingserver.";
+  const value = settings && enabled && hasEntity("usageTelemetryInstallationId")
+    ? String(getEntityValue("usageTelemetryInstallationId") || "").trim()
+    : "";
+  const installationId = ["unknown", "unavailable", "nan"].includes(value.toLowerCase()) ? "" : value;
   return `
     <div class="oq-usage-consent${enabled ? " is-enabled" : ""}${settings ? " oq-usage-consent--settings" : ""}">
       <div class="oq-usage-consent-copy">
@@ -47,6 +53,7 @@ export function renderUsageTelemetryConsent({ enabled, busy, settings = false })
           <span class="oq-usage-consent-kicker">Vrijwillige keuze</span>
           <h3>Beperkte statistieken delen</h3>
           <p>${scheduleCopy}</p>
+          ${installationId ? `<div class="oq-usage-consent-installation-id"><strong>Installatie-ID</strong><code>${escapeHtml(installationId)}</code></div>` : ""}
         </div>
       </div>
       <div class="oq-usage-consent-action">

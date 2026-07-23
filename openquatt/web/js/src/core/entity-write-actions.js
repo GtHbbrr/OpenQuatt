@@ -28,7 +28,7 @@ async function commitUsageTelemetrySwitch(entity, enabled) {
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}`);
     }
-    await refreshEntities([key, "usageTelemetryChoiceConfigured"], "all");
+    await refreshEntities([key, "usageTelemetryChoiceConfigured", "usageTelemetryInstallationId"], "all");
     if (!isUsageTelemetryChoiceConfirmed({
       telemetryValue: getEntityValue(key),
       choiceValue: getEntityValue("usageTelemetryChoiceConfigured"),
@@ -44,7 +44,7 @@ async function commitUsageTelemetrySwitch(entity, enabled) {
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);
       }
-      await refreshEntities([key, "usageTelemetryChoiceConfigured"], "all");
+      await refreshEntities([key, "usageTelemetryChoiceConfigured", "usageTelemetryInstallationId"], "all");
       disabledConfirmed = isUsageTelemetryChoiceConfirmed({
         telemetryValue: getEntityValue(key),
         choiceValue: getEntityValue("usageTelemetryChoiceConfigured"),

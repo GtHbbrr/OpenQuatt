@@ -398,6 +398,9 @@ void OpenQuattUsageTelemetry::apply_storage_(const Storage &storage) {
   this->enabled_.store(enabled);
   this->choice_configured_.store(choice_configured);
   this->publish_state(enabled);
+  if (this->installation_id_sensor_ != nullptr) {
+    this->installation_id_sensor_->publish_state(this->installation_id_);
+  }
   if (this->choice_configured_sensor_ != nullptr) {
     this->choice_configured_sensor_->publish_state(choice_configured);
   }
