@@ -185,7 +185,7 @@ import { fetchWithTimeout } from "./browser-utils.js";
     heating: ["strategy"],
     cooling: ["manualCoolingEnable", "coolingWithoutDewPointMode"],
     integrations: ["otEnabled", "cicPollingEnabled", "flowSource"],
-    system: ["setupComplete", "projectVersionText", "releaseChannelText", "firmwareUpdateChannel", "statusLedsEnabled", "usageTelemetryEnabled", "usageTelemetryChoiceConfigured"],
+    system: ["setupComplete", "projectVersionText", "releaseChannelText", "firmwareUpdateChannel", "statusLedsEnabled", "usageTelemetryEnabled", "usageTelemetryChoiceConfigured", "usageTelemetryInstallationId"],
   };
 
   export const SETTINGS_GROUP_KEY_MAP = {
@@ -249,6 +249,7 @@ import { fetchWithTimeout } from "./browser-utils.js";
       "statusLedsEnabled",
       "usageTelemetryEnabled",
       "usageTelemetryChoiceConfigured",
+      "usageTelemetryInstallationId",
       ...SETTINGS_STORAGE_KEYS,
       "webServerLogHistoryEnabled",
       "debugLevel",
