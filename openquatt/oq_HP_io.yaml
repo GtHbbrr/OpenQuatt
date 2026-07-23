@@ -93,6 +93,11 @@ globals:
     restore_value: no
     initial_value: 'false'
 
+  - id: ${hp_id}_last_offline_probe_ms
+    type: uint32_t
+    restore_value: no
+    initial_value: '0'
+
 # ----------------------------
 # SELECT
 # ----------------------------
@@ -1327,9 +1332,32 @@ interval:
   - interval: ${oq_modbus_update_interval_s}s
     startup_delay: ${oq_modbus_startup_delay_ms}ms
     then:
-      - if:
-          condition:
-            lambda: |-
-              return !id(oq_runtime_polling_paused).state;
-          then:
-            - component.update: ${hp_id}
+      - lambda: |-
+          if (id(oq_runtime_polling_paused).state) {
+            return;
+          }
+
+          // A confirmed online HP keeps the normal full-register polling cadence.
+          if (id(${hp_id}_is_online)) {
+            id(${hp_id}).update();
+            return;
+          }
+
+          // An absent HP only receives one lightweight recovery probe per interval.
+          const uint32_t now = millis();
+          const uint32_t last_probe = id(${hp_id}_last_offline_probe_ms);
+          if (last_probe != 0U &&
+              now - last_probe < ${oq_modbus_offline_probe_interval_s}UL * 1000UL) {
+            return;
+          }
+          if (id(${hp_id}).get_command_queue_length() != 0U) {
+            return;
+          }
+
+          id(${hp_id}_last_offline_probe_ms) = now == 0U ? 1U : now;
+          auto probe = esphome::modbus_controller::ModbusCommandItem::create_read_command(
+              id(${hp_id}), esphome::modbus::ModbusRegisterType::HOLDING, 2099, 1,
+              [=](esphome::modbus::ModbusRegisterType, uint16_t, const std::vector<uint8_t> &) {
+                id(${hp_id}_is_online) = true;
+              });
+          id(${hp_id}).queue_command(probe);
