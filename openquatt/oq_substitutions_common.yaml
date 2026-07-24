@@ -17,6 +17,7 @@ project_version: "v0.45.0"                            # ESPHome project version 
 release_channel: "main"                               # Firmware release channel shown in diagnostics (`main` or `dev`).
 oq_hardware_profile: "unknown"                        # Compile-time hardware profile id.
 oq_hardware_build_flag: "-DOQ_HARDWARE_HEATPUMP_CONTROLLER_Q=0" # Hardware capability flag for C++ lambdas.
+oq_boiler_transport_shutdown_extra: ""                 # Optional profile-specific synchronous actuator shutdown statements.
 oq_local_supply_temp_sensor_id: "water_supply_temp_ds18b20" # Profile-safe local supply-temperature sensor used by shared lambdas.
 oq_local_supply_temp_selector_id: "water_supply_source"     # Validation-safe placeholder outside Q profiles.
 oq_controller_flow_sensor_id: "hp1_flow"              # Profile-safe controller-flow source used by shared lambdas.
@@ -208,7 +209,8 @@ oq_water_cp_j_per_kgk: "4186.0"                       # Specific heat capacity o
 # BOILER CONTROL
 # ----------------------------
 oq_boiler_loop_s: "5"                                 # Main interval for boiler gating/safety loop [s].
-oq_boiler_command_max_age_s: "15"                     # Fail-safe maximum age of the transport-neutral boiler command [s].
+oq_boiler_command_max_age_s: "75"                     # Fail-safe command age; covers the 60s Power House cadence plus scheduler margin [s].
+oq_boiler_transport_settle_s: "2"                     # Break-before-make hold after changing R1/OpenTherm transport [s].
 oq_boiler_relay_min_on_s: "0"                         # R1 minimum on-time [s]; zero preserves existing relay behavior in foundation phase.
 oq_boiler_relay_min_off_s: "0"                        # R1 minimum off-time [s]; zero preserves existing relay behavior in foundation phase.
 oq_boiler_otb_min_on_s: "30"                          # OpenTherm minimum requested on-time [s]; safety trips override it.

@@ -17,6 +17,11 @@ globals:
     restore_value: false
     initial_value: 'false'
 
+  - id: oq_commissioning_boiler_request_updated_ms
+    type: uint32_t
+    restore_value: false
+    initial_value: '0'
+
   - id: oq_commissioning_result_w
     type: float
     restore_value: false

@@ -27,6 +27,8 @@ enum BlockReason : uint8_t {
   BLOCK_MIN_OFF_TIME = 10,
   BLOCK_TRANSPORT_UNAVAILABLE = 11,
   BLOCK_TARGET_INVALID = 12,
+  BLOCK_TRANSPORT_SETTLING = 13,
+  BLOCK_AWAITING_FRESH_COMMAND = 14,
 };
 
 struct BoilerCommand {
@@ -45,6 +47,8 @@ struct ControllerInput {
   bool boiler_inhibit_active;
   bool hard_trip_active;
   bool transport_available;
+  bool transport_settled;
+  bool command_rearmed;
   bool target_required;
   bool target_valid;
   bool output_active;
@@ -175,6 +179,35 @@ inline bool command_is_fresh(const BoilerCommand &command,
   return (uint32_t)(now_ms - command.updated_at_ms) <= max_age_ms;
 }
 
+inline bool strategy_output_is_current(bool output_valid,
+                                       uint8_t output_source,
+                                       uint8_t active_source,
+                                       uint32_t updated_at_ms) {
+  return output_valid && output_source == active_source && updated_at_ms != 0;
+}
+
+inline bool timestamp_is_strictly_newer(uint32_t candidate_ms,
+                                        uint32_t reference_ms) {
+  if (candidate_ms == 0 || candidate_ms == reference_ms) return false;
+  return static_cast<int32_t>(candidate_ms - reference_ms) > 0;
+}
+
+inline bool command_satisfies_rearm(bool rearm_required,
+                                    const BoilerCommand &command,
+                                    uint32_t reference_ms) {
+  return !rearm_required ||
+      (command.valid &&
+       timestamp_is_strictly_newer(command.updated_at_ms, reference_ms));
+}
+
+inline bool settle_period_elapsed(bool settle_required,
+                                  uint32_t now_ms,
+                                  uint32_t started_ms,
+                                  uint32_t settle_ms) {
+  return !settle_required || settle_ms == 0 ||
+      (uint32_t)(now_ms - started_ms) >= settle_ms;
+}
+
 inline bool minimum_time_active(uint32_t now_ms,
                                 uint32_t last_change_ms,
                                 uint32_t minimum_time_ms) {
@@ -211,10 +244,20 @@ inline ControllerDecision evaluate(const BoilerCommand &command,
     decision.force_off = true;
     decision.block_reason = BLOCK_SUPPLY_UNAVAILABLE;
   } else if (!command.demand_present) {
+    // Losing the owning control context (for example CM3 -> CM5) is not a
+    // normal anti-cycling stop. Withdraw heat immediately, even inside the
+    // configured minimum on-time.
+    decision.force_off = true;
     decision.block_reason = BLOCK_NO_HEAT_REQUEST;
+  } else if (!input.transport_settled) {
+    decision.force_off = true;
+    decision.block_reason = BLOCK_TRANSPORT_SETTLING;
   } else if (!input.transport_available) {
     decision.force_off = true;
     decision.block_reason = BLOCK_TRANSPORT_UNAVAILABLE;
+  } else if (!input.command_rearmed) {
+    decision.force_off = true;
+    decision.block_reason = BLOCK_AWAITING_FRESH_COMMAND;
   } else if (command.heat_request && input.target_required && !input.target_valid) {
     decision.force_off = true;
     decision.block_reason = BLOCK_TARGET_INVALID;
@@ -261,6 +304,8 @@ inline const char *block_reason_text(uint8_t reason) {
     case BLOCK_MIN_OFF_TIME: return "boiler minimum off-time active";
     case BLOCK_TRANSPORT_UNAVAILABLE: return "selected boiler transport unavailable";
     case BLOCK_TARGET_INVALID: return "boiler target temperature invalid";
+    case BLOCK_TRANSPORT_SETTLING: return "boiler transport change settling";
+    case BLOCK_AWAITING_FRESH_COMMAND: return "awaiting fresh boiler command";
     default: return "";
   }
 }

@@ -76,6 +76,31 @@ globals:
     restore_value: false
     initial_value: 'false'
 
+  - id: oq_boiler_transport_change_ms
+    type: uint32_t
+    restore_value: false
+    initial_value: '0'
+
+  - id: oq_boiler_transport_settle_required
+    type: bool
+    restore_value: false
+    initial_value: 'false'
+
+  - id: oq_boiler_rearm_required
+    type: bool
+    restore_value: false
+    initial_value: 'false'
+
+  - id: oq_boiler_rearm_after_command_ms
+    type: uint32_t
+    restore_value: false
+    initial_value: '0'
+
+  - id: oq_boiler_runtime_pause_state
+    type: bool
+    restore_value: false
+    initial_value: 'false'
+
   # Common declaration lets non-Q profiles compile the same controller. Only
   # the Q OpenTherm package can set this state true.
   - id: oq_otb_link_available_state
@@ -114,12 +139,19 @@ select:
               return;
             }
             const uint32_t now_ms = millis();
+            id(oq_boiler_transport_change_ms) = now_ms;
+            id(oq_boiler_transport_settle_required) = true;
+            id(oq_boiler_rearm_required) = true;
+            // A command can re-arm only when its originating strategy or
+            // commissioning authorization was evaluated after this edge.
+            id(oq_boiler_rearm_after_command_ms) = now_ms;
             if (id(oq_boiler_output_request)) {
               id(oq_boiler_output_request) = false;
               id(oq_boiler_output_last_change_ms) = now_ms;
             }
             id(oq_boiler_transport_active) = false;
             id(boiler_relay).turn_off();
+            ${oq_boiler_transport_shutdown_extra}
 
 # ----------------------------
 # R1 OUTPUT
@@ -304,6 +336,37 @@ text_sensor:
 # MAIN LOOP
 # ----------------------------
 interval:
+  - interval: 1s
+    startup_delay: 1s
+    then:
+      - lambda: |-
+          // Treat both entering and leaving a runtime pause as an actuator
+          // boundary. This prevents a command from before an OTA lifecycle
+          // edge from being replayed when polling resumes.
+          const bool paused = id(oq_runtime_polling_paused).state;
+          if (paused == id(oq_boiler_runtime_pause_state)) {
+            return;
+          }
+
+          const uint32_t now_ms = millis();
+          id(oq_boiler_runtime_pause_state) = paused;
+          id(oq_boiler_rearm_required) = true;
+          id(oq_boiler_rearm_after_command_ms) = now_ms;
+          if (id(oq_boiler_output_request)) {
+            id(oq_boiler_output_request) = false;
+            id(oq_boiler_output_last_change_ms) = now_ms;
+          }
+          id(oq_boiler_transport_active) = false;
+          id(oq_boiler_block_reason_code) = paused
+              ? oq_boiler::BLOCK_TRANSPORT_UNAVAILABLE
+              : oq_boiler::BLOCK_AWAITING_FRESH_COMMAND;
+          id(boiler_relay).turn_off();
+          ${oq_boiler_transport_shutdown_extra}
+          ESP_LOGI(
+              "quatt.boiler",
+              "Runtime polling %s; boiler outputs withdrawn until a fresh command",
+              paused ? "paused" : "resumed");
+
   - interval: ${oq_boiler_loop_s}s
     startup_delay: 4600ms
     then:
@@ -316,9 +379,24 @@ interval:
           const bool opentherm_selected =
               id(oq_boiler_connection).has_state() &&
               id(oq_boiler_connection).current_option() == "OpenTherm";
+          // The watcher state closes the scheduling edge on resume: if this
+          // slower loop runs before the watcher, it still cannot replay the
+          // pre-pause command.
+          const bool runtime_available =
+              !id(oq_runtime_polling_paused).state &&
+              !id(oq_boiler_runtime_pause_state);
           const bool transport_available =
-              !opentherm_selected ||
-              (${oq_otb_supported} && id(oq_otb_link_available_state));
+              runtime_available &&
+              (!opentherm_selected ||
+               (${oq_otb_supported} && id(oq_otb_link_available_state)));
+          const bool transport_settled = oq_boiler::settle_period_elapsed(
+              id(oq_boiler_transport_settle_required),
+              now_ms,
+              id(oq_boiler_transport_change_ms),
+              (uint32_t) (${oq_boiler_transport_settle_s} * 1000UL));
+          if (transport_settled && id(oq_boiler_transport_settle_required)) {
+            id(oq_boiler_transport_settle_required) = false;
+          }
           const float target_c = id(oq_boiler_command_target_temperature_c);
           const float boiler_flow_lph = id(flow_rate_selected).state;
           const bool boiler_flow_valid =
@@ -343,12 +421,21 @@ interval:
               id(oq_boiler_command_source_code),
               id(oq_boiler_command_updated_ms),
           };
+          const bool command_rearmed = oq_boiler::command_satisfies_rearm(
+              id(oq_boiler_rearm_required),
+              command,
+              id(oq_boiler_rearm_after_command_ms));
+          if (id(oq_boiler_rearm_required) && command_rearmed) {
+            id(oq_boiler_rearm_required) = false;
+          }
           const oq_boiler::ControllerInput input{
               id(oq_boiler_assist_enabled).state,
               has_valid_supply_temp,
               id(oq_water_temp_boiler_inhibit_active),
               id(oq_water_temp_hard_trip_active),
               transport_available,
+              transport_settled,
+              command_rearmed,
               opentherm_selected,
               target_valid,
               id(oq_boiler_output_request),
@@ -388,6 +475,8 @@ interval:
             if (decision.block_reason == oq_boiler::BLOCK_COMMAND_INVALID ||
                 decision.block_reason == oq_boiler::BLOCK_COMMAND_STALE ||
                 decision.block_reason == oq_boiler::BLOCK_TRANSPORT_UNAVAILABLE ||
+                decision.block_reason == oq_boiler::BLOCK_TRANSPORT_SETTLING ||
+                decision.block_reason == oq_boiler::BLOCK_AWAITING_FRESH_COMMAND ||
                 decision.block_reason == oq_boiler::BLOCK_TARGET_INVALID) {
               return openquatt_decision_log::REASON_SENSOR_FALLBACK;
             }

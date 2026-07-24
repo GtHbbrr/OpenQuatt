@@ -58,6 +58,23 @@ globals:
     restore_value: false
     initial_value: 'false'
 
+  # Freshness contract for consumers that may actuate independently of the
+  # strategy loop. Source codes match oq_strategy_active_code.
+  - id: oq_strategy_output_valid
+    type: bool
+    restore_value: false
+    initial_value: 'false'
+
+  - id: oq_strategy_output_source_code
+    type: uint8_t
+    restore_value: false
+    initial_value: '0'
+
+  - id: oq_strategy_output_updated_ms
+    type: uint32_t
+    restore_value: false
+    initial_value: '0'
+
   - id: oq_strategy_hp_expected_power_w
     type: float
     restore_value: false
@@ -112,6 +129,9 @@ select:
             id(oq_strategy_requested_power_w) = NAN;
             id(oq_strategy_supply_target_temp) = NAN;
             id(oq_strategy_heat_request_active) = false;
+            id(oq_strategy_output_valid) = false;
+            id(oq_strategy_output_source_code) = 0;
+            id(oq_strategy_output_updated_ms) = 0;
             id(oq_strategy_hp_expected_power_w) = NAN;
             id(oq_strategy_hp_max_power_w) = NAN;
             id(oq_strategy_hp_saturated) = false;

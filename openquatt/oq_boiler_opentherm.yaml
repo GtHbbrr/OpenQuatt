@@ -314,6 +314,8 @@ interval:
               !isnan(flow_lph) && flow_lph >= ${oq_cm_min_flow_lph};
           const bool command_active =
               opentherm_selected &&
+              !id(oq_runtime_polling_paused).state &&
+              !id(oq_boiler_runtime_pause_state) &&
               id(oq_otb_link_available_state) &&
               id(oq_boiler_output_request) &&
               target_valid &&
@@ -364,12 +366,36 @@ interval:
           id(otb_link_available).publish_state(available);
           ESP_LOGI("quatt.otb", "Boiler OpenTherm link %s", available ? "available" : "unavailable");
 
+          // Any link edge invalidates the last actuator decision. On loss this
+          // withdraws CH/TSet immediately; on recovery it prevents an old
+          // request from being replayed before the heating strategy runs again.
+          const bool opentherm_selected =
+              id(oq_boiler_connection).has_state() &&
+              id(oq_boiler_connection).current_option() == "OpenTherm";
+          if (opentherm_selected) {
+            if (id(oq_boiler_output_request)) {
+              id(oq_boiler_output_request) = false;
+              id(oq_boiler_output_last_change_ms) = now_ms;
+            }
+            id(oq_boiler_transport_active) = false;
+            id(oq_boiler_rearm_required) = true;
+            // Require an originating decision strictly after this link edge;
+            // a strategy result queued before the edge must not restart CH.
+            id(oq_boiler_rearm_after_command_ms) = now_ms;
+            id(oq_boiler_block_reason_code) = available
+                ? oq_boiler::BLOCK_AWAITING_FRESH_COMMAND
+                : oq_boiler::BLOCK_TRANSPORT_UNAVAILABLE;
+            id(oq_otb_ch_enable).turn_off();
+            if (!id(oq_otb_t_set_command).has_state() ||
+                fabsf(id(oq_otb_t_set_command).state) >= 0.05f) {
+              auto call = id(oq_otb_t_set_command).make_call();
+              call.set_value(0.0f);
+              call.perform();
+            }
+          }
+
           // Phase 2: prevent stale operational values from looking current after link loss.
           if (available) return;
-          if (id(oq_boiler_connection).has_state() &&
-              id(oq_boiler_connection).current_option() == "OpenTherm") {
-            id(oq_boiler_transport_active) = false;
-          }
           id(otb_fault_indication).publish_state(false);
           id(otb_ch_active).publish_state(false);
           id(otb_dhw_active).publish_state(false);

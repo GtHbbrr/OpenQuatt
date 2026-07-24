@@ -75,12 +75,23 @@ interval:
           if (cm_code == 3) {
             command.demand_present = true;
             const int strategy_code = id(oq_strategy_active_code);
+            const uint32_t strategy_updated_ms = id(oq_strategy_output_updated_ms);
+            const bool strategy_output_current =
+                oq_boiler::strategy_output_is_current(
+                    id(oq_strategy_output_valid),
+                    id(oq_strategy_output_source_code),
+                    (uint8_t) strategy_code,
+                    strategy_updated_ms);
+            // A CM3 command inherits the strategy decision timestamp. Re-running
+            // dispatch alone must never make stale strategy output look fresh.
+            command.updated_at_ms = strategy_updated_ms;
             if (strategy_code == 3) {
               command.source = oq_boiler::COMMAND_SOURCE_POWER_HOUSE;
               const float strategy_requested_w = id(oq_strategy_requested_power_w);
               const float hp_expected_w = id(oq_strategy_hp_expected_power_w);
               const float rated_boiler_w = id(oq_boiler_rated_heat_power).state;
               command.valid =
+                  strategy_output_current &&
                   !isnan(strategy_requested_w) &&
                   !isnan(hp_expected_w) &&
                   !isnan(rated_boiler_w) &&
@@ -116,6 +127,7 @@ interval:
               }
             } else if (strategy_code == 2) {
               command.source = oq_boiler::COMMAND_SOURCE_HEATING_CURVE;
+              command.valid = strategy_output_current;
               command.heat_request = id(oq_strategy_heat_request_active);
               command.requested_power_w = NAN;
               command.target_temperature_c = id(oq_strategy_supply_target_temp);
@@ -128,6 +140,10 @@ interval:
             command.requested_power_w = id(oq_boiler_rated_heat_power).state;
             command.target_temperature_c = id(max_water_temp_limit_c).state;
             command.source = oq_boiler::COMMAND_SOURCE_COMMISSIONING;
+            // Keep the authorization timestamp stable. A dispatcher pass is
+            // not a fresh commissioning decision and must not re-arm the
+            // boiler after a transport or OpenTherm link edge.
+            command.updated_at_ms = id(oq_commissioning_boiler_request_updated_ms);
           }
 
           // Phase 2: publish atomically before the controller interval evaluates it.
