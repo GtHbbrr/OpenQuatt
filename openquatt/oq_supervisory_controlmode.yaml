@@ -1321,8 +1321,24 @@ interval:
               const bool boiler_transport_available =
                   !opentherm_selected ||
                   (${oq_otb_supported} && id(oq_otb_link_available_state));
+              const bool strategy_output_current =
+                  oq_boiler::strategy_output_is_current(
+                      id(oq_strategy_output_valid),
+                      id(oq_strategy_output_source_code),
+                      (uint8_t) strategy_active_code,
+                      id(oq_strategy_output_updated_ms));
+              const float rated_boiler_w = id(oq_boiler_rated_heat_power).state;
+              const bool boiler_strategy_command_available =
+                  strategy_output_current &&
+                  (!power_house_active ||
+                   (!isnan(id(oq_strategy_requested_power_w)) &&
+                    !isnan(id(oq_strategy_hp_expected_power_w)) &&
+                    !isnan(rated_boiler_w) &&
+                    rated_boiler_w > 0.0f));
               const bool boiler_assist_available =
-                  boiler_assist_enabled && boiler_transport_available;
+                  boiler_assist_enabled &&
+                  boiler_transport_available &&
+                  boiler_strategy_command_available;
               if (heating_strategy_active && boiler_assist_available) {
                 bool need_on = false;
                 bool ok_off = true;
@@ -1421,6 +1437,42 @@ interval:
           };
           const int desired = resolve_desired_cm();
           const char* desired_cm = cm_code_to_id(desired);
+          const bool next_mode_owns_boiler =
+              desired == 3 ||
+              (desired == 100 &&
+               id(oq_commissioning_active) &&
+               id(oq_commissioning_task_code) ==
+                   oq_commissioning::TASK_BOILER_POWER_TEST);
+          const bool current_mode_owns_boiler =
+              strcmp(cur_cm, "CM3") == 0 ||
+              (strcmp(cur_cm, "CM100") == 0 &&
+               (id(oq_boiler_command_source_code) ==
+                    oq_boiler::COMMAND_SOURCE_COMMISSIONING ||
+                id(oq_boiler_output_request)));
+          if (!next_mode_owns_boiler &&
+              (current_mode_owns_boiler || id(oq_boiler_output_request))) {
+            // Withdraw at the ownership edge itself. The staggered dispatcher
+            // must not leave R1 or OpenTherm honoring the previous mode for up
+            // to another boiler-control cadence.
+            id(oq_boiler_command_valid) = false;
+            id(oq_boiler_command_demand_present) = false;
+            id(oq_boiler_command_heat_request) = false;
+            id(oq_boiler_command_requested_power_w) = NAN;
+            id(oq_boiler_command_target_temperature_c) = NAN;
+            id(oq_boiler_command_source_code) =
+                oq_boiler::COMMAND_SOURCE_NONE;
+            id(oq_boiler_command_updated_ms) = now_ms;
+            if (id(oq_boiler_output_request)) {
+              id(oq_boiler_output_last_change_ms) = now_ms;
+            }
+            id(oq_boiler_output_request) = false;
+            id(oq_boiler_output_target_temperature_c) = NAN;
+            id(oq_boiler_transport_active) = false;
+            id(oq_boiler_block_reason_code) =
+                oq_boiler::BLOCK_NO_HEAT_REQUEST;
+            id(boiler_relay).turn_off();
+            ${oq_boiler_transport_shutdown_extra}
+          }
           id(oq_control_mode_code) = desired;
           const bool cooling_preflow =
               desired == 1 && (cooling_req || id(oq_cm1_next_after) == 5);

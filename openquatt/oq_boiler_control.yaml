@@ -48,6 +48,7 @@ esphome:
           id(oq_boiler_command_valid) = false;
           id(oq_boiler_command_heat_request) = false;
           id(oq_boiler_output_request) = false;
+          id(oq_boiler_output_target_temperature_c) = NAN;
           id(oq_boiler_transport_active) = false;
           id(oq_boiler_block_reason_code) = oq_boiler::BLOCK_COMMAND_INVALID;
       - switch.turn_off: boiler_relay
@@ -70,6 +71,11 @@ globals:
     type: uint32_t
     restore_value: false
     initial_value: '0'
+
+  - id: oq_boiler_output_target_temperature_c
+    type: float
+    restore_value: false
+    initial_value: 'NAN'
 
   - id: oq_boiler_transport_active
     type: bool
@@ -149,6 +155,7 @@ select:
               id(oq_boiler_output_request) = false;
               id(oq_boiler_output_last_change_ms) = now_ms;
             }
+            id(oq_boiler_output_target_temperature_c) = NAN;
             id(oq_boiler_transport_active) = false;
             id(boiler_relay).turn_off();
             ${oq_boiler_transport_shutdown_extra}
@@ -337,37 +344,6 @@ text_sensor:
 # MAIN LOOP
 # ----------------------------
 interval:
-  - interval: 1s
-    startup_delay: 1s
-    then:
-      - lambda: |-
-          // Treat both entering and leaving a runtime pause as an actuator
-          // boundary. This prevents a command from before an OTA lifecycle
-          // edge from being replayed when polling resumes.
-          const bool paused = id(oq_runtime_polling_paused).state;
-          if (paused == id(oq_boiler_runtime_pause_state)) {
-            return;
-          }
-
-          const uint32_t now_ms = millis();
-          id(oq_boiler_runtime_pause_state) = paused;
-          id(oq_boiler_rearm_required) = true;
-          id(oq_boiler_rearm_after_command_ms) = now_ms;
-          if (id(oq_boiler_output_request)) {
-            id(oq_boiler_output_request) = false;
-            id(oq_boiler_output_last_change_ms) = now_ms;
-          }
-          id(oq_boiler_transport_active) = false;
-          id(oq_boiler_block_reason_code) = paused
-              ? oq_boiler::BLOCK_TRANSPORT_UNAVAILABLE
-              : oq_boiler::BLOCK_AWAITING_FRESH_COMMAND;
-          id(boiler_relay).turn_off();
-          ${oq_boiler_transport_shutdown_extra}
-          ESP_LOGI(
-              "quatt.boiler",
-              "Runtime polling %s; boiler outputs withdrawn until a fresh command",
-              paused ? "paused" : "resumed");
-
   - interval: ${oq_boiler_loop_s}s
     startup_delay: 4600ms
     then:
@@ -460,6 +436,16 @@ interval:
           if (boiler_output_changed) {
             id(oq_boiler_output_last_change_ms) = now_ms;
           }
+          // A minimum-on hold keeps the last validated target even after the
+          // strategy withdraws its current command target.
+          id(oq_boiler_output_target_temperature_c) =
+              oq_boiler::effective_output_target(
+                  decision.output_active,
+                  opentherm_selected,
+                  decision.desired_active,
+                  target_valid,
+                  target_c,
+                  id(oq_boiler_output_target_temperature_c));
           id(oq_boiler_block_reason_code) = decision.block_reason;
 
           // Phase 2: map the transport-neutral decision to existing decision-log semantics.

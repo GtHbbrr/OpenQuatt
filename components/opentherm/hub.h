@@ -63,6 +63,7 @@ class OpenthermHub final : public Component {
   OPENTHERM_SETTING_LIST(OPENTHERM_DECLARE_SETTING, )
 
   bool sending_initial_ = true;
+  bool priority_sequence_active_ = false;
   std::unordered_map<MessageId, uint8_t> configured_messages_;
   std::vector<MessageId> messages_;
   std::vector<MessageId>::const_iterator message_iterator_;
@@ -158,6 +159,9 @@ class OpenthermHub final : public Component {
   void set_summer_mode_active(bool value) { this->summer_mode_active = value; }
   void set_dhw_block(bool value) { this->dhw_block = value; }
   void set_sync_mode(bool sync_mode) { this->sync_mode_ = sync_mode; }
+
+  void prioritize_messages(MessageId first, MessageId second);
+  void resume_polling();
 
   template<typename F> void add_on_before_send_callback(F &&callback) {
     this->before_send_callback_.add(std::forward<F>(callback));

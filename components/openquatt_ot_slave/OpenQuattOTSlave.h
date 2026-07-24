@@ -50,6 +50,7 @@ namespace esphome {
 			void set_cooling_enable(bool bCoolingEnable) { m_master_state.cooling_enable = bCoolingEnable; }
 			void set_slave_fault(bool value) { m_slave_state.fault = value; }
 			void set_slave_ch_active(bool value) { m_slave_state.ch_active = value; }
+			void set_slave_dhw_present(bool value) { m_slave_state.dhw_present = value; }
 			void set_slave_dhw_active(bool value) { m_slave_state.dhw_active = value; }
 			void set_slave_flame_on(bool value) { m_slave_state.flame_on = value; }
 			void set_slave_cooling_active(bool value) { m_slave_state.cooling_active = value; }
@@ -118,6 +119,7 @@ namespace esphome {
 				struct SlaveState {
 					bool fault = false;
 					bool ch_active = false;
+					bool dhw_present = false;
 					bool dhw_active = false;
 					bool flame_on = false;
 					bool cooling_active = false;

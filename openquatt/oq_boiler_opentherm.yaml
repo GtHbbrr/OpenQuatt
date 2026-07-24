@@ -65,6 +65,11 @@ globals:
     restore_value: false
     initial_value: 'false'
 
+  - id: oq_otb_applied_command_active
+    type: bool
+    restore_value: false
+    initial_value: 'false'
+
 opentherm:
   - id: oq_otb_hub
     in_pin: ${oq_ot_boiler_in_pin}
@@ -182,6 +187,9 @@ script:
           call.perform();
 
           if (!can_confirm) return;
+          id(oq_otb_hub).prioritize_messages(
+              esphome::opentherm::MessageId::STATUS,
+              esphome::opentherm::MessageId::CH_SETPOINT);
 
           // Phase 2: advance only the OT hub until both off requests are
           // acknowledged or the bounded shutdown budget is exhausted.
@@ -212,6 +220,38 @@ script:
                 YESNO(oq_otb::off_flush_state.setpoint_zero_acknowledged()));
           }
           oq_otb::off_flush_state.end();
+
+  - id: oq_otb_invalidate_telemetry
+    mode: restart
+    then:
+      - lambda: |-
+          // Invalidate every binary capability, activity and fault field.
+          id(otb_fault_indication).invalidate_state();
+          id(otb_ch_active).invalidate_state();
+          id(otb_dhw_active).invalidate_state();
+          id(otb_flame_on).invalidate_state();
+          id(otb_diagnostic_indication).invalidate_state();
+          id(otb_dhw_present).invalidate_state();
+          id(otb_service_request).invalidate_state();
+          id(otb_lockout_reset).invalidate_state();
+          id(otb_low_water_pressure).invalidate_state();
+          id(otb_flame_fault).invalidate_state();
+          id(otb_air_pressure_fault).invalidate_state();
+          id(otb_water_over_temp).invalidate_state();
+          // Publish unknown for every numeric operational and identity field.
+          id(otb_relative_modulation).publish_state(NAN);
+          id(otb_ch_pressure).publish_state(NAN);
+          id(otb_boiler_water_temp).publish_state(NAN);
+          id(otb_return_water_temp).publish_state(NAN);
+          id(otb_dhw_temp).publish_state(NAN);
+          id(otb_oem_fault_code).publish_state(NAN);
+          id(otb_oem_diagnostic_code).publish_state(NAN);
+          id(otb_max_capacity).publish_state(NAN);
+          id(otb_min_modulation).publish_state(NAN);
+          id(otb_opentherm_version).publish_state(NAN);
+          id(otb_device_type).publish_state(NAN);
+          id(otb_device_version).publish_state(NAN);
+          id(oq_boiler_transport_active) = false;
 
 number:
   - platform: opentherm
@@ -625,7 +665,7 @@ interval:
           const bool opentherm_selected =
               id(oq_boiler_connection).has_state() &&
               id(oq_boiler_connection).current_option() == "OpenTherm";
-          const float target_c = id(oq_boiler_command_target_temperature_c);
+          const float target_c = id(oq_boiler_output_target_temperature_c);
           const bool target_valid =
               !isnan(target_c) && target_c > 0.0f && target_c <= 90.0f;
           const float flow_lph = id(flow_rate_selected).state;
@@ -644,6 +684,29 @@ interval:
               id(oq_boiler_output_request) &&
               target_valid &&
               flow_valid;
+          const bool applied_stop =
+              id(oq_otb_applied_command_active) && !command_active;
+
+          if (applied_stop && id(oq_boiler_output_request)) {
+            // A fast adapter gate (most notably transient flow loss) may stop
+            // the physical OpenTherm request between controller evaluations.
+            // Make that real stop visible to the central anti-cycling state.
+            id(oq_boiler_output_request) = false;
+            id(oq_boiler_output_target_temperature_c) = NAN;
+            id(oq_boiler_output_last_change_ms) = millis();
+            id(oq_boiler_block_reason_code) =
+                flow_valid && target_valid
+                    ? oq_boiler::BLOCK_TRANSPORT_UNAVAILABLE
+                    : oq_boiler::BLOCK_TARGET_INVALID;
+          }
+          if (applied_stop && opentherm_selected &&
+              id(oq_otb_link_available_state)) {
+            // Put both physical off frames ahead of non-control telemetry.
+            // The hub restores its normal repeating sequence afterwards.
+            id(oq_otb_hub).prioritize_messages(
+                esphome::opentherm::MessageId::STATUS,
+                esphome::opentherm::MessageId::CH_SETPOINT);
+          }
 
           if (command_active) {
             if (!id(oq_otb_t_set_command).has_state() ||
@@ -662,6 +725,7 @@ interval:
               call.perform();
             }
           }
+          id(oq_otb_applied_command_active) = command_active;
 
           id(oq_boiler_transport_active) =
               opentherm_selected &&
@@ -698,6 +762,9 @@ interval:
             id(otb_diagnostic_indication).invalidate_state();
             id(oq_boiler_transport_active) = false;
           }
+          if (field_is_stale(oq_otb::FIELD_DEVICE_CONFIG)) {
+            id(otb_dhw_present).invalidate_state();
+          }
           if (field_is_stale(oq_otb::FIELD_FAULT_FLAGS)) {
             id(otb_service_request).invalidate_state();
             id(otb_lockout_reset).invalidate_state();
@@ -725,6 +792,17 @@ interval:
           if (field_is_stale(oq_otb::FIELD_OEM_DIAGNOSTIC)) {
             invalidate_sensor(id(otb_oem_diagnostic_code));
           }
+          if (field_is_stale(oq_otb::FIELD_MAX_BOILER_CAPACITY)) {
+            invalidate_sensor(id(otb_max_capacity));
+            invalidate_sensor(id(otb_min_modulation));
+          }
+          if (field_is_stale(oq_otb::FIELD_OT_VERSION_DEVICE)) {
+            invalidate_sensor(id(otb_opentherm_version));
+          }
+          if (field_is_stale(oq_otb::FIELD_VERSION_DEVICE)) {
+            invalidate_sensor(id(otb_device_type));
+            invalidate_sensor(id(otb_device_version));
+          }
 
   - interval: ${oq_otb_link_watch_s}s
     startup_delay: 2s
@@ -735,6 +813,9 @@ interval:
           // STATUS (ID 0) is mandatory and control-critical. Optional fields
           // may be unsupported without taking down the link, but an invalid or
           // stale STATUS response means the transport is not safe to actuate.
+          oq_otb::telemetry_state.expire_response_session_if_stale(
+              now_ms,
+              (uint32_t) (${oq_otb_link_timeout_s} * 1000UL));
           const bool available =
               oq_otb::telemetry_state.transport_is_available(
                   now_ms,
@@ -757,10 +838,13 @@ interval:
               id(oq_boiler_connection).has_state() &&
               id(oq_boiler_connection).current_option() == "OpenTherm";
           if (opentherm_selected) {
+            id(oq_boiler_transport_change_ms) = now_ms;
+            id(oq_boiler_transport_settle_required) = true;
             if (id(oq_boiler_output_request)) {
               id(oq_boiler_output_request) = false;
               id(oq_boiler_output_last_change_ms) = now_ms;
             }
+            id(oq_boiler_output_target_temperature_c) = NAN;
             id(oq_boiler_transport_active) = false;
             id(oq_boiler_rearm_required) = true;
             // Require an originating decision strictly after this link edge;
@@ -780,21 +864,4 @@ interval:
 
           // Phase 2: prevent stale operational values from looking current after link loss.
           if (available) return;
-          id(otb_fault_indication).invalidate_state();
-          id(otb_ch_active).invalidate_state();
-          id(otb_dhw_active).invalidate_state();
-          id(otb_flame_on).invalidate_state();
-          id(otb_diagnostic_indication).invalidate_state();
-          id(otb_service_request).invalidate_state();
-          id(otb_lockout_reset).invalidate_state();
-          id(otb_low_water_pressure).invalidate_state();
-          id(otb_flame_fault).invalidate_state();
-          id(otb_air_pressure_fault).invalidate_state();
-          id(otb_water_over_temp).invalidate_state();
-          id(otb_relative_modulation).publish_state(NAN);
-          id(otb_ch_pressure).publish_state(NAN);
-          id(otb_boiler_water_temp).publish_state(NAN);
-          id(otb_return_water_temp).publish_state(NAN);
-          id(otb_dhw_temp).publish_state(NAN);
-          id(otb_oem_fault_code).publish_state(NAN);
-          id(otb_oem_diagnostic_code).publish_state(NAN);
+          id(oq_otb_invalidate_telemetry).execute();

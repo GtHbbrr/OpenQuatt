@@ -97,6 +97,24 @@ class TelemetryState {
     return state.valid && (uint32_t) (now_ms - state.last_valid_ms) <= max_age_ms;
   }
 
+  bool expire_response_session_if_stale(
+      uint32_t now_ms, uint32_t max_age_ms) {
+    if (!this->session_has_response_ ||
+        (uint32_t) (now_ms - this->last_response_ms_) <= max_age_ms) {
+      return false;
+    }
+
+    // Latch expiry before millis() can make a full 32-bit revolution. Without
+    // this state transition, an unattended disconnected bus could appear
+    // fresh again for one timeout window after roughly 49.7 days.
+    this->session_has_response_ = false;
+    this->last_response_ms_ = 0;
+    for (auto &field : this->fields_) {
+      field.valid = false;
+    }
+    return true;
+  }
+
   bool response_payload_is_usable(uint8_t message_id, uint8_t message_type) const {
     // Every field tracked by this helper is requested as READ_DATA. A
     // syntactically valid WRITE_ACK for such an ID must not reach ESPHome's

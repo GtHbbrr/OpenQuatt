@@ -161,6 +161,27 @@ void OpenthermHub::setup() {
 
 void OpenthermHub::on_shutdown() { this->opentherm_->stop(); }
 
+void OpenthermHub::prioritize_messages(MessageId first, MessageId second) {
+  this->opentherm_->stop();
+  this->messages_ = {first, second};
+  this->message_iterator_ = this->messages_.begin();
+  this->sending_initial_ = false;
+  this->priority_sequence_active_ = true;
+  this->last_conversation_start_ = 0;
+  this->last_conversation_end_ = 0;
+}
+
+void OpenthermHub::resume_polling() {
+  this->opentherm_->stop();
+  this->sending_initial_ = true;
+  this->priority_sequence_active_ = false;
+  this->write_initial_messages_(this->messages_);
+  this->message_iterator_ = this->messages_.begin();
+  this->last_conversation_start_ = 0;
+  this->last_conversation_end_ = 0;
+  this->enable_loop();
+}
+
 // Disabling clang-tidy for this particular line since it keeps removing the trailing underscore (bug?)
 void OpenthermHub::write_initial_messages_(std::vector<MessageId> &target) {  // NOLINT
   std::vector<std::pair<MessageId, uint8_t>> sorted;
@@ -339,7 +360,11 @@ bool OpenthermHub::should_skip_loop_(uint32_t cur_time) const {
 
 void OpenthermHub::start_conversation_() {
   if (this->message_iterator_ == this->messages_.end()) {
-    if (this->sending_initial_) {
+    if (this->priority_sequence_active_) {
+      this->priority_sequence_active_ = false;
+      this->sending_initial_ = false;
+      this->write_repeating_messages_(this->messages_);
+    } else if (this->sending_initial_) {
       this->sending_initial_ = false;
       this->write_repeating_messages_(this->messages_);
     }
