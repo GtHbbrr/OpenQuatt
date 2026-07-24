@@ -6,18 +6,21 @@ substitutions:
   oq_hardware_build_flag: "-DOQ_HARDWARE_HEATPUMP_CONTROLLER_Q=1" # Enable Q-only local sensor paths.
   oq_otb_supported: "true"                             # GPIO47/GPIO48 provide the boiler OpenTherm master transport.
   oq_boiler_transport_selection_extra: |-
-    oq_otb::telemetry_state.reset_link_session();
-    id(oq_otb_link_initialized) = true;
-    id(oq_otb_link_available_state) = false;
-    id(otb_link_available).publish_state(false);
+    // Preserve the old session until a leaving-OpenTherm off flush has had
+    // its bounded acknowledgement opportunity.
     if (id(oq_otb_hub_ready)) {
       if (x == "OpenTherm") {
         id(oq_otb_hub).enable_loop();
       } else {
+        id(oq_otb_withdraw_and_flush).execute();
         id(oq_otb_hub).on_shutdown();
         id(oq_otb_hub).disable_loop();
       }
     }
+    oq_otb::telemetry_state.reset_link_session();
+    id(oq_otb_link_initialized) = true;
+    id(oq_otb_link_available_state) = false;
+    id(otb_link_available).publish_state(false);
   oq_boiler_transport_shutdown_extra: "id(oq_otb_ch_enable).turn_off(); { auto call = id(oq_otb_t_set_command).make_call(); call.set_value(0.0f); call.perform(); }" # Withdraw OTB synchronously on every transport edge.
   oq_local_supply_temp_sensor_id: "water_supply_temp_pt1000" # Q-edition local PT1000 source.
   oq_local_supply_temp_selector_id: "oq_local_supply_temp_source" # Explicit local physical-sensor selection.

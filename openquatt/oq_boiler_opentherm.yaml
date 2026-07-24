@@ -38,12 +38,10 @@ esphome:
     priority: 700
     then:
       - lambda: |-
-          // Best-effort normal shutdown handshake. Hard power loss remains
-          // inherently fail-silent because no OpenTherm requests are sent.
-          id(oq_otb_ch_enable).turn_off();
-          auto call = id(oq_otb_t_set_command).make_call();
-          call.set_value(0.0f);
-          call.perform();
+          // A normal shutdown gets one bounded opportunity to deliver and
+          // acknowledge STATUS(CH=off) plus TSet=0 before the hub is stopped.
+          // Hard power loss remains inherently fail-silent.
+          id(oq_otb_withdraw_and_flush).execute();
           id(oq_boiler_transport_active) = false;
 
 logger:
@@ -84,6 +82,11 @@ opentherm:
     ch2_active: false
     summer_mode_active: false
     dhw_block: false
+    before_send:
+      then:
+        - lambda: |-
+            oq_otb::off_flush_state.record_request(
+                x.id, x.type, x.valueHB, x.valueLB);
     before_process_response:
       then:
         - lambda: |-
@@ -93,6 +96,8 @@ opentherm:
             // entities and hide the frame from ESPHome's payload-only processor.
             const uint8_t response_id = x.id;
             const uint8_t response_type = x.type;
+            oq_otb::off_flush_state.record_response(
+                response_id, response_type, x.valueHB, x.valueLB);
             oq_otb::telemetry_state.record_response(
                 millis(), response_id, response_type);
 
@@ -153,6 +158,60 @@ opentherm:
                 break;
             }
             x.id = 0xFF;
+
+script:
+  - id: oq_otb_withdraw_and_flush
+    mode: single
+    then:
+      - lambda: |-
+          // Phase 1: withdraw the local command before sending any new frame.
+          // A fresh link is the runtime proof that the hub can converse.
+          // Component::is_in_loop_state() is deliberately not used here:
+          // runtime transport gating can report LOOP_DONE during this edge
+          // even though the active session still needs its final off frames.
+          const bool can_confirm =
+              id(oq_otb_hub_ready) &&
+              id(oq_otb_link_available_state);
+          if (can_confirm) {
+            oq_otb::off_flush_state.begin();
+          }
+
+          id(oq_otb_ch_enable).turn_off();
+          auto call = id(oq_otb_t_set_command).make_call();
+          call.set_value(0.0f);
+          call.perform();
+
+          if (!can_confirm) return;
+
+          // Phase 2: advance only the OT hub until both off requests are
+          // acknowledged or the bounded shutdown budget is exhausted.
+          constexpr uint32_t flush_timeout_ms = 3500;
+          const uint32_t started_ms = millis();
+          while (!oq_otb::off_flush_state.complete() &&
+                 (uint32_t) (millis() - started_ms) < flush_timeout_ms) {
+            id(oq_otb_hub).loop();
+            App.feed_wdt();
+            delay(1);
+          }
+
+          // Phase 3: retain a clear diagnostic without blocking shutdown.
+          const uint32_t elapsed_ms =
+              (uint32_t) (millis() - started_ms);
+          if (oq_otb::off_flush_state.complete()) {
+            ESP_LOGI(
+                "quatt.boiler",
+                "OpenTherm off handshake acknowledged in %u ms",
+                (unsigned) elapsed_ms);
+          } else {
+            ESP_LOGW(
+                "quatt.boiler",
+                "OpenTherm off handshake timed out after %u ms "
+                "(STATUS=%s, TSet=%s)",
+                (unsigned) elapsed_ms,
+                YESNO(oq_otb::off_flush_state.status_off_acknowledged()),
+                YESNO(oq_otb::off_flush_state.setpoint_zero_acknowledged()));
+          }
+          oq_otb::off_flush_state.end();
 
 number:
   - platform: opentherm
