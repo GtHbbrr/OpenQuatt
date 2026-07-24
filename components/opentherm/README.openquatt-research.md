@@ -7,7 +7,8 @@ the source stays byte-for-byte equal to ESPHome 2026.7.0:
 - `__init__.py`: include the ESP-IDF RMT driver;
 - `hub.cpp`: service completed RMT frames from normal and synchronous loops;
 - `opentherm.cpp` and `opentherm.h`: ESP32 RMT capture, bounded hand-off,
-  timeout arbitration and diagnostics;
+  timeout arbitration, diagnostics and an explicit idle master-output level
+  when an in-flight conversation is stopped;
 - `opentherm_rmt_decoder.h`: the host-testable Manchester decoder.
 
 The full component, including the `output` platform, is deliberately present:
@@ -52,6 +53,13 @@ only master timeout correlated one-to-one with a simulator
 commissioning command and two controlled response-loss intervals also
 validated OT actuation, R1 exclusion, link-loss withdrawal, simulator watchdog
 shutdown, recovery at CH off/TSet 0 and the 120-second minimum off time.
+
+Runtime route changes can stop a conversation between Manchester half-bits.
+The built-in `OpenTherm::stop()` stops the timer but does not restore the output
+pin. This candidate explicitly drives the same idle-high level used during
+initialization, so disabling the hub cannot leave the digital master output at
+an asserted half-bit. This is physical fail-silent behavior; it does not claim
+that the boiler acknowledged a final CH-off frame.
 
 This remains a separate draft candidate, not a release-ready dependency fork.
 Preferred disposition is an upstream ESPHome fix followed by removal of this

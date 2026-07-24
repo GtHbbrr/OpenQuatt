@@ -132,6 +132,10 @@ void OpenTherm::stop() {
 #ifdef USE_ESP32
   this->cancel_esp32_rmt_();
 #endif
+  // A runtime transport change can stop an in-flight request. Always restore
+  // the master output to its initialized idle level instead of leaving the
+  // final Manchester half-bit asserted on the physical interface.
+  this->out_pin_->digital_write(true);
   this->mode_ = OperationMode::IDLE;
 }
 
