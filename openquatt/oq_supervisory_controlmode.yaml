@@ -1363,6 +1363,8 @@ interval:
                       if (id(oq_cm3_need_since_ms) == 0) id(oq_cm3_need_since_ms) = now_ms;
                       if (now_ms - id(oq_cm3_need_since_ms) >= T_ON_MS) {
                         desired_local = 3;
+                        id(oq_cm3_need_since_ms) = 0;
+                        id(oq_cm3_demote_since_ms) = 0;
                         cm_transition_reason = promote_reason;
                       }
                     } else {
@@ -1370,16 +1372,30 @@ interval:
                     }
                   }
                 } else if (cm_now == 3) {
-                  if (now_ms - id(oq_cm_last_change_ms) >= MIN_CM3_MS) {
+                  const bool minimum_run_elapsed =
+                      now_ms - id(oq_cm_last_change_ms) >= MIN_CM3_MS;
+                  bool demote_confirmation_elapsed = false;
+                  if (minimum_run_elapsed) {
                     if (ok_off) {
                       if (id(oq_cm3_demote_since_ms) == 0) id(oq_cm3_demote_since_ms) = now_ms;
-                      if (now_ms - id(oq_cm3_demote_since_ms) >= T_OFF_MS) {
-                        desired_local = 2;
-                        cm_transition_reason = demote_reason;
-                      }
+                      demote_confirmation_elapsed =
+                          now_ms - id(oq_cm3_demote_since_ms) >= T_OFF_MS;
                     } else {
                       id(oq_cm3_demote_since_ms) = 0;
                     }
+                  } else {
+                    id(oq_cm3_demote_since_ms) = 0;
+                  }
+                  if (oq_boiler::cm3_should_hold(
+                          minimum_run_elapsed,
+                          ok_off,
+                          demote_confirmation_elapsed)) {
+                    desired_local = 3;
+                  } else {
+                    desired_local = 2;
+                    id(oq_cm3_need_since_ms) = 0;
+                    id(oq_cm3_demote_since_ms) = 0;
+                    cm_transition_reason = demote_reason;
                   }
                 } else {
                   id(oq_cm3_need_since_ms) = 0;

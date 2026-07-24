@@ -94,6 +94,12 @@ inline AssistSignal heating_curve_assist(bool heat_request,
   };
 }
 
+inline bool cm3_should_hold(bool minimum_run_elapsed,
+                            bool okay_off,
+                            bool demote_confirmation_elapsed) {
+  return !minimum_run_elapsed || !okay_off || !demote_confirmation_elapsed;
+}
+
 inline PowerTarget target_from_power(float requested_power_w,
                                      float rated_power_w,
                                      float inlet_temperature_c,
