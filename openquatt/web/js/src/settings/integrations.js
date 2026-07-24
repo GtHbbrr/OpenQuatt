@@ -12,13 +12,15 @@ import { escapeHtml } from "../core/html.js";
     const hasOpenThermConfig = hasEntity("otEnabled");
     const hasCicConfig = hasEntity("cicPollingEnabled") || hasEntity("cicFeedUrl");
     const hasCicCompatibilityConfig = hasEntity("cicCompatibilityMode");
-    const hasStatus = hasEntity("otLinkProblem") || hasEntity("cicDataStale") || hasEntity("cicJsonFeedOk");
+    const hasStatus = hasEntity("otLinkProblem") || hasEntity("otbLinkAvailable") || hasEntity("boilerCommandValid") || hasEntity("cicDataStale") || hasEntity("cicJsonFeedOk");
     if (!hasOpenThermConfig && !hasCicConfig && !hasCicCompatibilityConfig && !hasStatus) {
       return "";
     }
 
     const cicPollingEnabled = isInstallationMonitoringIntegrationEnabled("cicPollingEnabled");
     const otEnabled = isInstallationMonitoringIntegrationEnabled("otEnabled");
+    const boilerConnection = String(getEntityValue("boilerConnection") || "R1");
+    const otbSelected = boilerConnection === "OpenTherm";
     const renderDiagnosticItem = ({ label, value, active = false }) => `
       <div class="oq-settings-integration-diagnostic-item${active ? " is-warning" : ""}">
         <dt>${escapeHtml(label)}</dt>
@@ -34,7 +36,7 @@ import { escapeHtml } from "../core/html.js";
       return renderDiagnosticItem({
         label,
         value: active ? activeLabel : inactiveLabel,
-        active: options.warningWhenActive ? active : false,
+        active: (options.warningWhenActive && active) || (options.warningWhenInactive && !active),
       });
     };
 
@@ -84,20 +86,72 @@ import { escapeHtml } from "../core/html.js";
       </article>
     ` : "";
 
-    const otDiagnosticPanel = renderDiagnosticGroup("OpenTherm", [
+    const otDiagnosticPanel = renderDiagnosticGroup("OpenTherm thermostaat (OTT)", [
       hasEntity("otLinkProblem") ? renderDiagnosticItem({
-        label: "OT-link",
+        label: "Thermostaatlink",
         value: !otEnabled
           ? "Uitgeschakeld"
           : isInstallationMonitoringBinaryActive("otLinkProblem") ? "Probleem" : "OK",
         active: otEnabled && isInstallationMonitoringBinaryActive("otLinkProblem"),
       }) : "",
+      renderBinaryDiagnosticItem("otThermostatStatusValid", "Status geldig", "Ja", "Nee"),
       renderBinaryDiagnosticItem("otThermostatChEnable", "Thermostaat CH", "Actief", "Normaal"),
       renderBinaryDiagnosticItem("otThermostatCoolingEnable", "Thermostaat koeling", "Actief", "Normaal"),
       renderValueDiagnosticItem("otControlSetpoint", "Control setpoint"),
       renderValueDiagnosticItem("otRoomSetpoint", "Room setpoint", { fallbackKey: "roomSetpoint" }),
       renderValueDiagnosticItem("otRoomTemp", "Room temperature", { fallbackKey: "roomTemp" }),
     ]);
+
+    const boilerDiagnosticPanel = renderDiagnosticGroup("Ketelregeling", [
+      hasEntity("boilerConnection") ? renderDiagnosticItem({
+        label: "Aansluiting",
+        value: otbSelected ? "OpenTherm (OTB)" : "Aan/uit (R1)",
+      }) : "",
+      renderBinaryDiagnosticItem("boilerCommandValid", "Commando geldig", "Ja", "Nee", { warningWhenInactive: true }),
+      renderBinaryDiagnosticItem("boilerCommandActive", "Warmtevraag", "Actief", "Uit"),
+      renderValueDiagnosticItem("boilerCommandSource", "Bron"),
+      renderValueDiagnosticItem("boilerCommandTargetTemperature", "Doeltemperatuur"),
+      renderValueDiagnosticItem("boilerCommandRequestedPower", "Gevraagd vermogen"),
+      renderValueDiagnosticItem("boilerCommandAge", "Commando-ouderdom"),
+      renderValueDiagnosticItem("boilerBlockReason", "Blokkadereden"),
+    ]);
+
+    const otbDiagnosticRows = [
+      hasEntity("otbLinkAvailable") ? renderDiagnosticItem({
+        label: "Ketellink",
+        value: !otbSelected
+          ? "Niet geselecteerd"
+          : isInstallationMonitoringBinaryActive("otbLinkAvailable") ? "OK" : "Niet verbonden",
+        active: otbSelected && !isInstallationMonitoringBinaryActive("otbLinkAvailable"),
+      }) : "",
+    ];
+    if (otbSelected) {
+      otbDiagnosticRows.push(
+        renderBinaryDiagnosticItem("otbChCommand", "CH-commando", "Actief", "Uit"),
+        renderValueDiagnosticItem("otbControlSetpointCommand", "TSet-commando"),
+        renderBinaryDiagnosticItem("otbChActive", "CV actief", "Actief", "Uit"),
+        renderBinaryDiagnosticItem("otbFlameOn", "Vlam", "Aan", "Uit"),
+        renderBinaryDiagnosticItem("otbDhwActive", "Tapwater actief", "Actief", "Uit"),
+        renderValueDiagnosticItem("otbRelativeModulation", "Modulatie"),
+        renderValueDiagnosticItem("otbChPressure", "Waterdruk"),
+        renderValueDiagnosticItem("otbBoilerWaterTemp", "Keteltemperatuur"),
+        renderValueDiagnosticItem("otbReturnWaterTemp", "Retourtemperatuur"),
+        renderValueDiagnosticItem("otbDhwTemp", "Tapwatertemperatuur"),
+        renderBinaryDiagnosticItem("otbFaultIndication", "Ketelfout", "Actief", "Geen", { warningWhenActive: true }),
+        renderBinaryDiagnosticItem("otbDiagnosticIndication", "Diagnosemelding", "Actief", "Geen", { warningWhenActive: true }),
+        renderBinaryDiagnosticItem("otbServiceRequest", "Service gevraagd", "Ja", "Nee", { warningWhenActive: true }),
+        renderBinaryDiagnosticItem("otbLowWaterPressure", "Lage waterdruk", "Ja", "Nee", { warningWhenActive: true }),
+        renderBinaryDiagnosticItem("otbFlameFault", "Vlamstoring", "Ja", "Nee", { warningWhenActive: true }),
+        renderBinaryDiagnosticItem("otbAirPressureFault", "Luchtdrukstoring", "Ja", "Nee", { warningWhenActive: true }),
+        renderBinaryDiagnosticItem("otbWaterOverTemp", "Overtemperatuur", "Ja", "Nee", { warningWhenActive: true }),
+        renderValueDiagnosticItem("otbOemFaultCode", "OEM-foutcode"),
+        renderValueDiagnosticItem("otbOemDiagnosticCode", "OEM-diagnosecode"),
+        renderValueDiagnosticItem("otbLastResponseAge", "Laatste response"),
+        renderValueDiagnosticItem("otbLastResponseId", "Laatste message-ID"),
+        renderValueDiagnosticItem("otbResponseCount", "Geldige responses"),
+      );
+    }
+    const otbDiagnosticPanel = renderDiagnosticGroup("OpenTherm ketel (OTB)", otbDiagnosticRows);
 
     const cicDiagnosticPanel = renderDiagnosticGroup("CIC-feed", [
       hasEntity("cicJsonFeedOk") ? renderDiagnosticItem({
@@ -123,14 +177,16 @@ import { escapeHtml } from "../core/html.js";
       renderValueDiagnosticItem("cicLastSuccessAge", "Laatste succes"),
     ]);
 
-    const diagnosticsPanel = otDiagnosticPanel || cicDiagnosticPanel ? `
+    const diagnosticsPanel = otDiagnosticPanel || boilerDiagnosticPanel || otbDiagnosticPanel || cicDiagnosticPanel ? `
       <details class="oq-settings-integration-diagnostics"${state.integrationDiagnosticsOpen ? " open" : ""}>
         <summary data-oq-action="toggle-integration-diagnostics">
           <strong>Diagnostiek</strong>
-          <span>OpenTherm- en CIC-signalen</span>
+          <span>Thermostaat-, ketel- en CiC-signalen</span>
         </summary>
         <div class="oq-settings-integration-diagnostic-grid">
           ${otDiagnosticPanel}
+          ${boilerDiagnosticPanel}
+          ${otbDiagnosticPanel}
           ${cicDiagnosticPanel}
         </div>
       </details>
@@ -138,11 +194,14 @@ import { escapeHtml } from "../core/html.js";
 
     return renderSettingsSection(
       "Integratie",
-      "OpenTherm & CIC-polling",
-      "Configureer de directe thermostaatbus, externe CIC-feed en Quatt app-compatibiliteit.",
+      "OpenTherm en CiC",
+      "Configureer de thermostaatbus, externe CiC-feed en Quatt app-compatibiliteit.",
       `
         <div class="oq-settings-integration-grid">
-          ${renderSettingsIntegrationSwitchCard("otEnabled", "OpenTherm", "Thermostaatbus voor warmtevraag en kamerwaarden.")}
+          <p class="oq-settings-action-note oq-settings-integration-card--wide">
+            De aansluiting van de cv-ketel — OpenTherm of aan/uit via R1 — stel je in onder <strong>Instellingen → Installatie</strong>. Daarom wordt deze hier niet apart weergegeven.
+          </p>
+          ${renderSettingsIntegrationSwitchCard("otEnabled", "OpenTherm-thermostaat", "Thermostaatbus voor warmtevraag en kamerwaarden.")}
           ${renderSettingsIntegrationSwitchCard("cicPollingEnabled", "CIC-polling", "JSON-feed uitlezen voor setpoint, kamerwaarden en flow.")}
           ${renderSettingsIntegrationSwitchCard("cicCompatibilityMode", "CiC-compatibiliteit", "Gegevens doorgeven zodat de Quatt app kan blijven meekijken.")}
           ${urlField}

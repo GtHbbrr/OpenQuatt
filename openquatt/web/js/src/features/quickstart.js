@@ -635,7 +635,7 @@ import { renderUsageTelemetryConsent, renderUsageTelemetryDisclosure } from "./u
       <section class="oq-helper-panel">
         <p class="oq-helper-label">${escapeHtml(getQuickStepKicker("boiler"))}</p>
         <h2 class="oq-helper-section-title">CV-ketel of boiler</h2>
-        <p class="oq-helper-section-copy">Geef aan of OpenQuatt ondersteuning via een CV-ketel of boiler mag gebruiken. Als die aanwezig is, kun je meteen het vermogen als startpunt invullen.</p>
+        <p class="oq-helper-section-copy">Geef aan of er een ketel aanwezig is, kies de fysieke aansluiting en vul het beschikbare vermogen in.</p>
         ${renderBoilerCvFields("oq-settings-grid oq-settings-grid--quickstart oq-settings-boiler-simple-grid")}
         ${renderQuickStartStepNav()}
       </section>
@@ -949,7 +949,12 @@ import { renderUsageTelemetryConsent, renderUsageTelemetryDisclosure } from "./u
       ? [
           ["CV-ketel/boiler aanwezig", isEntityActive("boilerCvAssistEnabled") ? "Ja" : "Nee"],
           ...(isEntityActive("boilerCvAssistEnabled")
-            ? [["Boiler rated heat power", formatValue("boilerRatedHeatPower")]]
+            ? [
+                ...(hasEntity("boilerConnection")
+                  ? [["Ketelaansluiting", String(getEntityValue("boilerConnection") || "R1") === "OpenTherm" ? "OpenTherm (OTB)" : "Aan/uit (R1)"]]
+                  : []),
+                ["Ingesteld ketelvermogen", formatValue("boilerRatedHeatPower")],
+              ]
             : []),
         ]
       : [];

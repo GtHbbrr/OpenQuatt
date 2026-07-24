@@ -24,7 +24,13 @@ import { render } from "../core/render-scheduler.js";
       return [...new Set([...base, ...QUICK_START_THERMOSTAT_SOURCE_KEYS])];
     }
     if (stepId === "boiler") {
-      return [...new Set([...base, "boilerCvAssistEnabled", "boilerRatedHeatPower"])];
+      return [...new Set([
+        ...base,
+        "boilerCvAssistEnabled",
+        "boilerConnection",
+        "boilerRatedHeatPower",
+        "otbLinkAvailable",
+      ])];
     }
     if (stepId === "strategy") {
       return [...new Set([...base, "strategy"])];
@@ -50,6 +56,7 @@ import { render } from "../core/render-scheduler.js";
         "installationTopology",
         "hpGeneration",
         "boilerCvAssistEnabled",
+        "boilerConnection",
         "boilerRatedHeatPower",
         ...QUICK_START_FLOW_SOURCE_KEYS,
         ...QUICK_START_THERMOSTAT_SOURCE_KEYS,

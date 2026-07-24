@@ -768,6 +768,9 @@ import { replaceOuterHtmlIfSignatureChanged, setInnerHtmlIfChanged } from "./vie
   }
 
   export function getBoilerFlowKey() {
+    if (hasEntity("flowSelected")) {
+      return "flowSelected";
+    }
     const installationTopology = typeof getInstallationTopology === "function" ? getInstallationTopology() : "";
     if (installationTopology !== "single" && hasEntity("hp2Flow")) {
       return "hp2Flow";
@@ -775,35 +778,142 @@ import { replaceOuterHtmlIfSignatureChanged, setInnerHtmlIfChanged } from "./vie
     return "hp1Flow";
   }
 
+  export function getBoilerStatusModel({
+    opentherm,
+    linkAvailable,
+    fault,
+    dhwActive,
+    flameOn,
+    chActive,
+    commandActive,
+    commandValid,
+    requestedPower,
+    blockReason,
+  }) {
+    if (opentherm && fault) {
+      return { code: "fault", text: "Storing", copy: "Ketel meldt een storing", tone: "danger" };
+    }
+    if (opentherm && !linkAvailable) {
+      return { code: "offline", text: "Geen verbinding", copy: "Geen OpenTherm-reactie", tone: "offline" };
+    }
+    if (opentherm && dhwActive) {
+      return { code: "dhw", text: "Tapwater", copy: "Ketel verwarmt tapwater", tone: "dhw" };
+    }
+    if (opentherm && flameOn) {
+      return { code: "heating", text: "Verwarmt", copy: "Vlam actief voor CV", tone: "active" };
+    }
+    if (chActive) {
+      return { code: "heating", text: "CV actief", copy: opentherm ? "CV-circulatie actief" : "Levert ondersteuning", tone: "active" };
+    }
+    if (commandActive) {
+      return { code: "starting", text: "Start gevraagd", copy: opentherm ? "Wacht op de ketel" : "Ketel wordt aangestuurd", tone: "waiting" };
+    }
+
+    const normalizedBlockReason = String(blockReason || "").trim().toLowerCase();
+    const hasBlockedRequest = Number.isFinite(requestedPower) && requestedPower > 0 && (
+      !commandValid || (
+        normalizedBlockReason &&
+        normalizedBlockReason !== "no boiler heat request" &&
+        normalizedBlockReason !== "boiler/cv assist disabled"
+      )
+    );
+    if (hasBlockedRequest) {
+      return { code: "blocked", text: "Wacht", copy: "Warmtevraag is tijdelijk geblokkeerd", tone: "waiting" };
+    }
+    return { code: "idle", text: "Uit", copy: "Geen ondersteuning", tone: "neutral" };
+  }
+
   export function getBoilerPanelModel() {
+    const opentherm = String(getEntityValue("boilerConnection") || "R1") === "OpenTherm";
+    const linkAvailable = !opentherm || isEntityActive("otbLinkAvailable");
     const heatValue = getEntityNumericValue("boilerHeatPower");
     const flowValue = getEntityNumericValue(getBoilerFlowKey());
-    const active = hasEntity("boilerActive")
-      ? isEntityActive("boilerActive")
-      : (!Number.isNaN(heatValue) && heatValue > 20);
+    const chActive = opentherm
+      ? linkAvailable && isEntityActive("otbChActive")
+      : (hasEntity("boilerActive")
+        ? isEntityActive("boilerActive")
+        : (!Number.isNaN(heatValue) && heatValue > 20));
+    const flameOn = opentherm && linkAvailable && isEntityActive("otbFlameOn");
+    const dhwActive = opentherm && linkAvailable && isEntityActive("otbDhwActive");
+    const fault = opentherm && linkAvailable && [
+      "otbFaultIndication",
+      "otbFlameFault",
+      "otbAirPressureFault",
+      "otbWaterOverTemp",
+      "otbLowWaterPressure",
+    ].some((key) => isEntityActive(key));
+    const diagnostic = opentherm && linkAvailable && isEntityActive("otbDiagnosticIndication");
+    const commandActive = hasEntity("boilerCommandActive") && isEntityActive("boilerCommandActive");
+    const commandValid = !hasEntity("boilerCommandValid") || isEntityActive("boilerCommandValid");
+    const requestedPower = getEntityNumericValue("boilerCommandRequestedPower");
+    const blockReason = getEntityStateText("boilerBlockReason", "");
+    const status = getBoilerStatusModel({
+      opentherm,
+      linkAvailable,
+      fault,
+      dhwActive,
+      flameOn,
+      chActive,
+      commandActive,
+      commandValid,
+      requestedPower,
+      blockReason,
+    });
     const flowActive = !Number.isNaN(flowValue) && flowValue > 0;
     const heatText = formatNumericState(heatValue, 0, "W");
     const flowText = formatNumericState(flowValue, 0, "L/h");
-    const returnTempText = formatNumericState(getEntityNumericValue(getBoilerReturnTemperatureKey()), 1, "°C");
-    const supplyTempText = formatNumericState(getEntityNumericValue("supplyTemp"), 1, "°C");
-    const statusText = active ? "Aan" : "Uit";
-    const statusCopy = active
-      ? "Levert ondersteuning"
-      : "Geen ondersteuning";
+    const getFreshOtbValue = (key) => linkAvailable ? getEntityNumericValue(key) : Number.NaN;
+    const returnTempText = formatNumericState(
+      opentherm ? getFreshOtbValue("otbReturnWaterTemp") : getEntityNumericValue(getBoilerReturnTemperatureKey()),
+      1,
+      "°C",
+    );
+    const supplyTempText = formatNumericState(
+      opentherm ? getFreshOtbValue("otbBoilerWaterTemp") : getEntityNumericValue("supplyTemp"),
+      1,
+      "°C",
+    );
+    const pressureText = formatNumericState(getFreshOtbValue("otbChPressure"), 1, "bar");
+    const targetText = formatNumericState(getFreshOtbValue("otbControlSetpointCommand"), 1, "°C");
+    const modulationText = formatNumericState(getFreshOtbValue("otbRelativeModulation"), 0, "%");
+    const dhwTempText = formatNumericState(getFreshOtbValue("otbDhwTemp"), 1, "°C");
+    const diagnosticCopy = diagnostic && !fault ? "Diagnostische melding beschikbaar" : "";
     const boardClass = [
       "oq-boiler-card",
-      active ? "is-running" : "is-idle",
+      chActive ? "is-running" : "is-idle",
+      flameOn ? "has-flame" : "",
+      `is-${status.code}`,
     ].filter(Boolean).join(" ");
 
     return {
-      active,
+      active: chActive,
+      chActive,
+      flameOn,
+      dhwActive,
+      fault,
+      diagnostic,
+      opentherm,
+      linkAvailable,
+      commandActive,
+      commandValid,
+      blockReason,
       flowActive,
       heatText,
       flowText,
       returnTempText,
       supplyTempText,
-      statusText,
-      statusCopy,
+      pressureText,
+      targetText,
+      modulationText,
+      dhwTempText,
+      returnTempLabel: opentherm ? "Ketelretour" : "Retour",
+      supplyTempLabel: opentherm ? "Ketelwater" : "Aanvoer",
+      transportText: opentherm ? "OpenTherm" : "Aan/uit R1",
+      statusText: status.text,
+      statusCopy: status.copy,
+      statusCode: status.code,
+      statusTone: status.tone,
+      statusDetail: diagnosticCopy || (status.code === "blocked" && blockReason ? blockReason : ""),
       boardClass,
       flowPathClass: flowActive ? "is-flowing" : "is-static",
     };
@@ -813,7 +923,8 @@ import { replaceOuterHtmlIfSignatureChanged, setInnerHtmlIfChanged } from "./vie
     return getRenderSignature({
       version: "boiler-visual-mode-v1",
       visualMode: state.hpVisualMode,
-      boardClass: "oq-boiler-card",
+      transport: model.opentherm ? "opentherm" : "r1",
+      dhwActive: model.dhwActive,
     });
   }
 
@@ -823,12 +934,14 @@ import { replaceOuterHtmlIfSignatureChanged, setInnerHtmlIfChanged } from "./vie
       card.className = [
         "oq-boiler-card",
         model.active ? "is-running" : "is-idle",
+        model.flameOn ? "has-flame" : "",
+        `is-${model.statusCode}`,
         model.flowActive ? "is-flowing" : "is-static",
-      ].join(" ");
+      ].filter(Boolean).join(" ");
     }
     const chip = panel.querySelector(".oq-overview-chip");
     if (chip) {
-      chip.className = `oq-overview-chip oq-overview-chip--${model.active ? "active" : "neutral"}`;
+      chip.className = `oq-overview-chip oq-overview-chip--${model.statusTone}`;
       if (chip.textContent !== model.statusText) {
         chip.textContent = model.statusText;
       }
@@ -837,6 +950,7 @@ import { replaceOuterHtmlIfSignatureChanged, setInnerHtmlIfChanged } from "./vie
     if (supportBox) {
       supportBox.classList.toggle("is-active", model.active);
       supportBox.classList.toggle("is-idle", !model.active);
+      supportBox.dataset.status = model.statusCode;
     }
     const supportValue = panel.querySelector(".oq-boiler-summary-box--support strong");
     if (supportValue && supportValue.textContent !== model.statusCopy) {
@@ -859,10 +973,41 @@ import { replaceOuterHtmlIfSignatureChanged, setInnerHtmlIfChanged } from "./vie
     if (returnTemp && returnTemp.textContent !== model.returnTempText) {
       returnTemp.textContent = model.returnTempText;
     }
+    const returnReading = panel.querySelector('[data-oq-bind="boiler-return-reading"]');
+    if (returnReading) {
+      returnReading.setAttribute("aria-label", `${model.returnTempLabel} ${model.returnTempText}`);
+    }
     const supplyTemp = panel.querySelector('[data-oq-bind="boiler-supply-value"]');
     if (supplyTemp && supplyTemp.textContent !== model.supplyTempText) {
       supplyTemp.textContent = model.supplyTempText;
     }
+    const supplyReading = panel.querySelector('[data-oq-bind="boiler-supply-reading"]');
+    if (supplyReading) {
+      supplyReading.setAttribute("aria-label", `${model.supplyTempLabel} ${model.supplyTempText}`);
+    }
+    const schematic = panel.querySelector(".oq-boiler-mini-svg");
+    if (schematic) {
+      schematic.setAttribute("aria-label", `CV-ketel: ${model.statusCopy}`);
+    }
+    const statusDetail = panel.querySelector("[data-oq-boiler-status-detail]");
+    if (statusDetail) {
+      statusDetail.hidden = !model.statusDetail;
+      if (statusDetail.textContent !== model.statusDetail) {
+        statusDetail.textContent = model.statusDetail;
+      }
+    }
+    const telemetryValues = {
+      pressure: model.pressureText,
+      target: model.targetText,
+      modulation: model.modulationText,
+      dhw: model.dhwTempText,
+    };
+    Object.entries(telemetryValues).forEach(([key, value]) => {
+      const element = panel.querySelector(`[data-oq-boiler-${key}-value]`);
+      if (element && element.textContent !== value) {
+        element.textContent = value;
+      }
+    });
   }
 
   export function renderBoilerCompactPanel(model) {
@@ -870,9 +1015,10 @@ import { replaceOuterHtmlIfSignatureChanged, setInnerHtmlIfChanged } from "./vie
       <section class="oq-overview-hp oq-overview-boiler oq-overview-boiler--compact" data-oq-boiler-panel data-render-signature="${escapeHtml(getBoilerPanelRenderSignature(model))}">
         <div class="oq-overview-hp-head">
           <div>
+            <span class="oq-boiler-eyebrow">${escapeHtml(model.transportText)}</span>
             <h3>CV-ketel / boiler</h3>
           </div>
-          <span class="oq-overview-chip oq-overview-chip--${model.active ? "active" : "neutral"}">${escapeHtml(model.statusText)}</span>
+          <span class="oq-overview-chip oq-overview-chip--${model.statusTone}">${escapeHtml(model.statusText)}</span>
         </div>
         <div class="oq-overview-hp-stats">
           <article class="oq-overview-stat oq-overview-stat--orange">
@@ -881,17 +1027,44 @@ import { replaceOuterHtmlIfSignatureChanged, setInnerHtmlIfChanged } from "./vie
             <span>afgegeven warmte</span>
           </article>
           <article class="oq-overview-stat oq-overview-stat--blue">
-            <p>Water in</p>
+            <p>${escapeHtml(model.returnTempLabel)}</p>
             <strong data-oq-bind="boiler-return-value">${escapeHtml(model.returnTempText)}</strong>
             <span>retour naar boiler</span>
           </article>
           <article class="oq-overview-stat oq-overview-stat--sky">
-            <p>Water out</p>
+            <p>${escapeHtml(model.supplyTempLabel)}</p>
             <strong data-oq-bind="boiler-supply-value">${escapeHtml(model.supplyTempText)}</strong>
-            <span>naar het systeem</span>
+            <span>${model.opentherm ? "gemeten door ketel" : "naar het systeem"}</span>
           </article>
         </div>
+        ${model.opentherm ? renderBoilerTelemetry(model) : ""}
+        <p class="oq-boiler-status-detail" data-oq-boiler-status-detail${model.statusDetail ? "" : " hidden"}>${escapeHtml(model.statusDetail)}</p>
       </section>
+    `;
+  }
+
+  export function renderBoilerTelemetry(model) {
+    return `
+      <div class="oq-boiler-telemetry" aria-label="OpenTherm ketelwaarden">
+        <div class="oq-boiler-telemetry-item">
+          <span>Druk</span>
+          <strong data-oq-boiler-pressure-value>${escapeHtml(model.pressureText)}</strong>
+        </div>
+        <div class="oq-boiler-telemetry-item">
+          <span>CV-doel</span>
+          <strong data-oq-boiler-target-value>${escapeHtml(model.targetText)}</strong>
+        </div>
+        <div class="oq-boiler-telemetry-item">
+          <span>Modulatie</span>
+          <strong data-oq-boiler-modulation-value>${escapeHtml(model.modulationText)}</strong>
+        </div>
+        ${model.dhwActive ? `
+          <div class="oq-boiler-telemetry-item oq-boiler-telemetry-item--dhw">
+            <span>Tapwater</span>
+            <strong data-oq-boiler-dhw-value>${escapeHtml(model.dhwTempText)}</strong>
+          </div>
+        ` : ""}
+      </div>
     `;
   }
 
@@ -911,14 +1084,14 @@ import { replaceOuterHtmlIfSignatureChanged, setInnerHtmlIfChanged } from "./vie
           <div class="oq-boiler-card-main">
             <div class="oq-boiler-card-head">
               <div>
-                <span class="oq-boiler-eyebrow">Ondersteuning</span>
+                <span class="oq-boiler-eyebrow">Ondersteuning · ${escapeHtml(model.transportText)}</span>
                 <h3>CV-ketel / boiler</h3>
               </div>
-              <span class="oq-overview-chip oq-overview-chip--${model.active ? "active" : "neutral"}">${escapeHtml(model.statusText)}</span>
+              <span class="oq-overview-chip oq-overview-chip--${model.statusTone}">${escapeHtml(model.statusText)}</span>
             </div>
-            <p class="oq-boiler-copy">De boiler geeft ondersteuning wanneer de warmtepomp extra hulp nodig heeft.</p>
+            <p class="oq-boiler-copy">${model.opentherm ? "Live ketelstatus en ondersteuning naast de warmtepomp." : "De ketel geeft ondersteuning wanneer de warmtepomp extra hulp nodig heeft."}</p>
             <div class="oq-boiler-mini-schematic">
-              <svg class="oq-boiler-mini-svg" viewBox="0 0 420 132" role="img" aria-label="Schematische weergave CV-ketel of boiler">
+              <svg class="oq-boiler-mini-svg" viewBox="0 0 420 132" role="img" aria-label="CV-ketel: ${escapeHtml(model.statusCopy)}">
                 <defs>
                   <linearGradient id="oq-boiler-card-body" x1="0" y1="1" x2="0" y2="0">
                     <stop offset="0%" stop-color="#111827"></stop>
@@ -937,26 +1110,28 @@ import { replaceOuterHtmlIfSignatureChanged, setInnerHtmlIfChanged } from "./vie
                   <rect class="oq-boiler-card-unit-shell" x="176" y="26" width="68" height="82" rx="22" />
                   <rect class="oq-boiler-card-unit-core" x="190" y="40" width="40" height="54" rx="14" fill="url(#oq-boiler-card-body)" />
                   <path class="oq-boiler-card-coil" d="M199 54 H221 M199 68 H221 M199 82 H221" />
-                  <g class="oq-boiler-card-flame" transform="translate(210 90)">
+                  <g class="oq-boiler-card-flame" transform="translate(210 90)" aria-hidden="true">
                     <path class="oq-boiler-card-flame-outer" fill="url(#oq-boiler-card-flame)" d="M0 14 C-12 6 -9 -6 -1 -17 C2 -9 11 -6 9 5 C16 2 18 12 11 17 C7 21 -5 20 0 14 Z" />
                     <path class="oq-boiler-card-flame-inner" d="M0 14 C-5 9 -3 3 2 -4 C2 4 8 6 6 12 C4 16 -2 16 0 14 Z" />
                   </g>
                 </g>
-                ${renderTechWaterReading({ bind: "boiler-return", x: 22, y: 70, width: 78, value: model.returnTempText, label: "Retour", ariaLabel: `Retour ${model.returnTempText}`, align: "start" })}
-                ${renderTechTooltip({ bind: "boiler-return", modifier: "return", icon: "temperature", x: 82, y: 70, width: 124, kicker: "Temperatuur", detail: "Retour", direction: "left" })}
-                ${renderTechWaterReading({ bind: "boiler-supply", x: 320, y: 16, width: 76, value: model.supplyTempText, label: "Aanvoer", ariaLabel: `Aanvoer ${model.supplyTempText}`, align: "end" })}
-                ${renderTechTooltip({ bind: "boiler-supply", modifier: "supply", icon: "temperature", x: 294, y: 14, width: 124, kicker: "Temperatuur", detail: "Aanvoer", direction: "right" })}
+                ${renderTechWaterReading({ bind: "boiler-return", x: 22, y: 70, width: 78, value: model.returnTempText, label: model.returnTempLabel, ariaLabel: `${model.returnTempLabel} ${model.returnTempText}`, align: "start" })}
+                ${renderTechTooltip({ bind: "boiler-return", modifier: "return", icon: "temperature", x: 82, y: 70, width: 124, kicker: "Temperatuur", detail: model.returnTempLabel, direction: "left" })}
+                ${renderTechWaterReading({ bind: "boiler-supply", x: 320, y: 16, width: 76, value: model.supplyTempText, label: model.supplyTempLabel, ariaLabel: `${model.supplyTempLabel} ${model.supplyTempText}`, align: "end" })}
+                ${renderTechTooltip({ bind: "boiler-supply", modifier: "supply", icon: "temperature", x: 294, y: 14, width: 124, kicker: "Temperatuur", detail: model.supplyTempLabel, direction: "right" })}
               </svg>
               <div class="oq-boiler-summary-grid">
                 <div class="oq-boiler-summary-box oq-boiler-summary-box--power">
                   <span>Geleverd vermogen</span>
                   <strong data-oq-boiler-heat-value>${escapeHtml(model.heatText)}</strong>
                 </div>
-                <div class="oq-boiler-summary-box oq-boiler-summary-box--support ${model.active ? "is-active" : "is-idle"}">
+                <div class="oq-boiler-summary-box oq-boiler-summary-box--support ${model.active ? "is-active" : "is-idle"}" data-status="${escapeHtml(model.statusCode)}">
                   <span>Ondersteuning</span>
                   <strong data-oq-boiler-status-value>${escapeHtml(model.statusCopy)}</strong>
                 </div>
               </div>
+              ${model.opentherm ? renderBoilerTelemetry(model) : ""}
+              <p class="oq-boiler-status-detail" data-oq-boiler-status-detail${model.statusDetail ? "" : " hidden"}>${escapeHtml(model.statusDetail)}</p>
             </div>
           </div>
         </div>
