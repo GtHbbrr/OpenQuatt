@@ -296,6 +296,7 @@ NESTED_KEY_ORDER_RULES = {
         "oq_boiler_test",
     ),
     ("openquatt/packages/50_integrations.yaml", "packages"): (
+        "oq_boiler_dispatch",
         "oq_boiler_control",
         "oq_energy",
         "oq_cic",

@@ -1,0 +1,72 @@
+# ==============================================================================
+# OpenQuatt – Boiler Command Dispatch
+# ==============================================================================
+#
+# Owns the transport-neutral command contract consumed by `oq_boiler_control`.
+# During the foundation phase this adapter intentionally reproduces the existing
+# CM3 and CM100 relay demand. Later work packages replace the legacy CM3 command
+# with strategy-derived requested power and target temperature.
+#
+# This package never writes R1 or OpenTherm outputs.
+# ==============================================================================
+
+globals:
+  - id: oq_boiler_command_valid
+    type: bool
+    restore_value: false
+    initial_value: 'false'
+
+  - id: oq_boiler_command_demand_present
+    type: bool
+    restore_value: false
+    initial_value: 'false'
+
+  - id: oq_boiler_command_heat_request
+    type: bool
+    restore_value: false
+    initial_value: 'false'
+
+  - id: oq_boiler_command_requested_power_w
+    type: float
+    restore_value: false
+    initial_value: 'NAN'
+
+  - id: oq_boiler_command_target_temperature_c
+    type: float
+    restore_value: false
+    initial_value: 'NAN'
+
+  - id: oq_boiler_command_source_code
+    type: uint8_t
+    restore_value: false
+    initial_value: '0'
+
+  - id: oq_boiler_command_updated_ms
+    type: uint32_t
+    restore_value: false
+    initial_value: '0'
+
+interval:
+  - interval: ${oq_boiler_loop_s}s
+    startup_delay: 4500ms
+    then:
+      - lambda: |-
+          // Phase 1: adapt the existing CM3/CM100 ownership into the shared contract.
+          const int cm_code = id(oq_control_mode_code);
+          const bool commissioning_boiler_task =
+              id(oq_commissioning_task_code) == oq_commissioning::TASK_BOILER_POWER_TEST;
+          const auto command = oq_boiler::make_legacy_command(
+              cm_code,
+              id(oq_commissioning_active),
+              commissioning_boiler_task,
+              id(oq_commissioning_boiler_request),
+              millis());
+
+          // Phase 2: publish atomically before the controller interval evaluates it.
+          id(oq_boiler_command_valid) = command.valid;
+          id(oq_boiler_command_demand_present) = command.demand_present;
+          id(oq_boiler_command_heat_request) = command.heat_request;
+          id(oq_boiler_command_requested_power_w) = command.requested_power_w;
+          id(oq_boiler_command_target_temperature_c) = command.target_temperature_c;
+          id(oq_boiler_command_source_code) = command.source;
+          id(oq_boiler_command_updated_ms) = command.updated_at_ms;

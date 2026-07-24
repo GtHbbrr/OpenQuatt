@@ -206,6 +206,9 @@ oq_water_cp_j_per_kgk: "4186.0"                       # Specific heat capacity o
 # BOILER CONTROL
 # ----------------------------
 oq_boiler_loop_s: "5"                                 # Main interval for boiler gating/safety loop [s].
+oq_boiler_command_max_age_s: "15"                     # Fail-safe maximum age of the transport-neutral boiler command [s].
+oq_boiler_relay_min_on_s: "0"                         # R1 minimum on-time [s]; zero preserves existing relay behavior in foundation phase.
+oq_boiler_relay_min_off_s: "0"                        # R1 minimum off-time [s]; zero preserves existing relay behavior in foundation phase.
 
 # ----------------------------
 # OPEN THERM SLAVE
