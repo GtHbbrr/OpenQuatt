@@ -53,7 +53,7 @@ bool OpenTherm::initialize() {
   this->out_pin_->digital_write(true);
 
 #ifdef USE_ESP32
-  return this->init_esp32_timer_() && this->init_esp32_rmt_();
+  return this->init_esp32_timer_() && this->init_esp32_rmt_() && this->init_esp32_rmt_tx_();
 #else
   return true;
 #endif
@@ -95,11 +95,17 @@ void OpenTherm::send(OpenthermData &data) {
     this->data_ = this->data_ | 0x80000000;
   }
 
-  this->clock_ = 1;     // clock starts at HIGH
-  this->bit_pos_ = 33;  // count down (33 == start bit, 32-1 data, 0 == stop bit)
   this->mode_ = OperationMode::WRITE;
 
+#ifdef USE_ESP32
+  if (!this->start_esp32_rmt_tx_()) {
+    this->mode_ = OperationMode::ERROR_TIMER;
+  }
+#else
+  this->clock_ = 1;     // clock starts at HIGH
+  this->bit_pos_ = 33;  // count down (33 == start bit, 32-1 data, 0 == stop bit)
   this->start_write_timer_();
+#endif
 }
 
 bool OpenTherm::get_message(OpenthermData &data) {
@@ -130,7 +136,13 @@ bool OpenTherm::get_protocol_error(OpenThermError &error) {
 void OpenTherm::stop() {
   this->stop_timer_();
 #ifdef USE_ESP32
+  // Invalidate both RMT callbacks before cancelling either channel. Without
+  // this claim, a TX-complete ISR could arm RX between the two cancellations.
+  portENTER_CRITICAL(&this->rmt_mux_);
+  this->mode_ = OperationMode::IDLE;
+  portEXIT_CRITICAL(&this->rmt_mux_);
   this->cancel_esp32_rmt_();
+  this->cancel_esp32_rmt_tx_();
 #endif
   // A runtime transport change can stop an in-flight request. Always restore
   // the master output to its initialized idle level instead of leaving the
@@ -348,8 +360,175 @@ bool OpenTherm::init_esp32_rmt_() {
     return false;
   }
 
+  this->rmt_rx_config_.signal_range_min_ns = 3187;
+  this->rmt_rx_config_.signal_range_max_ns = 2500000;
+  this->rmt_rx_config_.flags.en_partial_rx = false;
+
   ESP_LOGCONFIG(TAG, "OpenTherm RMT receive capture active on GPIO%u",
                 static_cast<unsigned>(this->in_pin_->get_pin()));
+  return true;
+}
+
+bool OpenTherm::init_esp32_rmt_tx_() {
+  rmt_tx_channel_config_t config{};
+  config.gpio_num = static_cast<gpio_num_t>(this->out_pin_->get_pin());
+  config.clk_src = RMT_CLK_SRC_DEFAULT;
+  config.resolution_hz = 1000000;
+  config.mem_block_symbols = 48;
+  config.trans_queue_depth = 1;
+  config.intr_priority = 0;
+  config.flags.invert_out = false;
+  config.flags.with_dma = false;
+  config.flags.init_level = rmt_encoder::IDLE_LEVEL;
+  config.flags.io_loop_back = false;
+  config.flags.io_od_mode = false;
+  config.flags.allow_pd = false;
+
+  esp_err_t result = rmt_new_tx_channel(&config, &this->rmt_tx_channel_);
+  if (result != ESP_OK) {
+    ESP_LOGE(TAG, "Failed to create RMT TX channel: %s", esp_err_to_name(result));
+    this->rmt_tx_channel_ = nullptr;
+    return false;
+  }
+
+  rmt_copy_encoder_config_t encoder_config{};
+  result = rmt_new_copy_encoder(&encoder_config, &this->rmt_tx_encoder_);
+  if (result != ESP_OK) {
+    ESP_LOGE(TAG, "Failed to create RMT TX encoder: %s", esp_err_to_name(result));
+    rmt_del_channel(this->rmt_tx_channel_);
+    this->rmt_tx_channel_ = nullptr;
+    return false;
+  }
+
+  rmt_tx_event_callbacks_t callbacks{};
+  callbacks.on_trans_done = OpenTherm::rmt_tx_done_callback_;
+  result = rmt_tx_register_event_callbacks(this->rmt_tx_channel_, &callbacks, this);
+  if (result != ESP_OK) {
+    ESP_LOGE(TAG, "Failed to register RMT TX callback: %s", esp_err_to_name(result));
+    rmt_del_encoder(this->rmt_tx_encoder_);
+    this->rmt_tx_encoder_ = nullptr;
+    rmt_del_channel(this->rmt_tx_channel_);
+    this->rmt_tx_channel_ = nullptr;
+    return false;
+  }
+
+  result = rmt_enable(this->rmt_tx_channel_);
+  if (result != ESP_OK) {
+    ESP_LOGE(TAG, "Failed to enable RMT TX channel: %s", esp_err_to_name(result));
+    rmt_del_encoder(this->rmt_tx_encoder_);
+    this->rmt_tx_encoder_ = nullptr;
+    rmt_del_channel(this->rmt_tx_channel_);
+    this->rmt_tx_channel_ = nullptr;
+    return false;
+  }
+
+  if (!this->restore_esp32_rmt_tx_idle_()) {
+    return false;
+  }
+
+  ESP_LOGCONFIG(TAG, "OpenTherm RMT transmit active on GPIO%u",
+                static_cast<unsigned>(this->out_pin_->get_pin()));
+  return true;
+}
+
+bool OpenTherm::restore_esp32_rmt_tx_idle_() {
+  if (this->rmt_tx_channel_ == nullptr || this->rmt_tx_encoder_ == nullptr) {
+    return false;
+  }
+
+  // Attach or recover the RMT peripheral without producing an OpenTherm edge.
+  rmt_symbol_word_t idle_symbol{};
+  idle_symbol.level0 = rmt_encoder::IDLE_LEVEL;
+  idle_symbol.duration0 = 10;
+  idle_symbol.level1 = rmt_encoder::IDLE_LEVEL;
+  idle_symbol.duration1 = 10;
+  rmt_transmit_config_t transmit_config{};
+  transmit_config.loop_count = 0;
+  transmit_config.flags.eot_level = rmt_encoder::IDLE_LEVEL;
+  esp_err_t result = rmt_transmit(this->rmt_tx_channel_, this->rmt_tx_encoder_, &idle_symbol,
+                                  sizeof(idle_symbol), &transmit_config);
+  if (result == ESP_OK) {
+    result = rmt_tx_wait_all_done(this->rmt_tx_channel_, 100);
+  }
+  if (result != ESP_OK) {
+    ESP_LOGE(TAG, "Failed to restore RMT TX idle level: %s", esp_err_to_name(result));
+    return false;
+  }
+  return true;
+}
+
+bool OpenTherm::start_esp32_rmt_tx_() {
+  if (this->rmt_tx_channel_ == nullptr || this->rmt_tx_encoder_ == nullptr) {
+    ESP_LOGE(TAG, "RMT TX is not initialized");
+    return false;
+  }
+
+  for (size_t index = 0; index < RMT_TX_SYMBOLS; index++) {
+    const auto encoded = rmt_encoder::encode_frame_symbol(this->data_, index);
+    auto &symbol = this->rmt_tx_symbols_[index];
+    symbol.level0 = encoded.level0;
+    symbol.duration0 = encoded.duration0_us;
+    symbol.level1 = encoded.level1;
+    symbol.duration1 = encoded.duration1_us;
+  }
+
+  portENTER_CRITICAL(&this->rmt_mux_);
+  this->rmt_tx_active_ = true;
+  const uint32_t tx_started_us = micros();
+  this->rmt_tx_deadline_us_ = tx_started_us + RMT_TX_TIMEOUT_US;
+  this->receive_deadline_us_ =
+      tx_started_us +
+      static_cast<uint32_t>(RMT_TX_SYMBOLS * 2U * rmt_encoder::HALF_BIT_DURATION_US) +
+      static_cast<uint32_t>(this->device_timeout_) * 1000U;
+  portEXIT_CRITICAL(&this->rmt_mux_);
+
+  rmt_transmit_config_t config{};
+  config.loop_count = 0;
+  config.flags.eot_level = rmt_encoder::IDLE_LEVEL;
+  const esp_err_t result =
+      rmt_transmit(this->rmt_tx_channel_, this->rmt_tx_encoder_, this->rmt_tx_symbols_,
+                   sizeof(this->rmt_tx_symbols_), &config);
+  if (result != ESP_OK) {
+    portENTER_CRITICAL(&this->rmt_mux_);
+    this->rmt_tx_active_ = false;
+    portEXIT_CRITICAL(&this->rmt_mux_);
+    ESP_LOGE(TAG, "Failed to start RMT TX: %s", esp_err_to_name(result));
+    this->timer_error_ = result;
+    this->timer_error_type_ = TimerErrorType::TIMER_START_ERROR;
+    return false;
+  }
+  return true;
+}
+
+void OpenTherm::cancel_esp32_rmt_tx_() {
+  bool active = false;
+  portENTER_CRITICAL(&this->rmt_mux_);
+  active = this->rmt_tx_active_;
+  this->rmt_tx_active_ = false;
+  portEXIT_CRITICAL(&this->rmt_mux_);
+
+  if (!active || this->rmt_tx_channel_ == nullptr) {
+    return;
+  }
+
+  this->reset_esp32_rmt_tx_();
+}
+
+bool OpenTherm::reset_esp32_rmt_tx_() {
+  const esp_err_t disable_result = rmt_disable(this->rmt_tx_channel_);
+  if (disable_result != ESP_OK) {
+    ESP_LOGE(TAG, "Failed to cancel RMT TX: %s", esp_err_to_name(disable_result));
+    return false;
+  }
+  const esp_err_t enable_result = rmt_enable(this->rmt_tx_channel_);
+  if (enable_result != ESP_OK) {
+    ESP_LOGE(TAG, "Failed to re-enable RMT TX: %s", esp_err_to_name(enable_result));
+    return false;
+  }
+  if (!this->restore_esp32_rmt_tx_idle_()) {
+    ESP_LOGE(TAG, "Failed to recover the RMT TX idle level after cancellation");
+    return false;
+  }
   return true;
 }
 
@@ -358,11 +537,6 @@ bool OpenTherm::arm_esp32_rmt_() {
     return false;
   }
 
-  rmt_receive_config_t config{};
-  config.signal_range_min_ns = 3187;
-  config.signal_range_max_ns = 2500000;
-  config.flags.en_partial_rx = false;
-
   portENTER_CRITICAL(&this->rmt_mux_);
   this->rmt_symbol_count_ = 0;
   this->rmt_frame_ready_ = false;
@@ -370,7 +544,8 @@ bool OpenTherm::arm_esp32_rmt_() {
   portEXIT_CRITICAL(&this->rmt_mux_);
 
   const esp_err_t result =
-      rmt_receive(this->rmt_rx_channel_, this->rmt_rx_symbols_, sizeof(this->rmt_rx_symbols_), &config);
+      rmt_receive(this->rmt_rx_channel_, this->rmt_rx_symbols_, sizeof(this->rmt_rx_symbols_),
+                  &this->rmt_rx_config_);
   if (result != ESP_OK) {
     portENTER_CRITICAL(&this->rmt_mux_);
     this->rmt_armed_ = false;
@@ -425,7 +600,57 @@ bool IRAM_ATTR OpenTherm::rmt_rx_done_callback_(rmt_channel_handle_t,
   return false;
 }
 
+bool IRAM_ATTR OpenTherm::rmt_tx_done_callback_(rmt_channel_handle_t,
+                                                const rmt_tx_done_event_data_t *, void *user_ctx) {
+  auto *instance = static_cast<OpenTherm *>(user_ctx);
+  if (instance == nullptr) {
+    return false;
+  }
+
+  portENTER_CRITICAL_ISR(&instance->rmt_mux_);
+  if (instance->rmt_tx_active_ && instance->mode_ == OperationMode::WRITE) {
+    instance->rmt_tx_active_ = false;
+    instance->rmt_symbol_count_ = 0;
+    instance->rmt_frame_ready_ = false;
+    // Close the request/response handover inside the TX-complete ISR. Waiting
+    // for the application loop to observe SENT can miss an early boiler
+    // response when another component temporarily delays that loop.
+    // ESP-IDF explicitly permits rmt_receive() from ISR context. Keep the
+    // component lock until the handover is armed so stop() cannot cancel the
+    // channel between our state claim and the driver call.
+    const esp_err_t result =
+        rmt_receive(instance->rmt_rx_channel_, instance->rmt_rx_symbols_,
+                    sizeof(instance->rmt_rx_symbols_), &instance->rmt_rx_config_);
+    if (result == ESP_OK) {
+      instance->rmt_armed_ = true;
+      instance->mode_ = OperationMode::LISTEN;
+    } else {
+      instance->rmt_armed_ = false;
+      instance->timer_error_ = result;
+      instance->timer_error_type_ = TimerErrorType::TIMER_START_ERROR;
+      instance->mode_ = OperationMode::ERROR_TIMER;
+    }
+  }
+  portEXIT_CRITICAL_ISR(&instance->rmt_mux_);
+  return false;
+}
+
 void OpenTherm::process_esp32_rmt_() {
+  bool transmit_timed_out = false;
+  portENTER_CRITICAL(&this->rmt_mux_);
+  if (this->mode_ == OperationMode::WRITE && this->rmt_tx_active_ &&
+      static_cast<int32_t>(micros() - this->rmt_tx_deadline_us_) >= 0) {
+    this->rmt_tx_active_ = false;
+    this->mode_ = OperationMode::ERROR_TIMEOUT;
+    transmit_timed_out = true;
+  }
+  portEXIT_CRITICAL(&this->rmt_mux_);
+  if (transmit_timed_out) {
+    this->reset_esp32_rmt_tx_();
+    ESP_LOGW(TAG, "RMT transmit completion timed out");
+    return;
+  }
+
   if (this->mode_ != OperationMode::LISTEN && this->mode_ != OperationMode::RMT_PENDING) {
     return;
   }

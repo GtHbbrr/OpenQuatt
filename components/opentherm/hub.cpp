@@ -274,8 +274,13 @@ void OpenthermHub::sync_loop_() {
     return;
   }
 
-  // Check for errors and ensure we are in the right state (message sent successfully)
+  // ESP32 RMT closes the TX-to-RX handover in the TX-complete ISR, so the
+  // first spin can cover the complete request/response exchange. Other
+  // platforms still stop at SENT and enter the existing listen phase below.
   if (this->handle_error_(this->opentherm_->get_mode())) {
+    return;
+  } else if (this->opentherm_->has_message()) {
+    this->read_response_();
     return;
   } else if (!this->opentherm_->is_sent()) {
     ESP_LOGW(TAG, "Unexpected state after sending request: %s",
