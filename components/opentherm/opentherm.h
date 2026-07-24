@@ -15,6 +15,7 @@
 #ifdef USE_ESP32
 #include "driver/gptimer.h"
 #include "driver/rmt_rx.h"
+#include "driver/rmt_tx.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/portmacro.h"
 #endif
@@ -356,6 +357,8 @@ class OpenTherm {
   static bool timer_isr(gptimer_handle_t timer, const gptimer_alarm_event_data_t *edata, void *user_ctx);
   static bool IRAM_ATTR rmt_rx_done_callback_(rmt_channel_handle_t channel,
                                              const rmt_rx_done_event_data_t *event, void *user_ctx);
+  static bool IRAM_ATTR rmt_tx_done_callback_(rmt_channel_handle_t channel,
+                                             const rmt_tx_done_event_data_t *event, void *user_ctx);
 #else
   static bool timer_isr(OpenTherm *arg);
 #endif
@@ -372,6 +375,7 @@ class OpenTherm {
 
 #ifdef USE_ESP32
   static constexpr size_t RMT_CAPTURE_SYMBOLS = 96;
+  static constexpr size_t RMT_TX_SYMBOLS = 34;
   gptimer_handle_t timer_handle_{nullptr};
   gptimer_alarm_config_t alarm_config_{
       .alarm_count = 0,
@@ -380,10 +384,14 @@ class OpenTherm {
   };
   rmt_channel_handle_t rmt_rx_channel_{nullptr};
   rmt_symbol_word_t rmt_rx_symbols_[RMT_CAPTURE_SYMBOLS]{};
+  rmt_channel_handle_t rmt_tx_channel_{nullptr};
+  rmt_encoder_handle_t rmt_tx_encoder_{nullptr};
+  rmt_symbol_word_t rmt_tx_symbols_[RMT_TX_SYMBOLS]{};
   portMUX_TYPE rmt_mux_ = portMUX_INITIALIZER_UNLOCKED;
   volatile size_t rmt_symbol_count_{0};
   volatile bool rmt_armed_{false};
   volatile bool rmt_frame_ready_{false};
+  volatile bool rmt_tx_active_{false};
   uint32_t receive_deadline_us_{0};
 #endif
 
@@ -402,8 +410,12 @@ class OpenTherm {
 
   bool init_esp32_timer_();
   bool init_esp32_rmt_();
+  bool init_esp32_rmt_tx_();
   bool arm_esp32_rmt_();
+  bool start_esp32_rmt_tx_();
+  bool restore_esp32_rmt_tx_idle_();
   void cancel_esp32_rmt_();
+  void cancel_esp32_rmt_tx_();
   void process_esp32_rmt_();
   void start_esp32_timer_(uint64_t alarm_value, bool auto_reload);
 #endif
