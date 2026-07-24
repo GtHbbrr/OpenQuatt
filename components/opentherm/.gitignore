@@ -1,0 +1,7 @@
+__pycache__/
+*.py[cod]
+
+# The repository-wide output/ rule is for generated artifacts. This directory
+# is an ESPHome component platform and must remain part of the vendored source.
+!output/
+!output/**
