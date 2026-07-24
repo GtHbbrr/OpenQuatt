@@ -217,6 +217,7 @@ oq_boiler_otb_min_on_s: "30"                          # OpenTherm minimum reques
 oq_boiler_otb_min_off_s: "120"                        # OpenTherm minimum requested off-time [s].
 oq_otb_supported: "false"                             # Compile-time availability of the boiler OpenTherm master transport.
 oq_otb_command_apply_s: "1"                           # Apply validated CH/TSet state to the OpenTherm master [s].
+oq_boiler_transport_selection_extra: ""               # Hardware-specific start/stop hook after changing the boiler transport.
 
 # ----------------------------
 # OPEN THERM SLAVE
@@ -229,6 +230,7 @@ oq_ot_response_enabled_default: "true"                # Allow the OT slave to an
 # ----------------------------
 oq_otb_link_watch_s: "1"                              # OTB link/freshness evaluation interval [s].
 oq_otb_link_timeout_s: "10"                           # Maximum age of the last valid boiler response [s].
+oq_otb_field_timeout_s: "10"                          # Maximum age of one repeating boiler telemetry field [s].
 
 # ----------------------------
 # CIC FEED
