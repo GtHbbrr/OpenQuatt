@@ -131,6 +131,110 @@ test("OpenTherm boiler model suppresses stale telemetry when the boiler link is 
   }
 });
 
+test("OpenTherm boiler panel distinguishes DHW from CV heat delivery", () => {
+  const previousEntities = state.entities;
+  const previousVisualMode = state.hpVisualMode;
+  state.hpVisualMode = "schematic";
+  state.entities = {
+    boilerCvAssistEnabled: { value: true },
+    boilerConnection: { value: "OpenTherm" },
+    boilerHeatPower: { value: 0 },
+    boilerCommandActive: { value: false },
+    boilerCommandValid: { value: true },
+    boilerCommandRequestedPower: { value: 0 },
+    boilerBlockReason: { value: "no boiler heat request" },
+    flowSelected: { value: 0 },
+    otbLinkAvailable: { value: true },
+    otbChActive: { value: false },
+    otbDhwActive: { value: true },
+    otbFlameOn: { value: true },
+    otbDhwTemp: { value: 52.3 },
+  };
+
+  try {
+    const model = getBoilerPanelModel();
+    assert.equal(model.statusCode, "dhw");
+    assert.equal(model.statusText, "Tapwater");
+    assert.equal(model.active, false);
+    assert.equal(model.dhwActive, true);
+    assert.equal(model.flameOn, true);
+    assert.equal(model.heatText, "0 W");
+    assert.equal(model.dhwTempText, "52.3 °C");
+
+    const html = renderBoilerPanel();
+    assert.match(html, /Ketel verwarmt tapwater/);
+    assert.match(html, /Tapwater/);
+    assert.match(html, /52\.3 °C/);
+  } finally {
+    state.entities = previousEntities;
+    state.hpVisualMode = previousVisualMode;
+  }
+});
+
+test("OpenTherm boiler panel prioritizes fault flags and keeps diagnostics separate", () => {
+  const previousEntities = state.entities;
+  state.entities = {
+    boilerCvAssistEnabled: { value: true },
+    boilerConnection: { value: "OpenTherm" },
+    boilerHeatPower: { value: 900 },
+    boilerCommandValid: { value: true },
+    boilerCommandRequestedPower: { value: 1200 },
+    flowSelected: { value: 600 },
+    otbLinkAvailable: { value: true },
+    otbChActive: { value: true },
+    otbFlameOn: { value: true },
+    otbLowWaterPressure: { value: true },
+    otbDiagnosticIndication: { value: true },
+  };
+
+  try {
+    const faultModel = getBoilerPanelModel();
+    assert.equal(faultModel.statusCode, "fault");
+    assert.equal(faultModel.statusText, "Storing");
+    assert.equal(faultModel.fault, true);
+    assert.equal(faultModel.diagnostic, true);
+    assert.equal(faultModel.statusDetail, "");
+    assert.match(faultModel.boardClass, /is-fault/);
+
+    state.entities.otbLowWaterPressure.value = false;
+    const diagnosticModel = getBoilerPanelModel();
+    assert.equal(diagnosticModel.statusCode, "heating");
+    assert.equal(diagnosticModel.fault, false);
+    assert.equal(diagnosticModel.statusDetail, "Diagnostische melding beschikbaar");
+  } finally {
+    state.entities = previousEntities;
+  }
+});
+
+test("OpenTherm boiler panel suppresses only an unavailable individual field", () => {
+  const previousEntities = state.entities;
+  state.entities = {
+    boilerConnection: { value: "OpenTherm" },
+    boilerHeatPower: { value: 0 },
+    boilerCommandValid: { value: true },
+    boilerCommandRequestedPower: { value: 0 },
+    flowSelected: { value: 700 },
+    otbLinkAvailable: { value: true },
+    otbReturnWaterTemp: { value: 31.4 },
+    otbBoilerWaterTemp: { value: null, state: "NA" },
+    otbChPressure: { value: 1.6 },
+    otbControlSetpointCommand: { value: 45 },
+    otbRelativeModulation: { value: 37 },
+  };
+
+  try {
+    const model = getBoilerPanelModel();
+    assert.equal(model.statusCode, "idle");
+    assert.equal(model.returnTempText, "31.4 °C");
+    assert.equal(model.supplyTempText, "—");
+    assert.equal(model.pressureText, "1.6 bar");
+    assert.equal(model.targetText, "45.0 °C");
+    assert.equal(model.modulationText, "37 %");
+  } finally {
+    state.entities = previousEntities;
+  }
+});
+
 test("R1 boiler view keeps OpenTherm-only telemetry out of the panel", () => {
   const previousEntities = state.entities;
   const previousVisualMode = state.hpVisualMode;
@@ -154,6 +258,29 @@ test("R1 boiler view keeps OpenTherm-only telemetry out of the panel", () => {
   } finally {
     state.entities = previousEntities;
     state.hpVisualMode = previousVisualMode;
+  }
+});
+
+test("R1 diagnostics shows selection state without stale OpenTherm details", () => {
+  const previousEntities = state.entities;
+  state.entities = {
+    boilerConnection: { value: "R1" },
+    boilerCommandValid: { value: true },
+    otbLinkAvailable: { value: false },
+    otbFlameOn: { value: true },
+    otbChPressure: { value: 1.6, uom: "bar" },
+    otbLastResponseAge: { value: 4.2, uom: "s" },
+  };
+
+  try {
+    const html = renderSettingsOpenThermCicSection();
+    assert.match(html, /OpenTherm ketel \(OTB\)/);
+    assert.match(html, /Niet geselecteerd/);
+    assert.doesNotMatch(html, /Waterdruk/);
+    assert.doesNotMatch(html, /Laatste response/);
+    assert.doesNotMatch(html, />Vlam</);
+  } finally {
+    state.entities = previousEntities;
   }
 });
 

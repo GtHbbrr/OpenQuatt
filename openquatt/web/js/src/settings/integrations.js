@@ -116,7 +116,7 @@ import { escapeHtml } from "../core/html.js";
       renderValueDiagnosticItem("boilerBlockReason", "Blokkadereden"),
     ]);
 
-    const otbDiagnosticPanel = renderDiagnosticGroup("OpenTherm ketel (OTB)", [
+    const otbDiagnosticRows = [
       hasEntity("otbLinkAvailable") ? renderDiagnosticItem({
         label: "Ketellink",
         value: !otbSelected
@@ -124,29 +124,34 @@ import { escapeHtml } from "../core/html.js";
           : isInstallationMonitoringBinaryActive("otbLinkAvailable") ? "OK" : "Niet verbonden",
         active: otbSelected && !isInstallationMonitoringBinaryActive("otbLinkAvailable"),
       }) : "",
-      renderBinaryDiagnosticItem("otbChCommand", "CH-commando", "Actief", "Uit"),
-      renderValueDiagnosticItem("otbControlSetpointCommand", "TSet-commando"),
-      renderBinaryDiagnosticItem("otbChActive", "CV actief", "Actief", "Uit"),
-      renderBinaryDiagnosticItem("otbFlameOn", "Vlam", "Aan", "Uit"),
-      renderBinaryDiagnosticItem("otbDhwActive", "Tapwater actief", "Actief", "Uit"),
-      renderValueDiagnosticItem("otbRelativeModulation", "Modulatie"),
-      renderValueDiagnosticItem("otbChPressure", "Waterdruk"),
-      renderValueDiagnosticItem("otbBoilerWaterTemp", "Keteltemperatuur"),
-      renderValueDiagnosticItem("otbReturnWaterTemp", "Retourtemperatuur"),
-      renderValueDiagnosticItem("otbDhwTemp", "Tapwatertemperatuur"),
-      renderBinaryDiagnosticItem("otbFaultIndication", "Ketelfout", "Actief", "Geen", { warningWhenActive: true }),
-      renderBinaryDiagnosticItem("otbDiagnosticIndication", "Diagnosemelding", "Actief", "Geen", { warningWhenActive: true }),
-      renderBinaryDiagnosticItem("otbServiceRequest", "Service gevraagd", "Ja", "Nee", { warningWhenActive: true }),
-      renderBinaryDiagnosticItem("otbLowWaterPressure", "Lage waterdruk", "Ja", "Nee", { warningWhenActive: true }),
-      renderBinaryDiagnosticItem("otbFlameFault", "Vlamstoring", "Ja", "Nee", { warningWhenActive: true }),
-      renderBinaryDiagnosticItem("otbAirPressureFault", "Luchtdrukstoring", "Ja", "Nee", { warningWhenActive: true }),
-      renderBinaryDiagnosticItem("otbWaterOverTemp", "Overtemperatuur", "Ja", "Nee", { warningWhenActive: true }),
-      renderValueDiagnosticItem("otbOemFaultCode", "OEM-foutcode"),
-      renderValueDiagnosticItem("otbOemDiagnosticCode", "OEM-diagnosecode"),
-      renderValueDiagnosticItem("otbLastResponseAge", "Laatste response"),
-      renderValueDiagnosticItem("otbLastResponseId", "Laatste message-ID"),
-      renderValueDiagnosticItem("otbResponseCount", "Geldige responses"),
-    ]);
+    ];
+    if (otbSelected) {
+      otbDiagnosticRows.push(
+        renderBinaryDiagnosticItem("otbChCommand", "CH-commando", "Actief", "Uit"),
+        renderValueDiagnosticItem("otbControlSetpointCommand", "TSet-commando"),
+        renderBinaryDiagnosticItem("otbChActive", "CV actief", "Actief", "Uit"),
+        renderBinaryDiagnosticItem("otbFlameOn", "Vlam", "Aan", "Uit"),
+        renderBinaryDiagnosticItem("otbDhwActive", "Tapwater actief", "Actief", "Uit"),
+        renderValueDiagnosticItem("otbRelativeModulation", "Modulatie"),
+        renderValueDiagnosticItem("otbChPressure", "Waterdruk"),
+        renderValueDiagnosticItem("otbBoilerWaterTemp", "Keteltemperatuur"),
+        renderValueDiagnosticItem("otbReturnWaterTemp", "Retourtemperatuur"),
+        renderValueDiagnosticItem("otbDhwTemp", "Tapwatertemperatuur"),
+        renderBinaryDiagnosticItem("otbFaultIndication", "Ketelfout", "Actief", "Geen", { warningWhenActive: true }),
+        renderBinaryDiagnosticItem("otbDiagnosticIndication", "Diagnosemelding", "Actief", "Geen", { warningWhenActive: true }),
+        renderBinaryDiagnosticItem("otbServiceRequest", "Service gevraagd", "Ja", "Nee", { warningWhenActive: true }),
+        renderBinaryDiagnosticItem("otbLowWaterPressure", "Lage waterdruk", "Ja", "Nee", { warningWhenActive: true }),
+        renderBinaryDiagnosticItem("otbFlameFault", "Vlamstoring", "Ja", "Nee", { warningWhenActive: true }),
+        renderBinaryDiagnosticItem("otbAirPressureFault", "Luchtdrukstoring", "Ja", "Nee", { warningWhenActive: true }),
+        renderBinaryDiagnosticItem("otbWaterOverTemp", "Overtemperatuur", "Ja", "Nee", { warningWhenActive: true }),
+        renderValueDiagnosticItem("otbOemFaultCode", "OEM-foutcode"),
+        renderValueDiagnosticItem("otbOemDiagnosticCode", "OEM-diagnosecode"),
+        renderValueDiagnosticItem("otbLastResponseAge", "Laatste response"),
+        renderValueDiagnosticItem("otbLastResponseId", "Laatste message-ID"),
+        renderValueDiagnosticItem("otbResponseCount", "Geldige responses"),
+      );
+    }
+    const otbDiagnosticPanel = renderDiagnosticGroup("OpenTherm ketel (OTB)", otbDiagnosticRows);
 
     const cicDiagnosticPanel = renderDiagnosticGroup("CIC-feed", [
       hasEntity("cicJsonFeedOk") ? renderDiagnosticItem({
