@@ -82,6 +82,11 @@ void test_strategy_inputs() {
       true, true, 45.0f, NAN, 3.0f, 1.0f);
   assert(!curve_invalid.need_on);
   assert(curve_invalid.okay_off);
+
+  assert(oq_boiler::cm3_should_hold(false, false, false));
+  assert(oq_boiler::cm3_should_hold(true, false, false));
+  assert(oq_boiler::cm3_should_hold(true, true, false));
+  assert(!oq_boiler::cm3_should_hold(true, true, true));
 }
 
 void test_power_target() {
