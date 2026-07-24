@@ -32,7 +32,17 @@ int main() {
   assert(!link_state.transport_is_available(250, 1000, 1000));
   link_state.record_response(260, 0, oq_otb::MESSAGE_TYPE_READ_ACK);
   assert(link_state.transport_is_available(260, 1000, 1000));
-  assert(!link_state.transport_is_available(1261, 1000, 1000));
+  const uint32_t accepted_before_reset = link_state.accepted_response_count();
+  link_state.reset_link_session();
+  assert(!link_state.session_has_response());
+  assert(link_state.accepted_response_count() == accepted_before_reset);
+  assert(link_state.last_response_id() == -1);
+  assert(strcmp(link_state.last_response_type_name(), "Never") == 0);
+  assert(!link_state.field_is_valid(oq_otb::FIELD_STATUS));
+  assert(!link_state.transport_is_available(260, 1000, 1000));
+  link_state.record_response(270, 0, oq_otb::MESSAGE_TYPE_READ_ACK);
+  assert(link_state.transport_is_available(270, 1000, 1000));
+  assert(!link_state.transport_is_available(1271, 1000, 1000));
 
   // A READ_ACK makes only the matching field valid. Zero-valued payloads are
   // still legitimate samples; validity comes from the response type, not data.

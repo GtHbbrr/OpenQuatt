@@ -8,6 +8,23 @@
 # ==============================================================================
 
 esphome:
+  on_boot:
+    priority: -100
+    then:
+      - lambda: |-
+          // The OpenTherm hub is runtime-owned by the installation choice. A
+          // normal R1 installation must not poll an unconnected boiler bus.
+          oq_otb::telemetry_state.reset_link_session();
+          id(oq_otb_link_initialized) = true;
+          id(oq_otb_link_available_state) = false;
+          id(otb_link_available).publish_state(false);
+          const bool opentherm_selected =
+              id(oq_boiler_connection).has_state() &&
+              id(oq_boiler_connection).current_option() == "OpenTherm";
+          if (!opentherm_selected) {
+            id(oq_otb_hub).on_shutdown();
+            id(oq_otb_hub).disable_loop();
+          }
   on_shutdown:
     priority: 700
     then:
@@ -38,10 +55,10 @@ opentherm:
   - id: oq_otb_hub
     in_pin: ${oq_ot_boiler_in_pin}
     out_pin: ${oq_ot_boiler_out_pin}
-    # Q-duo HIL: synchronous request handling eliminated simulator-side RX
-    # decode failures and master response timeouts. It does increase the
-    # observed main-loop duration; real-boiler timing remains a release gate.
-    sync_mode: true
+    # Keep the application loop asynchronous. A missing boiler response may
+    # take up to 800 ms; sync mode would block Modbus, API and web handling for
+    # that entire interval. RX reliability remains an explicit release gate.
+    sync_mode: false
     # The runtime switch is default-off and owns the actual STATUS bit. The hub
     # gate must be true or ESPHome would mask that switch permanently.
     ch_enable: true
@@ -324,7 +341,7 @@ sensor:
     web_server:
       sorting_group_id: oq_boiler
     lambda: |-
-      if (oq_otb::telemetry_state.accepted_response_count() == 0) return NAN;
+      if (!oq_otb::telemetry_state.session_has_response()) return NAN;
       return (float) ((uint32_t) (
           millis() - oq_otb::telemetry_state.last_response_ms())) / 1000.0f;
 

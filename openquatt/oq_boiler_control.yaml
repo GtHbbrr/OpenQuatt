@@ -152,6 +152,7 @@ select:
             id(oq_boiler_transport_active) = false;
             id(boiler_relay).turn_off();
             ${oq_boiler_transport_shutdown_extra}
+            ${oq_boiler_transport_selection_extra}
 
 # ----------------------------
 # R1 OUTPUT

@@ -47,7 +47,18 @@ struct FieldState {
 
 class TelemetryState {
  public:
+  void reset_link_session() {
+    this->session_has_response_ = false;
+    this->last_response_ms_ = 0;
+    this->last_response_id_ = -1;
+    this->last_response_type_ = -1;
+    for (auto &field : this->fields_) {
+      field = {};
+    }
+  }
+
   void record_response(uint32_t now_ms, uint8_t message_id, uint8_t message_type) {
+    this->session_has_response_ = true;
     this->last_response_ms_ = now_ms;
     this->last_response_id_ = message_id;
     this->last_response_type_ = message_type;
@@ -100,7 +111,7 @@ class TelemetryState {
   bool transport_is_available(
       uint32_t now_ms, uint32_t response_max_age_ms,
       uint32_t status_max_age_ms) const {
-    return this->accepted_response_count_ != 0 &&
+    return this->session_has_response_ &&
            (uint32_t) (now_ms - this->last_response_ms_) <= response_max_age_ms &&
            this->field_is_fresh(FIELD_STATUS, now_ms, status_max_age_ms);
   }
@@ -146,6 +157,7 @@ class TelemetryState {
   }
 
   uint32_t last_response_ms() const { return this->last_response_ms_; }
+  bool session_has_response() const { return this->session_has_response_; }
   int last_response_id() const { return this->last_response_id_; }
   int last_response_type() const { return this->last_response_type_; }
   uint32_t accepted_response_count() const { return this->accepted_response_count_; }
@@ -241,6 +253,7 @@ class TelemetryState {
 
   FieldState fields_[FIELD_COUNT]{};
 
+  bool session_has_response_{false};
   uint32_t last_response_ms_{0};
   int last_response_id_{-1};
   int last_response_type_{-1};
