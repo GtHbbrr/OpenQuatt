@@ -136,6 +136,11 @@ bool OpenTherm::get_protocol_error(OpenThermError &error) {
 void OpenTherm::stop() {
   this->stop_timer_();
 #ifdef USE_ESP32
+  // Invalidate both RMT callbacks before cancelling either channel. Without
+  // this claim, a TX-complete ISR could arm RX between the two cancellations.
+  portENTER_CRITICAL(&this->rmt_mux_);
+  this->mode_ = OperationMode::IDLE;
+  portEXIT_CRITICAL(&this->rmt_mux_);
   this->cancel_esp32_rmt_();
   this->cancel_esp32_rmt_tx_();
 #endif
@@ -355,6 +360,10 @@ bool OpenTherm::init_esp32_rmt_() {
     return false;
   }
 
+  this->rmt_rx_config_.signal_range_min_ns = 3187;
+  this->rmt_rx_config_.signal_range_max_ns = 2500000;
+  this->rmt_rx_config_.flags.en_partial_rx = false;
+
   ESP_LOGCONFIG(TAG, "OpenTherm RMT receive capture active on GPIO%u",
                 static_cast<unsigned>(this->in_pin_->get_pin()));
   return true;
@@ -465,7 +474,12 @@ bool OpenTherm::start_esp32_rmt_tx_() {
 
   portENTER_CRITICAL(&this->rmt_mux_);
   this->rmt_tx_active_ = true;
-  this->rmt_tx_deadline_us_ = micros() + RMT_TX_TIMEOUT_US;
+  const uint32_t tx_started_us = micros();
+  this->rmt_tx_deadline_us_ = tx_started_us + RMT_TX_TIMEOUT_US;
+  this->receive_deadline_us_ =
+      tx_started_us +
+      static_cast<uint32_t>(RMT_TX_SYMBOLS * 2U * rmt_encoder::HALF_BIT_DURATION_US) +
+      static_cast<uint32_t>(this->device_timeout_) * 1000U;
   portEXIT_CRITICAL(&this->rmt_mux_);
 
   rmt_transmit_config_t config{};
@@ -523,11 +537,6 @@ bool OpenTherm::arm_esp32_rmt_() {
     return false;
   }
 
-  rmt_receive_config_t config{};
-  config.signal_range_min_ns = 3187;
-  config.signal_range_max_ns = 2500000;
-  config.flags.en_partial_rx = false;
-
   portENTER_CRITICAL(&this->rmt_mux_);
   this->rmt_symbol_count_ = 0;
   this->rmt_frame_ready_ = false;
@@ -535,7 +544,8 @@ bool OpenTherm::arm_esp32_rmt_() {
   portEXIT_CRITICAL(&this->rmt_mux_);
 
   const esp_err_t result =
-      rmt_receive(this->rmt_rx_channel_, this->rmt_rx_symbols_, sizeof(this->rmt_rx_symbols_), &config);
+      rmt_receive(this->rmt_rx_channel_, this->rmt_rx_symbols_, sizeof(this->rmt_rx_symbols_),
+                  &this->rmt_rx_config_);
   if (result != ESP_OK) {
     portENTER_CRITICAL(&this->rmt_mux_);
     this->rmt_armed_ = false;
@@ -600,7 +610,26 @@ bool IRAM_ATTR OpenTherm::rmt_tx_done_callback_(rmt_channel_handle_t,
   portENTER_CRITICAL_ISR(&instance->rmt_mux_);
   if (instance->rmt_tx_active_ && instance->mode_ == OperationMode::WRITE) {
     instance->rmt_tx_active_ = false;
-    instance->mode_ = OperationMode::SENT;
+    instance->rmt_symbol_count_ = 0;
+    instance->rmt_frame_ready_ = false;
+    // Close the request/response handover inside the TX-complete ISR. Waiting
+    // for the application loop to observe SENT can miss an early boiler
+    // response when another component temporarily delays that loop.
+    // ESP-IDF explicitly permits rmt_receive() from ISR context. Keep the
+    // component lock until the handover is armed so stop() cannot cancel the
+    // channel between our state claim and the driver call.
+    const esp_err_t result =
+        rmt_receive(instance->rmt_rx_channel_, instance->rmt_rx_symbols_,
+                    sizeof(instance->rmt_rx_symbols_), &instance->rmt_rx_config_);
+    if (result == ESP_OK) {
+      instance->rmt_armed_ = true;
+      instance->mode_ = OperationMode::LISTEN;
+    } else {
+      instance->rmt_armed_ = false;
+      instance->timer_error_ = result;
+      instance->timer_error_type_ = TimerErrorType::TIMER_START_ERROR;
+      instance->mode_ = OperationMode::ERROR_TIMER;
+    }
   }
   portEXIT_CRITICAL_ISR(&instance->rmt_mux_);
   return false;

@@ -386,6 +386,7 @@ class OpenTherm {
       .flags = {.auto_reload_on_alarm = true},
   };
   rmt_channel_handle_t rmt_rx_channel_{nullptr};
+  rmt_receive_config_t rmt_rx_config_{};
   rmt_symbol_word_t rmt_rx_symbols_[RMT_CAPTURE_SYMBOLS]{};
   rmt_channel_handle_t rmt_tx_channel_{nullptr};
   rmt_encoder_handle_t rmt_tx_encoder_{nullptr};
