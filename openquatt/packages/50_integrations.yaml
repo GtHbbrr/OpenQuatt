@@ -2,6 +2,7 @@
 # OpenQuatt - Integration Packages
 # ==============================================================================
 packages:
+  oq_boiler_dispatch: !include ../oq_boiler_dispatch.yaml
   oq_boiler_control: !include
     file: ../oq_boiler_control.yaml
     vars:
