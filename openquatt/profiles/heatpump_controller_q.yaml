@@ -10,11 +10,13 @@ substitutions:
     id(oq_otb_link_initialized) = true;
     id(oq_otb_link_available_state) = false;
     id(otb_link_available).publish_state(false);
-    if (x == "OpenTherm") {
-      id(oq_otb_hub).enable_loop();
-    } else {
-      id(oq_otb_hub).on_shutdown();
-      id(oq_otb_hub).disable_loop();
+    if (id(oq_otb_hub_ready)) {
+      if (x == "OpenTherm") {
+        id(oq_otb_hub).enable_loop();
+      } else {
+        id(oq_otb_hub).on_shutdown();
+        id(oq_otb_hub).disable_loop();
+      }
     }
   oq_boiler_transport_shutdown_extra: "id(oq_otb_ch_enable).turn_off(); { auto call = id(oq_otb_t_set_command).make_call(); call.set_value(0.0f); call.perform(); }" # Withdraw OTB synchronously on every transport edge.
   oq_local_supply_temp_sensor_id: "water_supply_temp_pt1000" # Q-edition local PT1000 source.

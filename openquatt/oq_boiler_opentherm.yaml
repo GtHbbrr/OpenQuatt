@@ -18,10 +18,13 @@ esphome:
           id(oq_otb_link_initialized) = true;
           id(oq_otb_link_available_state) = false;
           id(otb_link_available).publish_state(false);
+          id(oq_otb_hub_ready) = true;
           const bool opentherm_selected =
               id(oq_boiler_connection).has_state() &&
               id(oq_boiler_connection).current_option() == "OpenTherm";
-          if (!opentherm_selected) {
+          if (opentherm_selected) {
+            id(oq_otb_hub).enable_loop();
+          } else {
             id(oq_otb_hub).on_shutdown();
             id(oq_otb_hub).disable_loop();
           }
@@ -46,6 +49,13 @@ logger:
               millis(), tag, message);
 
 globals:
+  # The restored Boiler connection select is set up before the OpenTherm hub.
+  # Its boot callback must not dereference the hub until component setup ended.
+  - id: oq_otb_hub_ready
+    type: bool
+    restore_value: false
+    initial_value: 'false'
+
   - id: oq_otb_link_initialized
     type: bool
     restore_value: false
