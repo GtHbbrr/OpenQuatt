@@ -217,6 +217,12 @@ oq_ot_enabled_default: "false"                        # Default runtime state of
 oq_ot_response_enabled_default: "true"                # Allow the OT slave to answer thermostat requests by default.
 
 # ----------------------------
+# OPEN THERM BOILER MASTER
+# ----------------------------
+oq_otb_link_watch_s: "1"                              # OTB link/freshness evaluation interval [s].
+oq_otb_link_timeout_s: "10"                           # Maximum age of the last valid boiler response [s].
+
+# ----------------------------
 # CIC FEED
 # ----------------------------
 cic_backoff_start_ms: "5000"                          # Initial polling backoff after success/startup [ms].

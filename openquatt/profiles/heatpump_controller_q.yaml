@@ -17,6 +17,8 @@ substitutions:
   uart_rts_pin: "GPIO41"                                # Modbus 1 mode / DE/RE; primary heat-pump bus.
   oq_ot_thermostat_in_pin: "GPIO21"                     # OpenTherm slave input.
   oq_ot_thermostat_out_pin: "GPIO14"                    # OpenTherm slave output.
+  oq_ot_boiler_in_pin: "GPIO47"                         # OpenTherm boiler master input.
+  oq_ot_boiler_out_pin: "GPIO48"                        # OpenTherm boiler master output.
   ds18b20_pin: "GPIO18"                                 # Dallas DS18B20 1-Wire input.
   oq_boiler_relay_pin: "GPIO16"                         # Relay 1 output.
   controller_aux_relay_pin: "GPIO3"                     # Relay 2 output reserved for controller logic.
@@ -49,6 +51,7 @@ packages:
     file: ../oq_ot_slave.yaml
     vars:
       ot_secondary_present: "${ot_secondary_present}"
+  oq_boiler_opentherm: !include ../oq_boiler_opentherm.yaml
 
 openquatt_usage_telemetry:
   cic_compatibility_switch: cic_compatibility_enable
