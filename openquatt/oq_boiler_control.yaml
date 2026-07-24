@@ -3,8 +3,8 @@
 # ==============================================================================
 #
 # Goal:
-#   Validates the transport-neutral boiler command and applies it to the
-#   configured R1 relay during CM3 and the explicit CM100 boiler power test.
+#   Validates the transport-neutral boiler command and exposes one safe output
+#   request to the selected R1 or OpenTherm transport.
 #
 # Role in architecture:
 #   Owner of boiler safety gating and the R1 transport adapter. Control Mode and
@@ -13,7 +13,7 @@
 # What this package DOES do:
 #   - Switch boiler relay via configured output pin (`oq_boiler_relay_pin`)
 #   - Validate command availability/freshness before transport activation
-#   - Preserve the existing CM3/CM100 R1 behavior through the legacy dispatcher
+#   - Keep R1 and OpenTherm mutually exclusive through an explicit selection
 #   - Follow the shared water-temperature guardrail state from `oq_strategy_manager`
 #   - Enforce transport minimum on/off timing when configured
 #   - Publish optional diagnostics (for example boiler status / optionally derived power)
@@ -44,10 +44,11 @@ esphome:
     priority: 700
     then:
       - lambda: |-
-          // Fail-safe R1 shutdown; OTB adds its own controlled off handshake later.
+          // Fail-safe shared shutdown; OTB adds its own controlled off handshake.
           id(oq_boiler_command_valid) = false;
           id(oq_boiler_command_heat_request) = false;
           id(oq_boiler_output_request) = false;
+          id(oq_boiler_transport_active) = false;
           id(oq_boiler_block_reason_code) = oq_boiler::BLOCK_COMMAND_INVALID;
       - switch.turn_off: boiler_relay
 
@@ -69,6 +70,49 @@ globals:
     type: uint32_t
     restore_value: false
     initial_value: '0'
+
+  - id: oq_boiler_transport_active
+    type: bool
+    restore_value: false
+    initial_value: 'false'
+
+  # Common declaration lets non-Q profiles compile the same controller. Only
+  # the Q OpenTherm package can set this state true.
+  - id: oq_otb_link_available_state
+    type: bool
+    restore_value: false
+    initial_value: 'false'
+
+# ----------------------------
+# TRANSPORT SELECTION
+# ----------------------------
+select:
+  - platform: template
+    id: oq_boiler_connection
+    name: "Boiler connection"
+    icon: mdi:connection
+    entity_category: config
+    optimistic: true
+    restore_value: true
+    options:
+      - R1
+      - OpenTherm
+    initial_option: R1
+    web_server:
+      sorting_group_id: oq_control
+    on_value:
+      then:
+        - lambda: |-
+            // Break-before-make: a transport change immediately drops both the
+            // shared request and R1. The selected path may restart only after a
+            // fresh controller evaluation.
+            const uint32_t now_ms = millis();
+            if (id(oq_boiler_output_request)) {
+              id(oq_boiler_output_request) = false;
+              id(oq_boiler_output_last_change_ms) = now_ms;
+            }
+            id(oq_boiler_transport_active) = false;
+            id(boiler_relay).turn_off();
 
 # ----------------------------
 # R1 OUTPUT
@@ -104,7 +148,7 @@ binary_sensor:
     web_server:
       sorting_group_id: oq_boiler
     lambda: |-
-      return id(boiler_relay).state;
+      return id(oq_boiler_transport_active);
 
 sensor:
   - platform: template
@@ -119,15 +163,8 @@ sensor:
     web_server:
       sorting_group_id: oq_boiler
     lambda: |-
-      const int cm_code = id(oq_control_mode_code);
-      const bool commissioning_boiler =
-          (cm_code == 100) &&
-          id(oq_commissioning_active) &&
-          (id(oq_commissioning_task_code) == oq_commissioning::TASK_BOILER_POWER_TEST) &&
-          id(oq_commissioning_boiler_request);
-      const bool in_cm3 = (cm_code == 3);
       if (!id(oq_boiler_assist_enabled).state) return 0.0f;
-      if (!in_cm3 && !commissioning_boiler) return 0.0f;
+      if (!id(oq_boiler_transport_active)) return 0.0f;
 
       const float hp2_outlet_c = id(${heatpump_outlet_temp_id}).state;
       const float supply_c = id(water_supply_temp_selected).state;
@@ -157,6 +194,27 @@ interval:
           const uint32_t now_ms = millis();
           const float supply_c = id(water_supply_temp_selected).state;
           const bool has_valid_supply_temp = !isnan(supply_c);
+          const bool opentherm_selected =
+              id(oq_boiler_connection).has_state() &&
+              id(oq_boiler_connection).current_option() == "OpenTherm";
+          const bool transport_available =
+              !opentherm_selected ||
+              (${oq_otb_supported} && id(oq_otb_link_available_state));
+          const float target_c = id(oq_boiler_command_target_temperature_c);
+          const float boiler_flow_lph = id(flow_rate_selected).state;
+          const bool boiler_flow_valid =
+              !isnan(boiler_flow_lph) && boiler_flow_lph >= ${oq_cm_min_flow_lph};
+          const bool target_valid =
+              !isnan(target_c) && target_c > 0.0f && target_c <= 90.0f &&
+              boiler_flow_valid;
+          const uint32_t minimum_on_ms = (uint32_t) (
+              (opentherm_selected
+                   ? ${oq_boiler_otb_min_on_s}
+                   : ${oq_boiler_relay_min_on_s}) * 1000UL);
+          const uint32_t minimum_off_ms = (uint32_t) (
+              (opentherm_selected
+                   ? ${oq_boiler_otb_min_off_s}
+                   : ${oq_boiler_relay_min_off_s}) * 1000UL);
           const oq_boiler::BoilerCommand command{
               id(oq_boiler_command_valid),
               id(oq_boiler_command_demand_present),
@@ -171,12 +229,15 @@ interval:
               has_valid_supply_temp,
               id(oq_water_temp_boiler_inhibit_active),
               id(oq_water_temp_hard_trip_active),
-              id(boiler_relay).state,
+              transport_available,
+              opentherm_selected,
+              target_valid,
+              id(oq_boiler_output_request),
               now_ms,
               (uint32_t) (${oq_boiler_command_max_age_s} * 1000UL),
               id(oq_boiler_output_last_change_ms),
-              (uint32_t) (${oq_boiler_relay_min_on_s} * 1000UL),
-              (uint32_t) (${oq_boiler_relay_min_off_s} * 1000UL),
+              minimum_on_ms,
+              minimum_off_ms,
           };
           const auto decision = oq_boiler::evaluate(command, input);
           const bool commissioning_boiler =
@@ -186,7 +247,12 @@ interval:
               oq_boiler::block_reason_text(decision.block_reason);
           const bool boiler_allowed = decision.output_active;
           const bool boiler_requested = decision.demand_present;
+          const bool boiler_output_changed =
+              id(oq_boiler_output_request) != decision.output_active;
           id(oq_boiler_output_request) = decision.output_active;
+          if (boiler_output_changed) {
+            id(oq_boiler_output_last_change_ms) = now_ms;
+          }
           id(oq_boiler_block_reason_code) = decision.block_reason;
 
           // Phase 2: map the transport-neutral decision to existing decision-log semantics.
@@ -201,7 +267,9 @@ interval:
               return openquatt_decision_log::REASON_NO_CANDIDATE;
             }
             if (decision.block_reason == oq_boiler::BLOCK_COMMAND_INVALID ||
-                decision.block_reason == oq_boiler::BLOCK_COMMAND_STALE) {
+                decision.block_reason == oq_boiler::BLOCK_COMMAND_STALE ||
+                decision.block_reason == oq_boiler::BLOCK_TRANSPORT_UNAVAILABLE ||
+                decision.block_reason == oq_boiler::BLOCK_TARGET_INVALID) {
               return openquatt_decision_log::REASON_SENSOR_FALLBACK;
             }
             if (boiler_block_reason == "CM100 boiler commissioning waiting for flow settle") {
@@ -253,33 +321,36 @@ interval:
           }
           last_boiler_blocked = boiler_blocked;
 
-          // Phase 3: apply the evaluated output request to the R1 transport only.
-          if (boiler_allowed) {
-            if (!id(boiler_relay).state) {
-              id(oq_decision_log).emit(
-                  openquatt_decision_log::EVENT_BOILER_ASSIST_START,
-                  openquatt_decision_log::SUBJECT_CV,
-                  openquatt_decision_log::REASON_BOILER_ASSIST,
-                  openquatt_decision_log::SEVERITY_NORMAL,
-                  (uint8_t) cm_code,
-                  openquatt_decision_log::STATE_STANDBY,
-                  openquatt_decision_log::STATE_ACTIVE,
-                  has_valid_supply_temp ? (int16_t) lroundf(supply_c * 10.0f) : 0);
-              id(boiler_relay).turn_on();
-              id(oq_boiler_output_last_change_ms) = now_ms;
-            }
+          // Phase 3: log the shared request and apply it only to R1 when selected.
+          if (boiler_output_changed) {
+            id(oq_decision_log).emit(
+                boiler_allowed
+                    ? openquatt_decision_log::EVENT_BOILER_ASSIST_START
+                    : openquatt_decision_log::EVENT_BOILER_ASSIST_STOP,
+                openquatt_decision_log::SUBJECT_CV,
+                boiler_allowed
+                    ? openquatt_decision_log::REASON_BOILER_ASSIST
+                    : boiler_log_reason_code,
+                boiler_allowed
+                    ? openquatt_decision_log::SEVERITY_NORMAL
+                    : boiler_log_severity,
+                (uint8_t) cm_code,
+                boiler_allowed
+                    ? openquatt_decision_log::STATE_STANDBY
+                    : openquatt_decision_log::STATE_ACTIVE,
+                boiler_allowed
+                    ? openquatt_decision_log::STATE_ACTIVE
+                    : openquatt_decision_log::STATE_STANDBY,
+                has_valid_supply_temp ? (int16_t) lroundf(supply_c * 10.0f) : 0);
+          }
+
+          if (opentherm_selected) {
+            id(boiler_relay).turn_off();
+          } else if (boiler_allowed) {
+            id(boiler_relay).turn_on();
           } else {
-            if (id(boiler_relay).state) {
-              id(oq_decision_log).emit(
-                  openquatt_decision_log::EVENT_BOILER_ASSIST_STOP,
-                  openquatt_decision_log::SUBJECT_CV,
-                  boiler_log_reason_code,
-                  boiler_log_severity,
-                  (uint8_t) cm_code,
-                  openquatt_decision_log::STATE_ACTIVE,
-                  openquatt_decision_log::STATE_STANDBY,
-                  has_valid_supply_temp ? (int16_t) lroundf(supply_c * 10.0f) : 0);
-              id(boiler_relay).turn_off();
-              id(oq_boiler_output_last_change_ms) = now_ms;
-            }
+            id(boiler_relay).turn_off();
+          }
+          if (!opentherm_selected) {
+            id(oq_boiler_transport_active) = id(boiler_relay).state;
           }

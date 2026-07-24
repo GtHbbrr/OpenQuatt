@@ -671,13 +671,18 @@ interval:
           int request_owner_hp = 0;
           int request_reason_code = 0;
 
-          #if OQ_TOPOLOGY_DUO
-          const float Pr = id(house_rated_power_w).state;
+          const float strategy_rated_power_w = id(house_rated_power_w).state;
           float P_req_total = id(oq_phouse_req_w);
-          float P_cap = NAN;
-          if (!isnan(Pr) && Pr > 0.0f) P_cap = (Pr * ((float) f / (float) demand_max_f));
-          if (!isnan(P_cap)) P_req_total = std::min(P_req_total, P_cap);
+          float strategy_power_cap_w = NAN;
+          if (!isnan(strategy_rated_power_w) && strategy_rated_power_w > 0.0f) {
+            strategy_power_cap_w =
+                strategy_rated_power_w * ((float) f / (float) demand_max_f);
+          }
+          if (!isnan(strategy_power_cap_w)) {
+            P_req_total = std::min(P_req_total, strategy_power_cap_w);
+          }
 
+          #if OQ_TOPOLOGY_DUO
           const float cap_total = publish_capacity_and_deficit(P_req_total);
           const bool perf_inputs_valid = !isnan(Tamb) && !isnan(Tsup) && level_cap > 0;
           if (!perf_inputs_valid) {
@@ -1045,12 +1050,6 @@ interval:
           }
           #else
           publish_optimizer_reason("single_topology");
-          const float Pr = id(house_rated_power_w).state;
-          float P_req_total = id(oq_phouse_req_w);
-          float P_cap = NAN;
-          if (!isnan(Pr) && Pr > 0.0f) P_cap = (Pr * ((float) f / (float) demand_max_f));
-          if (!isnan(P_cap)) P_req_total = std::min(P_req_total, P_cap);
-
           const float cap_total = publish_capacity_and_deficit(P_req_total);
           const bool perf_inputs_valid = !isnan(Tamb) && !isnan(Tsup) && level_cap > 0;
           if (!perf_inputs_valid) {
@@ -1103,10 +1102,30 @@ interval:
           id(oq_ph_request_owner_hp) = request_owner_hp;
           id(oq_ph_request_reason_code) = request_reason_code;
 
+          float hp_expected_power_w = 0.0f;
+          bool hp_expected_power_valid = !isnan(Tamb) && !isnan(Tsup);
+          if (hp_expected_power_valid && hp1_req > 0) {
+            const float hp1_expected_w =
+                oq_perf::interp_power_th_w(hp1_req, Tamb, Tsup) * hp1_th_fac;
+            if (isnan(hp1_expected_w)) hp_expected_power_valid = false;
+            else hp_expected_power_w += hp1_expected_w;
+          }
+          if (hp_expected_power_valid && hp2_req > 0) {
+            const float hp2_expected_w =
+                oq_perf::interp_power_th_w(hp2_req, Tamb, Tsup) * hp2_th_fac;
+            if (isnan(hp2_expected_w)) hp_expected_power_valid = false;
+            else hp_expected_power_w += hp2_expected_w;
+          }
+
           id(oq_strategy_phase_code) = (f > 0) ? 1 : 0;
-          id(oq_strategy_requested_power_w) = id(oq_phouse_req_w);
+          id(oq_strategy_requested_power_w) = P_req_total;
           id(oq_strategy_supply_target_temp) = NAN;
           id(oq_strategy_heat_request_active) = (f > 0);
+          id(oq_strategy_hp_expected_power_w) =
+              hp_expected_power_valid ? hp_expected_power_w : NAN;
+          id(oq_strategy_hp_max_power_w) = id(oq_P_hp_cap_w);
+          id(oq_strategy_hp_saturated) =
+              (f > 0) && !isnan(id(oq_P_deficit_w)) && id(oq_P_deficit_w) > 0.0f;
           id(oq_strategy_phase_text).publish_state((f > 0) ? "heat" : "idle");
 
           char debug_buf[160];

@@ -58,6 +58,21 @@ globals:
     restore_value: false
     initial_value: 'false'
 
+  - id: oq_strategy_hp_expected_power_w
+    type: float
+    restore_value: false
+    initial_value: 'NAN'
+
+  - id: oq_strategy_hp_max_power_w
+    type: float
+    restore_value: false
+    initial_value: 'NAN'
+
+  - id: oq_strategy_hp_saturated
+    type: bool
+    restore_value: false
+    initial_value: 'false'
+
   - id: oq_strategy_water_limit_factor
     type: float
     restore_value: false
@@ -97,6 +112,9 @@ select:
             id(oq_strategy_requested_power_w) = NAN;
             id(oq_strategy_supply_target_temp) = NAN;
             id(oq_strategy_heat_request_active) = false;
+            id(oq_strategy_hp_expected_power_w) = NAN;
+            id(oq_strategy_hp_max_power_w) = NAN;
+            id(oq_strategy_hp_saturated) = false;
             oq_curve::reset_control_state(
               id(oq_curve_demand_continuous),
               id(oq_demand_curve),

@@ -7,8 +7,10 @@ namespace oq_boiler {
 
 enum CommandSource : uint8_t {
   COMMAND_SOURCE_NONE = 0,
-  COMMAND_SOURCE_CM3 = 1,
+  COMMAND_SOURCE_POWER_HOUSE = 1,
+  COMMAND_SOURCE_CM3 = COMMAND_SOURCE_POWER_HOUSE,
   COMMAND_SOURCE_COMMISSIONING = 2,
+  COMMAND_SOURCE_HEATING_CURVE = 3,
 };
 
 enum BlockReason : uint8_t {
@@ -23,6 +25,8 @@ enum BlockReason : uint8_t {
   BLOCK_NO_HEAT_REQUEST = 8,
   BLOCK_MIN_ON_TIME = 9,
   BLOCK_MIN_OFF_TIME = 10,
+  BLOCK_TRANSPORT_UNAVAILABLE = 11,
+  BLOCK_TARGET_INVALID = 12,
 };
 
 struct BoilerCommand {
@@ -40,6 +44,9 @@ struct ControllerInput {
   bool supply_temperature_valid;
   bool boiler_inhibit_active;
   bool hard_trip_active;
+  bool transport_available;
+  bool target_required;
+  bool target_valid;
   bool output_active;
   uint32_t now_ms;
   uint32_t command_max_age_ms;
@@ -47,6 +54,83 @@ struct ControllerInput {
   uint32_t min_on_ms;
   uint32_t min_off_ms;
 };
+
+struct PowerTarget {
+  bool valid;
+  float requested_power_w;
+  float target_temperature_c;
+};
+
+struct AssistSignal {
+  bool need_on;
+  bool okay_off;
+};
+
+inline AssistSignal power_house_assist(float deficit_w,
+                                       float on_threshold_w,
+                                       float off_threshold_w) {
+  return AssistSignal{
+      !isnan(deficit_w) && deficit_w >= on_threshold_w,
+      isnan(deficit_w) || deficit_w <= off_threshold_w,
+  };
+}
+
+inline AssistSignal heating_curve_assist(bool heat_request,
+                                         bool hp_saturated,
+                                         float target_temperature_c,
+                                         float supply_temperature_c,
+                                         float on_delta_c,
+                                         float off_delta_c) {
+  const bool temperatures_valid =
+      !isnan(target_temperature_c) && !isnan(supply_temperature_c);
+  const float target_error_c = temperatures_valid
+      ? target_temperature_c - supply_temperature_c
+      : NAN;
+  return AssistSignal{
+      heat_request && hp_saturated && temperatures_valid &&
+          target_error_c >= on_delta_c,
+      !heat_request || !hp_saturated || !temperatures_valid ||
+          target_error_c <= off_delta_c,
+  };
+}
+
+inline bool cm3_should_hold(bool minimum_run_elapsed,
+                            bool okay_off,
+                            bool demote_confirmation_elapsed) {
+  return !minimum_run_elapsed || !okay_off || !demote_confirmation_elapsed;
+}
+
+inline PowerTarget target_from_power(float requested_power_w,
+                                     float rated_power_w,
+                                     float inlet_temperature_c,
+                                     float flow_lph,
+                                     float cp_j_per_kgk,
+                                     float maximum_temperature_c) {
+  PowerTarget target{false, 0.0f, NAN};
+  if (isnan(requested_power_w) || isnan(rated_power_w) ||
+      isnan(inlet_temperature_c) || isnan(flow_lph) ||
+      isnan(cp_j_per_kgk) || isnan(maximum_temperature_c) ||
+      requested_power_w <= 0.0f || rated_power_w <= 0.0f ||
+      flow_lph <= 0.0f || cp_j_per_kgk <= 0.0f ||
+      inlet_temperature_c >= maximum_temperature_c) {
+    return target;
+  }
+
+  const float thermal_conductance_w_per_k =
+      (flow_lph / 3600.0f) * cp_j_per_kgk;
+  const float maximum_hydraulic_power_w =
+      thermal_conductance_w_per_k *
+      (maximum_temperature_c - inlet_temperature_c);
+  float usable_power_w = fminf(requested_power_w, rated_power_w);
+  usable_power_w = fminf(usable_power_w, maximum_hydraulic_power_w);
+  if (usable_power_w <= 0.0f) return target;
+
+  target.valid = true;
+  target.requested_power_w = usable_power_w;
+  target.target_temperature_c =
+      inlet_temperature_c + usable_power_w / thermal_conductance_w_per_k;
+  return target;
+}
 
 struct ControllerDecision {
   bool demand_present;
@@ -128,6 +212,12 @@ inline ControllerDecision evaluate(const BoilerCommand &command,
     decision.block_reason = BLOCK_SUPPLY_UNAVAILABLE;
   } else if (!command.demand_present) {
     decision.block_reason = BLOCK_NO_HEAT_REQUEST;
+  } else if (!input.transport_available) {
+    decision.force_off = true;
+    decision.block_reason = BLOCK_TRANSPORT_UNAVAILABLE;
+  } else if (command.heat_request && input.target_required && !input.target_valid) {
+    decision.force_off = true;
+    decision.block_reason = BLOCK_TARGET_INVALID;
   } else if (!command.heat_request) {
     decision.block_reason = command.source == COMMAND_SOURCE_COMMISSIONING
         ? BLOCK_COMMISSIONING_WAITING
@@ -166,9 +256,11 @@ inline const char *block_reason_text(uint8_t reason) {
     case BLOCK_WATER_TEMP_INHIBIT: return "water temperature boiler inhibit active";
     case BLOCK_WATER_TEMP_HARD_TRIP: return "water temperature hard trip active";
     case BLOCK_COMMISSIONING_WAITING: return "CM100 boiler commissioning waiting for flow settle";
-    case BLOCK_NO_HEAT_REQUEST: return "Control Mode is not CM3";
+    case BLOCK_NO_HEAT_REQUEST: return "no boiler heat request";
     case BLOCK_MIN_ON_TIME: return "boiler minimum on-time active";
     case BLOCK_MIN_OFF_TIME: return "boiler minimum off-time active";
+    case BLOCK_TRANSPORT_UNAVAILABLE: return "selected boiler transport unavailable";
+    case BLOCK_TARGET_INVALID: return "boiler target temperature invalid";
     default: return "";
   }
 }

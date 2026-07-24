@@ -1,14 +1,24 @@
 # ==============================================================================
-# OpenQuatt – OpenTherm Boiler (OTB) passive master and telemetry
+# OpenQuatt – OpenTherm Boiler (OTB) master, transport and telemetry
 # ==============================================================================
 #
-# Q-hardware-only OpenTherm master. This phase deliberately keeps CH disabled
-# and TSet at 0 °C while proving the physical link and collecting boiler data.
-# DHW permission remains enabled so attaching a combi boiler for passive testing
-# does not disable normal tap-water operation.
-#
-# Active BoilerCommand transport is added in the CM3 strategy phase.
+# Q-hardware-only OpenTherm master. CH follows only the centrally validated
+# BoilerCommand output request while this transport is selected. DHW permission
+# remains enabled so OpenQuatt does not disable normal tap-water operation.
 # ==============================================================================
+
+esphome:
+  on_shutdown:
+    priority: 700
+    then:
+      - lambda: |-
+          // Best-effort normal shutdown handshake. Hard power loss remains
+          // inherently fail-silent because no OpenTherm requests are sent.
+          id(oq_otb_ch_enable).turn_off();
+          auto call = id(oq_otb_t_set_command).make_call();
+          call.set_value(0.0f);
+          call.perform();
+          id(oq_boiler_transport_active) = false;
 
 globals:
   - id: oq_otb_last_response_ms
@@ -26,11 +36,6 @@ globals:
     restore_value: false
     initial_value: '-1'
 
-  - id: oq_otb_link_available_state
-    type: bool
-    restore_value: false
-    initial_value: 'false'
-
   - id: oq_otb_link_initialized
     type: bool
     restore_value: false
@@ -40,7 +45,9 @@ opentherm:
   - id: oq_otb_hub
     in_pin: ${oq_ot_boiler_in_pin}
     out_pin: ${oq_ot_boiler_out_pin}
-    ch_enable: false
+    # The runtime switch is default-off and owns the actual STATUS bit. The hub
+    # gate must be true or ESPHome would mask that switch permanently.
+    ch_enable: true
     dhw_enable: true
     cooling_enable: false
     otc_active: false
@@ -69,6 +76,17 @@ number:
       step: 0.1
       initial_value: 0
       restore_value: false
+
+switch:
+  - platform: opentherm
+    opentherm_id: oq_otb_hub
+    ch_enable:
+      id: oq_otb_ch_enable
+      name: "OTB - Central Heating Command"
+      internal: true
+      entity_category: diagnostic
+      restore_mode: ALWAYS_OFF
+      icon: mdi:radiator
 
 binary_sensor:
   - platform: template
@@ -278,6 +296,53 @@ sensor:
       return message_id >= 0 ? (float) message_id : NAN;
 
 interval:
+  - interval: ${oq_otb_command_apply_s}s
+    startup_delay: 3s
+    then:
+      - lambda: |-
+          // Apply only the central controller output. Selection, link and target
+          // checks are repeated here so a lost link cannot leave CH requested
+          // while waiting for the slower safety loop.
+          const bool opentherm_selected =
+              id(oq_boiler_connection).has_state() &&
+              id(oq_boiler_connection).current_option() == "OpenTherm";
+          const float target_c = id(oq_boiler_command_target_temperature_c);
+          const bool target_valid =
+              !isnan(target_c) && target_c > 0.0f && target_c <= 90.0f;
+          const float flow_lph = id(flow_rate_selected).state;
+          const bool flow_valid =
+              !isnan(flow_lph) && flow_lph >= ${oq_cm_min_flow_lph};
+          const bool command_active =
+              opentherm_selected &&
+              id(oq_otb_link_available_state) &&
+              id(oq_boiler_output_request) &&
+              target_valid &&
+              flow_valid;
+
+          if (command_active) {
+            if (!id(oq_otb_t_set_command).has_state() ||
+                fabsf(id(oq_otb_t_set_command).state - target_c) >= 0.05f) {
+              auto call = id(oq_otb_t_set_command).make_call();
+              call.set_value(target_c);
+              call.perform();
+            }
+            id(oq_otb_ch_enable).turn_on();
+          } else {
+            id(oq_otb_ch_enable).turn_off();
+            if (!id(oq_otb_t_set_command).has_state() ||
+                fabsf(id(oq_otb_t_set_command).state) >= 0.05f) {
+              auto call = id(oq_otb_t_set_command).make_call();
+              call.set_value(0.0f);
+              call.perform();
+            }
+          }
+
+          id(oq_boiler_transport_active) =
+              opentherm_selected &&
+              id(oq_otb_link_available_state) &&
+              id(otb_ch_active).has_state() &&
+              id(otb_ch_active).state;
+
   - interval: ${oq_otb_link_watch_s}s
     startup_delay: 2s
     then:
@@ -301,6 +366,10 @@ interval:
 
           // Phase 2: prevent stale operational values from looking current after link loss.
           if (available) return;
+          if (id(oq_boiler_connection).has_state() &&
+              id(oq_boiler_connection).current_option() == "OpenTherm") {
+            id(oq_boiler_transport_active) = false;
+          }
           id(otb_fault_indication).publish_state(false);
           id(otb_ch_active).publish_state(false);
           id(otb_dhw_active).publish_state(false);

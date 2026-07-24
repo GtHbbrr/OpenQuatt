@@ -753,6 +753,7 @@ interval:
               id(cooling_permitted_core).has_state() && id(cooling_permitted_core).state;
           const bool cooling_req = cooling_req_raw && openquatt_enabled;
           const bool power_house_active = (strategy_active_code == 3);
+          const bool heating_curve_active = (strategy_active_code == 2);
 
           const int hp1_lvl = id(hp1_last_applied_level);
           const int hp1_cmd_lvl =
@@ -1305,8 +1306,8 @@ interval:
                     desired_local = 1;
                   }
 
-              // CM3 (boiler assist) is a Power House-only feature and only applies
-              // when the installation has explicit boiler/CV assist enabled.
+              // CM3 is the sole boiler-assist owner for both heating strategies.
+              // Transport selection affects availability, never strategy intent.
               const int cm_now =
                   (strcmp(cur_cm, "CM3") == 0) ? 3 :
                   (strcmp(cur_cm, "CM2") == 0) ? 2 :
@@ -1314,14 +1315,43 @@ interval:
                   (strcmp(cur_cm, "CM1") == 0) ? 1 :
                   (strcmp(cur_cm, "CM98") == 0) ? 98 : 0;
               const bool boiler_assist_enabled = id(oq_boiler_assist_enabled).state;
-              if (power_house_active && boiler_assist_enabled) {
-                // CM3 (boiler assist) auto-switching
-                // Promote/Demote: deficit-based (thermal deficit) + timers/hysteresis
-                const float deficit_w = id(oq_P_deficit_w);
-                const float on_th = id(oq_cm3_deficit_on_w).state;
-                const float off_th = id(oq_cm3_deficit_off_w).state;
-                const bool need_on = (!isnan(deficit_w) && deficit_w >= on_th);
-                const bool ok_off  = (isnan(deficit_w) || deficit_w <= off_th);
+              const bool opentherm_selected =
+                  id(oq_boiler_connection).has_state() &&
+                  id(oq_boiler_connection).current_option() == "OpenTherm";
+              const bool boiler_transport_available =
+                  !opentherm_selected ||
+                  (${oq_otb_supported} && id(oq_otb_link_available_state));
+              const bool boiler_assist_available =
+                  boiler_assist_enabled && boiler_transport_available;
+              if (heating_strategy_active && boiler_assist_available) {
+                bool need_on = false;
+                bool ok_off = true;
+                const char *promote_reason = "boiler assist promoted to CM3";
+                const char *demote_reason = "boiler assist cleared, demoting to CM2";
+
+                if (power_house_active) {
+                  const auto assist = oq_boiler::power_house_assist(
+                      id(oq_P_deficit_w),
+                      id(oq_cm3_deficit_on_w).state,
+                      id(oq_cm3_deficit_off_w).state);
+                  need_on = assist.need_on;
+                  ok_off = assist.okay_off;
+                  promote_reason = "power-house deficit promoted to CM3";
+                  demote_reason = "power-house deficit cleared, demoting to CM2";
+                } else if (heating_curve_active) {
+                  const auto assist = oq_boiler::heating_curve_assist(
+                      heating_req,
+                      id(oq_strategy_hp_saturated),
+                      id(oq_strategy_supply_target_temp),
+                      id(oq_system_supply_temp).state,
+                      ${oq_cm3_curve_on_delta_c},
+                      ${oq_cm3_curve_off_delta_c});
+                  need_on = assist.need_on;
+                  ok_off = assist.okay_off;
+                  promote_reason = "heating-curve saturation promoted to CM3";
+                  demote_reason = "heating-curve target recovered, demoting to CM2";
+                }
+
                 const uint32_t T_ON_MS = (uint32_t)(${oq_cm3_promote_s}UL * 1000UL);
                 const uint32_t T_OFF_MS = (uint32_t)(${oq_cm3_demote_s}UL * 1000UL);
                 const uint32_t MIN_CM3_MS = (uint32_t)(${oq_cm3_min_run_s}UL * 1000UL);
@@ -1333,23 +1363,39 @@ interval:
                       if (id(oq_cm3_need_since_ms) == 0) id(oq_cm3_need_since_ms) = now_ms;
                       if (now_ms - id(oq_cm3_need_since_ms) >= T_ON_MS) {
                         desired_local = 3;
-                        cm_transition_reason = "power-house deficit promoted to CM3";
+                        id(oq_cm3_need_since_ms) = 0;
+                        id(oq_cm3_demote_since_ms) = 0;
+                        cm_transition_reason = promote_reason;
                       }
                     } else {
                       id(oq_cm3_need_since_ms) = 0;
                     }
                   }
                 } else if (cm_now == 3) {
-                  if (now_ms - id(oq_cm_last_change_ms) >= MIN_CM3_MS) {
+                  const bool minimum_run_elapsed =
+                      now_ms - id(oq_cm_last_change_ms) >= MIN_CM3_MS;
+                  bool demote_confirmation_elapsed = false;
+                  if (minimum_run_elapsed) {
                     if (ok_off) {
                       if (id(oq_cm3_demote_since_ms) == 0) id(oq_cm3_demote_since_ms) = now_ms;
-                      if (now_ms - id(oq_cm3_demote_since_ms) >= T_OFF_MS) {
-                        desired_local = 2;
-                        cm_transition_reason = "power-house deficit cleared, demoting to CM2";
-                      }
+                      demote_confirmation_elapsed =
+                          now_ms - id(oq_cm3_demote_since_ms) >= T_OFF_MS;
                     } else {
                       id(oq_cm3_demote_since_ms) = 0;
                     }
+                  } else {
+                    id(oq_cm3_demote_since_ms) = 0;
+                  }
+                  if (oq_boiler::cm3_should_hold(
+                          minimum_run_elapsed,
+                          ok_off,
+                          demote_confirmation_elapsed)) {
+                    desired_local = 3;
+                  } else {
+                    desired_local = 2;
+                    id(oq_cm3_need_since_ms) = 0;
+                    id(oq_cm3_demote_since_ms) = 0;
+                    cm_transition_reason = demote_reason;
                   }
                 } else {
                   id(oq_cm3_need_since_ms) = 0;
@@ -1360,9 +1406,13 @@ interval:
                 id(oq_cm3_demote_since_ms) = 0;
                 if (cm_now == 3 && heating_req && base_target == 2) {
                   desired_local = 2;
-                  cm_transition_reason = boiler_assist_enabled
-                      ? "Power House assist disabled, returning to CM2"
-                      : "boiler/CV assist disabled, returning to CM2";
+                  if (!boiler_assist_enabled) {
+                    cm_transition_reason = "boiler/CV assist disabled, returning to CM2";
+                  } else if (!boiler_transport_available) {
+                    cm_transition_reason = "selected boiler transport unavailable, returning to CM2";
+                  } else {
+                    cm_transition_reason = "heating strategy unavailable for boiler assist, returning to CM2";
+                  }
                 }
               }
               }
