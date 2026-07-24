@@ -7,6 +7,12 @@
 # remains enabled so OpenQuatt does not disable normal tap-water operation.
 # ==============================================================================
 
+external_components:
+  - source:
+      type: local
+      path: ${external_components_path}
+    components: [opentherm]
+
 esphome:
   on_boot:
     priority: -100
