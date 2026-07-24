@@ -215,6 +215,15 @@ inline bool minimum_time_active(uint32_t now_ms,
   return (uint32_t)(now_ms - last_change_ms) < minimum_time_ms;
 }
 
+inline float effective_output_target(
+    bool output_active, bool target_required, bool desired_active,
+    bool command_target_valid, float command_target_c,
+    float previous_target_c) {
+  if (!output_active || !target_required) return NAN;
+  if (desired_active && command_target_valid) return command_target_c;
+  return previous_target_c;
+}
+
 inline ControllerDecision evaluate(const BoilerCommand &command,
                                    const ControllerInput &input) {
   ControllerDecision decision{};

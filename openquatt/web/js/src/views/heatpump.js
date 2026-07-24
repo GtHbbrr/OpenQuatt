@@ -874,7 +874,11 @@ import { replaceOuterHtmlIfSignatureChanged, setInnerHtmlIfChanged } from "./vie
       "°C",
     );
     const pressureText = formatNumericState(getFreshOtbValue("otbChPressure"), 1, "bar");
-    const targetText = formatNumericState(getFreshOtbValue("otbControlSetpointCommand"), 1, "°C");
+    const targetText = formatNumericState(
+      getFreshOtbValue("boilerCommandTargetTemperature"),
+      1,
+      "°C",
+    );
     const modulationText = formatNumericState(getFreshOtbValue("otbRelativeModulation"), 0, "%");
     const dhwTempText = formatNumericState(getFreshOtbValue("otbDhwTemp"), 1, "°C");
     const diagnosticCopy = diagnostic && !fault ? "Diagnostische melding beschikbaar" : "";

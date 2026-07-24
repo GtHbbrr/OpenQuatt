@@ -12,6 +12,11 @@ static constexpr uint16_t HALF_BIT_MAX_US = 620;
 static constexpr uint16_t FULL_BIT_MIN_US = 880;
 static constexpr uint16_t FULL_BIT_MAX_US = 1120;
 
+inline bool completion_is_within_deadline(
+    uint32_t completed_us, uint32_t deadline_us) {
+  return static_cast<int32_t>(completed_us - deadline_us) <= 0;
+}
+
 struct Pulse {
   uint16_t duration_us;
   bool level;

@@ -43,6 +43,15 @@ int main() {
   link_state.record_response(270, 0, oq_otb::MESSAGE_TYPE_READ_ACK);
   assert(link_state.transport_is_available(270, 1000, 1000));
   assert(!link_state.transport_is_available(1271, 1000, 1000));
+  assert(link_state.expire_response_session_if_stale(1271, 1000));
+  assert(!link_state.session_has_response());
+  assert(!link_state.field_is_valid(oq_otb::FIELD_STATUS));
+  // Once observed, a stale session remains unavailable across a full millis
+  // rollover until a genuinely new response starts a new session.
+  assert(!link_state.transport_is_available(271, 1000, 1000));
+  assert(!link_state.expire_response_session_if_stale(271, 1000));
+  link_state.record_response(272, 0, oq_otb::MESSAGE_TYPE_READ_ACK);
+  assert(link_state.transport_is_available(272, 1000, 1000));
 
   // A READ_ACK makes only the matching field valid. Zero-valued payloads are
   // still legitimate samples; validity comes from the response type, not data.

@@ -12,7 +12,11 @@ const {
   renderBoilerPanel,
 } = await import("../js/src/views/heatpump.js");
 const { renderSettingsOpenThermCicSection } = await import("../js/src/settings/integrations.js");
-const { ENTITY_DEFS } = await import("../js/src/core/config.js");
+const {
+  ENTITY_DEFS,
+  FAST_OVERVIEW_KEYS,
+  OVERVIEW_KEYS,
+} = await import("../js/src/core/config.js");
 const { INITIAL_SETTINGS_READY_KEY_MAP, SETTINGS_GROUP_KEY_MAP } = await import("../js/src/core/entity-sync.js");
 const heatPumpCss = await readFile(new URL("../css/src/40-heatpump.css", import.meta.url), "utf8");
 const boilerOpenThermYaml = await readFile(new URL("../../oq_boiler_opentherm.yaml", import.meta.url), "utf8");
@@ -76,7 +80,7 @@ test("OpenTherm boiler model uses actual fresh boiler telemetry and actual flame
     otbReturnWaterTemp: { value: 31.4 },
     otbBoilerWaterTemp: { value: 42.8 },
     otbChPressure: { value: 1.6 },
-    otbControlSetpointCommand: { value: 45 },
+    boilerCommandTargetTemperature: { value: 45 },
     otbRelativeModulation: { value: 37 },
   };
 
@@ -114,7 +118,7 @@ test("OpenTherm boiler model suppresses stale telemetry when the boiler link is 
     otbReturnWaterTemp: { value: 31.4 },
     otbBoilerWaterTemp: { value: 42.8 },
     otbChPressure: { value: 1.6 },
-    otbControlSetpointCommand: { value: 45 },
+    boilerCommandTargetTemperature: { value: 45 },
     otbRelativeModulation: { value: 37 },
   };
 
@@ -218,7 +222,7 @@ test("OpenTherm boiler panel suppresses only an unavailable individual field", (
     otbReturnWaterTemp: { value: 31.4 },
     otbBoilerWaterTemp: { value: null, state: "NA" },
     otbChPressure: { value: 1.6 },
-    otbControlSetpointCommand: { value: 45 },
+    boilerCommandTargetTemperature: { value: 45 },
     otbRelativeModulation: { value: 37 },
   };
 
@@ -233,6 +237,11 @@ test("OpenTherm boiler panel suppresses only an unavailable individual field", (
   } finally {
     state.entities = previousEntities;
   }
+});
+
+test("overview hydration includes requested boiler power", () => {
+  assert.ok(OVERVIEW_KEYS.includes("boilerCommandRequestedPower"));
+  assert.ok(FAST_OVERVIEW_KEYS.includes("boilerCommandRequestedPower"));
 });
 
 test("R1 boiler view keeps OpenTherm-only telemetry out of the panel", () => {

@@ -73,6 +73,17 @@ EncodedFrame encode(uint32_t data, int jitter_us = 0) {
 }  // namespace
 
 int main() {
+  assert(esphome::opentherm::rmt_decoder::completion_is_within_deadline(
+      1000U, 1000U));
+  assert(esphome::opentherm::rmt_decoder::completion_is_within_deadline(
+      999U, 1000U));
+  assert(!esphome::opentherm::rmt_decoder::completion_is_within_deadline(
+      1001U, 1000U));
+  assert(esphome::opentherm::rmt_decoder::completion_is_within_deadline(
+      UINT32_MAX - 10U, 5U));
+  assert(!esphome::opentherm::rmt_decoder::completion_is_within_deadline(
+      20U, 5U));
+
   const uint32_t data = with_even_parity(0x40001234U);
 
   const auto nominal = encode(data);

@@ -395,6 +395,7 @@ class OpenTherm {
   volatile size_t rmt_symbol_count_{0};
   volatile bool rmt_armed_{false};
   volatile bool rmt_frame_ready_{false};
+  volatile uint32_t rmt_frame_completed_us_{0};
   volatile bool rmt_tx_active_{false};
   uint32_t rmt_tx_deadline_us_{0};
   uint32_t receive_deadline_us_{0};

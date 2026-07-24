@@ -540,6 +540,7 @@ bool OpenTherm::arm_esp32_rmt_() {
   portENTER_CRITICAL(&this->rmt_mux_);
   this->rmt_symbol_count_ = 0;
   this->rmt_frame_ready_ = false;
+  this->rmt_frame_completed_us_ = 0;
   this->rmt_armed_ = true;
   portEXIT_CRITICAL(&this->rmt_mux_);
 
@@ -562,6 +563,7 @@ void OpenTherm::cancel_esp32_rmt_() {
   armed = this->rmt_armed_;
   this->rmt_armed_ = false;
   this->rmt_frame_ready_ = false;
+  this->rmt_frame_completed_us_ = 0;
   this->rmt_symbol_count_ = 0;
   portEXIT_CRITICAL(&this->rmt_mux_);
 
@@ -591,6 +593,7 @@ bool IRAM_ATTR OpenTherm::rmt_rx_done_callback_(rmt_channel_handle_t,
     instance->rmt_symbol_count_ =
         event->num_symbols < RMT_CAPTURE_SYMBOLS ? event->num_symbols : RMT_CAPTURE_SYMBOLS;
     instance->rmt_armed_ = false;
+    instance->rmt_frame_completed_us_ = micros();
     instance->rmt_frame_ready_ = true;
     // Claim the completed frame immediately while keeping the bounded
     // Manchester decode in the main loop.
@@ -612,6 +615,7 @@ bool IRAM_ATTR OpenTherm::rmt_tx_done_callback_(rmt_channel_handle_t,
     instance->rmt_tx_active_ = false;
     instance->rmt_symbol_count_ = 0;
     instance->rmt_frame_ready_ = false;
+    instance->rmt_frame_completed_us_ = 0;
     // Close the request/response handover inside the TX-complete ISR. Waiting
     // for the application loop to observe SENT can miss an early boiler
     // response when another component temporarily delays that loop.
@@ -661,9 +665,17 @@ void OpenTherm::process_esp32_rmt_() {
   size_t symbol_count = 0;
   portENTER_CRITICAL(&this->rmt_mux_);
   if (this->rmt_frame_ready_) {
-    frame_ready = true;
-    symbol_count = this->rmt_symbol_count_;
+    const bool completed_in_time =
+        rmt_decoder::completion_is_within_deadline(
+            this->rmt_frame_completed_us_, this->receive_deadline_us_);
+    if (completed_in_time) {
+      frame_ready = true;
+      symbol_count = this->rmt_symbol_count_;
+    } else {
+      this->mode_ = OperationMode::ERROR_TIMEOUT;
+    }
     this->rmt_frame_ready_ = false;
+    this->rmt_frame_completed_us_ = 0;
   } else if (this->mode_ == OperationMode::LISTEN && deadline_expired) {
     // Arbitrate completion and timeout under the same lock used by the ISR:
     // exactly one of them is allowed to claim this receive operation.

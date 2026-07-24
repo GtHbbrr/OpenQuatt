@@ -156,6 +156,17 @@ void test_command_ownership_and_time() {
   assert(no_owner.source == oq_boiler::COMMAND_SOURCE_NONE);
 }
 
+void test_effective_output_target() {
+  assert(isnan(oq_boiler::effective_output_target(
+      false, true, false, false, NAN, 45.0f)));
+  assert(isnan(oq_boiler::effective_output_target(
+      true, false, true, true, 50.0f, 45.0f)));
+  assert(fabsf(oq_boiler::effective_output_target(
+      true, true, true, true, 50.0f, 45.0f) - 50.0f) < 0.001f);
+  assert(fabsf(oq_boiler::effective_output_target(
+      true, true, false, false, NAN, 45.0f) - 45.0f) < 0.001f);
+}
+
 void test_fail_safe_priority() {
   const auto command = active_command(1000);
   auto input = safe_input(1500);
@@ -318,6 +329,7 @@ int main() {
   test_strategy_inputs();
   test_power_target();
   test_command_ownership_and_time();
+  test_effective_output_target();
   test_fail_safe_priority();
   test_minimum_times_and_ownership_loss();
   test_commissioning_wait_state();
