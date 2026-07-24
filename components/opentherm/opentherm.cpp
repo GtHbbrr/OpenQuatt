@@ -370,7 +370,7 @@ bool OpenTherm::init_esp32_rmt_tx_() {
   config.intr_priority = 0;
   config.flags.invert_out = false;
   config.flags.with_dma = false;
-  config.flags.init_level = true;
+  config.flags.init_level = rmt_encoder::IDLE_LEVEL;
   config.flags.io_loop_back = false;
   config.flags.io_od_mode = false;
   config.flags.allow_pd = false;
@@ -429,13 +429,13 @@ bool OpenTherm::restore_esp32_rmt_tx_idle_() {
 
   // Attach or recover the RMT peripheral without producing an OpenTherm edge.
   rmt_symbol_word_t idle_symbol{};
-  idle_symbol.level0 = 1;
+  idle_symbol.level0 = rmt_encoder::IDLE_LEVEL;
   idle_symbol.duration0 = 10;
-  idle_symbol.level1 = 1;
+  idle_symbol.level1 = rmt_encoder::IDLE_LEVEL;
   idle_symbol.duration1 = 10;
   rmt_transmit_config_t transmit_config{};
   transmit_config.loop_count = 0;
-  transmit_config.flags.eot_level = 1;
+  transmit_config.flags.eot_level = rmt_encoder::IDLE_LEVEL;
   esp_err_t result = rmt_transmit(this->rmt_tx_channel_, this->rmt_tx_encoder_, &idle_symbol,
                                   sizeof(idle_symbol), &transmit_config);
   if (result == ESP_OK) {
@@ -454,28 +454,23 @@ bool OpenTherm::start_esp32_rmt_tx_() {
     return false;
   }
 
-  auto encode_bit = [](bool bit) {
-    rmt_symbol_word_t symbol{};
-    symbol.level0 = bit ? 0 : 1;
-    symbol.duration0 = 500;
-    symbol.level1 = bit ? 1 : 0;
-    symbol.duration1 = 500;
-    return symbol;
-  };
-
-  this->rmt_tx_symbols_[0] = encode_bit(true);
-  for (int bit = 31; bit >= 0; bit--) {
-    this->rmt_tx_symbols_[32 - bit] = encode_bit(read_bit(this->data_, bit) != 0);
+  for (size_t index = 0; index < RMT_TX_SYMBOLS; index++) {
+    const auto encoded = rmt_encoder::encode_frame_symbol(this->data_, index);
+    auto &symbol = this->rmt_tx_symbols_[index];
+    symbol.level0 = encoded.level0;
+    symbol.duration0 = encoded.duration0_us;
+    symbol.level1 = encoded.level1;
+    symbol.duration1 = encoded.duration1_us;
   }
-  this->rmt_tx_symbols_[33] = encode_bit(true);
 
   portENTER_CRITICAL(&this->rmt_mux_);
   this->rmt_tx_active_ = true;
+  this->rmt_tx_deadline_us_ = micros() + RMT_TX_TIMEOUT_US;
   portEXIT_CRITICAL(&this->rmt_mux_);
 
   rmt_transmit_config_t config{};
   config.loop_count = 0;
-  config.flags.eot_level = 1;
+  config.flags.eot_level = rmt_encoder::IDLE_LEVEL;
   const esp_err_t result =
       rmt_transmit(this->rmt_tx_channel_, this->rmt_tx_encoder_, this->rmt_tx_symbols_,
                    sizeof(this->rmt_tx_symbols_), &config);
@@ -502,19 +497,25 @@ void OpenTherm::cancel_esp32_rmt_tx_() {
     return;
   }
 
+  this->reset_esp32_rmt_tx_();
+}
+
+bool OpenTherm::reset_esp32_rmt_tx_() {
   const esp_err_t disable_result = rmt_disable(this->rmt_tx_channel_);
   if (disable_result != ESP_OK) {
     ESP_LOGE(TAG, "Failed to cancel RMT TX: %s", esp_err_to_name(disable_result));
-    return;
+    return false;
   }
   const esp_err_t enable_result = rmt_enable(this->rmt_tx_channel_);
   if (enable_result != ESP_OK) {
     ESP_LOGE(TAG, "Failed to re-enable RMT TX: %s", esp_err_to_name(enable_result));
-    return;
+    return false;
   }
   if (!this->restore_esp32_rmt_tx_idle_()) {
     ESP_LOGE(TAG, "Failed to recover the RMT TX idle level after cancellation");
+    return false;
   }
+  return true;
 }
 
 bool OpenTherm::arm_esp32_rmt_() {
@@ -606,6 +607,21 @@ bool IRAM_ATTR OpenTherm::rmt_tx_done_callback_(rmt_channel_handle_t,
 }
 
 void OpenTherm::process_esp32_rmt_() {
+  bool transmit_timed_out = false;
+  portENTER_CRITICAL(&this->rmt_mux_);
+  if (this->mode_ == OperationMode::WRITE && this->rmt_tx_active_ &&
+      static_cast<int32_t>(micros() - this->rmt_tx_deadline_us_) >= 0) {
+    this->rmt_tx_active_ = false;
+    this->mode_ = OperationMode::ERROR_TIMEOUT;
+    transmit_timed_out = true;
+  }
+  portEXIT_CRITICAL(&this->rmt_mux_);
+  if (transmit_timed_out) {
+    this->reset_esp32_rmt_tx_();
+    ESP_LOGW(TAG, "RMT transmit completion timed out");
+    return;
+  }
+
   if (this->mode_ != OperationMode::LISTEN && this->mode_ != OperationMode::RMT_PENDING) {
     return;
   }

@@ -12,6 +12,8 @@
 #include "esphome/core/helpers.h"
 #include "esphome/core/log.h"
 
+#include "opentherm_rmt_encoder.h"
+
 #ifdef USE_ESP32
 #include "driver/gptimer.h"
 #include "driver/rmt_rx.h"
@@ -44,7 +46,7 @@ enum OperationMode {
   RMT_PENDING = 6,  // ESP32 hardware captured a frame; main-loop decode pending
 
   ERROR_PROTOCOL = 8,  // protocol error, can happed only during READ
-  ERROR_TIMEOUT = 9,   // timeout while waiting for response from device, only during LISTEN
+  ERROR_TIMEOUT = 9,   // timeout while sending or waiting for a response
   ERROR_TIMER = 10     // error operating the ESP32 timer
 };
 
@@ -375,7 +377,8 @@ class OpenTherm {
 
 #ifdef USE_ESP32
   static constexpr size_t RMT_CAPTURE_SYMBOLS = 96;
-  static constexpr size_t RMT_TX_SYMBOLS = 34;
+  static constexpr size_t RMT_TX_SYMBOLS = rmt_encoder::FRAME_SYMBOLS;
+  static constexpr uint32_t RMT_TX_TIMEOUT_US = 100000;
   gptimer_handle_t timer_handle_{nullptr};
   gptimer_alarm_config_t alarm_config_{
       .alarm_count = 0,
@@ -392,6 +395,7 @@ class OpenTherm {
   volatile bool rmt_armed_{false};
   volatile bool rmt_frame_ready_{false};
   volatile bool rmt_tx_active_{false};
+  uint32_t rmt_tx_deadline_us_{0};
   uint32_t receive_deadline_us_{0};
 #endif
 
@@ -414,6 +418,7 @@ class OpenTherm {
   bool arm_esp32_rmt_();
   bool start_esp32_rmt_tx_();
   bool restore_esp32_rmt_tx_idle_();
+  bool reset_esp32_rmt_tx_();
   void cancel_esp32_rmt_();
   void cancel_esp32_rmt_tx_();
   void process_esp32_rmt_();
