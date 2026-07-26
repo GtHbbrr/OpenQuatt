@@ -1,7 +1,7 @@
 const FACTORY_ROOT = new URL("../firmware/main/", window.location.href).toString().replace(/\/$/, "");
 const VERSION_URL = new URL("../firmware/main/version.json", window.location.href).toString();
 const FACTORY_FILES_URL = new URL("../firmware/main/factory_files.json", window.location.href).toString();
-const FALLBACK_RELEASE_URL = "https://github.com/jeroen85/OpenQuatt/releases/latest";
+const FALLBACK_RELEASE_URL = "https://github.com/OpenQuatt/OpenQuatt/releases/latest";
 const FALLBACK_DEVICE_URL = "http://openquatt.local";
 
 const HARDWARE_LABELS = {

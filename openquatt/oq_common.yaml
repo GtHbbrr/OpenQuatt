@@ -764,7 +764,7 @@ button:
                 const std::string url = id(oq_firmware_test_ota_url).state;
                 const std::string md5_url = id(oq_firmware_test_ota_md5_url).state;
                 const std::string prefix =
-                    "https://github.com/jeroen85/OpenQuatt/releases/download/pr-";
+                    "https://github.com/OpenQuatt/OpenQuatt/releases/download/pr-";
                 std::string hardware_slug;
                 const std::string hardware = "${oq_hardware_profile}";
                 if (hardware == "waveshare") {
