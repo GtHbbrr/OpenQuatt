@@ -965,7 +965,6 @@ sensor:
       accuracy_decimals: 0
     block:
       name: "Heap Max Block"
-      internal: true
       icon: mdi:memory
       entity_category: diagnostic
       disabled_by_default: true
@@ -978,7 +977,6 @@ sensor:
       accuracy_decimals: 0
     fragmentation:
       name: "Heap Fragmentation"
-      internal: true
       icon: mdi:memory
       entity_category: diagnostic
       disabled_by_default: true
