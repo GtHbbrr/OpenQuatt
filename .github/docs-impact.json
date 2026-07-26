@@ -66,16 +66,6 @@
       ]
     },
     {
-      "name": "Home Assistant-dashboards",
-      "source_patterns": [
-        "docs/dashboard/*.yaml"
-      ],
-      "docs_any_of": [
-        "docs/dashboard/README.md",
-        "docs/dashboardoverzicht.md"
-      ]
-    },
-    {
       "name": "Regelstrategieën en flow",
       "source_patterns": [
         "openquatt/oq_boiler_control.yaml",
