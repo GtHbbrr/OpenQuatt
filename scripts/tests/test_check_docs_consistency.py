@@ -79,6 +79,37 @@ Docs-impact motivatie:
         self.assertIn("Gebruikersentiteiten en instellingen raakt gebruikersdocumentatie", output)
         self.assertNotIn("Service/debug entities changed", output)
 
+    def test_dashboard_yaml_change_does_not_require_markdown_change(self) -> None:
+        exit_code, output = self.run_strict_check(
+            "",
+            changed_file="docs/dashboard/openquatt_ha_dashboard_duo_en.yaml",
+        )
+
+        self.assertEqual(0, exit_code, output)
+        self.assertIn("Docs consistency checks passed.", output)
+
+    def test_dashboard_view_contract_still_fails_on_title_drift(self) -> None:
+        parse_titles = check_docs_consistency.parse_dashboard_titles
+
+        def titles_with_drift(path: Path) -> list[str]:
+            titles = parse_titles(path)
+            if path.name == "openquatt_ha_dashboard_duo_en.yaml":
+                return [*titles, "Unexpected"]
+            return titles
+
+        with mock.patch.object(
+            check_docs_consistency,
+            "parse_dashboard_titles",
+            side_effect=titles_with_drift,
+        ):
+            exit_code, output = self.run_strict_check(
+                "",
+                changed_file="docs/dashboard/openquatt_ha_dashboard_duo_en.yaml",
+            )
+
+        self.assertEqual(1, exit_code, output)
+        self.assertIn("View titles differ from expected", output)
+
 
 if __name__ == "__main__":
     unittest.main()
