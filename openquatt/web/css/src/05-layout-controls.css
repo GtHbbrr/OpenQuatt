@@ -193,6 +193,20 @@
   line-height: 1.45;
 }
 
+.oq-usage-consent-installation-id {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin-top: 7px;
+  color: var(--oq-helper-soft);
+  font-size: 0.78rem;
+}
+
+.oq-usage-consent-installation-id code {
+  color: var(--oq-helper-ink);
+  overflow-wrap: anywhere;
+}
+
 .oq-usage-consent-action {
   min-width: 170px;
 }

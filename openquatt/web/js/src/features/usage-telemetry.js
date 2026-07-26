@@ -1,4 +1,6 @@
+import { hasEntity } from "../core/app-shared.js";
 import { renderOqIcon } from "../core/config.js";
+import { getEntityValue } from "../core/entity-store.js";
 import { escapeHtml } from "../core/html.js";
 import { renderSettingsCompactSwitchControl } from "../settings/controls.js";
 
@@ -6,6 +8,7 @@ const USAGE_TELEMETRY_EXAMPLE_JSON = JSON.stringify({
   schema_version: 1,
   message_id: "c8272f30-b64d-4af0-a13c-bf8e0cbde842",
   installation_id: "7df1c1f8-fc47-4ac8-b0d7-94d8c42d772f",
+  timestamp_s: 1784527200,
   uptime_s: 86420,
   firmware_version: "v0.44.0",
   release_channel: "main",
@@ -38,6 +41,10 @@ export function renderUsageTelemetryConsent({ enabled, busy, settings = false })
   const scheduleCopy = settings
     ? "Na inschakelen verstuurt OpenQuatt vrijwel direct en daarna ongeveer elk uur technische gegevens naar de OpenQuatt-loggingserver."
     : "Na het afronden verstuurt OpenQuatt vrijwel direct en daarna ongeveer elk uur technische gegevens naar de OpenQuatt-loggingserver.";
+  const value = settings && enabled && hasEntity("usageTelemetryInstallationId")
+    ? String(getEntityValue("usageTelemetryInstallationId") || "").trim()
+    : "";
+  const installationId = ["unknown", "unavailable", "nan"].includes(value.toLowerCase()) ? "" : value;
   return `
     <div class="oq-usage-consent${enabled ? " is-enabled" : ""}${settings ? " oq-usage-consent--settings" : ""}">
       <div class="oq-usage-consent-copy">
@@ -46,6 +53,7 @@ export function renderUsageTelemetryConsent({ enabled, busy, settings = false })
           <span class="oq-usage-consent-kicker">Vrijwillige keuze</span>
           <h3>Beperkte statistieken delen</h3>
           <p>${scheduleCopy}</p>
+          ${installationId ? `<div class="oq-usage-consent-installation-id"><strong>Installatie-ID</strong><code>${escapeHtml(installationId)}</code></div>` : ""}
         </div>
       </div>
       <div class="oq-usage-consent-action">
@@ -74,7 +82,7 @@ export function renderUsageTelemetryDisclosure({ collapsible = false, idPrefix =
           <h4 id="${includedTitleId}">In het bericht</h4>
         </div>
         <ul>
-          <li><strong>Installatie</strong><span>Willekeurig ID en uptime</span></li>
+          <li><strong>Installatie</strong><span>Willekeurig ID, tijdstip en uptime</span></li>
           <li><strong>Software</strong><span>Versie en releasekanaal</span></li>
           <li><strong>Platform</strong><span>Hardware, opstelling, verbinding en wifi-signaal</span></li>
           <li><strong>Systeemstatus</strong><span>Geheugen, looptijd, chiptemperatuur en herstartreden</span></li>

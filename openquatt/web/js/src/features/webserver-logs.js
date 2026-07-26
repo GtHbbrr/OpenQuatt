@@ -972,7 +972,7 @@ export function renderWebServerLoggerLevelControl() {
       dataValue: "debugLevel",
       label: "Logger level",
       value: value || "Onbekend",
-      note: "Past het runtime logniveau aan voor nieuwe firmwaremeldingen.",
+      note: "DEBUG is tijdelijk en wordt na een herstart teruggezet naar INFO. Bij veel Modbusverkeer kan DEBUG zoveel logging produceren dat de web-app en Home Assistant traag of onbereikbaar worden.",
       action: `<label class="oq-webserver-log-level-control" aria-label="Logger level">
         <select class="oq-helper-select" data-oq-field="debugLevel" ${busy ? "disabled" : ""}>
           ${options.map((option) => `<option value="${escapeHtml(option)}" ${option === value ? "selected" : ""}>${escapeHtml(option)}</option>`).join("")}

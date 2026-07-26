@@ -12,6 +12,8 @@
 #include "esphome/components/select/select.h"
 #include "esphome/components/sensor/sensor.h"
 #include "esphome/components/switch/switch.h"
+#include "esphome/components/text_sensor/text_sensor.h"
+#include "esphome/components/time/real_time_clock.h"
 #include "esphome/core/component.h"
 #include "esphome/core/preferences.h"
 #include "mqtt_client.h"
@@ -30,6 +32,8 @@ class OpenQuattUsageTelemetry : public switch_::Switch, public Component {
   void set_username(const std::string &username) { this->username_ = username; }
   void set_password(const std::string &password) { this->password_ = password; }
   void set_topic(const std::string &topic) { this->topic_ = topic; }
+  void set_clock(time::RealTimeClock *clock) { this->clock_ = clock; }
+  void set_installation_id_sensor(text_sensor::TextSensor *sensor) { this->installation_id_sensor_ = sensor; }
   void set_setup_complete_sensor(binary_sensor::BinarySensor *sensor) { this->setup_complete_sensor_ = sensor; }
   void set_choice_configured_sensor(binary_sensor::BinarySensor *sensor) { this->choice_configured_sensor_ = sensor; }
   void set_interval_ms(uint32_t interval_ms) { this->interval_ms_ = interval_ms; }
@@ -75,10 +79,12 @@ class OpenQuattUsageTelemetry : public switch_::Switch, public Component {
 
   static constexpr uint32_t STORAGE_MAGIC = 0x4F515553;
   static constexpr uint16_t STORAGE_VERSION = 2;
+  static constexpr uint32_t INITIAL_PUBLISH_DELAY_MS = 90UL * 1000UL;
   static constexpr uint32_t SESSION_TIMEOUT_MS = 30000;
   static constexpr uint32_t RETRY_MIN_MS = 5UL * 60UL * 1000UL;
   static constexpr uint32_t RETRY_MAX_MS = 60UL * 60UL * 1000UL;
   static constexpr uint32_t MQTT_START_TASK_STACK_SIZE = 24576;
+  static constexpr uint32_t MQTT_CLEANUP_TASK_STACK_SIZE = 6144;
   static constexpr int MQTT_TASK_STACK_SIZE = 12288;
 
   struct StorageV1 {
@@ -109,17 +115,21 @@ class OpenQuattUsageTelemetry : public switch_::Switch, public Component {
   bool is_setup_complete_() const;
   void apply_storage_(const Storage &storage);
   void schedule_initial_publish_();
+  void schedule_immediate_publish_();
   void schedule_regular_publish_();
   void schedule_retry_();
   void start_publish_session_();
   bool start_client_();
   void finish_publish_session_(bool succeeded);
+  bool prepare_cleanup_task_();
+  void complete_publish_session_();
   void build_payload_();
   std::string read_hardware_revision_() const;
   static bool time_reached_(uint32_t now_ms, uint32_t target_ms);
   static std::string format_uuid_(const std::array<uint8_t, 16> &bytes);
   static std::string random_message_id_();
   static void start_client_task_(void *arg);
+  static void cleanup_client_task_(void *arg);
   static void mqtt_event_handler_(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data);
 
   std::string broker_;
@@ -128,6 +138,8 @@ class OpenQuattUsageTelemetry : public switch_::Switch, public Component {
   std::string username_;
   std::string password_;
   std::string topic_;
+  time::RealTimeClock *clock_{nullptr};
+  text_sensor::TextSensor *installation_id_sensor_{nullptr};
   binary_sensor::BinarySensor *setup_complete_sensor_{nullptr};
   binary_sensor::BinarySensor *choice_configured_sensor_{nullptr};
   uint32_t interval_ms_{60UL * 60UL * 1000UL};
@@ -164,12 +176,17 @@ class OpenQuattUsageTelemetry : public switch_::Switch, public Component {
   std::atomic<bool> session_active_{false};
   std::atomic<bool> finishing_session_{false};
   std::atomic<bool> start_task_running_{false};
+  std::atomic<bool> cleanup_task_running_{false};
+  std::atomic<bool> cleanup_task_complete_{false};
+  std::atomic<bool> cleanup_succeeded_{false};
   std::atomic<bool> publish_succeeded_{false};
   std::atomic<bool> publish_failed_{false};
   std::atomic<int> pending_message_id_{-1};
   uint32_t session_started_ms_{0};
   uint32_t next_publish_ms_{0};
   uint8_t consecutive_failures_{0};
+  bool boot_publish_pending_{false};
+  std::atomic<TaskHandle_t> cleanup_task_handle_{nullptr};
 };
 
 }  // namespace openquatt_usage_telemetry

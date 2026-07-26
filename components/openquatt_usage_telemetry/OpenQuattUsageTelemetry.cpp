@@ -215,12 +215,18 @@ void OpenQuattUsageTelemetry::setup() {
   }
 
   this->apply_storage_(storage);
-  if (this->enabled_.load() && this->is_setup_complete_()) {
-    this->schedule_initial_publish_();
-  }
+  this->boot_publish_pending_ = this->enabled_.load();
+  this->next_publish_ms_ = 0;
 }
 
 void OpenQuattUsageTelemetry::loop() {
+  if (this->cleanup_task_complete_.exchange(false)) {
+    this->complete_publish_session_();
+  }
+  if (this->finishing_session_.load()) {
+    return;
+  }
+
   if (this->session_active_.load()) {
     if (this->start_task_running_.load()) {
       return;
@@ -242,13 +248,17 @@ void OpenQuattUsageTelemetry::loop() {
 
   if (!this->enabled_.load() || !this->is_setup_complete_() || !this->is_configured() ||
       !network::is_connected()) {
-    if (!this->is_setup_complete_()) {
+    if (this->boot_publish_pending_) {
       this->next_publish_ms_ = 0;
     }
     return;
   }
   if (this->next_publish_ms_ == 0U) {
-    this->schedule_initial_publish_();
+    if (this->boot_publish_pending_) {
+      this->schedule_initial_publish_();
+    } else {
+      this->schedule_immediate_publish_();
+    }
   }
   if (time_reached_(millis(), this->next_publish_ms_)) {
     this->start_publish_session_();
@@ -304,14 +314,17 @@ void OpenQuattUsageTelemetry::write_state(bool state) {
   if (state) {
     this->consecutive_failures_ = 0;
     if (this->is_setup_complete_()) {
-      this->schedule_initial_publish_();
+      this->boot_publish_pending_ = false;
+      this->schedule_immediate_publish_();
     } else {
+      this->boot_publish_pending_ = true;
       this->next_publish_ms_ = 0;
     }
     if (!this->is_configured()) {
       ESP_LOGW(TAG, "Usage statistics were enabled, but no telemetry broker is configured in this build");
     }
   } else {
+    this->boot_publish_pending_ = false;
     this->next_publish_ms_ = 0;
     if (!this->session_active_.load()) {
       this->payload_.clear();
@@ -385,14 +398,23 @@ void OpenQuattUsageTelemetry::apply_storage_(const Storage &storage) {
   this->enabled_.store(enabled);
   this->choice_configured_.store(choice_configured);
   this->publish_state(enabled);
+  if (this->installation_id_sensor_ != nullptr) {
+    this->installation_id_sensor_->publish_state(this->installation_id_);
+  }
   if (this->choice_configured_sensor_ != nullptr) {
     this->choice_configured_sensor_->publish_state(choice_configured);
   }
 }
 
 void OpenQuattUsageTelemetry::schedule_initial_publish_() {
-  // Keep zero as the unscheduled sentinel while allowing a newly recorded
-  // opt-in to publish on the next loop iteration.
+  // Avoid overlapping the MQTT client and its worker stacks with the first
+  // full sensor/API publication wave after connectivity becomes available.
+  this->next_publish_ms_ = millis() + INITIAL_PUBLISH_DELAY_MS;
+}
+
+void OpenQuattUsageTelemetry::schedule_immediate_publish_() {
+  // Defer to the next loop iteration so a runtime opt-in does not start MQTT
+  // work inside the switch write callback.
   this->next_publish_ms_ = millis() + 1U;
 }
 
@@ -414,6 +436,16 @@ void OpenQuattUsageTelemetry::start_publish_session_() {
     return;
   }
 
+  this->boot_publish_pending_ = false;
+
+  // Reserve the cleanup worker before MQTT/TLS can consume the remaining heap.
+  // If this allocation fails, no client resources exist yet and retrying is safe.
+  if (!this->prepare_cleanup_task_()) {
+    this->start_task_running_.store(false);
+    this->schedule_retry_();
+    return;
+  }
+
   if (this->payload_.empty()) {
     this->build_payload_();
   }
@@ -421,6 +453,8 @@ void OpenQuattUsageTelemetry::start_publish_session_() {
   this->publish_failed_.store(false);
   this->pending_message_id_.store(-1);
   this->finishing_session_.store(false);
+  this->cleanup_task_complete_.store(false);
+  this->cleanup_succeeded_.store(false);
   this->session_started_ms_ = millis();
   this->session_active_.store(true);
 
@@ -494,25 +528,41 @@ bool OpenQuattUsageTelemetry::start_client_() {
 }
 
 void OpenQuattUsageTelemetry::finish_publish_session_(bool succeeded) {
-  if (!this->session_active_.load() || this->start_task_running_.load()) {
+  if (!this->session_active_.load() || this->start_task_running_.load() ||
+      this->finishing_session_.exchange(true)) {
     return;
   }
-  this->finishing_session_.store(true);
+  this->cleanup_succeeded_.store(succeeded);
+  xTaskNotifyGive(this->cleanup_task_handle_.load());
+}
 
-  if (this->runtime_lock_ != nullptr && xSemaphoreTake(this->runtime_lock_, portMAX_DELAY) == pdTRUE) {
-    if (this->mqtt_client_ != nullptr) {
-      esp_mqtt_client_stop(this->mqtt_client_);
-      esp_mqtt_client_destroy(this->mqtt_client_);
-      this->mqtt_client_ = nullptr;
-    }
-    xSemaphoreGive(this->runtime_lock_);
+bool OpenQuattUsageTelemetry::prepare_cleanup_task_() {
+  if (this->cleanup_task_running_.exchange(true)) {
+    return false;
   }
+
+  TaskHandle_t task_handle = nullptr;
+  const BaseType_t created = xTaskCreatePinnedToCore(&OpenQuattUsageTelemetry::cleanup_client_task_,
+                                                     "oq_usage_cleanup", MQTT_CLEANUP_TASK_STACK_SIZE, this, 4,
+                                                     &task_handle, tskNO_AFFINITY);
+  if (created != pdPASS || task_handle == nullptr) {
+    this->cleanup_task_running_.store(false);
+    ESP_LOGE(TAG, "Failed to create usage telemetry MQTT cleanup task");
+    return false;
+  }
+  this->cleanup_task_handle_.store(task_handle);
+  return true;
+}
+
+void OpenQuattUsageTelemetry::complete_publish_session_() {
+  const bool succeeded = this->cleanup_succeeded_.load();
 
   this->session_active_.store(false);
   this->publish_succeeded_.store(false);
   this->publish_failed_.store(false);
   this->pending_message_id_.store(-1);
   this->finishing_session_.store(false);
+  this->cleanup_succeeded_.store(false);
 
   if (!this->enabled_.load()) {
     this->payload_.clear();
@@ -549,7 +599,19 @@ void OpenQuattUsageTelemetry::build_payload_() {
   this->payload_ += this->payload_message_id_;
   this->payload_ += R"(","installation_id":")";
   this->payload_ += this->installation_id_;
-  this->payload_ += R"(","uptime_s":)";
+  this->payload_ += '"';
+  append_json_key_(this->payload_, "timestamp_s");
+  if (this->clock_ == nullptr) {
+    this->payload_ += "null";
+  } else {
+    const auto now = this->clock_->now();
+    if (now.is_valid()) {
+      this->payload_ += std::to_string(static_cast<uint64_t>(now.timestamp));
+    } else {
+      this->payload_ += "null";
+    }
+  }
+  this->payload_ += R"(,"uptime_s":)";
   this->payload_ += std::to_string(uptime_s);
   this->payload_ += R"(,"firmware_version":")";
   this->payload_ += json_escape_(this->firmware_version_);
@@ -644,6 +706,29 @@ void OpenQuattUsageTelemetry::start_client_task_(void *arg) {
     }
     self->start_task_running_.store(false);
     App.wake_loop_threadsafe();
+  }
+  vTaskDelete(nullptr);
+}
+
+void OpenQuattUsageTelemetry::cleanup_client_task_(void *arg) {
+  auto *self = static_cast<OpenQuattUsageTelemetry *>(arg);
+  while (self != nullptr) {
+    ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+    esp_mqtt_client_handle_t client = nullptr;
+    if (self->runtime_lock_ != nullptr && xSemaphoreTake(self->runtime_lock_, portMAX_DELAY) == pdTRUE) {
+      client = self->mqtt_client_;
+      self->mqtt_client_ = nullptr;
+      xSemaphoreGive(self->runtime_lock_);
+    }
+    if (client != nullptr) {
+      esp_mqtt_client_stop(client);
+      esp_mqtt_client_destroy(client);
+    }
+    self->cleanup_task_handle_.store(nullptr);
+    self->cleanup_task_running_.store(false);
+    self->cleanup_task_complete_.store(true);
+    App.wake_loop_threadsafe();
+    break;
   }
   vTaskDelete(nullptr);
 }

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-import { FAST_OVERVIEW_KEYS, OVERVIEW_KEYS, QUICK_STEPS } from "../js/src/core/config.js";
+import { ENTITY_DEFS, FAST_OVERVIEW_KEYS, OVERVIEW_KEYS, QUICK_STEPS, SETTINGS_KEYS } from "../js/src/core/config.js";
 
 globalThis.__OQ_PREVIEW__ = false;
 
@@ -85,14 +85,25 @@ test("usage telemetry disclosure matches the hourly payload scope", async () => 
   const entityWriteSource = await readFile(new URL("../js/src/core/entity-write-actions.js", import.meta.url), "utf8");
   const settingsSource = await readFile(new URL("../js/src/settings/privacy.js", import.meta.url), "utf8");
   const disclosureSource = await readFile(new URL("../js/src/features/usage-telemetry.js", import.meta.url), "utf8");
+  const telemetryYaml = await readFile(new URL("../../oq_usage_telemetry.yaml", import.meta.url), "utf8");
 
   assert.match(quickStartSource, /renderUsageTelemetryDisclosure\(\)/);
   assert.match(quickStartSource, /data-oq-action="confirm-no-usage-telemetry"/);
   assert.match(entityWriteSource, /commitUsageTelemetrySwitch/);
+  assert.match(entityWriteSource, /refreshEntities\(\[key, "usageTelemetryChoiceConfigured", "usageTelemetryInstallationId"\]/);
   assert.match(entityWriteSource, /isUsageTelemetryChoiceConfirmed/);
   assert.match(entityWriteSource, /"turn_off"/);
   assert.match(settingsSource, /renderUsageTelemetryDisclosure\(\{ collapsible: true/);
   assert.match(settingsSource, /usageTelemetryDetailsOpen/);
+  assert.deepEqual(ENTITY_DEFS.usageTelemetryInstallationId, {
+    domain: "text_sensor",
+    name: "Usage statistics installation ID",
+    optional: true,
+  });
+  assert.ok(SETTINGS_KEYS.includes("usageTelemetryInstallationId"));
+  assert.match(telemetryYaml, /name: "Usage statistics installation ID"[\s\S]*internal: true/);
+  assert.match(disclosureSource, /settings && enabled && hasEntity\("usageTelemetryInstallationId"\)/);
+  assert.match(disclosureSource, /oq-usage-consent-installation-id/);
   assert.match(disclosureSource, /vrijwel direct en daarna ongeveer elk uur/);
   assert.match(disclosureSource, /OpenQuatt-loggingserver/);
   assert.match(disclosureSource, /wifi-signaal/);
@@ -102,6 +113,7 @@ test("usage telemetry disclosure matches the hourly payload scope", async () => 
   assert.match(disclosureSource, /Nooit een wifi-netwerknaam, wifi-wachtwoord, gebruikersnaam, ander wachtwoord of inloggegevens/);
   assert.match(disclosureSource, /Voorbeeld van het verzonden bericht \(JSON\)/);
   assert.match(disclosureSource, /schema_version/);
+  assert.match(disclosureSource, /timestamp_s/);
   assert.match(disclosureSource, /oq-usage-disclosure--collapsible/);
   assert.match(disclosureSource, /data-oq-action="toggle-usage-telemetry-details"/);
   assert.match(disclosureSource, /technisch wel het bron-IP-adres zien/);
