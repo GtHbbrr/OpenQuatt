@@ -12,7 +12,7 @@ import sys
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-GITHUB_REPO_URL = "https://github.com/jeroen85/OpenQuatt"
+GITHUB_REPO_URL = "https://github.com/OpenQuatt/OpenQuatt"
 SEARCH_ICON_HTML = (
     '<svg class="search-icon-svg" viewBox="0 0 24 24" focusable="false" aria-hidden="true">'
     '<circle cx="10.5" cy="10.5" r="6.5"></circle>'

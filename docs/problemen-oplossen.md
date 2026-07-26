@@ -193,7 +193,7 @@ Begin bijna altijd met bronkeuze en flow. Strategie-instellingen komen daarna pa
 | Situatie | Juiste route |
 |---|---|
 | Gebruiksvraag of hulp bij diagnose | Vraag het in het [OpenQuatt Discord-kanaal](https://discord.com/channels/1176602554885492786/1464174190788874427). |
-| Reproduceerbare fout in OpenQuatt | Meld die als [GitHub-issue](https://github.com/jeroen85/OpenQuatt/issues/new/choose). |
+| Reproduceerbare fout in OpenQuatt | Meld die als [GitHub-issue](https://github.com/OpenQuatt/OpenQuatt/issues/new/choose). |
 | Fysiek probleem met de warmtepomp, lekkage of een mogelijk onveilige situatie | Stop en neem contact op met een vakbekwaam installateur of Quatt. |
 
 Twijfel je wat er gebeurt? Verander dan geen nieuwe instellingen, noteer de actuele toestand en verzamel eerst de informatie hieronder.

@@ -93,7 +93,7 @@ DEV_VERSION="${BASE_VERSION}-dev.${DEV_STAMP}+local"
 esphome \
   -s project_version "${DEV_VERSION}" \
   -s release_channel dev \
-  -s release_manifest_url https://github.com/jeroen85/OpenQuatt/releases/download/dev-latest/openquatt-waveshare-duo-wifi-ota.manifest.json \
+  -s release_manifest_url https://github.com/OpenQuatt/OpenQuatt/releases/download/dev-latest/openquatt-waveshare-duo-wifi-ota.manifest.json \
   compile configs/waveshare/duo_wifi.yaml
 ```
 
@@ -149,7 +149,7 @@ If you used the recommended fast-forward promotion and did not add extra `main`-
 ## Notes
 
 - Enabled target configs under `configs/` are secrets-free and suitable for CI builds.
-- First-install UX now lives on the GitHub Pages installer at `https://jeroen85.github.io/OpenQuatt/install/`, which builds ESP Web Tools manifests dynamically in the browser against same-origin stable factory binaries mirrored onto Pages.
+- First-install UX now lives on the GitHub Pages installer at `https://openquatt.github.io/OpenQuatt/install/`, which builds ESP Web Tools manifests dynamically in the browser against same-origin stable factory binaries mirrored onto Pages.
 - Target-specific `*-ota.manifest.json` files are intended for OTA update flows.
 - Each firmware reads `${release_manifest_url}` from its selected config entrypoint.
 - OTA manifests and OTA binaries remain on GitHub Releases; only first-install factory binaries are mirrored onto Pages for Web Serial/CORS compatibility.

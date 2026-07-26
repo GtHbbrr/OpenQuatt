@@ -7,7 +7,7 @@ OpenQuatt is open-source ESPHome-firmware voor Quatt Hybrid `Single`- en `Duo`-i
 > [!IMPORTANT]
 > OpenQuatt is momenteel een **open-sourceproject op best-effortbasis**. Ontwikkeling, documentatie en ondersteuning worden door de community geleverd op basis van beschikbare tijd; er is geen gegarandeerde responstijd of individuele ondersteuning.
 >
-> Voor gebruiksvragen en hulp bij diagnose kun je terecht in het [OpenQuatt Discord-kanaal](https://discord.com/channels/1176602554885492786/1464174190788874427). Een reproduceerbare bug meld je als [GitHub-issue](https://github.com/jeroen85/OpenQuatt/issues/new/choose).
+> Voor gebruiksvragen en hulp bij diagnose kun je terecht in het [OpenQuatt Discord-kanaal](https://discord.com/channels/1176602554885492786/1464174190788874427). Een reproduceerbare bug meld je als [GitHub-issue](https://github.com/OpenQuatt/OpenQuatt/issues/new/choose).
 
 > [!WARNING]
 > OpenQuatt is community-firmware voor gebruikers met enig technisch inzicht. Gebruik het bewust en test wijzigingen stap voor stap.
@@ -23,7 +23,7 @@ Kies alleen de route die bij jouw huidige hardware en situatie hoort. Home Assis
 | Nieuwe Heatpump Controller Q-edition met OpenQuatt voorgeïnstalleerd | [Q-edition aansluiten en in gebruik nemen](docs/q-edition.md) | Controller aansluiten, online brengen en Quick Start afronden. Zelf firmware flashen is normaal niet nodig. |
 | Bestaande Waveshare- of Heatpump Listener-module | [Andere modules installeren](docs/installatie-en-ingebruikname.md) | Exact hardwareprofiel kiezen, firmware flashen en Quick Start afronden. Deze modules hebben limited/best-effort support. |
 | OpenQuatt draait al | [Web-app gebruiken](docs/web-app.md) | Instellingen beheren, updaten, backups maken en diagnose uitvoeren via `openquatt.local`. |
-| Eerst alleen rondkijken | [Web-app demo](https://jeroen85.github.io/OpenQuatt/demo/) | De interface bekijken zonder hardware of wijzigingen aan je installatie. |
+| Eerst alleen rondkijken | [Web-app demo](https://openquatt.github.io/OpenQuatt/demo/) | De interface bekijken zonder hardware of wijzigingen aan je installatie. |
 
 ## Wat is OpenQuatt?
 
@@ -61,7 +61,7 @@ De basisinstallatie is afgerond wanneer:
 
 Home Assistant en het meegeleverde dashboard zijn optionele vervolgstappen. Ze zijn niet nodig om OpenQuatt zelf te installeren of via de web-app te gebruiken.
 
-Voor bestaande Waveshare- en Heatpump Listener-modules biedt de [installer](https://jeroen85.github.io/OpenQuatt/install/) de nieuwste stabiele eerste-installatiebestanden. Bij een HCQ gebruik je de installer alleen om Wi-Fi via USB in te stellen of als herstelroute. Ga bij problemen naar [Problemen oplossen](docs/problemen-oplossen.md).
+Voor bestaande Waveshare- en Heatpump Listener-modules biedt de [installer](https://openquatt.github.io/OpenQuatt/install/) de nieuwste stabiele eerste-installatiebestanden. Bij een HCQ gebruik je de installer alleen om Wi-Fi via USB in te stellen of als herstelroute. Ga bij problemen naar [Problemen oplossen](docs/problemen-oplossen.md).
 
 ## Mogelijkheden
 

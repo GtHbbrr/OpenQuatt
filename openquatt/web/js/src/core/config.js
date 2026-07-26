@@ -1,6 +1,6 @@
   export const FIRMWARE_RELEASE_URLS = {
-    main: "https://github.com/jeroen85/OpenQuatt/releases/latest",
-    dev: "https://github.com/jeroen85/OpenQuatt/releases/tag/dev-latest",
+    main: "https://github.com/OpenQuatt/OpenQuatt/releases/latest",
+    dev: "https://github.com/OpenQuatt/OpenQuatt/releases/tag/dev-latest",
   };
   export const OFFICIAL_ESPHOME_UI_URL = "https://oi.esphome.io/v3/www.js";
   export const ENTITY_REFRESH_CONCURRENCY = 2;

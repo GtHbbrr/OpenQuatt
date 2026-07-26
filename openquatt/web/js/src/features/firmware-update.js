@@ -179,12 +179,12 @@ import { render } from "../core/render-scheduler.js";
     if (!prNumber || !target.available) {
       return null;
     }
-    const baseUrl = `https://github.com/jeroen85/OpenQuatt/releases/download/pr-${prNumber}`;
+    const baseUrl = `https://github.com/OpenQuatt/OpenQuatt/releases/download/pr-${prNumber}`;
     const otaUrl = `${baseUrl}/${target.otaFileName}`;
     return {
       otaUrl,
       md5Url: `${otaUrl}.md5`,
-      releaseApiUrl: `https://api.github.com/repos/jeroen85/OpenQuatt/releases/tags/pr-${prNumber}`,
+      releaseApiUrl: `https://api.github.com/repos/OpenQuatt/OpenQuatt/releases/tags/pr-${prNumber}`,
     };
   }
 
