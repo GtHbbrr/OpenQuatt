@@ -112,8 +112,8 @@ export function renderSettingsView() {
       <footer class="oq-helper-powered-by" aria-label="Platform">
         ${versionMarkup}
         <nav class="oq-helper-footer-links" aria-label="OpenQuatt links">
-          <a href="https://jeroen85.github.io/OpenQuatt/" target="_blank" rel="noreferrer">Docs</a>
-          <a href="https://github.com/jeroen85/OpenQuatt" target="_blank" rel="noreferrer">GitHub</a>
+          <a href="https://openquatt.github.io/OpenQuatt/" target="_blank" rel="noreferrer">Docs</a>
+          <a href="https://github.com/OpenQuatt/OpenQuatt" target="_blank" rel="noreferrer">GitHub</a>
         </nav>
         <a class="oq-helper-powered-by-link" href="https://esphome.io/" target="_blank" rel="noreferrer" aria-label="Built with ESPHome">
           <span>Built with</span>

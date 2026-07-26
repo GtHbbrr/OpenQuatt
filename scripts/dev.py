@@ -664,7 +664,7 @@ def preview_pages_command(args: argparse.Namespace) -> int:
                 {
                     "version": describe_version(root_dir),
                     "channel": "local",
-                    "release_url": "https://github.com/jeroen85/OpenQuatt/releases/latest",
+                    "release_url": "https://github.com/OpenQuatt/OpenQuatt/releases/latest",
                 },
                 indent=2,
             )

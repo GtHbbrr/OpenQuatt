@@ -383,24 +383,8 @@ def main() -> int:
             if phrase not in home_text:
                 add(findings, "docs/dashboardoverzicht.md", 1, f"Missing dashboard docs phrase: {phrase}")
 
-    # 3) Advisory changed-file guards for likely doc drift.
+    # 3) Changed-file documentation impact guards.
     if args.changed_only and changed:
-        if any_changed(
-            changed,
-            {
-                "docs/dashboard/openquatt_ha_dashboard_duo_en.yaml",
-                "docs/dashboard/openquatt_ha_dashboard_duo_nl.yaml",
-                "docs/dashboard/openquatt_ha_dashboard_single_nl.yaml",
-                "docs/dashboard/openquatt_ha_dashboard_single_en.yaml",
-            },
-        ) and not any_changed(changed, {"docs/dashboardoverzicht.md"}):
-            add(
-                findings,
-                "docs/dashboardoverzicht.md",
-                1,
-                "Dashboard YAML changed; consider updating docs/dashboardoverzicht.md.",
-                severity="warning",
-            )
         check_docs_impact(findings, changed, docs_impact_rules)
 
     if not findings:

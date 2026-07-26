@@ -4,11 +4,11 @@ Deze route is bedoeld voor een bestaande `Waveshare ESP32-S3-Relay-1CH` of `Elec
 
 Heb je een nieuwe Heatpump Controller Q-edition met OpenQuatt voorgeïnstalleerd? Volg dan de primaire route [Heatpump Controller Q-edition aansluiten en in gebruik nemen](q-edition.md). Zelf firmware flashen is daarbij normaal niet nodig.
 
-> OpenQuatt is een open-sourceproject op best-effortbasis, zonder gegarandeerde responstijd of individuele ondersteuning. Voor gebruiksvragen en hulp bij diagnose kun je terecht in het [OpenQuatt Discord-kanaal](https://discord.com/channels/1176602554885492786/1464174190788874427). Een reproduceerbare bug meld je als [GitHub-issue](https://github.com/jeroen85/OpenQuatt/issues/new/choose).
+> OpenQuatt is een open-sourceproject op best-effortbasis, zonder gegarandeerde responstijd of individuele ondersteuning. Voor gebruiksvragen en hulp bij diagnose kun je terecht in het [OpenQuatt Discord-kanaal](https://discord.com/channels/1176602554885492786/1464174190788874427). Een reproduceerbare bug meld je als [GitHub-issue](https://github.com/OpenQuatt/OpenQuatt/issues/new/choose).
 
 ## Installatieroute
 
-1. Open de [OpenQuatt installer](https://jeroen85.github.io/OpenQuatt/install/).
+1. Open de [OpenQuatt installer](https://openquatt.github.io/OpenQuatt/install/).
 2. Kies `Single` of `Duo` en daarna exact jouw hardwareprofiel.
 3. Sluit de module via USB aan en flash de firmware.
 4. Stel Wi-Fi in.
@@ -62,7 +62,7 @@ Kies `Single` voor één warmtepomp en `Duo` voor twee warmtepompen.
 
 ### Firmware flashen
 
-1. Open de [OpenQuatt installer](https://jeroen85.github.io/OpenQuatt/install/).
+1. Open de [OpenQuatt installer](https://openquatt.github.io/OpenQuatt/install/).
 2. Kies de combinatie die past bij je opstelling en hardware.
 3. Sluit het ESP32-bord via USB aan.
 4. Flash de firmware.

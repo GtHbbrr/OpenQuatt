@@ -1,6 +1,6 @@
 # Handmatige installatie
 
-De normale installatieroute is de [OpenQuatt installer](https://jeroen85.github.io/OpenQuatt/install/). Gebruik handmatige installatie alleen als de installer niet werkt of als je bewust een firmwarebestand uit een release wilt flashen.
+De normale installatieroute is de [OpenQuatt installer](https://openquatt.github.io/OpenQuatt/install/). Gebruik handmatige installatie alleen als de installer niet werkt of als je bewust een firmwarebestand uit een release wilt flashen.
 
 ## Wanneer gebruik je dit?
 

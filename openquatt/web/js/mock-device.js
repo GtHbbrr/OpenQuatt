@@ -1284,8 +1284,8 @@
 
   function getMockReleaseUrl(channel) {
     return channel === "dev"
-      ? "https://github.com/jeroen85/OpenQuatt/releases/download/dev-latest/manifest.json"
-      : "https://github.com/jeroen85/OpenQuatt/releases/latest";
+      ? "https://github.com/OpenQuatt/OpenQuatt/releases/download/dev-latest/manifest.json"
+      : "https://github.com/OpenQuatt/OpenQuatt/releases/latest";
   }
 
   function syncOverviewTelemetry(single) {
