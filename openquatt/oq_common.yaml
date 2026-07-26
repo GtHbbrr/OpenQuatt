@@ -33,6 +33,7 @@ esphome:
           #endif
           id(oq_hardware_profile_text).publish_state("${oq_hardware_profile}");
           id(oq_connection_text).publish_state("${oq_connection}");
+          id(oq_fw_select_callbacks_runtime_ready) = true;
           id(oq_firmware_update).add_on_state_callback([]() {
             const uint32_t request_generation = id(oq_fw_check_request_generation);
             if (request_generation == 0 || id(oq_fw_check_completed_generation) == request_generation) {
@@ -78,6 +79,7 @@ esphome:
                      (unsigned long) request_generation,
                      id(oq_fw_check_target_ready) ? "ready" : "mismatch");
           });
+      - script.execute: oq_initial_firmware_update_check
 
 logger:
   level: DEBUG
@@ -256,6 +258,18 @@ globals:
     type: uint32_t
     restore_value: false
     initial_value: '0'
+  - id: oq_fw_select_callbacks_runtime_ready
+    type: bool
+    restore_value: false
+    initial_value: 'false'
+  - id: oq_fw_boot_check_pending
+    type: bool
+    restore_value: false
+    initial_value: 'true'
+  - id: oq_fw_boot_check_network_since_ms
+    type: uint32_t
+    restore_value: false
+    initial_value: '0'
   - id: oq_fw_check_request_generation
     type: uint32_t
     restore_value: false
@@ -336,6 +350,88 @@ script:
                    target.c_str(), channel.c_str(), source_url);
           id(oq_firmware_update).set_source_url(source_url);
 
+  - id: oq_initial_firmware_update_check
+    mode: single
+    then:
+      # Keep the TLS-heavy manifest request outside the first API/web/MQTT
+      # publication waves. A disconnect restarts the stable-network window.
+      - while:
+          condition:
+            lambda: |-
+              return id(oq_fw_boot_check_pending);
+          then:
+            - if:
+                condition:
+                  lambda: |-
+                    return esphome::network::is_connected()
+                        && !id(oq_runtime_polling_paused).state;
+                then:
+                  - lambda: |-
+                      id(oq_fw_boot_check_network_since_ms) = (uint32_t) millis();
+                      ESP_LOGI("oq_fw", "Initial firmware manifest check scheduled after ${oq_firmware_initial_check_delay_s} seconds of stable network.");
+                  - while:
+                      condition:
+                        lambda: |-
+                          const uint32_t elapsed_ms =
+                              (uint32_t) millis() - id(oq_fw_boot_check_network_since_ms);
+                          return id(oq_fw_boot_check_pending)
+                              && esphome::network::is_connected()
+                              && !id(oq_runtime_polling_paused).state
+                              && elapsed_ms < (uint32_t) ${oq_firmware_initial_check_delay_s} * 1000UL;
+                      then:
+                        # Five-second sampling avoids a hot polling loop while
+                        # still rejecting meaningful connectivity interruptions.
+                        - delay: 5s
+                  - if:
+                      condition:
+                        lambda: |-
+                          const uint32_t elapsed_ms =
+                              (uint32_t) millis() - id(oq_fw_boot_check_network_since_ms);
+                          return id(oq_fw_boot_check_pending)
+                              && esphome::network::is_connected()
+                              && !id(oq_runtime_polling_paused).state
+                              && elapsed_ms >= (uint32_t) ${oq_firmware_initial_check_delay_s} * 1000UL;
+                      then:
+                        - lambda: |-
+                            id(oq_fw_boot_check_pending) = false;
+                            id(oq_fw_check_last_request_ms) = (uint32_t) millis();
+                        - script.execute: oq_apply_firmware_update_source
+                        - script.wait: oq_apply_firmware_update_source
+                        - update.check:
+                            id: oq_firmware_update
+                      else:
+                        - lambda: |-
+                            if (id(oq_fw_boot_check_pending)) {
+                              ESP_LOGI("oq_fw", "Initial firmware manifest check delayed until the network is stable and OTA is inactive again.");
+                            }
+                else:
+                  - delay: 5s
+      # The http_request update component's native scheduler is disabled below
+      # so its built-in network-ready check cannot run during boot. Keep all
+      # subsequent automatic checks on this explicit cadence.
+      - while:
+          condition:
+            lambda: |-
+              return true;
+          then:
+            - delay: ${oq_firmware_periodic_check_interval}
+            - if:
+                condition:
+                  lambda: |-
+                    return esphome::network::is_connected()
+                        && !id(oq_runtime_polling_paused).state
+                        && !id(oq_firmware_target_install_active);
+                then:
+                  - script.execute: oq_apply_firmware_update_source
+                  - script.wait: oq_apply_firmware_update_source
+                  - lambda: |-
+                      id(oq_fw_check_last_request_ms) = (uint32_t) millis();
+                  - update.check:
+                      id: oq_firmware_update
+                else:
+                  - lambda: |-
+                      ESP_LOGI("oq_fw", "Periodic firmware manifest check skipped: network unavailable or OTA active.");
+
   - id: oq_watch_http_ota_start
     mode: restart
     then:
@@ -365,6 +461,7 @@ script:
     then:
       - lambda: |-
           // Clear terminal state before starting a new install attempt.
+          id(oq_fw_boot_check_pending) = false;
           id(oq_http_ota_begin_observed) = false;
           id(oq_ota_phase_code) = 1;
           id(oq_firmware_update_status).publish_state("Starting");
@@ -610,6 +707,11 @@ select:
         - if:
             condition:
               lambda: |-
+                if (!id(oq_fw_select_callbacks_runtime_ready)) {
+                  return false;
+                }
+                // A real runtime selection supersedes the deferred boot check.
+                id(oq_fw_boot_check_pending) = false;
                 // Prevent duplicate update checks when the channel changes repeatedly.
                 constexpr uint32_t fw_check_cooldown_ms = 1000UL;
                 const uint32_t now_ms = (uint32_t) millis();
@@ -675,6 +777,12 @@ select:
         - if:
             condition:
               lambda: |-
+                if (!id(oq_fw_select_callbacks_runtime_ready)) {
+                  return false;
+                }
+                // A real runtime selection supersedes the deferred boot check.
+                id(oq_fw_boot_check_pending) = false;
+                // Prevent duplicate update checks when the target changes repeatedly.
                 constexpr uint32_t fw_check_cooldown_ms = 1000UL;
                 const uint32_t now_ms = (uint32_t) millis();
                 const uint32_t last_request_ms = id(oq_fw_check_last_request_ms);
@@ -900,6 +1008,9 @@ button:
       - if:
           condition:
             lambda: |-
+              // A manual request supersedes the deferred boot check.
+              id(oq_fw_boot_check_pending) = false;
+              // Prevent duplicate update checks after repeated manual requests.
               constexpr uint32_t fw_check_cooldown_ms = 1000UL;
               const uint32_t now_ms = (uint32_t) millis();
               const uint32_t last_request_ms = id(oq_fw_check_last_request_ms);
@@ -1265,7 +1376,9 @@ update:
     id: oq_firmware_update
     name: Firmware Update
     source: ${release_manifest_url}
-    update_interval: 4h
+    # Prevent ESPHome's built-in network-ready check at about 10 seconds after
+    # boot. oq_initial_firmware_update_check owns both initial and periodic checks.
+    update_interval: never
     icon: mdi:update
     entity_category: diagnostic
     web_server:
