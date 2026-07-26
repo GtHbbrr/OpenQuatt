@@ -100,6 +100,22 @@ This prevents hidden control coupling and keeps debugging deterministic.
 | Boiler control | `${oq_boiler_loop_s}` (default 5s) | CM3 gating plus CM100 boiler test under the shared water-temperature guardrail |
 | CIC polling tick | `${cic_poll_tick_ms}` (default 5s) | Poll scheduler, stale detection, feed invalidation |
 
+### 3.1 Boot and first-run timing
+
+Configured startup delays are relative to the ESPHome scheduler becoming active. Network association, restored-state callbacks and physical bus responses make their observed wall-clock time variable.
+
+| Subsystem | First configured activity after scheduler start | Steady cadence / gate |
+|---|---:|---|
+| HP1 Modbus | `${oq_modbus_startup_delay_ms}` (default 0ms) | Base poll every `${oq_modbus_update_interval_s}` (default 5s), commands throttled by `${oq_modbus_command_throttle_ms}` (default 500ms) |
+| HP2 Modbus (Duo) | 2500ms | Same base cadence; the offset intentionally stages HP1 and HP2 traffic |
+| OpenTherm thermostat slave (OTT) | Component setup | Runtime validation every 2s |
+| OpenTherm boiler master (OTB) | Enabled at late boot only when `Boiler connection` is `OpenTherm` | Link/freshness checks start after 2s and run every `${oq_otb_link_watch_s}` (default 1s); command application starts after 3s and runs every `${oq_otb_command_apply_s}` (default 1s) |
+| CIC | First scheduler tick after `${cic_poll_tick_ms}` (default 5s) | Fetching only runs when CIC polling is enabled |
+| MQTT usage statistics | 90s after setup-complete, opt-in, broker configuration and network gates are all satisfied | Publishes every 1h; a boot-time network loss restarts the 90s delay |
+| Firmware manifest | `${oq_firmware_initial_check_delay_s}` (default 300s) of continuously available network without an active OTA, sampled every 5s | Automatic checks every `${oq_firmware_periodic_check_interval}` (default 4h); manual checks and real runtime channel/target changes remain immediate |
+
+These offsets spread network and bus work; they are not readiness guarantees. A successful Modbus or OpenTherm exchange can only occur once the corresponding external equipment is connected and responsive.
+
 ## 4. Data Pipeline
 
 ### 4.1 Input layer
