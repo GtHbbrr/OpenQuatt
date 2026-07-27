@@ -44,104 +44,51 @@ import { renderModalShell } from "../core/modal-shell.js";
   }
 
   export function getApiSecurityStatusLabel() {
+    if (state.apiSecurityError) {
+      return "Niet beschikbaar";
+    }
     const status = state.apiSecurityStatus;
     if (!status) {
       return "Laden...";
     }
-    const restartPending = Boolean(status.pending_restart
-      || (typeof status.enabled === "boolean"
-        && typeof status.transport_active === "boolean"
-        && status.enabled !== status.transport_active));
-    if (restartPending) {
-      return "Herstart nodig";
-    }
     if (status.transport_active === true) {
-      return "Aan";
+      return "Actief";
     }
-    if (status.transport_active === false) {
-      return "Uit";
+    if (status.provisioning_closed === true) {
+      return "Niet beschikbaar";
     }
-    return status.enabled ? "Aan" : "Uit";
+    if (status.provisioning_pending === true) {
+      return "Wacht op koppeling";
+    }
+    return "Niet beschikbaar";
   }
 
   export function getApiSecurityStatusDetail() {
+    if (state.apiSecurityError) {
+      return "De beveiligingsstatus kon niet worden opgehaald. Controleer de verbinding met het apparaat en probeer het opnieuw.";
+    }
     const status = state.apiSecurityStatus;
     if (!status) {
-      return "API-encryptie wordt geladen.";
-    }
-    const restartPending = Boolean(status.pending_restart
-      || (typeof status.enabled === "boolean"
-        && typeof status.transport_active === "boolean"
-        && status.enabled !== status.transport_active));
-    if (restartPending) {
-      if (status.enabled === true && status.transport_active === false) {
-        return "API-encryptie wordt ingeschakeld na herstart. Kopieer de sleutel nu voor Home Assistant.";
-      }
-      if (status.enabled === false && status.transport_active === true) {
-        return "API-encryptie wordt uitgeschakeld na herstart. Tot die tijd blijft de native API beveiligd.";
-      }
-      return status.key
-        ? "Deze wijziging wordt actief na herstart. De sleutel blijft opgeslagen voor later gebruik."
-        : "Deze wijziging wordt actief na herstart.";
+      return "Beveiligde verbinding wordt gecontroleerd.";
     }
     if (status.transport_active === true) {
-      return "API-encryptie staat aan. Gebruik dezelfde sleutel in Home Assistant.";
+      return "De beveiliging voor Home Assistant is ingesteld.";
     }
-    return "De native API staat nu open op je lokale netwerk.";
+    if (status.provisioning_pending === true) {
+      return "Dit apparaat is nog niet gekoppeld. Na een opstart kan Home Assistant 10 minuten lang de beveiligde verbinding instellen. Daarna worden nieuwe koppelpogingen geweigerd.";
+    }
+    if (status.provisioning_closed === true) {
+      return "De eerste koppeling is niet binnen 10 minuten gelukt. Zet het apparaat kort uit en weer aan om opnieuw te proberen.";
+    }
+    return "De beveiligde verbinding is tijdelijk niet beschikbaar.";
   }
 
   export function getApiSecurityModalTitle() {
-    return "ESPHome API encryption";
+    return "Beveiligde verbinding met Home Assistant";
   }
 
   export function getApiSecurityModalCopy() {
-    const status = state.apiSecurityStatus;
-    if (!status) {
-      return "We halen de huidige API-beveiliging op.";
-    }
-    const restartPending = Boolean(status.pending_restart
-      || (typeof status.enabled === "boolean"
-        && typeof status.transport_active === "boolean"
-        && status.enabled !== status.transport_active));
-    if (restartPending) {
-      if (status.enabled === true && status.transport_active === false) {
-        return "API-encryptie wordt ingeschakeld na herstart. Kopieer de sleutel nu alvast voor Home Assistant.";
-      }
-      if (status.enabled === false && status.transport_active === true) {
-        return "API-encryptie wordt uitgeschakeld na herstart. Tot die tijd blijft de native API nog beveiligd.";
-      }
-      return "Deze wijziging wordt actief na herstart. Je kunt de sleutel hier bekijken, kopiëren of vernieuwen.";
-    }
-    if (status.transport_active === true) {
-      return "De native API is beveiligd. Je kunt de sleutel hier bekijken, kopiëren of vernieuwen.";
-    }
-    return "API-encryptie staat uit. Schakel in om een sleutel te bekijken, kopiëren of vernieuwen.";
-  }
-
-  export function getApiSecurityToggleLabel() {
-    const status = state.apiSecurityStatus;
-    if (!status) {
-      return "Laden...";
-    }
-    const restartPending = Boolean(status.pending_restart
-      || (typeof status.enabled === "boolean"
-        && typeof status.transport_active === "boolean"
-        && status.enabled !== status.transport_active));
-    if (restartPending && status.enabled === true && status.transport_active === false) {
-      return "Annuleer inschakelen";
-    }
-    if (restartPending && status.enabled === false && status.transport_active === true) {
-      return "Annuleer uitschakelen";
-    }
-    return status.enabled ? "Uitschakelen" : "Inschakelen";
-  }
-
-  export function getApiSecurityRotateLabel() {
-    const status = state.apiSecurityStatus;
-    if (!status) {
-      return "Laden...";
-    }
-    return status.key ? "Vernieuw sleutel" : "Genereer sleutel";
+    return "Home Assistant regelt deze beveiliging automatisch. Je hoeft hier niets in te stellen.";
   }
 
   export function renderLoginStatusRow(label, value, copy = "", loading = false) {
@@ -160,19 +107,6 @@ import { renderModalShell } from "../core/modal-shell.js";
   }
 
   export function renderApiSecurityModal() {
-    const status = state.apiSecurityStatus || {};
-    const enabled = status.enabled === true;
-    const hasKey = Boolean(status.key);
-    const restartPending = Boolean(status.pending_restart
-      || (typeof status.enabled === "boolean"
-        && typeof status.transport_active === "boolean"
-        && status.enabled !== status.transport_active));
-    const showKeySection = hasKey || status.transport_active === true || restartPending;
-    const modalNotice = state.apiSecurityNotice;
-    const errorMarkup = state.apiSecurityError
-      ? `<div class="oq-helper-modal-note oq-helper-modal-note--error" aria-live="assertive">${escapeHtml(state.apiSecurityError)}</div>`
-      : "";
-
     return renderModalShell({
       id: "system",
       titleId: "oq-api-security-modal-title",
@@ -183,77 +117,13 @@ import { renderModalShell } from "../core/modal-shell.js";
       closeAction: "close-system-modal",
       closeLabel: "Sluit API-beveiliging popup",
       body: `
-          ${modalNotice ? `<div class="oq-helper-modal-success oq-helper-modal-success--compact" aria-live="polite"><strong>Status</strong><span>${escapeHtml(modalNotice)}</span></div>` : ""}
-          ${errorMarkup}
-          <div class="oq-settings-api-security-shell oq-settings-api-security-shell--modal">
-            <div class="oq-settings-quickstart-status-row oq-settings-api-security-status-row">
-              <div>
-                <p class="oq-settings-quickstart-status-label">Huidige status</p>
-                <strong class="oq-settings-quickstart-status-value">${escapeHtml(getApiSecurityStatusLabel())}</strong>
-                <p class="oq-settings-quickstart-status-copy">${escapeHtml(getApiSecurityStatusDetail())}</p>
-              </div>
-              <button
-                class="oq-helper-button oq-helper-button--primary"
-                type="button"
-                data-oq-action="${enabled ? "disable-api-security" : "enable-api-security"}"
-                ${state.apiSecurityBusy || !status.csrf_token ? "disabled" : ""}
-              >
-                ${escapeHtml(getApiSecurityToggleLabel())}
-              </button>
-            </div>
-            ${showKeySection ? `
-            <div class="oq-settings-api-security-key">
-              <div class="oq-settings-field-head">
-                <h3>API-sleutel</h3>
-              </div>
-              <p class="oq-settings-action-note">${escapeHtml(restartPending
-                ? (hasKey
-                    ? "Deze sleutel is opgeslagen. Kopieer hem nu en kies daarna Opslaan en herstarten."
-                    : "Inschakelen maakt direct een nieuwe sleutel aan. Deze wijziging wordt actief na herstart.")
-                : (status.transport_active
-                    ? "Gebruik deze sleutel in Home Assistant voor de ESPHome-integratie."
-                    : status.key
-                      ? "Bewaar deze sleutel voor later gebruik of kopieer hem nu."
-                      : "Er is nog geen API-sleutel opgeslagen."))}</p>
-              ${hasKey ? `<div class="oq-settings-api-security-key-row"><div class="oq-settings-api-security-key-value">${escapeHtml(status.key)}</div></div>` : ""}
-              ${hasKey
-                ? `
-                  <div class="oq-settings-api-security-actions">
-                    <button
-                      class="oq-helper-button oq-helper-button--ghost"
-                      type="button"
-                      data-oq-action="rotate-api-security"
-                      ${state.apiSecurityBusy || !status.csrf_token ? "disabled" : ""}
-                    >
-                      ${escapeHtml(getApiSecurityRotateLabel())}
-                    </button>
-                    <button
-                      class="oq-helper-button oq-helper-button--ghost"
-                      type="button"
-                      data-oq-action="copy-api-security-key"
-                      ${state.apiSecurityBusy ? "disabled" : ""}
-                    >
-                      Kopieer sleutel
-                    </button>
-                  </div>
-                `
-                : ""}
-            </div>
-            ` : ""}
-          </div>`,
-      actions: `
-        ${restartPending ? `
-              <button
-                class="oq-helper-button oq-helper-button--primary"
-                type="button"
-                data-oq-action="restart-api-security"
-                ${state.apiSecurityBusy ? "disabled" : ""}
-              >
-                Opslaan en herstarten
-              </button>
-        ` : ""}
-        <button class="oq-helper-button oq-helper-button--ghost" type="button" data-oq-action="close-system-modal" ${state.apiSecurityBusy ? "disabled" : ""}>Gereed</button>
-      `,
+        <div class="oq-settings-api-security-shell oq-settings-api-security-shell--modal">
+          <div class="oq-helper-modal-grid">
+            ${renderLoginStatusRow("Status", getApiSecurityStatusLabel(), getApiSecurityStatusDetail())}
+            ${renderLoginStatusRow("Beheer", "Automatisch door Home Assistant", "De beveiligingssleutel wordt automatisch ingesteld en bewaard.")}
+          </div>
+        </div>`,
+      actions: `<button class="oq-helper-button oq-helper-button--ghost" type="button" data-oq-action="close-system-modal">Gereed</button>`,
     });
   }
 
