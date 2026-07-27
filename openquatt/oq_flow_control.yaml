@@ -86,6 +86,7 @@ number:
     id: oq_flow_setpoint_lph
     name: "Flow Setpoint"
     icon: mdi:waves-arrow-right
+    entity_category: config
     unit_of_measurement: "L/h"
     mode: slider
     web_server:
@@ -101,6 +102,7 @@ number:
     id: oq_cooling_flow_setpoint_lph
     name: "Cooling Flow Setpoint"
     icon: mdi:snowflake-thermometer
+    entity_category: config
     unit_of_measurement: "L/h"
     mode: slider
     web_server:
@@ -116,6 +118,7 @@ number:
     id: oq_flow_manual_pwm
     name: "Manual iPWM"
     icon: mdi:fan
+    entity_category: config
     unit_of_measurement: "iPWM"
     mode: slider
     min_value: 50
@@ -166,6 +169,7 @@ number:
     id: oq_flow_kp
     name: "Flow PI Kp"
     icon: mdi:alpha-k-circle-outline
+    entity_category: config
     mode: slider
     web_server:
       sorting_group_id: oq_tuning_flow
@@ -181,6 +185,7 @@ number:
     id: oq_flow_ki
     name: "Flow PI Ki"
     icon: mdi:alpha-i-circle-outline
+    entity_category: config
     mode: slider
     web_server:
       sorting_group_id: oq_tuning_flow
@@ -201,6 +206,7 @@ select:
     id: oq_flow_control_mode
     name: "Flow Control Mode"
     icon: mdi:tune-variant
+    entity_category: config
     options:
       - Flow Setpoint
       - Manual PWM

@@ -253,6 +253,7 @@ sensor:
     state_class: measurement
     accuracy_decimals: 1
     entity_category: diagnostic
+    disabled_by_default: true
     update_interval: 1s
     web_server:
       sorting_group_id: oq_boiler
@@ -268,6 +269,7 @@ sensor:
     state_class: measurement
     accuracy_decimals: 0
     entity_category: diagnostic
+    disabled_by_default: true
     update_interval: 1s
     web_server:
       sorting_group_id: oq_boiler
@@ -281,6 +283,7 @@ sensor:
     unit_of_measurement: "s"
     accuracy_decimals: 1
     entity_category: diagnostic
+    internal: true
     update_interval: 1s
     web_server:
       sorting_group_id: oq_boiler
@@ -325,6 +328,7 @@ text_sensor:
     name: "Boiler command source"
     icon: mdi:source-branch
     entity_category: diagnostic
+    disabled_by_default: true
     update_interval: 1s
     web_server:
       sorting_group_id: oq_boiler
@@ -345,6 +349,7 @@ text_sensor:
     name: "Boiler block reason"
     icon: mdi:shield-alert-outline
     entity_category: diagnostic
+    disabled_by_default: true
     update_interval: 1s
     web_server:
       sorting_group_id: oq_boiler

@@ -88,6 +88,7 @@ binary_sensor:
     name: "HA - Heating Enable"
     entity_id: ${ha_heating_enable_entity_id}
     internal: false
+    disabled_by_default: true
     icon: mdi:radiator
     device_class: heat
     web_server:
@@ -98,6 +99,7 @@ binary_sensor:
     name: "HA - Cooling Enable"
     entity_id: ${ha_cooling_enable_entity_id}
     internal: false
+    disabled_by_default: true
     icon: mdi:snowflake-check
     device_class: cold
     web_server:

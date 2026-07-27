@@ -248,6 +248,7 @@ number:
     id: oq_min_runtime_min
     name: "Minimum runtime"
     icon: mdi:timer-cog-outline
+    entity_category: config
     unit_of_measurement: "s"
     min_value: 300
     max_value: 3600
@@ -265,6 +266,7 @@ number:
     name: "Dual HP Enable Hold"
     internal: ${hc_dual_tuning_internal}
     disabled_by_default: true
+    entity_category: config
     icon: mdi:timer-plus-outline
     unit_of_measurement: "min"
     min_value: 1
@@ -283,6 +285,7 @@ number:
     name: "Dual HP Disable Hold"
     internal: ${hc_dual_tuning_internal}
     disabled_by_default: true
+    entity_category: config
     icon: mdi:timer-minus-outline
     unit_of_measurement: "min"
     min_value: 1
@@ -303,6 +306,8 @@ button:
     id: oq_reset_runtime
     name: "${hc_runtime_reset_button_name}"
     icon: mdi:restart
+    entity_category: config
+    disabled_by_default: true
     web_server:
       sorting_group_id: oq_heating_strategy
     on_press:

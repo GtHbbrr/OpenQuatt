@@ -62,6 +62,7 @@ sensor:
     id: mqtt_cooling_dew_point
     name: "MQTT Cooling Dew Point"
     icon: mdi:water-thermometer
+    disabled_by_default: true
     unit_of_measurement: "°C"
     device_class: temperature
     state_class: measurement
@@ -74,6 +75,7 @@ sensor:
     id: mqtt_cooling_dew_point_age
     name: "MQTT Cooling Dew Point Age"
     icon: mdi:timer-outline
+    internal: true
     unit_of_measurement: "s"
     accuracy_decimals: 0
     update_interval: never
@@ -84,6 +86,7 @@ sensor:
     id: mqtt_outside_temperature
     name: "MQTT Outside Temperature"
     icon: mdi:thermometer
+    disabled_by_default: true
     unit_of_measurement: "°C"
     device_class: temperature
     state_class: measurement
@@ -96,6 +99,7 @@ sensor:
     id: mqtt_outside_temperature_age
     name: "MQTT Outside Temperature Age"
     icon: mdi:timer-outline
+    internal: true
     unit_of_measurement: "s"
     accuracy_decimals: 0
     update_interval: never
@@ -106,6 +110,7 @@ sensor:
     id: mqtt_room_temperature
     name: "MQTT Room Temperature"
     icon: mdi:home-thermometer
+    disabled_by_default: true
     unit_of_measurement: "°C"
     device_class: temperature
     state_class: measurement
@@ -118,6 +123,7 @@ sensor:
     id: mqtt_room_temperature_age
     name: "MQTT Room Temperature Age"
     icon: mdi:timer-outline
+    internal: true
     unit_of_measurement: "s"
     accuracy_decimals: 0
     update_interval: never
@@ -128,6 +134,7 @@ sensor:
     id: mqtt_room_setpoint
     name: "MQTT Room Setpoint"
     icon: mdi:thermostat
+    disabled_by_default: true
     unit_of_measurement: "°C"
     device_class: temperature
     state_class: measurement
@@ -140,6 +147,7 @@ sensor:
     id: mqtt_room_setpoint_age
     name: "MQTT Room Setpoint Age"
     icon: mdi:timer-outline
+    internal: true
     unit_of_measurement: "s"
     accuracy_decimals: 0
     update_interval: never
@@ -150,6 +158,7 @@ sensor:
     id: mqtt_heating_enable_age
     name: "MQTT Heating Enable Age"
     icon: mdi:timer-outline
+    internal: true
     unit_of_measurement: "s"
     accuracy_decimals: 0
     update_interval: never
@@ -160,6 +169,7 @@ sensor:
     id: mqtt_cooling_enable_age
     name: "MQTT Cooling Enable Age"
     icon: mdi:timer-outline
+    internal: true
     unit_of_measurement: "s"
     accuracy_decimals: 0
     update_interval: never
@@ -171,6 +181,7 @@ binary_sensor:
     id: mqtt_cooling_dew_point_valid
     name: "MQTT Cooling Dew Point Valid"
     icon: mdi:water-check
+    internal: true
     device_class: connectivity
     web_server:
       sorting_group_id: oq_ha_inputs
@@ -179,6 +190,7 @@ binary_sensor:
     id: mqtt_outside_temperature_valid
     name: "MQTT Outside Temperature Valid"
     icon: mdi:check-decagram
+    internal: true
     device_class: connectivity
     web_server:
       sorting_group_id: oq_ha_inputs
@@ -187,6 +199,7 @@ binary_sensor:
     id: mqtt_room_temperature_valid
     name: "MQTT Room Temperature Valid"
     icon: mdi:check-decagram
+    internal: true
     device_class: connectivity
     web_server:
       sorting_group_id: oq_ha_inputs
@@ -195,6 +208,7 @@ binary_sensor:
     id: mqtt_room_setpoint_valid
     name: "MQTT Room Setpoint Valid"
     icon: mdi:check-decagram
+    internal: true
     device_class: connectivity
     web_server:
       sorting_group_id: oq_ha_inputs
@@ -203,6 +217,7 @@ binary_sensor:
     id: mqtt_heating_enable
     name: "MQTT Heating Enable"
     icon: mdi:radiator
+    disabled_by_default: true
     device_class: heat
     web_server:
       sorting_group_id: oq_ha_inputs
@@ -211,6 +226,7 @@ binary_sensor:
     id: mqtt_heating_enable_valid
     name: "MQTT Heating Enable Valid"
     icon: mdi:check-decagram
+    internal: true
     device_class: connectivity
     web_server:
       sorting_group_id: oq_ha_inputs
@@ -219,6 +235,7 @@ binary_sensor:
     id: mqtt_cooling_enable
     name: "MQTT Cooling Enable"
     icon: mdi:snowflake-check
+    disabled_by_default: true
     device_class: cold
     web_server:
       sorting_group_id: oq_ha_inputs
@@ -227,6 +244,7 @@ binary_sensor:
     id: mqtt_cooling_enable_valid
     name: "MQTT Cooling Enable Valid"
     icon: mdi:check-decagram
+    internal: true
     device_class: connectivity
     web_server:
       sorting_group_id: oq_ha_inputs
