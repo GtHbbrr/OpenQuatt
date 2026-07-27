@@ -102,6 +102,11 @@ Bij Waveshare en Heatpump Listener ligt `Single` of `Duo` al vast in de firmware
 9. stille uren en compressorlimieten;
 10. controleren en afronden.
 
+Op Heatpump Controller Q kies je bij de CV-ketel of boiler ook de fysieke
+aansluiting: `Aan/uit (R1)` of `OpenTherm (OTB)`. Wanneer bij een R1-keuze
+tijdens het opstarten toch een OpenTherm-ketel antwoordt, blijft R1 uit en
+blokkeert Quick Start totdat je `OpenTherm (OTB)` kiest.
+
 Blijkt dat je `Single` of `Duo` verkeerd hebt gekozen? Flash dan via de installer het juiste profiel voordat je verdergaat. Deze modules kunnen de setup niet vanuit Quick Start wisselen.
 
 ## Wanneer is de installatie klaar?
