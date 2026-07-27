@@ -4767,7 +4767,6 @@
 
   seedEntities();
   refreshAuthToken();
-  refreshApiSecurityToken();
   refreshMqttToken();
   setInstallationMode(state.installation);
   applyScenario(state.scenario);

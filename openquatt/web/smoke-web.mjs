@@ -316,6 +316,9 @@ async function checkWriteActionContracts() {
   if (statusPayload.includes("key:") || statusPayload.includes("csrf_token")) {
     throw new Error("API security status mock exposes a secret or CSRF token");
   }
+  if (mockDevice.includes("refreshApiSecurityToken")) {
+    throw new Error("Mock still references the removed API security token lifecycle");
+  }
   assertContains(mqttActions, 'fetch("/mqtt/save"', "MQTT config save");
   assertContains(mqttActions, 'fetch("/mqtt/input/save"', "MQTT input save");
   assertContains(firmwareActions, 'buildEntityPath(installButtonEntity.domain, installButtonEntity.name, "press")', "Firmware install button endpoint");
