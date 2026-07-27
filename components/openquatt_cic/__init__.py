@@ -1,6 +1,6 @@
 import esphome.codegen as cg
 import esphome.config_validation as cv
-from esphome.components import binary_sensor, sensor, switch, text
+from esphome.components import binary_sensor, sensor, socket, switch, text
 from esphome.const import CONF_ID
 
 AUTO_LOAD = ["sensor", "binary_sensor", "switch", "text"]
@@ -73,6 +73,10 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Optional(CONF_LAST_STATUS_CODE_SENSOR): cv.use_id(sensor.Sensor),
     }
 ).extend(cv.polling_component_schema("5s"))
+CONFIG_SCHEMA = cv.All(
+    CONFIG_SCHEMA,
+    socket.consume_sockets(1, "openquatt_cic"),
+)
 
 
 async def to_code(config):
