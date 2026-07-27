@@ -16,6 +16,32 @@ Gebruik de web-app voor alles wat direct op OpenQuatt zelf hoort:
 
 De web-app blijft altijd de plek waar je OpenQuatt inricht, beheert en controleert als er iets niet klopt. Gebruik je Home Assistant, dan is dat daarnaast een prettige plek voor dagelijks meekijken, dashboards en automatisering.
 
+## ESPHome API-key provisioning
+
+De ESPHome API gebruikt native provisioning. De firmware bevat `api.encryption:` zonder ingebouwde sleutel; Home Assistant maakt bij de eerste verbinding een Noise-PSK aan en laat ESPHome die in de native API-opslag bewaren. Home Assistant en ESPHome zijn samen de enige eigenaar van deze sleutel. OpenQuatt toont daarom alleen de status en biedt geen enable-, disable- of rotate-knoppen.
+
+De provisioning window staat na een boot maximaal 10 minuten open zolang het device nog geen API-sleutel heeft. Daarna worden nieuwe API-clients geweigerd totdat het device opnieuw wordt gereset of gepowercycled. Een bestaande sleutel wordt door de timer niet gewist en blijft firmware-updates, reboots en powercycles overleven.
+
+In `Instellingen → Toegang & Beveiliging` zie je:
+
+- `Active`: native API-encryptie is actief;
+- `Awaiting provisioning`: Home Assistant kan de sleutel nog instellen;
+- `Unavailable`: provisioning is gesloten of de native status is tijdelijk niet beschikbaar.
+
+De web-app geeft de API-sleutel nooit terug. Er is geen HTTPS op de lokale webinterface; herstel van een onbekende sleutel verloopt daarom via Home Assistant-herkoppeling of fysieke USB/serial-recovery. Een oude OpenQuatt-sleutel wordt niet automatisch naar ESPHome gekopieerd. Daardoor kan bij een migratie eenmalig opnieuw koppelen of het verwijderen van een stale Home Assistant-sleutel nodig zijn.
+
+Bij de migratie geldt deze matrix:
+
+| Device | Home Assistant | Gedrag |
+|---|---|---|
+| Native key aanwezig | Key bekend | Key behouden; OTA en startup wissen hem nooit. |
+| Alleen oude OpenQuatt-key aanwezig | Geen native key | Oude key wordt genegeerd; Home Assistant provisiont een nieuwe native key. |
+| Geen key | Geen key | Home Assistant provisiont automatisch binnen de provisioning window. |
+| Geen key | Stale key | Eenmalig opnieuw koppelen of de stale key in Home Assistant verwijderen. |
+| Native key aanwezig | Key onbekend | Herstel via Home Assistant- of USB/serial-procedure; OpenQuatt neemt hem niet over. |
+
+De oude OpenQuatt-preference wordt bij deze firmwareversie niet gewist, maar ook niet meer gelezen of toegepast. Dat houdt rollback mogelijk zonder een tweede bron van waarheid te activeren.
+
 ## Wat doe je waar?
 
 | Plek | Gebruik je vooral voor |
