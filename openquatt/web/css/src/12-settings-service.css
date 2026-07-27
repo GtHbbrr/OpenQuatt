@@ -1224,6 +1224,30 @@
   padding-top: 2px;
 }
 
+.oq-settings-boiler-connection-note {
+  margin: 0;
+  color: var(--oq-helper-soft);
+  line-height: 1.55;
+}
+
+.oq-settings-boiler-connection-note.is-warning {
+  display: grid;
+  gap: 5px;
+  padding: 12px 14px;
+  border: 1px solid var(--oq-settings-warning-border, rgba(234, 88, 12, 0.24));
+  border-radius: var(--oq-helper-radius-md);
+  background: var(--oq-theme-surface-1vxv, rgba(255, 247, 237, 0.86));
+}
+
+.oq-settings-boiler-connection-note.is-warning strong {
+  color: var(--oq-helper-ink);
+  font-size: 0.94rem;
+}
+
+.oq-settings-boiler-connection-note.is-warning p {
+  margin: 0;
+}
+
 .oq-settings-boiler-foot {
   padding-top: 2px;
 }

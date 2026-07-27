@@ -13,8 +13,10 @@
 device_name: "openquatt"                              # Internal ESPHome device ID / hostname base.
 friendly_name: OpenQuatt                              # Display name in Home Assistant / UI.
 project_name: "openquatt.openquatt"                   # ESPHome project identifier shown in firmware metadata.
-project_version: "v0.45.0"                            # ESPHome project version shown in firmware metadata.
+project_version: "v0.46.0"                            # ESPHome project version shown in firmware metadata.
 release_channel: "main"                               # Firmware release channel shown in diagnostics (`main` or `dev`).
+oq_firmware_initial_check_delay_s: "300"              # Stable-network delay before the first automatic manifest check [s].
+oq_firmware_periodic_check_interval: "4h"              # Automatic manifest-check cadence after the initial boot window.
 oq_hardware_profile: "unknown"                        # Compile-time hardware profile id.
 oq_hardware_build_flag: "-DOQ_HARDWARE_HEATPUMP_CONTROLLER_Q=0" # Hardware capability flag for C++ lambdas.
 oq_boiler_transport_shutdown_extra: ""                 # Optional profile-specific synchronous actuator shutdown statements.
@@ -217,6 +219,7 @@ oq_boiler_otb_min_on_s: "30"                          # OpenTherm minimum reques
 oq_boiler_otb_min_off_s: "120"                        # OpenTherm minimum requested off-time [s].
 oq_otb_supported: "false"                             # Compile-time availability of the boiler OpenTherm master transport.
 oq_otb_command_apply_s: "1"                           # Apply validated CH/TSet state to the OpenTherm master [s].
+oq_otb_startup_probe_timeout_s: "8"                   # R1 boot verification window for detecting a physically connected OpenTherm boiler [s].
 oq_boiler_transport_selection_extra: ""               # Hardware-specific start/stop hook after changing the boiler transport.
 
 # ----------------------------

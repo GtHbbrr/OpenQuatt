@@ -10,11 +10,22 @@ substitutions:
     // its bounded acknowledgement opportunity.
     if (id(oq_otb_hub_ready)) {
       if (x == "OpenTherm") {
+        oq_otb::startup_probe_state.end();
+        id(oq_otb_startup_probe_active) = false;
+        id(oq_boiler_connection_mismatch_state) = false;
+        id(oq_boiler_connection_mismatch).publish_state(false);
         id(oq_otb_hub).resume_polling();
       } else {
         id(oq_otb_withdraw_and_flush).execute();
-        id(oq_otb_hub).on_shutdown();
-        id(oq_otb_hub).disable_loop();
+        oq_otb::startup_probe_state.begin(millis());
+        id(oq_otb_startup_probe_active) = true;
+        id(oq_boiler_connection_mismatch_state) = false;
+        id(oq_boiler_connection_mismatch).publish_state(false);
+        id(boiler_relay).turn_off();
+        id(oq_otb_hub).prioritize_messages(
+            esphome::opentherm::MessageId::STATUS,
+            esphome::opentherm::MessageId::CH_SETPOINT);
+        id(oq_otb_hub).enable_loop();
       }
     }
     oq_otb::telemetry_state.reset_link_session();

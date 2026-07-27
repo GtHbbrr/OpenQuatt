@@ -114,6 +114,18 @@ globals:
     restore_value: false
     initial_value: 'false'
 
+  # Q hardware verifies an R1 selection against the physical OpenTherm bus
+  # before the relay transport can become available.
+  - id: oq_otb_startup_probe_active
+    type: bool
+    restore_value: false
+    initial_value: 'false'
+
+  - id: oq_boiler_connection_mismatch_state
+    type: bool
+    restore_value: false
+    initial_value: 'false'
+
 # ----------------------------
 # TRANSPORT SELECTION
 # ----------------------------
@@ -363,9 +375,13 @@ interval:
               !id(oq_runtime_polling_paused).state &&
               !id(oq_boiler_runtime_pause_state);
           const bool transport_available =
-              runtime_available &&
-              (!opentherm_selected ||
-               (${oq_otb_supported} && id(oq_otb_link_available_state)));
+              oq_boiler::transport_available_for_selection(
+                  runtime_available,
+                  opentherm_selected,
+                  ${oq_otb_supported},
+                  id(oq_otb_link_available_state),
+                  id(oq_otb_startup_probe_active),
+                  id(oq_boiler_connection_mismatch_state));
           const bool transport_settled = oq_boiler::settle_period_elapsed(
               id(oq_boiler_transport_settle_required),
               now_ms,
@@ -410,6 +426,7 @@ interval:
               has_valid_supply_temp,
               id(oq_water_temp_boiler_inhibit_active),
               id(oq_water_temp_hard_trip_active),
+              id(oq_boiler_connection_mismatch_state),
               transport_available,
               transport_settled,
               command_rearmed,
@@ -464,6 +481,7 @@ interval:
                 decision.block_reason == oq_boiler::BLOCK_TRANSPORT_UNAVAILABLE ||
                 decision.block_reason == oq_boiler::BLOCK_TRANSPORT_SETTLING ||
                 decision.block_reason == oq_boiler::BLOCK_AWAITING_FRESH_COMMAND ||
+                decision.block_reason == oq_boiler::BLOCK_CONNECTION_MISMATCH ||
                 decision.block_reason == oq_boiler::BLOCK_TARGET_INVALID) {
               return openquatt_decision_log::REASON_SENSOR_FALLBACK;
             }
@@ -539,7 +557,10 @@ interval:
                 has_valid_supply_temp ? (int16_t) lroundf(supply_c * 10.0f) : 0);
           }
 
-          if (opentherm_selected) {
+          if (oq_boiler::relay_must_be_off(
+                  opentherm_selected,
+                  id(oq_otb_startup_probe_active),
+                  id(oq_boiler_connection_mismatch_state))) {
             id(boiler_relay).turn_off();
           } else if (boiler_allowed) {
             id(boiler_relay).turn_on();

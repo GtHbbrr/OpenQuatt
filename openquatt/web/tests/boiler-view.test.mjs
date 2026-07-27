@@ -11,6 +11,11 @@ const {
   getBoilerStatusModel,
   renderBoilerPanel,
 } = await import("../js/src/views/heatpump.js");
+const {
+  BOILER_OPENTHERM_CAPABILITY,
+  getBoilerOpenThermCapability,
+  getSupportedBoilerConnectionOptions,
+} = await import("../js/src/settings/boiler.js");
 const { renderSettingsOpenThermCicSection } = await import("../js/src/settings/integrations.js");
 const {
   ENTITY_DEFS,
@@ -20,8 +25,10 @@ const {
 const { INITIAL_SETTINGS_READY_KEY_MAP, SETTINGS_GROUP_KEY_MAP } = await import("../js/src/core/entity-sync.js");
 const heatPumpCss = await readFile(new URL("../css/src/40-heatpump.css", import.meta.url), "utf8");
 const boilerOpenThermYaml = await readFile(new URL("../../oq_boiler_opentherm.yaml", import.meta.url), "utf8");
+const heatPumpQProfileYaml = await readFile(new URL("../../profiles/heatpump_controller_q.yaml", import.meta.url), "utf8");
 const otSlaveYaml = await readFile(new URL("../../oq_ot_slave.yaml", import.meta.url), "utf8");
 const quickStartSource = await readFile(new URL("../js/src/features/quickstart.js", import.meta.url), "utf8");
+const installationSource = await readFile(new URL("../js/src/settings/installation.js", import.meta.url), "utf8");
 
 function status(overrides = {}) {
   return getBoilerStatusModel({
@@ -327,9 +334,71 @@ test("integration diagnostics separates thermostat, boiler control, OTB and CiC"
 
 test("settings hydration loads boiler setup and diagnostics before rendering", () => {
   assert.ok(INITIAL_SETTINGS_READY_KEY_MAP.installation.includes("boilerConnection"));
+  assert.ok(INITIAL_SETTINGS_READY_KEY_MAP.installation.includes("otbLinkAvailable"));
+  assert.ok(INITIAL_SETTINGS_READY_KEY_MAP.installation.includes("otbConnectionMismatch"));
   assert.ok(SETTINGS_GROUP_KEY_MAP.installation.includes("boilerConnection"));
+  assert.ok(SETTINGS_GROUP_KEY_MAP.installation.includes("otbLinkAvailable"));
+  assert.ok(SETTINGS_GROUP_KEY_MAP.installation.includes("otbConnectionMismatch"));
   assert.ok(SETTINGS_GROUP_KEY_MAP.integrations.includes("boilerCommandValid"));
   assert.ok(SETTINGS_GROUP_KEY_MAP.integrations.includes("otbChPressure"));
+});
+
+test("Quick Start blocks R1 after a boiler answers the safe OpenTherm probe", () => {
+  assert.match(installationSource, /OpenTherm-ketel gevonden/);
+  assert.match(installationSource, /Kies OpenTherm \(OTB\)/);
+  assert.match(quickStartSource, /nextDisabled:\s*boilerConnectionMismatch/);
+});
+
+test("firmware publishes boiler connection mismatch transitions immediately", () => {
+  assert.match(
+    boilerOpenThermYaml,
+    /oq_boiler_connection_mismatch_state\) = true;\s+id\(oq_boiler_connection_mismatch\)\.publish_state\(true\);/,
+  );
+  assert.match(
+    boilerOpenThermYaml,
+    /oq_boiler_connection_mismatch_state\) = false;\s+id\(oq_boiler_connection_mismatch\)\.publish_state\(false\);/,
+  );
+  assert.match(
+    heatPumpQProfileYaml,
+    /oq_boiler_connection_mismatch_state\) = false;\s+id\(oq_boiler_connection_mismatch\)\.publish_state\(false\);/,
+  );
+});
+
+test("Quick Start keeps the mismatch remedy visible when boiler assist is off", () => {
+  assert.match(
+    installationSource,
+    /\(boilerPresent \|\| boilerConnectionMismatch\) && boilerConnectionAvailable \? renderSettingsFieldCard/,
+  );
+  assert.match(installationSource, /OpenTherm-ketel gevonden/);
+});
+
+test("R1 setup explains its bounded OpenTherm startup check", () => {
+  assert.match(installationSource, /OT-controle bij opstart actief/);
+});
+
+test("installation keeps OpenTherm selectable when the supported boiler link is offline", () => {
+  const capability = getBoilerOpenThermCapability({ linkEntityPresent: true });
+  assert.equal(capability, BOILER_OPENTHERM_CAPABILITY.SUPPORTED);
+  assert.deepEqual(
+    getSupportedBoilerConnectionOptions(["R1", "OpenTherm"], capability),
+    ["R1", "OpenTherm"],
+  );
+});
+
+test("installation does not silently present R1 while OpenTherm capability is unresolved", () => {
+  const capability = getBoilerOpenThermCapability();
+  assert.equal(capability, BOILER_OPENTHERM_CAPABILITY.UNKNOWN);
+  assert.match(installationSource, /Beschikbaarheid controleren/);
+  assert.match(installationSource, /aansluitingskeuze is tijdelijk geblokkeerd/);
+});
+
+test("installation offers only R1 after OpenTherm capability is confirmed absent", () => {
+  const capability = getBoilerOpenThermCapability({ linkEntityConfirmedMissing: true });
+  assert.equal(capability, BOILER_OPENTHERM_CAPABILITY.UNSUPPORTED);
+  assert.deepEqual(
+    getSupportedBoilerConnectionOptions(["R1", "OpenTherm"], capability),
+    ["R1"],
+  );
 });
 
 test("DHW permission stays enabled without a user-facing setting", () => {

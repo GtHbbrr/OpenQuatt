@@ -1008,8 +1008,8 @@ void OpenQuattDecisionLog::write_decision_log(httpd_req_t *req) const {
   ChunkedJsonWriter writer(req);
   const uint64_t boot_epoch_s = this->boot_epoch_s_();
   const uint64_t uptime_s = this->monotonic_uptime_s_();
-  const uint32_t internal_free = heap_caps_get_free_size(MALLOC_CAP_8BIT);
-  const uint32_t internal_min = heap_caps_get_minimum_free_size(MALLOC_CAP_8BIT);
+  const uint32_t internal_free = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
+  const uint32_t internal_min = heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL);
   const uint32_t psram_free = heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
 
   size_t event_count = 0;
