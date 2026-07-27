@@ -11,6 +11,7 @@ import { formatDiagnosticsDateTime, formatUptimeFromMeta, getDeviceIpAddress, ge
 import { getUpdateStatus } from "../features/firmware-update.js";
 import { getEspTemperatureLabel } from "../features/header-status.js";
 import { getWebServerLogStatusLabel } from "../features/webserver-logs.js";
+import { BOILER_OPENTHERM_CAPABILITY, getBoilerOpenThermCapability, getSupportedBoilerConnectionOptions } from "./boiler.js";
 import { getSelectEntityOptions, renderNamedActionButton, renderSettingsChoiceOption, renderSettingsCompactSwitchControl, renderSettingsFieldCard, renderSettingsNumberField, renderSettingsSection, renderSettingsSliderField, renderSettingsSystemRow } from "./controls.js";
 import { renderSettingsHeatPumpLimiterCard } from "./heating.js";
 import { escapeHtml } from "../core/html.js";
@@ -602,12 +603,19 @@ import { escapeHtml } from "../core/html.js";
     const boilerConnection = boilerConnectionAvailable
       ? String(getEntityValue("boilerConnection") || "R1")
       : "R1";
-    const openthermBoilerSupported = hasEntity("otbLinkAvailable");
+    const openthermBoilerCapability = getBoilerOpenThermCapability({
+      linkEntityPresent: hasEntity("otbLinkAvailable"),
+      linkEntityConfirmedMissing: Boolean(state.optionalMissingEntities?.otbLinkAvailable),
+    });
+    const openthermBoilerSupported = openthermBoilerCapability === BOILER_OPENTHERM_CAPABILITY.SUPPORTED;
+    const openthermBoilerCapabilityKnown = openthermBoilerCapability !== BOILER_OPENTHERM_CAPABILITY.UNKNOWN;
     const boilerConnectionOptions = boilerConnectionAvailable
-      ? getSelectEntityOptions(state.entities.boilerConnection || {})
-          .filter((option) => option !== "OpenTherm" || openthermBoilerSupported)
+      ? getSupportedBoilerConnectionOptions(
+          getSelectEntityOptions(state.entities.boilerConnection || {}),
+          openthermBoilerCapability,
+        )
       : [];
-    const boilerConnectionControl = boilerConnectionAvailable ? `
+    const boilerConnectionControl = boilerConnectionAvailable && openthermBoilerCapabilityKnown ? `
       <label class="oq-settings-control oq-settings-control--select">
         <select class="oq-helper-select" data-oq-field="boilerConnection" ${state.loadingEntities ? "disabled" : ""}>
           ${boilerConnectionOptions.map((option) => `
@@ -618,6 +626,11 @@ import { escapeHtml } from "../core/html.js";
         </select>
         <span class="oq-settings-select-caret" aria-hidden="true"></span>
       </label>
+    ` : boilerConnectionAvailable ? `
+      <div class="oq-settings-boiler-power-empty" role="status" aria-live="polite">
+        <strong>Beschikbaarheid controleren…</strong>
+        <p>De aansluitingskeuze is tijdelijk geblokkeerd.</p>
+      </div>
     ` : "";
     const boilerPowerMissingHint = "Deze firmware levert nog geen bewerkbare boilervermogensinstelling.";
     const boilerPowerControl = boilerPowerEntityAvailable
@@ -655,7 +668,9 @@ import { escapeHtml } from "../core/html.js";
           ${boilerPresent && boilerConnectionAvailable ? renderSettingsFieldCard(
             "boilerConnection",
             "Ketelaansluiting",
-            openthermBoilerSupported
+            !openthermBoilerCapabilityKnown
+              ? "OpenQuatt controleert welke ketelaansluitingen deze hardware ondersteunt."
+              : openthermBoilerSupported
               ? "Kies de aansluiting die fysiek met de ketel is verbonden. OpenQuatt gebruikt nooit beide routes tegelijk."
               : "Deze hardware ondersteunt alleen de aan/uit-aansluiting via R1.",
             boilerConnectionControl,
