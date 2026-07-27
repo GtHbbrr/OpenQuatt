@@ -80,6 +80,13 @@ Controleer vooral:
 
 De waarde met `Gekozen` of `Selected` is de waarde die OpenQuatt echt gebruikt. Als die niet klopt, reageert OpenQuatt logisch op verkeerde informatie.
 
+## Quick Start meldt een OpenTherm-ketel bij R1
+
+Controleer onder **Instellingen -> Installatie** hoe de CV-ketel fysiek is
+aangesloten. Kies `OpenTherm (OTB)` wanneer de ketel via OpenTherm is
+aangesloten. Zolang de gevonden OpenTherm-ketel niet overeenkomt met de gekozen
+`Aan/uit (R1)`-aansluiting, houdt OpenQuatt R1 uit en blokkeert Quick Start.
+
 ## Het huis wordt niet warm genoeg
 
 Controleer eerst:
