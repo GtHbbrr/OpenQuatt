@@ -1639,12 +1639,11 @@ views:
               <details>
               <summary><strong>Uitleg</strong></summary>
 
-              Deze tab toont per signaal de waarde die OpenQuatt gebruikt en de beschikbare ruwe bronnen. Sensorselectie wijzig je in de OpenQuatt web-app via `http://openquatt.local`, zodat hardwareprofiel, CIC-status en geldige opties daar samen worden bewaakt.
+              Deze tab toont per signaal de waarde en effectieve bron die OpenQuatt gebruikt. Sensorselectie en ruwe brondiagnostiek vind je in de OpenQuatt web-app via `http://openquatt.local`, waar hardwareprofiel, CIC-status en geldige opties samen worden bewaakt.
 
               Gebruik dit blok voor:
-              - snelle vergelijking tussen CIC, lokaal en HA input
               - validatie van de effectieve regelinput
-              - diagnose van ontbrekende of afwijkende bronwaarden
+              - bevestiging van de geselecteerde lokale of OpenTherm-waarde
 
               Voor HA-invoer blijft de HA bronconfiguratie verderop op deze tab staan.
 
@@ -1668,8 +1667,6 @@ views:
                     name: Effectieve kamertemperatuurbron
                   - entity: sensor.openquatt_room_temperature_selected
                     name: Geselecteerde kamertemperatuur
-                  - entity: sensor.openquatt_cic_room_temperature
-                    name: Kamertemperatuur (CIC)
                   - type: conditional
                     conditions:
                       - entity: switch.openquatt_opentherm_enabled
@@ -1677,8 +1674,6 @@ views:
                     row:
                       entity: sensor.openquatt_ot_room_temperature
                       name: Kamertemperatuur (OT-thermostaat)
-                  - entity: sensor.openquatt_ha_thermostat_room_temperature
-                    name: Kamertemperatuur (HA-invoer)
           - type: vertical-stack
             cards:
               - type: heading
@@ -1695,10 +1690,6 @@ views:
                     name: Geselecteerde aanvoertemperatuur
                   - entity: sensor.openquatt_water_supply_temp
                     name: Aanvoertemperatuur (ESP)
-                  - entity: sensor.openquatt_cic_water_supply_temp
-                    name: Aanvoertemperatuur (CIC)
-                  - entity: sensor.openquatt_ha_water_supply_temperature
-                    name: Aanvoertemperatuur (HA-invoer)
           - type: vertical-stack
             cards:
               - type: heading
@@ -1715,8 +1706,6 @@ views:
                     name: Geselecteerde flow
                   - entity: sensor.openquatt_flow_average_local
                     name: Flow (buitenunit)
-                  - entity: sensor.openquatt_cic_flowrate_filtered
-                    name: Flow (CIC)
           - type: vertical-stack
             cards:
               - type: heading
@@ -1733,8 +1722,6 @@ views:
                     name: Geselecteerde buitentemperatuur
                   - entity: sensor.openquatt_outside_temperature_local_aggregated
                     name: Buitentemperatuur (buitenunit)
-                  - entity: sensor.openquatt_ha_outside_temperature
-                    name: Buitentemperatuur (HA-invoer)
           - type: vertical-stack
             cards:
               - type: heading
@@ -1751,8 +1738,6 @@ views:
                     name: Effectieve setpointbron
                   - entity: sensor.openquatt_room_setpoint_selected
                     name: Geselecteerd kamer setpoint
-                  - entity: sensor.openquatt_cic_room_setpoint
-                    name: Kamer setpoint (CIC)
                   - type: conditional
                     conditions:
                       - entity: switch.openquatt_opentherm_enabled
@@ -1760,8 +1745,6 @@ views:
                     row:
                       entity: sensor.openquatt_ot_room_setpoint
                       name: Kamer setpoint (OT-thermostaat)
-                  - entity: sensor.openquatt_ha_thermostat_setpoint
-                    name: Kamer setpoint (HA-invoer)
           - type: vertical-stack
             cards:
               - type: heading
@@ -1789,10 +1772,6 @@ views:
                     row:
                       entity: binary_sensor.openquatt_ot_thermostat_ch_enable
                       name: Warmtetoestemming (OT-thermostaat)
-                  - entity: binary_sensor.openquatt_cic_ch_enabled
-                    name: Warmtetoestemming (CIC)
-                  - entity: binary_sensor.openquatt_ha_heating_enable
-                    name: Warmtetoestemming (HA-invoer)
           - type: vertical-stack
             cards:
               - type: heading
@@ -1811,10 +1790,6 @@ views:
                     name: Effectieve koeltoestemmingsbron
                   - entity: binary_sensor.openquatt_cooling_enable_selected
                     name: Geselecteerde koeltoestemming
-                  - entity: binary_sensor.openquatt_cic_cooling_enabled
-                    name: Koeltoestemming (CIC)
-                  - entity: binary_sensor.openquatt_ha_cooling_enable
-                    name: Koeltoestemming (HA-invoer)
         column_span: 3
       - type: grid
         cards:
@@ -1921,38 +1896,6 @@ views:
                     name: Proxy koeltoestemming
                   - entity: binary_sensor.openquatt_ext_cooling_enable_valid
                     name: Koeltoestemmingsbron geldig
-          - type: vertical-stack
-            cards:
-              - type: heading
-                icon: mdi:chip
-                heading: OpenQuatt HA-invoerwaarden
-                heading_style: subtitle
-              - type: markdown
-                content: |-
-                  <details>
-                  <summary><strong>Uitleg</strong></summary>
-
-                  Dit zijn de zes HA-invoerwaarden zoals OpenQuatt ze ontvangt. Deze horen de proxywaarden uit het middelste blok te volgen.
-
-                  Blijft een waarde op `Unknown`, controleer dan eerst of de bijbehorende `...bron geldig` op `on` staat.
-
-                  </details>
-                text_only: true
-              - type: entities
-                show_header_toggle: false
-                entities:
-                  - entity: sensor.openquatt_ha_outside_temperature
-                    name: HA - Buitentemperatuur
-                  - entity: sensor.openquatt_ha_water_supply_temperature
-                    name: HA - Aanvoertemperatuur
-                  - entity: sensor.openquatt_ha_thermostat_setpoint
-                    name: HA - Thermostaat doeltemperatuur
-                  - entity: sensor.openquatt_ha_thermostat_room_temperature
-                    name: HA - Thermostaat kamertemperatuur
-                  - entity: binary_sensor.openquatt_ha_heating_enable
-                    name: HA - Warmtetoestemming
-                  - entity: binary_sensor.openquatt_ha_cooling_enable
-                    name: HA - Koeltoestemming
         column_span: 3
         visibility:
           - condition: state
@@ -2252,31 +2195,11 @@ views:
             icon: mdi:cloud-check
             heading_style: title
             heading: Quatt CiC-configuratie
-          - type: markdown
-            content: |-
-              <details>
-              <summary><strong>Uitleg</strong></summary>
-
-              Dit blok toont de status van de CiC-feed. Als de feed niet OK is of data stale wordt, kunnen CIC-bronnen onbruikbaar worden voor de geselecteerde signalen.
-
-              Controleer bij afwijkingen:
-              - `JSON feed OK`
-              - `Data verouderd`
-              - `Tijd sinds laatste succes`
-
-              </details>
-            text_only: true
           - type: entities
             show_header_toggle: false
             entities:
               - entity: switch.openquatt_cic_enable_polling
                 name: Polling inschakelen
-              - entity: binary_sensor.openquatt_cic_json_feed_ok
-                name: JSON feed OK
-              - entity: binary_sensor.openquatt_cic_data_stale
-                name: Data verouderd
-              - entity: text.openquatt_cic_feed_url
-                name: CIC feed URL
     cards: []
     header:
       card:
@@ -2285,7 +2208,7 @@ views:
           # <ha-icon icon="mdi:source-branch"></ha-icon> Sensorconfiguratie
 
 
-          Bekijk hier per signaal welke waarde OpenQuatt gebruikt en of de bronstatus klopt. Sensorselectie doe je in de OpenQuatt web-app: `http://openquatt.local`.
+          Bekijk hier per signaal welke waarde en effectieve bron OpenQuatt gebruikt. Configureer bronnen en bekijk uitgebreide diagnostiek in de OpenQuatt web-app: `http://openquatt.local`.
     top_margin: false
     dense_section_placement: false
   - title: Instellingen
@@ -2612,7 +2535,7 @@ views:
               <summary><strong>Uitleg parameters</strong></summary>
 
 
-              - Kies hier maximaal twee compressorlevels per HP die de verdelingslogica moet overslaan.
+              - Configureer maximaal twee uitgesloten compressorlevels per HP in de OpenQuatt web-app.
 
               - `None` betekent: geen uitsluiting in dat slot.
 
@@ -2632,10 +2555,6 @@ views:
             title: HP1 uitgesloten levels
             show_header_toggle: false
             entities:
-              - entity: select.openquatt_hp1_excluded_compressor_level_a
-                name: Excluded level A
-              - entity: select.openquatt_hp1_excluded_compressor_level_b
-                name: Excluded level B
               - entity: sensor.openquatt_hp1_excluded_compressor_levels
                 name: Actieve uitsluitingen
     header:
@@ -2665,9 +2584,6 @@ views:
               <summary><strong>Uitleg parameters</strong></summary>
 
 
-              - **Reset draaitellers**. Let op: het kan maximaal 1 minuut duren voordat je effect ziet.
-
-              - **Reset cumulatieve energietellers** zet cumulatieve elektriciteits-en warmte-energiemeters terug naar 0.
 
               - **HP1 draaitijd counter** toont de actuele teller waarop de runtime-balans wordt gebaseerd.
 
@@ -2679,10 +2595,6 @@ views:
           - type: entities
             show_header_toggle: false
             entities:
-              - entity: button.openquatt_reset_runtime_counters_hp1
-                name: Reset draaitellers
-              - entity: button.openquatt_reset_cumulative_energy_counters
-                name: Reset cumulatieve energietellers
               - entity: sensor.openquatt_hp1_runtime_hours
                 name: HP1 draaitijd
               - entity: sensor.openquatt_runtime_lead_hp

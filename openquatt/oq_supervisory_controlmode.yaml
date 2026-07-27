@@ -223,6 +223,7 @@ select:
     id: oq_silent_mode_override
     name: "Silent Mode Override"
     icon: mdi:weather-night
+    entity_category: config
     options:
       - "Schedule"
       - "On"
@@ -248,6 +249,7 @@ switch:
     id: oq_enabled
     name: "OpenQuatt Enabled"
     icon: mdi:power-standby
+    entity_category: config
     restore_mode: RESTORE_DEFAULT_ON
     optimistic: true
     on_turn_on:
