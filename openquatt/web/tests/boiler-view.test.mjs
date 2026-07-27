@@ -334,10 +334,22 @@ test("integration diagnostics separates thermostat, boiler control, OTB and CiC"
 test("settings hydration loads boiler setup and diagnostics before rendering", () => {
   assert.ok(INITIAL_SETTINGS_READY_KEY_MAP.installation.includes("boilerConnection"));
   assert.ok(INITIAL_SETTINGS_READY_KEY_MAP.installation.includes("otbLinkAvailable"));
+  assert.ok(INITIAL_SETTINGS_READY_KEY_MAP.installation.includes("otbConnectionMismatch"));
   assert.ok(SETTINGS_GROUP_KEY_MAP.installation.includes("boilerConnection"));
   assert.ok(SETTINGS_GROUP_KEY_MAP.installation.includes("otbLinkAvailable"));
+  assert.ok(SETTINGS_GROUP_KEY_MAP.installation.includes("otbConnectionMismatch"));
   assert.ok(SETTINGS_GROUP_KEY_MAP.integrations.includes("boilerCommandValid"));
   assert.ok(SETTINGS_GROUP_KEY_MAP.integrations.includes("otbChPressure"));
+});
+
+test("Quick Start blocks R1 after a boiler answers the safe OpenTherm probe", () => {
+  assert.match(installationSource, /OpenTherm-ketel gevonden/);
+  assert.match(installationSource, /Kies OpenTherm \(OTB\)/);
+  assert.match(quickStartSource, /nextDisabled:\s*boilerConnectionMismatch/);
+});
+
+test("R1 setup explains its bounded OpenTherm startup check", () => {
+  assert.match(installationSource, /OT-controle bij opstart actief/);
 });
 
 test("installation keeps OpenTherm selectable when the supported boiler link is offline", () => {

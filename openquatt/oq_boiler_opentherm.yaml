@@ -25,14 +25,32 @@ esphome:
           id(oq_otb_link_available_state) = false;
           id(otb_link_available).publish_state(false);
           id(oq_otb_hub_ready) = true;
+          id(oq_otb_ch_enable).turn_off();
+          {
+            auto call = id(oq_otb_t_set_command).make_call();
+            call.set_value(0.0f);
+            call.perform();
+          }
           const bool opentherm_selected =
               id(oq_boiler_connection).has_state() &&
               id(oq_boiler_connection).current_option() == "OpenTherm";
           if (opentherm_selected) {
+            oq_otb::startup_probe_state.end();
+            id(oq_otb_startup_probe_active) = false;
+            id(oq_boiler_connection_mismatch_state) = false;
             id(oq_otb_hub).enable_loop();
           } else {
-            id(oq_otb_hub).on_shutdown();
-            id(oq_otb_hub).disable_loop();
+            // Before R1 can become available, actively check whether an
+            // OpenTherm boiler is physically responding. STATUS(CH=off) and
+            // TSet=0 are prioritized; a matching STATUS READ_ACK latches it.
+            oq_otb::startup_probe_state.begin(millis());
+            id(oq_otb_startup_probe_active) = true;
+            id(oq_boiler_connection_mismatch_state) = false;
+            id(boiler_relay).turn_off();
+            id(oq_otb_hub).prioritize_messages(
+                esphome::opentherm::MessageId::STATUS,
+                esphome::opentherm::MessageId::CH_SETPOINT);
+            id(oq_otb_hub).enable_loop();
           }
   on_shutdown:
     priority: 700
@@ -42,6 +60,8 @@ esphome:
           // acknowledge STATUS(CH=off) plus TSet=0 before the hub is stopped.
           // Hard power loss remains inherently fail-silent.
           id(oq_otb_withdraw_and_flush).execute();
+          oq_otb::startup_probe_state.end();
+          id(oq_otb_startup_probe_active) = false;
           id(oq_boiler_transport_active) = false;
 
 logger:
@@ -49,6 +69,11 @@ logger:
     level: WARN
     then:
       - lambda: |-
+          if (id(oq_otb_startup_probe_active) &&
+              id(oq_boiler_connection).has_state() &&
+              id(oq_boiler_connection).current_option() == "R1") {
+            return;
+          }
           oq_otb::telemetry_state.record_log_message(
               millis(), tag, message);
 
@@ -92,6 +117,8 @@ opentherm:
         - lambda: |-
             oq_otb::off_flush_state.record_request(
                 x.id, x.type, x.valueHB, x.valueLB);
+            oq_otb::startup_probe_state.record_request(
+                x.id, x.type, x.valueHB, x.valueLB);
     before_process_response:
       then:
         - lambda: |-
@@ -103,6 +130,8 @@ opentherm:
             const uint8_t response_type = x.type;
             oq_otb::off_flush_state.record_response(
                 response_id, response_type, x.valueHB, x.valueLB);
+            oq_otb::startup_probe_state.record_response(
+                response_id, response_type);
             oq_otb::telemetry_state.record_response(
                 millis(), response_id, response_type);
 
@@ -284,6 +313,18 @@ switch:
 # telemetry internal. The OpenQuatt entity endpoint deliberately includes
 # internal entities, so local diagnostics retain access to that telemetry.
 binary_sensor:
+  - platform: template
+    id: oq_boiler_connection_mismatch
+    name: "OTB - Boiler Connection Mismatch"
+    internal: true
+    device_class: problem
+    entity_category: diagnostic
+    icon: mdi:connection
+    web_server:
+      sorting_group_id: oq_boiler
+    lambda: |-
+      return id(oq_boiler_connection_mismatch_state);
+
   - platform: template
     id: otb_link_available
     name: "OTB - Boiler Link Available"
@@ -684,6 +725,58 @@ text_sensor:
       return {oq_otb::telemetry_state.last_transport_error_name()};
 
 interval:
+  - interval: ${oq_otb_link_watch_s}s
+    startup_delay: 1s
+    then:
+      - lambda: |-
+          if (!id(oq_otb_startup_probe_active)) return;
+
+          const uint32_t now_ms = millis();
+          const auto result = oq_otb::startup_probe_state.result(
+              now_ms,
+              (uint32_t) (${oq_otb_startup_probe_timeout_s} * 1000UL));
+          if (result == oq_otb::STARTUP_PROBE_RUNNING) return;
+
+          oq_otb::startup_probe_state.end();
+          id(oq_otb_startup_probe_active) = false;
+          id(boiler_relay).turn_off();
+          id(oq_boiler_output_request) = false;
+          id(oq_boiler_output_target_temperature_c) = NAN;
+          id(oq_boiler_transport_active) = false;
+          id(oq_boiler_transport_change_ms) = now_ms;
+          id(oq_boiler_transport_settle_required) = true;
+          id(oq_boiler_rearm_required) = true;
+          id(oq_boiler_rearm_after_command_ms) = now_ms;
+
+          if (result == oq_otb::STARTUP_PROBE_OPENTHERM_DETECTED) {
+            // Fail closed and retain periodic STATUS(CH=off) traffic. The
+            // mismatch is deliberately latched until OpenTherm is selected or
+            // a new boot verifies the physically disconnected R1 installation.
+            id(oq_boiler_connection_mismatch_state) = true;
+            id(oq_boiler_block_reason_code) =
+                oq_boiler::BLOCK_CONNECTION_MISMATCH;
+            ESP_LOGE(
+                "quatt.boiler",
+                "OpenTherm boiler detected while R1 is selected; "
+                "R1 remains blocked and OpenTherm stays active with CH off");
+            return;
+          }
+
+          // No valid STATUS response was observed during the bounded probe.
+          // This is the only path that makes an R1 selection available.
+          id(oq_boiler_connection_mismatch_state) = false;
+          id(oq_otb_hub).on_shutdown();
+          id(oq_otb_hub).disable_loop();
+          oq_otb::telemetry_state.reset_link_session();
+          id(oq_otb_link_initialized) = true;
+          id(oq_otb_link_available_state) = false;
+          id(otb_link_available).publish_state(false);
+          id(oq_otb_invalidate_telemetry).execute();
+          ESP_LOGI(
+              "quatt.boiler",
+              "No OpenTherm boiler detected during startup verification; "
+              "R1 transport may become available after safety settle");
+
   - interval: ${oq_otb_command_apply_s}s
     startup_delay: 3s
     then:

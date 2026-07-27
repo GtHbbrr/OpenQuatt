@@ -29,6 +29,7 @@ enum BlockReason : uint8_t {
   BLOCK_TARGET_INVALID = 12,
   BLOCK_TRANSPORT_SETTLING = 13,
   BLOCK_AWAITING_FRESH_COMMAND = 14,
+  BLOCK_CONNECTION_MISMATCH = 15,
 };
 
 struct BoilerCommand {
@@ -46,6 +47,7 @@ struct ControllerInput {
   bool supply_temperature_valid;
   bool boiler_inhibit_active;
   bool hard_trip_active;
+  bool connection_mismatch;
   bool transport_available;
   bool transport_settled;
   bool command_rearmed;
@@ -208,6 +210,34 @@ inline bool settle_period_elapsed(bool settle_required,
       (uint32_t)(now_ms - started_ms) >= settle_ms;
 }
 
+inline bool connection_guard_active(bool startup_probe_active,
+                                    bool connection_mismatch) {
+  return startup_probe_active || connection_mismatch;
+}
+
+inline bool transport_available_for_selection(
+    bool runtime_available,
+    bool opentherm_selected,
+    bool opentherm_supported,
+    bool opentherm_link_available,
+    bool startup_probe_active,
+    bool connection_mismatch) {
+  if (!runtime_available) return false;
+  if (opentherm_selected) {
+    return opentherm_supported && opentherm_link_available;
+  }
+  return !connection_guard_active(
+      startup_probe_active, connection_mismatch);
+}
+
+inline bool relay_must_be_off(bool opentherm_selected,
+                             bool startup_probe_active,
+                             bool connection_mismatch) {
+  return opentherm_selected ||
+      connection_guard_active(
+          startup_probe_active, connection_mismatch);
+}
+
 inline bool minimum_time_active(uint32_t now_ms,
                                 uint32_t last_change_ms,
                                 uint32_t minimum_time_ms) {
@@ -261,6 +291,9 @@ inline ControllerDecision evaluate(const BoilerCommand &command,
   } else if (!input.transport_settled) {
     decision.force_off = true;
     decision.block_reason = BLOCK_TRANSPORT_SETTLING;
+  } else if (input.connection_mismatch) {
+    decision.force_off = true;
+    decision.block_reason = BLOCK_CONNECTION_MISMATCH;
   } else if (!input.transport_available) {
     decision.force_off = true;
     decision.block_reason = BLOCK_TRANSPORT_UNAVAILABLE;
@@ -315,6 +348,7 @@ inline const char *block_reason_text(uint8_t reason) {
     case BLOCK_TARGET_INVALID: return "boiler target temperature invalid";
     case BLOCK_TRANSPORT_SETTLING: return "boiler transport change settling";
     case BLOCK_AWAITING_FRESH_COMMAND: return "awaiting fresh boiler command";
+    case BLOCK_CONNECTION_MISMATCH: return "OpenTherm boiler detected while R1 is selected";
     default: return "";
   }
 }
