@@ -155,6 +155,9 @@ import { render } from "../core/render-scheduler.js";
       return previousSignature !== nextSignature;
     } catch (error) {
       state.apiSecurityError = `API-beveiliging kon niet worden geladen. ${error.message}`;
+      if (state.systemModal === "api-security") {
+        render();
+      }
       return false;
     }
   }
@@ -300,12 +303,15 @@ import { render } from "../core/render-scheduler.js";
       render();
       return refreshLoginModalAuthStatus({ poll: true });
     },
-    "open-api-security-modal": () => {
+    "open-api-security-modal": async () => {
       state.systemModal = "api-security";
       state.apiSecurityNotice = "";
       state.apiSecurityError = "";
       render();
-      return refreshApiSecurityStatus({ force: true });
+      await refreshApiSecurityStatus({ force: true });
+      if (state.systemModal === "api-security") {
+        render();
+      }
     },
     "save-web-auth": () => commitWebAuthChanges(),
     "disable-web-auth": () => commitDisableWebAuth(),

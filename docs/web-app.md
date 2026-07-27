@@ -28,7 +28,7 @@ In `Instellingen → Toegang & Beveiliging` zie je:
 - `Wacht op koppeling`: open Home Assistant om dit apparaat toe te voegen;
 - `Niet beschikbaar`: de koppeltijd is verlopen of de status kan tijdelijk niet worden opgehaald.
 
-De web-app toont deze geheime sleutel nooit. Er is geen HTTPS op de lokale webinterface; herstel van een onbekende sleutel verloopt daarom via Home Assistant opnieuw koppelen of fysieke USB/serial-recovery. Een oude OpenQuatt-sleutel wordt niet automatisch overgenomen. Daardoor kan bij een migratie eenmalig opnieuw koppelen of het verwijderen van een oude Home Assistant-sleutel nodig zijn.
+De web-app toont deze geheime sleutel nooit. Er is geen HTTPS op de lokale webinterface. Als de sleutel op het apparaat onbekend is, is fysieke USB/serial-recovery van het apparaat nodig; daarna kan Home Assistant opnieuw koppelen. Een oude OpenQuatt-sleutel wordt niet automatisch overgenomen. Als alleen Home Assistant nog een oude sleutel bewaart, moet die oude sleutel daar eenmalig worden verwijderd voordat opnieuw koppelen lukt.
 
 Bij de migratie geldt deze matrix:
 
@@ -38,7 +38,7 @@ Bij de migratie geldt deze matrix:
 | Alleen oude OpenQuatt-key aanwezig | Geen native key | Oude key wordt genegeerd; Home Assistant provisiont een nieuwe native key. |
 | Geen key | Geen key | Home Assistant provisiont automatisch binnen de provisioning window. |
 | Geen key | Stale key | Eenmalig opnieuw koppelen of de stale key in Home Assistant verwijderen. |
-| Native key aanwezig | Key onbekend | Herstel via Home Assistant- of USB/serial-procedure; OpenQuatt neemt hem niet over. |
+| Native key aanwezig | Key onbekend | Verplichte fysieke USB/serial-reset van de sleutel op het apparaat; daarna opnieuw koppelen. OpenQuatt neemt de onbekende sleutel niet over. |
 
 De oude OpenQuatt-preference wordt bij deze firmwareversie niet gewist, maar ook niet meer gelezen of toegepast. Dat houdt rollback mogelijk zonder een tweede bron van waarheid te activeren.
 

@@ -44,6 +44,9 @@ import { renderModalShell } from "../core/modal-shell.js";
   }
 
   export function getApiSecurityStatusLabel() {
+    if (state.apiSecurityError) {
+      return "Niet beschikbaar";
+    }
     const status = state.apiSecurityStatus;
     if (!status) {
       return "Laden...";
@@ -61,12 +64,15 @@ import { renderModalShell } from "../core/modal-shell.js";
   }
 
   export function getApiSecurityStatusDetail() {
+    if (state.apiSecurityError) {
+      return "De beveiligingsstatus kon niet worden opgehaald. Controleer de verbinding met het apparaat en probeer het opnieuw.";
+    }
     const status = state.apiSecurityStatus;
     if (!status) {
       return "Beveiligde verbinding wordt gecontroleerd.";
     }
     if (status.transport_active === true) {
-      return "De verbinding met Home Assistant is beveiligd.";
+      return "De beveiliging voor Home Assistant is ingesteld.";
     }
     if (status.provisioning_pending === true) {
       return "Dit apparaat is nog niet gekoppeld. Na een opstart kan Home Assistant 10 minuten lang de beveiligde verbinding instellen. Daarna worden nieuwe koppelpogingen geweigerd.";
