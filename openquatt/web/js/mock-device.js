@@ -93,12 +93,10 @@
       recoveryUntil: 0,
     },
     apiSecurity: {
-      enabled: false,
       transportActive: false,
-      pendingRestart: false,
-      key: "",
-      source: "bootstrap-disabled",
-      csrfToken: "",
+      keyPresent: false,
+      provisioningPending: true,
+      provisioningClosed: false,
     },
     mqtt: {
       enabled: true,
@@ -588,10 +586,6 @@
     state.auth.csrfToken = generateAuthToken();
   }
 
-  function refreshApiSecurityToken() {
-    state.apiSecurity.csrfToken = generateAuthToken();
-  }
-
   function refreshMqttToken() {
     state.mqtt.csrfToken = generateAuthToken();
   }
@@ -1055,84 +1049,17 @@
     });
   }
 
-  function generateApiKey() {
-    const bytes = new Uint8Array(32);
-    window.crypto.getRandomValues(bytes);
-    let binary = "";
-    bytes.forEach((byte) => {
-      binary += String.fromCharCode(byte);
-    });
-    return window.btoa(binary);
-  }
-
   function getApiSecurityStatusPayload() {
     return {
-      enabled: Boolean(state.apiSecurity.enabled),
       transport_active: Boolean(state.apiSecurity.transportActive),
-      pending_restart: Boolean(state.apiSecurity.pendingRestart),
-      key: String(state.apiSecurity.key || ""),
-      source: String(state.apiSecurity.source || ""),
-      csrf_token: String(state.apiSecurity.csrfToken || ""),
+      key_present: Boolean(state.apiSecurity.keyPresent),
+      provisioning_pending: Boolean(state.apiSecurity.provisioningPending),
+      provisioning_closed: Boolean(state.apiSecurity.provisioningClosed),
     };
   }
 
   function handleApiSecurityStatus() {
     return makeAuthResponse(200, getApiSecurityStatusPayload());
-  }
-
-  function handleApiSecurityEnable(init) {
-    const params = parseAuthFormBody(init);
-    const status = getApiSecurityStatusPayload();
-    if (params.get("csrf_token") !== status.csrf_token) {
-      return makeAuthResponse(403, { ok: false, error: "forbidden" });
-    }
-
-    if (!state.apiSecurity.key) {
-      state.apiSecurity.key = generateApiKey();
-    }
-    state.apiSecurity.enabled = true;
-    state.apiSecurity.pendingRestart = true;
-    state.apiSecurity.source = "runtime-enabled";
-    refreshApiSecurityToken();
-    return makeAuthResponse(200, {
-      ok: true,
-      status: getApiSecurityStatusPayload(),
-    });
-  }
-
-  function handleApiSecurityRotate(init) {
-    const params = parseAuthFormBody(init);
-    const status = getApiSecurityStatusPayload();
-    if (params.get("csrf_token") !== status.csrf_token) {
-      return makeAuthResponse(403, { ok: false, error: "forbidden" });
-    }
-
-    state.apiSecurity.key = generateApiKey();
-    state.apiSecurity.enabled = true;
-    state.apiSecurity.pendingRestart = true;
-    state.apiSecurity.source = "runtime-rotated";
-    refreshApiSecurityToken();
-    return makeAuthResponse(200, {
-      ok: true,
-      status: getApiSecurityStatusPayload(),
-    });
-  }
-
-  function handleApiSecurityDisable(init) {
-    const params = parseAuthFormBody(init);
-    const status = getApiSecurityStatusPayload();
-    if (params.get("csrf_token") !== status.csrf_token) {
-      return makeAuthResponse(403, { ok: false, error: "forbidden" });
-    }
-
-    state.apiSecurity.enabled = false;
-    state.apiSecurity.pendingRestart = true;
-    state.apiSecurity.source = "runtime-disabled";
-    refreshApiSecurityToken();
-    return makeAuthResponse(200, {
-      ok: true,
-      status: getApiSecurityStatusPayload(),
-    });
   }
 
   function getMqttStatusPayload() {
@@ -4207,9 +4134,6 @@
       state.energyHistoryLastWriteAt = Date.now();
       updateEnergyHistoryStats();
     } else if (name === "Restart") {
-      state.apiSecurity.transportActive = Boolean(state.apiSecurity.enabled);
-      state.apiSecurity.pendingRestart = false;
-      state.apiSecurity.source = state.apiSecurity.enabled ? "stored" : "bootstrap-disabled";
     }
     updateSummary();
     notifyMockUpdated();
@@ -4559,15 +4483,6 @@
       if (url.pathname === "/api-security/status" && (!init || !init.method || String(init.method).toUpperCase() === "GET")) {
         return handleApiSecurityStatus();
       }
-      if (url.pathname === "/api-security/enable" && String(init?.method || "GET").toUpperCase() === "POST") {
-        return handleApiSecurityEnable(init || {});
-      }
-      if (url.pathname === "/api-security/rotate" && String(init?.method || "GET").toUpperCase() === "POST") {
-        return handleApiSecurityRotate(init || {});
-      }
-      if (url.pathname === "/api-security/disable" && String(init?.method || "GET").toUpperCase() === "POST") {
-        return handleApiSecurityDisable(init || {});
-      }
       if (url.pathname === "/mqtt/status" && method === "GET") {
         return handleMqttStatus();
       }
@@ -4852,7 +4767,6 @@
 
   seedEntities();
   refreshAuthToken();
-  refreshApiSecurityToken();
   refreshMqttToken();
   setInstallationMode(state.installation);
   applyScenario(state.scenario);

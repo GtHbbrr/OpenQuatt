@@ -93,10 +93,12 @@ debug:
 api:
   reboot_timeout: 0s
   encryption:
-  on_client_connected:
+
+provisioning:
+  timeout: 10min
+  on_timeout:
     then:
-      - lambda: |-
-          id(oq_web_auth_store).on_api_client_connected();
+      - logger.log: "API provisioning window closed; power-cycle to reopen it"
 
 ota:
   - platform: esphome

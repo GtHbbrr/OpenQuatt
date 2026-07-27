@@ -16,6 +16,32 @@ Gebruik de web-app voor alles wat direct op OpenQuatt zelf hoort:
 
 De web-app blijft altijd de plek waar je OpenQuatt inricht, beheert en controleert als er iets niet klopt. Gebruik je Home Assistant, dan is dat daarnaast een prettige plek voor dagelijks meekijken, dashboards en automatisering.
 
+## Beveiligde verbinding met Home Assistant
+
+OpenQuatt beveiligt de verbinding met Home Assistant automatisch. Bij de eerste koppeling maakt Home Assistant een geheime sleutel aan en bewaart die veilig samen met het apparaat. Je hoeft deze sleutel niet zelf te maken, te kopiëren of in OpenQuatt in te voeren.
+
+Alleen bij de eerste koppeling staat de koppelmogelijkheid na een opstart maximaal 10 minuten open. Is Home Assistant dan nog niet beschikbaar, dan worden nieuwe koppelpogingen geweigerd. Het apparaat schakelt niet terug naar een onbeveiligde verbinding. Zet het apparaat kort uit en weer aan om opnieuw te proberen. Een bestaande koppeling blijft behouden na een firmware-update, herstart en stroomonderbreking; de timer speelt daarna geen rol meer.
+
+In `Instellingen → Toegang & Beveiliging` zie je:
+
+- `Actief`: de verbinding met Home Assistant is beveiligd;
+- `Wacht op koppeling`: open Home Assistant om dit apparaat toe te voegen;
+- `Niet beschikbaar`: de koppeltijd is verlopen of de status kan tijdelijk niet worden opgehaald.
+
+De web-app toont deze geheime sleutel nooit. Er is geen HTTPS op de lokale webinterface. Als de sleutel op het apparaat onbekend is, is fysieke USB/serial-recovery van het apparaat nodig; daarna kan Home Assistant opnieuw koppelen. Een oude OpenQuatt-sleutel wordt niet automatisch overgenomen. Als alleen Home Assistant nog een oude sleutel bewaart, moet die oude sleutel daar eenmalig worden verwijderd voordat opnieuw koppelen lukt.
+
+Bij de migratie geldt deze matrix:
+
+| Device | Home Assistant | Gedrag |
+|---|---|---|
+| Native key aanwezig | Key bekend | Key behouden; OTA en startup wissen hem nooit. |
+| Alleen oude OpenQuatt-key aanwezig | Geen native key | Oude key wordt genegeerd; Home Assistant provisiont een nieuwe native key. |
+| Geen key | Geen key | Home Assistant provisiont automatisch binnen de provisioning window. |
+| Geen key | Stale key | Eenmalig opnieuw koppelen of de stale key in Home Assistant verwijderen. |
+| Native key aanwezig | Key onbekend | Verplichte fysieke USB/serial-reset van de sleutel op het apparaat; daarna opnieuw koppelen. OpenQuatt neemt de onbekende sleutel niet over. |
+
+De oude OpenQuatt-preference wordt bij deze firmwareversie niet gewist, maar ook niet meer gelezen of toegepast. Dat houdt rollback mogelijk zonder een tweede bron van waarheid te activeren.
+
 ## Wat doe je waar?
 
 | Plek | Gebruik je vooral voor |

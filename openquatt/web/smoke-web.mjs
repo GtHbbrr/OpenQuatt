@@ -294,15 +294,31 @@ async function checkWriteActionContracts() {
   const entityWriteActions = await source("js/src/core/entity-write-actions.js");
   const namedButtonActions = await source("js/src/core/named-button-actions.js");
   const securityActions = await source("js/src/features/security-actions.js");
+  const securityAccess = await source("js/src/features/security-access.js");
+  const mockDevice = await source("js/mock-device.js");
   const mqttActions = await source("js/src/features/mqtt-actions.js");
   const firmwareActions = await source("js/src/features/firmware-actions.js");
   const debugRecording = await source("js/src/features/debug-recording.js");
   const systemActions = await source("js/src/features/system-actions.js");
   const webServerLogs = await source("js/src/features/webserver-logs.js");
 
-  assertContains(securityActions, 'fetch("/api-security/enable"', "API security enable");
-  assertContains(securityActions, 'fetch("/api-security/rotate"', "API security rotate");
-  assertContains(securityActions, 'fetch("/api-security/disable"', "API security disable");
+  assertContains(securityActions, 'fetch("/api-security/status"', "API security status");
+  assertContains(securityAccess, "provisioning_pending", "API provisioning status UI");
+  assertContains(mockDevice, "provisioning_closed", "API provisioning mock status");
+  for (const endpoint of ["/api-security/enable", "/api-security/rotate", "/api-security/disable"]) {
+    if (securityActions.includes(endpoint) || securityAccess.includes(endpoint) || mockDevice.includes(endpoint)) {
+      throw new Error(`Removed API security mutation endpoint is still present: ${endpoint}`);
+    }
+  }
+  const statusPayloadStart = mockDevice.indexOf("function getApiSecurityStatusPayload()");
+  const statusPayloadEnd = mockDevice.indexOf("function handleApiSecurityStatus()", statusPayloadStart);
+  const statusPayload = mockDevice.slice(statusPayloadStart, statusPayloadEnd);
+  if (statusPayload.includes("key:") || statusPayload.includes("csrf_token")) {
+    throw new Error("API security status mock exposes a secret or CSRF token");
+  }
+  if (mockDevice.includes("refreshApiSecurityToken")) {
+    throw new Error("Mock still references the removed API security token lifecycle");
+  }
   assertContains(mqttActions, 'fetch("/mqtt/save"', "MQTT config save");
   assertContains(mqttActions, 'fetch("/mqtt/input/save"', "MQTT input save");
   assertContains(firmwareActions, 'buildEntityPath(installButtonEntity.domain, installButtonEntity.name, "press")', "Firmware install button endpoint");
