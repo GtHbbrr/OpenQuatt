@@ -65,7 +65,6 @@ sensor:
     state_class: measurement
     accuracy_decimals: 2
     icon: mdi:water-thermometer
-    disabled_by_default: true
     update_interval: never
     web_server:
       sorting_group_id: oq_temperatures
@@ -91,7 +90,6 @@ sensor:
     state_class: measurement
     accuracy_decimals: 1
     icon: mdi:home-thermometer
-    disabled_by_default: true
     update_interval: never
     web_server:
       sorting_group_id: oq_cic
@@ -104,7 +102,6 @@ sensor:
     state_class: measurement
     accuracy_decimals: 3
     icon: mdi:thermometer
-    disabled_by_default: true
     update_interval: never
     web_server:
       sorting_group_id: oq_cic
@@ -117,7 +114,6 @@ sensor:
     state_class: measurement
     accuracy_decimals: 1
     icon: mdi:water-pump
-    disabled_by_default: true
     update_interval: never
     web_server:
       sorting_group_id: oq_cic

@@ -1639,11 +1639,12 @@ views:
               <details>
               <summary><strong>Uitleg</strong></summary>
 
-              Deze tab toont per signaal de waarde en effectieve bron die OpenQuatt gebruikt. Sensorselectie en ruwe brondiagnostiek vind je in de OpenQuatt web-app via `http://openquatt.local`, waar hardwareprofiel, CIC-status en geldige opties samen worden bewaakt.
+              Deze tab toont per signaal de waarde die OpenQuatt gebruikt en de belangrijkste ruwe bronnen. Sensorselectie en volledige brondiagnostiek vind je in de OpenQuatt web-app via `http://openquatt.local`, waar hardwareprofiel, CIC-status en geldige opties samen worden bewaakt.
 
               Gebruik dit blok voor:
+              - snelle vergelijking tussen CIC, lokaal, OpenTherm en HA-invoer
               - validatie van de effectieve regelinput
-              - bevestiging van de geselecteerde lokale of OpenTherm-waarde
+              - diagnose van ontbrekende of afwijkende bronwaarden
 
               Voor HA-invoer blijft de HA bronconfiguratie verderop op deze tab staan.
 
@@ -1667,6 +1668,8 @@ views:
                     name: Effectieve kamertemperatuurbron
                   - entity: sensor.openquatt_room_temperature_selected
                     name: Geselecteerde kamertemperatuur
+                  - entity: sensor.openquatt_cic_room_temperature
+                    name: Kamertemperatuur (CIC)
                   - type: conditional
                     conditions:
                       - entity: switch.openquatt_opentherm_enabled
@@ -1674,6 +1677,8 @@ views:
                     row:
                       entity: sensor.openquatt_ot_room_temperature
                       name: Kamertemperatuur (OT-thermostaat)
+                  - entity: sensor.openquatt_ha_thermostat_room_temperature
+                    name: Kamertemperatuur (HA-invoer)
           - type: vertical-stack
             cards:
               - type: heading
@@ -1690,6 +1695,10 @@ views:
                     name: Geselecteerde aanvoertemperatuur
                   - entity: sensor.openquatt_water_supply_temp
                     name: Aanvoertemperatuur (ESP)
+                  - entity: sensor.openquatt_cic_water_supply_temp
+                    name: Aanvoertemperatuur (CIC)
+                  - entity: sensor.openquatt_ha_water_supply_temperature
+                    name: Aanvoertemperatuur (HA-invoer)
           - type: vertical-stack
             cards:
               - type: heading
@@ -1706,6 +1715,8 @@ views:
                     name: Geselecteerde flow
                   - entity: sensor.openquatt_flow_average_local
                     name: Flow (buitenunit)
+                  - entity: sensor.openquatt_cic_flowrate_filtered
+                    name: Flow (CIC)
           - type: vertical-stack
             cards:
               - type: heading
@@ -1722,6 +1733,8 @@ views:
                     name: Geselecteerde buitentemperatuur
                   - entity: sensor.openquatt_outside_temperature_local_aggregated
                     name: Buitentemperatuur (buitenunit)
+                  - entity: sensor.openquatt_ha_outside_temperature
+                    name: Buitentemperatuur (HA-invoer)
           - type: vertical-stack
             cards:
               - type: heading
@@ -1738,6 +1751,8 @@ views:
                     name: Effectieve setpointbron
                   - entity: sensor.openquatt_room_setpoint_selected
                     name: Geselecteerd kamer setpoint
+                  - entity: sensor.openquatt_cic_room_setpoint
+                    name: Kamer setpoint (CIC)
                   - type: conditional
                     conditions:
                       - entity: switch.openquatt_opentherm_enabled
@@ -1745,6 +1760,8 @@ views:
                     row:
                       entity: sensor.openquatt_ot_room_setpoint
                       name: Kamer setpoint (OT-thermostaat)
+                  - entity: sensor.openquatt_ha_thermostat_setpoint
+                    name: Kamer setpoint (HA-invoer)
           - type: vertical-stack
             cards:
               - type: heading

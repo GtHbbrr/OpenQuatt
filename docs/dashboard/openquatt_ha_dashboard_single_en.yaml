@@ -1594,11 +1594,12 @@ views:
               <details>
               <summary><strong>Explanation</strong></summary>
 
-              This tab shows the value and effective source OpenQuatt uses per signal. Configure sensor selection and inspect raw source diagnostics in the OpenQuatt web app at `http://openquatt.local`, where hardware profile, CIC status, and valid options are evaluated together.
+              This tab shows the value OpenQuatt uses per signal and the key raw sources. Configure sensor selection and inspect full source diagnostics in the OpenQuatt web app at `http://openquatt.local`, where hardware profile, CIC status, and valid options are evaluated together.
 
               Use this block for:
+              - quick comparison between CIC, local, OpenTherm, and HA Input
               - validation of the effective control input
-              - confirmation of the selected local or OpenTherm value
+              - diagnosis of missing or unexpected source values
 
               HA input source mapping remains further down on this tab.
 
@@ -1620,6 +1621,8 @@ views:
                     name: Effective room temperature source
                   - entity: sensor.openquatt_room_temperature_selected
                     name: Selected room temperature
+                  - entity: sensor.openquatt_cic_room_temperature
+                    name: Room temperature (CIC)
                   - type: conditional
                     conditions:
                       - entity: switch.openquatt_opentherm_enabled
@@ -1627,6 +1630,8 @@ views:
                     row:
                       entity: sensor.openquatt_ot_room_temperature
                       name: Room temperature (OT thermostat)
+                  - entity: sensor.openquatt_ha_thermostat_room_temperature
+                    name: Room temperature (HA Input)
           - type: vertical-stack
             cards:
               - type: heading
@@ -1643,6 +1648,10 @@ views:
                     name: Selected water supply temperature
                   - entity: sensor.openquatt_water_supply_temp
                     name: Water supply temperature (ESP)
+                  - entity: sensor.openquatt_cic_water_supply_temp
+                    name: Water supply temperature (CIC)
+                  - entity: sensor.openquatt_ha_water_supply_temperature
+                    name: Water supply temperature (HA Input)
           - type: vertical-stack
             cards:
               - type: heading
@@ -1659,6 +1668,8 @@ views:
                     name: Selected flow rate
                   - entity: sensor.openquatt_flow_average_local
                     name: Flow rate (Outdoor unit)
+                  - entity: sensor.openquatt_cic_flowrate_filtered
+                    name: Flow rate (CIC)
           - type: vertical-stack
             cards:
               - type: heading
@@ -1675,6 +1686,8 @@ views:
                     name: Selected outside temperature
                   - entity: sensor.openquatt_outside_temperature_local_aggregated
                     name: Outside temperature (Outdoor unit)
+                  - entity: sensor.openquatt_ha_outside_temperature
+                    name: Outside temperature (HA Input)
           - type: vertical-stack
             cards:
               - type: heading
@@ -1691,6 +1704,8 @@ views:
                     name: Effective room setpoint source
                   - entity: sensor.openquatt_room_setpoint_selected
                     name: Selected room setpoint
+                  - entity: sensor.openquatt_cic_room_setpoint
+                    name: Room setpoint (CIC)
                   - type: conditional
                     conditions:
                       - entity: switch.openquatt_opentherm_enabled
@@ -1698,6 +1713,8 @@ views:
                     row:
                       entity: sensor.openquatt_ot_room_setpoint
                       name: Room setpoint (OT thermostat)
+                  - entity: sensor.openquatt_ha_thermostat_setpoint
+                    name: Room setpoint (HA Input)
           - type: vertical-stack
             cards:
               - type: heading

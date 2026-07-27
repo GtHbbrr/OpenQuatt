@@ -22,7 +22,6 @@ sensor:
     name: "HA - Outside Temperature"
     entity_id: ${ha_outside_temp_entity_id}
     internal: false
-    disabled_by_default: true
     icon: mdi:thermometer
     unit_of_measurement: "°C"
     device_class: temperature
@@ -36,7 +35,6 @@ sensor:
     name: "HA - Water Supply Temperature"
     entity_id: ${ha_water_supply_temp_entity_id}
     internal: false
-    disabled_by_default: true
     icon: mdi:water-thermometer
     unit_of_measurement: "°C"
     device_class: temperature
@@ -50,7 +48,6 @@ sensor:
     name: "HA - Thermostat Setpoint"
     entity_id: ${ha_room_setpoint_entity_id}
     internal: false
-    disabled_by_default: true
     icon: mdi:thermostat
     unit_of_measurement: "°C"
     device_class: temperature
@@ -64,7 +61,6 @@ sensor:
     name: "HA - Thermostat Room Temperature"
     entity_id: ${ha_room_temp_entity_id}
     internal: false
-    disabled_by_default: true
     icon: mdi:home-thermometer
     unit_of_measurement: "°C"
     device_class: temperature
