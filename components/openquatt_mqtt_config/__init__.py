@@ -1,7 +1,7 @@
 import esphome.codegen as cg
 import esphome.config_validation as cv
 from esphome.core import CORE
-from esphome.components import binary_sensor, sensor
+from esphome.components import binary_sensor, sensor, socket
 from esphome.components.esp32 import add_idf_component, idf_version, include_builtin_idf_component
 from esphome.const import CONF_ID
 
@@ -88,6 +88,10 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Optional(CONF_DEFAULT_ENABLED, default=False): cv.boolean,
     }
 ).extend(cv.COMPONENT_SCHEMA)
+CONFIG_SCHEMA = cv.All(
+    CONFIG_SCHEMA,
+    socket.consume_sockets(1, "openquatt_mqtt_config"),
+)
 
 
 async def to_code(config):
