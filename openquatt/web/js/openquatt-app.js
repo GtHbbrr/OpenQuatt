@@ -2084,7 +2084,7 @@ Kenmerken: Flowmeter in de buitenunit ge\xEFntegreerd. Onder CV-ketel enkel een 
       `,b=t&&r?'<p class="oq-settings-boiler-power-note">Je kunt deze waarde altijd handmatig aanpassen.</p>':"",S=c==="R1"&&u?w?`
           <div class="oq-settings-boiler-connection-note is-warning" role="alert">
             <strong>OpenTherm-ketel gevonden</strong>
-            <p>OT-ketel antwoordt. Kies OpenTherm (OTB).</p>
+            <p>Kies OpenTherm (OTB).</p>
           </div>
         `:`
           <p class="oq-settings-boiler-connection-note">OT-controle bij opstart actief.</p>
@@ -2096,7 +2096,7 @@ Kenmerken: Flowmeter in de buitenunit ge\xEFntegreerd. Onder CV-ketel enkel een 
               </div>
             `,"oq-settings-field--compact")}
 
-          ${t&&l?he("boilerConnection","Ketelaansluiting",m?u?"Kies de aansluiting die fysiek met de ketel is verbonden. OpenQuatt gebruikt nooit beide routes tegelijk.":"Deze hardware ondersteunt alleen de aan/uit-aansluiting via R1.":"OpenQuatt controleert welke ketelaansluitingen deze hardware ondersteunt.",h,"oq-settings-field--compact",S):""}
+          ${(t||w)&&l?he("boilerConnection","Ketelaansluiting",m?u?"Kies de aansluiting die fysiek met de ketel is verbonden. OpenQuatt gebruikt nooit beide routes tegelijk.":"Deze hardware ondersteunt alleen de aan/uit-aansluiting via R1.":"OpenQuatt controleert welke ketelaansluitingen deze hardware ondersteunt.",h,"oq-settings-field--compact",S):""}
 
           ${t?he("boilerRatedHeatPower","Ingesteld boilervermogen","Vul hier het vermogen in dat OpenQuatt mag meerekenen.",`
               <div class="oq-settings-boiler-power-inline">

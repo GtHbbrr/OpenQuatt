@@ -38,14 +38,17 @@ esphome:
             oq_otb::startup_probe_state.end();
             id(oq_otb_startup_probe_active) = false;
             id(oq_boiler_connection_mismatch_state) = false;
+            id(oq_boiler_connection_mismatch).publish_state(false);
             id(oq_otb_hub).enable_loop();
           } else {
             // Before R1 can become available, actively check whether an
             // OpenTherm boiler is physically responding. STATUS(CH=off) and
-            // TSet=0 are prioritized; a matching STATUS READ_ACK latches it.
+            // TSet=0 are prioritized; a matching complete STATUS response
+            // latches the connection, including a valid negative acknowledgement.
             oq_otb::startup_probe_state.begin(millis());
             id(oq_otb_startup_probe_active) = true;
             id(oq_boiler_connection_mismatch_state) = false;
+            id(oq_boiler_connection_mismatch).publish_state(false);
             id(boiler_relay).turn_off();
             id(oq_otb_hub).prioritize_messages(
                 esphome::opentherm::MessageId::STATUS,
@@ -753,6 +756,7 @@ interval:
             // mismatch is deliberately latched until OpenTherm is selected or
             // a new boot verifies the physically disconnected R1 installation.
             id(oq_boiler_connection_mismatch_state) = true;
+            id(oq_boiler_connection_mismatch).publish_state(true);
             id(oq_boiler_block_reason_code) =
                 oq_boiler::BLOCK_CONNECTION_MISMATCH;
             ESP_LOGE(
@@ -765,6 +769,7 @@ interval:
           // No valid STATUS response was observed during the bounded probe.
           // This is the only path that makes an R1 selection available.
           id(oq_boiler_connection_mismatch_state) = false;
+          id(oq_boiler_connection_mismatch).publish_state(false);
           id(oq_otb_hub).on_shutdown();
           id(oq_otb_hub).disable_loop();
           oq_otb::telemetry_state.reset_link_session();

@@ -19,6 +19,10 @@ int main() {
       oq_otb::STARTUP_PROBE_ID_STATUS,
       oq_otb::STARTUP_PROBE_TYPE_READ_ACK);
   assert(!state.opentherm_detected());
+  state.record_response(
+      oq_otb::STARTUP_PROBE_ID_STATUS,
+      oq_otb::STARTUP_PROBE_TYPE_DATA_INVALID);
+  assert(!state.opentherm_detected());
 
   // STATUS with CH enabled is never accepted as a safe probe request.
   state.record_request(
@@ -29,14 +33,18 @@ int main() {
       oq_otb::STARTUP_PROBE_TYPE_READ_ACK);
   assert(!state.opentherm_detected());
 
-  // Only a matching acknowledgement after STATUS(CH=off) proves that an
-  // OpenTherm boiler is physically responding.
+  // Only a matching response after STATUS(CH=off) proves that an OpenTherm
+  // boiler is physically responding.
   state.record_request(
       oq_otb::STARTUP_PROBE_ID_STATUS,
       oq_otb::STARTUP_PROBE_TYPE_READ_DATA, 0, 0);
   state.record_response(
       oq_otb::STARTUP_PROBE_ID_STATUS,
       oq_otb::STARTUP_PROBE_TYPE_READ_DATA);
+  assert(!state.opentherm_detected());
+  state.record_response(
+      oq_otb::STARTUP_PROBE_ID_STATUS + 1,
+      oq_otb::STARTUP_PROBE_TYPE_DATA_INVALID);
   assert(!state.opentherm_detected());
   state.record_response(
       oq_otb::STARTUP_PROBE_ID_STATUS,
@@ -48,6 +56,27 @@ int main() {
   state.end();
   assert(!state.active());
   assert(state.result(1002, 8000) == oq_otb::STARTUP_PROBE_IDLE);
+
+  // A valid negative acknowledgement still proves that a boiler is connected.
+  state.begin(2000);
+  state.record_request(
+      oq_otb::STARTUP_PROBE_ID_STATUS,
+      oq_otb::STARTUP_PROBE_TYPE_READ_DATA, 0, 0);
+  state.record_response(
+      oq_otb::STARTUP_PROBE_ID_STATUS,
+      oq_otb::STARTUP_PROBE_TYPE_DATA_INVALID);
+  assert(state.opentherm_detected());
+  state.end();
+
+  state.begin(3000);
+  state.record_request(
+      oq_otb::STARTUP_PROBE_ID_STATUS,
+      oq_otb::STARTUP_PROBE_TYPE_READ_DATA, 0, 0);
+  state.record_response(
+      oq_otb::STARTUP_PROBE_ID_STATUS,
+      oq_otb::STARTUP_PROBE_TYPE_UNKNOWN_DATAID);
+  assert(state.opentherm_detected());
+  state.end();
 
   // A new generation cannot reuse proof from the previous probe.
   state.begin(UINT32_MAX - 5);

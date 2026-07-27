@@ -6,6 +6,8 @@ namespace oq_otb {
 
 constexpr uint8_t STARTUP_PROBE_TYPE_READ_DATA = 0;
 constexpr uint8_t STARTUP_PROBE_TYPE_READ_ACK = 4;
+constexpr uint8_t STARTUP_PROBE_TYPE_DATA_INVALID = 6;
+constexpr uint8_t STARTUP_PROBE_TYPE_UNKNOWN_DATAID = 7;
 constexpr uint8_t STARTUP_PROBE_ID_STATUS = 0;
 
 enum StartupProbeResult : uint8_t {
@@ -42,8 +44,11 @@ class StartupProbeState {
   void record_response(uint8_t message_id, uint8_t message_type) {
     if (!this->active_ || !this->safe_status_sent_) return;
 
-    if (message_id == STARTUP_PROBE_ID_STATUS &&
-        message_type == STARTUP_PROBE_TYPE_READ_ACK) {
+    const bool valid_status_response =
+        message_type == STARTUP_PROBE_TYPE_READ_ACK ||
+        message_type == STARTUP_PROBE_TYPE_DATA_INVALID ||
+        message_type == STARTUP_PROBE_TYPE_UNKNOWN_DATAID;
+    if (message_id == STARTUP_PROBE_ID_STATUS && valid_status_response) {
       this->opentherm_detected_ = true;
     }
   }

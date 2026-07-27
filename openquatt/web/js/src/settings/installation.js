@@ -658,7 +658,7 @@ import { escapeHtml } from "../core/html.js";
         ? `
           <div class="oq-settings-boiler-connection-note is-warning" role="alert">
             <strong>OpenTherm-ketel gevonden</strong>
-            <p>OT-ketel antwoordt. Kies OpenTherm (OTB).</p>
+            <p>Kies OpenTherm (OTB).</p>
           </div>
         `
         : `
@@ -680,7 +680,7 @@ import { escapeHtml } from "../core/html.js";
             "oq-settings-field--compact",
           )}
 
-          ${boilerPresent && boilerConnectionAvailable ? renderSettingsFieldCard(
+          ${(boilerPresent || boilerConnectionMismatch) && boilerConnectionAvailable ? renderSettingsFieldCard(
             "boilerConnection",
             "Ketelaansluiting",
             !openthermBoilerCapabilityKnown

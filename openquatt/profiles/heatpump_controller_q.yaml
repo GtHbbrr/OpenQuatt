@@ -13,12 +13,14 @@ substitutions:
         oq_otb::startup_probe_state.end();
         id(oq_otb_startup_probe_active) = false;
         id(oq_boiler_connection_mismatch_state) = false;
+        id(oq_boiler_connection_mismatch).publish_state(false);
         id(oq_otb_hub).resume_polling();
       } else {
         id(oq_otb_withdraw_and_flush).execute();
         oq_otb::startup_probe_state.begin(millis());
         id(oq_otb_startup_probe_active) = true;
         id(oq_boiler_connection_mismatch_state) = false;
+        id(oq_boiler_connection_mismatch).publish_state(false);
         id(boiler_relay).turn_off();
         id(oq_otb_hub).prioritize_messages(
             esphome::opentherm::MessageId::STATUS,
