@@ -20,7 +20,7 @@ De web-app blijft altijd de plek waar je OpenQuatt inricht, beheert en controlee
 
 OpenQuatt beveiligt de verbinding met Home Assistant automatisch. Bij de eerste koppeling maakt Home Assistant een geheime sleutel aan en bewaart die veilig samen met het apparaat. Je hoeft deze sleutel niet zelf te maken, te kopiëren of in OpenQuatt in te voeren.
 
-Na het inschakelen heeft Home Assistant maximaal 10 minuten om het apparaat voor de eerste keer te koppelen. Is Home Assistant dan nog niet beschikbaar, dan sluit de koppelmogelijkheid tijdelijk. Zet het apparaat kort uit en weer aan om opnieuw te kunnen koppelen. Een bestaande koppeling blijft behouden na een firmware-update, herstart en stroomonderbreking.
+Alleen bij de eerste koppeling staat de koppelmogelijkheid na een opstart maximaal 10 minuten open. Is Home Assistant dan nog niet beschikbaar, dan worden nieuwe koppelpogingen geweigerd. Het apparaat schakelt niet terug naar een onbeveiligde verbinding. Zet het apparaat kort uit en weer aan om opnieuw te proberen. Een bestaande koppeling blijft behouden na een firmware-update, herstart en stroomonderbreking; de timer speelt daarna geen rol meer.
 
 In `Instellingen → Toegang & Beveiliging` zie je:
 

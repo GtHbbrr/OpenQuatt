@@ -69,10 +69,10 @@ import { renderModalShell } from "../core/modal-shell.js";
       return "De verbinding met Home Assistant is beveiligd.";
     }
     if (status.provisioning_pending === true) {
-      return "Na het opstarten heeft Home Assistant 10 minuten om dit apparaat te koppelen. Open Home Assistant; de beveiliging wordt automatisch ingesteld.";
+      return "Dit apparaat is nog niet gekoppeld. Na een opstart kan Home Assistant 10 minuten lang de beveiligde verbinding instellen. Daarna worden nieuwe koppelpogingen geweigerd.";
     }
     if (status.provisioning_closed === true) {
-      return "De 10 minuten na het opstarten zijn voorbij. Zet het apparaat kort uit en weer aan om opnieuw te kunnen koppelen.";
+      return "De eerste koppeling is niet binnen 10 minuten gelukt. Zet het apparaat kort uit en weer aan om opnieuw te proberen.";
     }
     return "De beveiligde verbinding is tijdelijk niet beschikbaar.";
   }
