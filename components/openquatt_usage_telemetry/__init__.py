@@ -5,6 +5,7 @@ from esphome.components import (
     openquatt_mqtt_config,
     select,
     sensor,
+    socket,
     switch,
     text_sensor,
     time,
@@ -107,6 +108,7 @@ CONFIG_SCHEMA = cv.All(
     )
     .extend(cv.COMPONENT_SCHEMA),
     validate_config,
+    socket.consume_sockets(1, "openquatt_usage_telemetry"),
 )
 
 
