@@ -7,12 +7,12 @@ export { getApiSecurityStatusDetail, getApiSecurityStatusLabel } from "../featur
   export function renderSettingsAccessSecuritySection() {
     const items = [
       ["login", "Login", getWebAuthStatusLabel(), getWebAuthStatusDetail(), "open-login-modal"],
-      ["api", "ESPHome API encryption", getApiSecurityStatusLabel(), getApiSecurityStatusDetail(), "open-api-security-modal"],
+      ["api", "Beveiligde verbinding met Home Assistant", getApiSecurityStatusLabel(), getApiSecurityStatusDetail(), "open-api-security-modal"],
     ];
     return renderSettingsSection(
       "Toegang",
       "Toegang & Beveiliging",
-      "Beheer hier de web-login en bekijk de native ESPHome API-provisioningstatus.",
+      "Beheer hier de web-login en bekijk of Home Assistant veilig verbonden is.",
       `
         <div class="oq-settings-access-security-shell">
           ${items.map(([id, label, status, detail, action]) => `

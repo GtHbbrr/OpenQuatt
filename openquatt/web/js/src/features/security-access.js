@@ -49,40 +49,40 @@ import { renderModalShell } from "../core/modal-shell.js";
       return "Laden...";
     }
     if (status.transport_active === true) {
-      return "Active";
+      return "Actief";
     }
     if (status.provisioning_closed === true) {
-      return "Unavailable";
+      return "Niet beschikbaar";
     }
     if (status.provisioning_pending === true) {
-      return "Awaiting provisioning";
+      return "Wacht op koppeling";
     }
-    return "Unavailable";
+    return "Niet beschikbaar";
   }
 
   export function getApiSecurityStatusDetail() {
     const status = state.apiSecurityStatus;
     if (!status) {
-      return "API-encryptie wordt geladen.";
+      return "Beveiligde verbinding wordt gecontroleerd.";
     }
     if (status.transport_active === true) {
-      return "Beheerd door Home Assistant provisioning.";
+      return "De verbinding met Home Assistant is beveiligd.";
     }
     if (status.provisioning_pending === true) {
-      return "Home Assistant kan nu de native Noise-PSK instellen.";
+      return "Na het opstarten heeft Home Assistant 10 minuten om dit apparaat te koppelen. Open Home Assistant; de beveiliging wordt automatisch ingesteld.";
     }
     if (status.provisioning_closed === true) {
-      return "Provisioning window gesloten; power-cycle het device om opnieuw te openen.";
+      return "De 10 minuten na het opstarten zijn voorbij. Zet het apparaat kort uit en weer aan om opnieuw te kunnen koppelen.";
     }
-    return "Native API-encryptiestatus is niet beschikbaar.";
+    return "De beveiligde verbinding is tijdelijk niet beschikbaar.";
   }
 
   export function getApiSecurityModalTitle() {
-    return "ESPHome API encryption";
+    return "Beveiligde verbinding met Home Assistant";
   }
 
   export function getApiSecurityModalCopy() {
-    return "Status van native API-provisioning door Home Assistant.";
+    return "Home Assistant regelt deze beveiliging automatisch. Je hoeft hier niets in te stellen.";
   }
 
   export function renderLoginStatusRow(label, value, copy = "", loading = false) {
@@ -114,7 +114,7 @@ import { renderModalShell } from "../core/modal-shell.js";
         <div class="oq-settings-api-security-shell oq-settings-api-security-shell--modal">
           <div class="oq-helper-modal-grid">
             ${renderLoginStatusRow("Status", getApiSecurityStatusLabel(), getApiSecurityStatusDetail())}
-            ${renderLoginStatusRow("Beheer", "Home Assistant provisioning", "De Noise-PSK wordt alleen door ESPHome en Home Assistant beheerd.")}
+            ${renderLoginStatusRow("Beheer", "Automatisch door Home Assistant", "De beveiligingssleutel wordt automatisch ingesteld en bewaard.")}
           </div>
         </div>`,
       actions: `<button class="oq-helper-button oq-helper-button--ghost" type="button" data-oq-action="close-system-modal">Gereed</button>`,

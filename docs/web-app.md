@@ -16,19 +16,19 @@ Gebruik de web-app voor alles wat direct op OpenQuatt zelf hoort:
 
 De web-app blijft altijd de plek waar je OpenQuatt inricht, beheert en controleert als er iets niet klopt. Gebruik je Home Assistant, dan is dat daarnaast een prettige plek voor dagelijks meekijken, dashboards en automatisering.
 
-## ESPHome API-key provisioning
+## Beveiligde verbinding met Home Assistant
 
-De ESPHome API gebruikt native provisioning. De firmware bevat `api.encryption:` zonder ingebouwde sleutel; Home Assistant maakt bij de eerste verbinding een Noise-PSK aan en laat ESPHome die in de native API-opslag bewaren. Home Assistant en ESPHome zijn samen de enige eigenaar van deze sleutel. OpenQuatt toont daarom alleen de status en biedt geen enable-, disable- of rotate-knoppen.
+OpenQuatt beveiligt de verbinding met Home Assistant automatisch. Bij de eerste koppeling maakt Home Assistant een geheime sleutel aan en bewaart die veilig samen met het apparaat. Je hoeft deze sleutel niet zelf te maken, te kopiëren of in OpenQuatt in te voeren.
 
-De provisioning window staat na een boot maximaal 10 minuten open zolang het device nog geen API-sleutel heeft. Daarna worden nieuwe API-clients geweigerd totdat het device opnieuw wordt gereset of gepowercycled. Een bestaande sleutel wordt door de timer niet gewist en blijft firmware-updates, reboots en powercycles overleven.
+Na het inschakelen heeft Home Assistant maximaal 10 minuten om het apparaat voor de eerste keer te koppelen. Is Home Assistant dan nog niet beschikbaar, dan sluit de koppelmogelijkheid tijdelijk. Zet het apparaat kort uit en weer aan om opnieuw te kunnen koppelen. Een bestaande koppeling blijft behouden na een firmware-update, herstart en stroomonderbreking.
 
 In `Instellingen → Toegang & Beveiliging` zie je:
 
-- `Active`: native API-encryptie is actief;
-- `Awaiting provisioning`: Home Assistant kan de sleutel nog instellen;
-- `Unavailable`: provisioning is gesloten of de native status is tijdelijk niet beschikbaar.
+- `Actief`: de verbinding met Home Assistant is beveiligd;
+- `Wacht op koppeling`: open Home Assistant om dit apparaat toe te voegen;
+- `Niet beschikbaar`: de koppeltijd is verlopen of de status kan tijdelijk niet worden opgehaald.
 
-De web-app geeft de API-sleutel nooit terug. Er is geen HTTPS op de lokale webinterface; herstel van een onbekende sleutel verloopt daarom via Home Assistant-herkoppeling of fysieke USB/serial-recovery. Een oude OpenQuatt-sleutel wordt niet automatisch naar ESPHome gekopieerd. Daardoor kan bij een migratie eenmalig opnieuw koppelen of het verwijderen van een stale Home Assistant-sleutel nodig zijn.
+De web-app toont deze geheime sleutel nooit. Er is geen HTTPS op de lokale webinterface; herstel van een onbekende sleutel verloopt daarom via Home Assistant opnieuw koppelen of fysieke USB/serial-recovery. Een oude OpenQuatt-sleutel wordt niet automatisch overgenomen. Daardoor kan bij een migratie eenmalig opnieuw koppelen of het verwijderen van een oude Home Assistant-sleutel nodig zijn.
 
 Bij de migratie geldt deze matrix:
 
