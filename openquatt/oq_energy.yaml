@@ -11,6 +11,8 @@ button:
     id: oq_reset_cumulative_energy_counters
     name: "Reset Cumulative Energy Counters"
     icon: mdi:restart
+    entity_category: config
+    disabled_by_default: true
     web_server:
       sorting_group_id: oq_performance
     on_press:

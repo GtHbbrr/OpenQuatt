@@ -1594,10 +1594,10 @@ views:
               <details>
               <summary><strong>Explanation</strong></summary>
 
-              This tab shows the value OpenQuatt uses per signal and the available raw sources. Configure sensor selection in the OpenQuatt web app at `http://openquatt.local`, where hardware profile, CIC status, and valid options are evaluated together.
+              This tab shows the value OpenQuatt uses per signal and the key raw sources. Configure sensor selection and inspect full source diagnostics in the OpenQuatt web app at `http://openquatt.local`, where hardware profile, CIC status, and valid options are evaluated together.
 
               Use this block for:
-              - quick comparison between CIC, local, and HA Input
+              - quick comparison between CIC, local, OpenTherm, and HA Input
               - validation of the effective control input
               - diagnosis of missing or unexpected source values
 
@@ -1742,10 +1742,6 @@ views:
                     row:
                       entity: binary_sensor.openquatt_ot_thermostat_ch_enable
                       name: Heating enable (OT thermostat)
-                  - entity: binary_sensor.openquatt_cic_ch_enabled
-                    name: Heating enable (CIC)
-                  - entity: binary_sensor.openquatt_ha_heating_enable
-                    name: Heating enable (HA Input)
           - type: vertical-stack
             cards:
               - type: heading
@@ -1764,10 +1760,6 @@ views:
                     name: Effective cooling enable source
                   - entity: binary_sensor.openquatt_cooling_enable_selected
                     name: Selected cooling enable
-                  - entity: binary_sensor.openquatt_cic_cooling_enabled
-                    name: Cooling enable (CIC)
-                  - entity: binary_sensor.openquatt_ha_cooling_enable
-                    name: Cooling enable (HA Input)
         column_span: 3
       - type: grid
         cards:
@@ -1862,38 +1854,6 @@ views:
                     name: Proxy cooling enable
                   - entity: binary_sensor.openquatt_ext_cooling_enable_valid
                     name: Cooling enable source valid
-          - type: vertical-stack
-            cards:
-              - type: heading
-                icon: mdi:chip
-                heading: OpenQuatt HA input signals
-                heading_style: subtitle
-              - type: markdown
-                content: |-
-                  <details>
-                  <summary><strong>Explanation</strong></summary>
-
-                  These are the six HA input signals as received by OpenQuatt. They should follow the proxy values shown in the middle panel.
-
-                  If a value stays `Unknown`, first check whether the matching `... source valid` sensor is `on`.
-
-                  </details>
-                text_only: true
-              - type: entities
-                show_header_toggle: false
-                entities:
-                  - entity: sensor.openquatt_ha_outside_temperature
-                    name: HA - Outside Temperature
-                  - entity: sensor.openquatt_ha_water_supply_temperature
-                    name: HA - Water Supply Temperature
-                  - entity: sensor.openquatt_ha_thermostat_setpoint
-                    name: HA - Thermostat Setpoint
-                  - entity: sensor.openquatt_ha_thermostat_room_temperature
-                    name: HA - Thermostat Room Temperature
-                  - entity: binary_sensor.openquatt_ha_heating_enable
-                    name: HA - Heating Enable
-                  - entity: binary_sensor.openquatt_ha_cooling_enable
-                    name: HA - Cooling Enable
         column_span: 3
         visibility:
           - condition: state
@@ -2193,31 +2153,11 @@ views:
             icon: mdi:cloud-check
             heading_style: title
             heading: Quatt CiC configuration
-          - type: markdown
-            content: |-
-              <details>
-              <summary><strong>Explanation</strong></summary>
-
-              This block shows CiC feed health. If feed health degrades or data becomes stale, CIC-backed sources may become unusable for selected signals.
-
-              Check these first when values look wrong:
-              - `JSON feed OK`
-              - `Data stale`
-              - `Last success age`
-
-              </details>
-            text_only: true
           - type: entities
             show_header_toggle: false
             entities:
               - entity: switch.openquatt_cic_enable_polling
                 name: Enable polling
-              - entity: binary_sensor.openquatt_cic_json_feed_ok
-                name: JSON feed OK
-              - entity: binary_sensor.openquatt_cic_data_stale
-                name: Data stale
-              - entity: text.openquatt_cic_feed_url
-                name: CIC feed URL
     cards: []
     header:
       card:
@@ -2225,7 +2165,7 @@ views:
         content: |-
           # <ha-icon icon="mdi:source-branch"></ha-icon> Sensor configuration
 
-          Review which value OpenQuatt uses per signal and whether the source status looks healthy. Configure sensor selection in the OpenQuatt web app: `http://openquatt.local`.
+          Review which value and effective source OpenQuatt uses per signal. Configure sources and inspect advanced diagnostics in the OpenQuatt web app: `http://openquatt.local`.
     top_margin: false
     dense_section_placement: false
   - title: Tuning
@@ -2548,7 +2488,7 @@ views:
               <summary><strong>Parameter explanation</strong></summary>
 
 
-              - Select up to two compressor levels per HP that allocation logic should skip.
+              - Configure up to two excluded compressor levels per HP in the OpenQuatt web app.
 
               - `None` means: no exclusion for that slot.
 
@@ -2568,10 +2508,6 @@ views:
             title: HP1 excluded levels
             show_header_toggle: false
             entities:
-              - entity: select.openquatt_hp1_excluded_compressor_level_a
-                name: Excluded level A
-              - entity: select.openquatt_hp1_excluded_compressor_level_b
-                name: Excluded level B
               - entity: sensor.openquatt_hp1_excluded_compressor_levels
                 name: Active exclusions
     header:
@@ -2601,9 +2537,6 @@ views:
               <summary><strong>Parameter explanation</strong></summary>
 
 
-              - **Reset runtime counters**. Note: it can take up to 1 minute before the effect is visible.
-
-              - **Reset cumulative energy counters** sets cumulative electricity and thermal energy counters back to 0.
               - **HP1 Runtime counter** shows the current counter used for runtime balancing.
 
               - **Runtime lead HP** shows which unit is currently selected as lead based on the lowest runtime.
@@ -2614,10 +2547,6 @@ views:
           - type: entities
             show_header_toggle: false
             entities:
-              - entity: button.openquatt_reset_runtime_counters_hp1
-                name: Reset runtime counters
-              - entity: button.openquatt_reset_cumulative_energy_counters
-                name: Reset cumulative energy counters
               - entity: sensor.openquatt_hp1_runtime_hours
                 name: HP1 Runtime
               - entity: sensor.openquatt_runtime_lead_hp
