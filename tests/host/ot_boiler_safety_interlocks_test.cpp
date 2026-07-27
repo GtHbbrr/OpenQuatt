@@ -24,6 +24,7 @@ oq_boiler::ControllerInput safe_input(uint32_t now_ms) {
       true,
       false,
       false,
+      false,
       true,
       true,
       true,
@@ -215,6 +216,12 @@ void test_fail_safe_priority() {
       decision, false, true, oq_boiler::BLOCK_TRANSPORT_SETTLING);
 
   input = safe_input(1500);
+  input.connection_mismatch = true;
+  decision = oq_boiler::evaluate(command, input);
+  assert_decision(
+      decision, false, true, oq_boiler::BLOCK_CONNECTION_MISMATCH);
+
+  input = safe_input(1500);
   input.transport_available = false;
   input.command_rearmed = false;
   decision = oq_boiler::evaluate(command, input);
@@ -235,6 +242,30 @@ void test_fail_safe_priority() {
   input.target_required = false;
   decision = oq_boiler::evaluate(command, input);
   assert_decision(decision, true, false, oq_boiler::BLOCK_NONE);
+}
+
+void test_transport_selection_guard() {
+  assert(oq_boiler::connection_guard_active(true, false));
+  assert(oq_boiler::connection_guard_active(false, true));
+  assert(!oq_boiler::connection_guard_active(false, false));
+
+  assert(!oq_boiler::transport_available_for_selection(
+      true, false, true, false, true, false));
+  assert(!oq_boiler::transport_available_for_selection(
+      true, false, true, false, false, true));
+  assert(oq_boiler::transport_available_for_selection(
+      true, false, true, false, false, false));
+  assert(!oq_boiler::transport_available_for_selection(
+      false, false, true, false, false, false));
+  assert(oq_boiler::transport_available_for_selection(
+      true, true, true, true, false, false));
+  assert(!oq_boiler::transport_available_for_selection(
+      true, true, true, false, false, false));
+
+  assert(oq_boiler::relay_must_be_off(true, false, false));
+  assert(oq_boiler::relay_must_be_off(false, true, false));
+  assert(oq_boiler::relay_must_be_off(false, false, true));
+  assert(!oq_boiler::relay_must_be_off(false, false, false));
 }
 
 void test_minimum_times_and_ownership_loss() {
@@ -331,6 +362,7 @@ int main() {
   test_command_ownership_and_time();
   test_effective_output_target();
   test_fail_safe_priority();
+  test_transport_selection_guard();
   test_minimum_times_and_ownership_loss();
   test_commissioning_wait_state();
   return 0;

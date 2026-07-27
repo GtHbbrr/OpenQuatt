@@ -609,6 +609,9 @@ import { escapeHtml } from "../core/html.js";
     });
     const openthermBoilerSupported = openthermBoilerCapability === BOILER_OPENTHERM_CAPABILITY.SUPPORTED;
     const openthermBoilerCapabilityKnown = openthermBoilerCapability !== BOILER_OPENTHERM_CAPABILITY.UNKNOWN;
+    const boilerConnectionMismatch =
+      boilerConnection === "R1" &&
+      isEntityActive("otbConnectionMismatch");
     const boilerConnectionOptions = boilerConnectionAvailable
       ? getSupportedBoilerConnectionOptions(
           getSelectEntityOptions(state.entities.boilerConnection || {}),
@@ -650,6 +653,18 @@ import { escapeHtml } from "../core/html.js";
     const boilerPowerFooter = boilerPresent && boilerPowerEntityAvailable
       ? `<p class="oq-settings-boiler-power-note">Je kunt deze waarde altijd handmatig aanpassen.</p>`
       : "";
+    const boilerConnectionFooter = boilerConnection === "R1" && openthermBoilerSupported
+      ? boilerConnectionMismatch
+        ? `
+          <div class="oq-settings-boiler-connection-note is-warning" role="alert">
+            <strong>OpenTherm-ketel gevonden</strong>
+            <p>Kies OpenTherm (OTB).</p>
+          </div>
+        `
+        : `
+          <p class="oq-settings-boiler-connection-note">OT-controle bij opstart actief.</p>
+        `
+      : "";
 
     return `
         <div class="${escapeHtml(className)}">
@@ -665,7 +680,7 @@ import { escapeHtml } from "../core/html.js";
             "oq-settings-field--compact",
           )}
 
-          ${boilerPresent && boilerConnectionAvailable ? renderSettingsFieldCard(
+          ${(boilerPresent || boilerConnectionMismatch) && boilerConnectionAvailable ? renderSettingsFieldCard(
             "boilerConnection",
             "Ketelaansluiting",
             !openthermBoilerCapabilityKnown
@@ -675,6 +690,7 @@ import { escapeHtml } from "../core/html.js";
               : "Deze hardware ondersteunt alleen de aan/uit-aansluiting via R1.",
             boilerConnectionControl,
             "oq-settings-field--compact",
+            boilerConnectionFooter,
           ) : ""}
 
           ${boilerPresent ? renderSettingsFieldCard(

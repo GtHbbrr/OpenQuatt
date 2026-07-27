@@ -106,6 +106,7 @@
     openquattEnabled: { domain: "switch", name: "OpenQuatt Enabled", optional: true },
     boilerCvAssistEnabled: { domain: "switch", name: "Boiler assist enabled", optional: true },
     boilerConnection: { domain: "select", name: "Boiler connection", optional: true },
+    otbConnectionMismatch: { domain: "binary_sensor", name: "OTB - Boiler Connection Mismatch", optional: true },
     manualCoolingEnable: { domain: "switch", name: "Manual Cooling Enable", optional: true },
     cicCompatibilityMode: { domain: "switch", name: "CiC Compatibility Mode", optional: true },
     silentModeOverride: { domain: "select", name: "Silent Mode Override", optional: true },
