@@ -8,6 +8,7 @@ substitutions:
   oq_connection: "wifi"
 
 wifi:
+  power_save_mode: none
   min_auth_mode: wpa2
   ap:
     ssid: "OpenQuatt"
