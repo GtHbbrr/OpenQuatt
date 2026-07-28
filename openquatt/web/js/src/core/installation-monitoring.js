@@ -1,6 +1,14 @@
 import { getEntityStateText, hasEntity, isEntityActive } from "./app-shared.js";
+import { getEntityValue } from "./entity-store.js";
 import { formatFailures, formatWarningFailures } from "./failure-format.js";
 import { state } from "./state.js";
+
+const OT_THERMOSTAT_SOURCE_KEYS = [
+  "roomTempSource",
+  "roomSetpointSource",
+  "heatingEnableSource",
+  "coolingEnableSource",
+];
 
 export function isInstallationMonitoringBinaryActive(key) {
   return hasEntity(key) && isEntityActive(key);
@@ -37,6 +45,12 @@ export function getInstallationMonitoringModel() {
   const cyclingAlertLatched = isInstallationMonitoringBinaryActive("compressorCyclingAlertLatched");
   const cicPollingEnabled = isInstallationMonitoringIntegrationEnabled("cicPollingEnabled");
   const otEnabled = isInstallationMonitoringIntegrationEnabled("otEnabled");
+  const otThermostatSourceSelected = OT_THERMOSTAT_SOURCE_KEYS.some(
+    (key) => hasEntity(key) && String(getEntityValue(key) || "").trim() === "OT thermostat",
+  );
+  const otThermostatStatusInvalid = otThermostatSourceSelected
+    && hasEntity("otThermostatStatusValid")
+    && !isEntityActive("otThermostatStatusValid");
   const addBinaryProblem = (key, label) => {
     if (isInstallationMonitoringBinaryActive(key)) {
       problems.push({ key, label });
@@ -46,12 +60,22 @@ export function getInstallationMonitoringModel() {
   addBinaryProblem("compressorCyclingWarning72h", "Te veel compressorstarts in 72 uur");
   addBinaryProblem("alternatingCompressorStartsWarning", "Warmtepompen starten opvallend vaak om en om");
   addBinaryProblem("lowflowFaultActive", "Te lage flow");
+  addBinaryProblem("pt1000ReadProblem", "PT1000-aanvoersensor geeft geen geldige meting");
+  addBinaryProblem("waterSupplyTempFallbackActive", "Aanvoertemperatuur gebruikt de warmtepompuitlaat als fallback");
   addBinaryProblem("flowMismatch", "Flowverschil tussen warmtepomp 1 en 2");
   if (cicPollingEnabled) {
     addBinaryProblem("cicDataStale", "CIC-data is verouderd");
   }
+  if (otThermostatStatusInvalid) {
+    problems.push({
+      key: "otThermostatStatusInvalid",
+      label: "Geen actuele OpenTherm-thermostaatstatus",
+    });
+  }
   if (otEnabled) {
-    addBinaryProblem("otLinkProblem", "OpenTherm-verbinding meldt een probleem");
+    if (!otThermostatStatusInvalid) {
+      addBinaryProblem("otLinkProblem", "OpenTherm-verbinding meldt een probleem");
+    }
   }
   if (isInstallationMonitoringFailureActive("hp1Failures")) {
     problems.push({ key: "hp1Failures", label: `Warmtepomp 1: ${getInstallationMonitoringWarningFailureText("hp1Failures")}` });

@@ -108,6 +108,7 @@ secondary_outside_temp_id: "${secondary_hp_id}_outside_temp"
 secondary_outside_last_change_ms_id: "${secondary_hp_id}_outside_temp_last_change_ms"
 secondary_outside_activity_ms_id: "${secondary_hp_id}_outside_temp_activity_ms"
 secondary_water_out_temp_id: "${secondary_hp_id}_water_out_temp"
+secondary_water_out_last_update_ms_id: "${secondary_hp_id}_water_out_temp_last_update_ms"
 secondary_fault_binary_sensor_id: "${secondary_hp_id}_ot_fault_active"
 
 # ----------------------------
@@ -153,6 +154,7 @@ oq_strategy_loop_s: "5"                               # Interval for strategy ca
 oq_diagnostic_update_interval_s: "30"                # Shared cadence for slower operator-facing diagnostics [s].
 oq_strategy_demand_max_f: "20.0"                      # Upper bound of demand scale for mapping PID/power -> f.
 oq_selected_input_stale_hold_s: "300"                 # Hold selected HA-backed inputs this long when they briefly disappear during reloads [s].
+oq_hp_water_temp_stale_s: "60"                        # Maximum age for a heat-pump water temperature used as supply fallback [s].
 oq_temp_guard_delta_c: "0.5"                          # Minimum valid margin between T0 and Tc in the house model [°C].
 oq_outside_temp_stale_s: "1200"                       # Ignore a local outdoor reading when it stays frozen while the same HP still shows fresh activity [s].
 

@@ -104,3 +104,24 @@ test("MQTT als buitentemperatuurbron waarschuwt voor ontbrekende opstartwaarde e
   const outdoorUnitMarkup = renderSettingsSensorSelectionSection();
   assert.doesNotMatch(outdoorUnitMarkup, /kan OpenQuatt naar CM98 \(antivriescirculatie\) gaan/);
 });
+
+test("ongeldige PT1000 toont geen misleidende nulwaarde", () => {
+  setSourceSelectionState(false);
+  Object.assign(state.entities, {
+    waterSupplySource: { value: "Local", option: ["Local"] },
+    localWaterSupplyTempSource: { value: "PT1000", option: ["PT1000", "DS18B20"] },
+    supplyTemp: { value: 31.4, state: "31.4", uom: "°C" },
+    waterSupplyTempEffectiveSource: { value: "HP2 water out (fallback)", state: "HP2 water out (fallback)" },
+    waterSupplyTempEsp: { value: null, state: "nan", uom: "°C" },
+    waterSupplyTempPt1000: { value: null, state: "nan", uom: "°C" },
+    waterSupplyTempDs18b20: { value: 0, state: "0.0", uom: "°C" },
+    pt1000ReadProblem: { value: true, state: "ON" },
+  });
+
+  const markup = renderSettingsSensorSelectionSection();
+
+  assert.match(markup, /<span>PT1000<\/span>\s*<strong>—<\/strong>/);
+  assert.doesNotMatch(markup, /<span>PT1000<\/span>\s*<strong>0 °C<\/strong>/);
+  assert.match(markup, /<span>DS18B20<\/span>\s*<strong>0 °C<\/strong>/);
+  assert.match(markup, /<span>Bron<\/span>\s*<strong>HP2 uitgaand water \(fallback\)<\/strong>/);
+});

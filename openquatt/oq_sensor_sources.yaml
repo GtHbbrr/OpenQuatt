@@ -27,6 +27,10 @@ globals:
     type: bool
     restore_value: false
     initial_value: 'false'
+  - id: oq_water_supply_temp_fallback_runtime_active
+    type: bool
+    restore_value: false
+    initial_value: 'false'
 
   - id: oq_outside_temp_selected_last_valid_c
     type: float
@@ -142,6 +146,19 @@ switch:
 
 binary_sensor:
   - platform: template
+    id: oq_water_supply_temp_fallback_active
+    name: "Water Supply Temp Fallback Active"
+    icon: mdi:thermometer-alert
+    device_class: problem
+    entity_category: diagnostic
+    lambda: |-
+      return id(oq_water_supply_temp_fallback_runtime_active);
+    filters:
+      - delayed_on: 15s
+    web_server:
+      sorting_group_id: oq_sensor_selection
+
+  - platform: template
     id: heating_enable_valid
     name: "Heating Enable Valid"
     icon: mdi:check-decagram
@@ -253,6 +270,15 @@ binary_sensor:
       sorting_group_id: oq_sensor_selection
 
 text_sensor:
+  - platform: template
+    id: oq_water_supply_temp_effective_source
+    name: "Water Supply Temp Effective Source"
+    icon: mdi:source-branch
+    entity_category: diagnostic
+    update_interval: never
+    web_server:
+      sorting_group_id: oq_sensor_selection
+
   - platform: template
     id: oq_heating_enable_effective_source
     name: "Heating Enable Effective Source"
@@ -371,16 +397,31 @@ sensor:
     accuracy_decimals: 2
     update_interval: 5s
     lambda: |-
-      // Hold the selected HA water supply input briefly through HA reload gaps.
-      if (!id(water_supply_source).has_state()) return NAN;
-      const auto source = id(water_supply_source).current_option();
+      // Prefer the configured source, then the topology's last heat-pump outlet.
+      // If both are unavailable, keep the existing short HA reload hold as a last resort.
+      const bool source_available = id(water_supply_source).has_state();
+      const std::string source = source_available
+          ? id(water_supply_source).current_option()
+          : std::string();
       const bool hold_enabled = source == "HA input";
       const uint32_t hold_ms = (uint32_t)(${oq_selected_input_stale_hold_s}UL * 1000UL);
+      const uint32_t fallback_stale_ms = (uint32_t)(${oq_hp_water_temp_stale_s}UL * 1000UL);
       const uint32_t now_ms = (uint32_t) millis();
+
+      auto publish_effective_source = [&](const std::string &value) {
+        if (!id(oq_water_supply_temp_effective_source).has_state() ||
+            id(oq_water_supply_temp_effective_source).state != value) {
+          id(oq_water_supply_temp_effective_source).publish_state(value);
+        }
+      };
 
       float selected_c = NAN;
       if (source == "CIC") {
-        if (id(water_supply_temp_cic).has_state()) selected_c = id(water_supply_temp_cic).state;
+        if (id(feed_ok).has_state() && id(feed_ok).state &&
+            id(cic_data_stale).has_state() && !id(cic_data_stale).state &&
+            id(water_supply_temp_cic).has_state()) {
+          selected_c = id(water_supply_temp_cic).state;
+        }
       }
       if (source == "HA input") {
         if (id(water_supply_temp_valid_ha).state && id(water_supply_temp_ha).has_state()) selected_c = id(water_supply_temp_ha).state;
@@ -391,22 +432,57 @@ sensor:
 
       const bool selected_valid = !isnan(selected_c);
       if (selected_valid) {
-        id(oq_water_supply_temp_selected_last_valid_c) = selected_c;
-        id(oq_water_supply_temp_selected_last_valid_ms) = now_ms;
+        if (hold_enabled) {
+          id(oq_water_supply_temp_selected_last_valid_c) = selected_c;
+          id(oq_water_supply_temp_selected_last_valid_ms) = now_ms;
+        } else {
+          id(oq_water_supply_temp_selected_last_valid_c) = NAN;
+          id(oq_water_supply_temp_selected_last_valid_ms) = 0;
+        }
         id(oq_water_supply_temp_selected_hold_active) = false;
+        id(oq_water_supply_temp_fallback_runtime_active) = false;
+
+        std::string effective_source = source;
+        if (source == "Local") {
+          #if OQ_HARDWARE_HEATPUMP_CONTROLLER_Q
+          if (id(${oq_local_supply_temp_selector_id}).has_state()) {
+            effective_source += " - ";
+            effective_source += id(${oq_local_supply_temp_selector_id}).current_option();
+          }
+          #else
+          effective_source = "Local - DS18B20";
+          #endif
+        }
+        publish_effective_source(effective_source);
         return selected_c;
       }
 
       id(oq_water_supply_temp_selected_hold_active) = false;
+      const uint32_t fallback_last_update_ms = id(${secondary_water_out_last_update_ms_id});
+      const bool fallback_fresh =
+          fallback_last_update_ms > 0 &&
+          (uint32_t)(now_ms - fallback_last_update_ms) <= fallback_stale_ms;
+      if (id(${secondary_hp_id}_is_online) &&
+          fallback_fresh &&
+          id(${secondary_water_out_temp_id}).has_state() &&
+          !isnan(id(${secondary_water_out_temp_id}).state)) {
+        id(oq_water_supply_temp_fallback_runtime_active) = true;
+        publish_effective_source("${secondary_hp_id} water out (fallback)");
+        return id(${secondary_water_out_temp_id}).state;
+      }
+
+      id(oq_water_supply_temp_fallback_runtime_active) = false;
       if (hold_enabled &&
           hold_ms > 0 &&
           id(oq_water_supply_temp_selected_last_valid_ms) > 0 &&
           (uint32_t)(now_ms - id(oq_water_supply_temp_selected_last_valid_ms)) < hold_ms &&
           !isnan(id(oq_water_supply_temp_selected_last_valid_c))) {
         id(oq_water_supply_temp_selected_hold_active) = true;
+        publish_effective_source("HA input");
         return id(oq_water_supply_temp_selected_last_valid_c);
       }
 
+      publish_effective_source("Unavailable");
       return NAN;
     web_server:
       sorting_group_id: oq_temperatures
