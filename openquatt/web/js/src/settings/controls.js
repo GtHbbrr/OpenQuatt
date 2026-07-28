@@ -1,7 +1,7 @@
 import { hasEntity, isEntityActive } from "../core/app-shared.js";
 import { STRATEGY_OPTION_CURVE, STRATEGY_OPTION_POWER_HOUSE } from "../core/config.js";
 import { getInputDraftValue } from "../core/control-drafts.js";
-import { formatValue, getEntityValue, getNumberMeta, normalizeNumber, toTimeInputValue } from "../core/entity-store.js";
+import { formatValue, getEntityValue, getNumberMeta, normalizeNumber, parseLooseNumber, toTimeInputValue } from "../core/entity-store.js";
 import { escapeHtml } from "../core/html.js";
 import { renderNumberInputControl } from "../core/number-controls.js";
 import { state } from "../core/state.js";
@@ -62,8 +62,8 @@ export function getSettingsStatValue(key, options = {}) {
     return "—";
   }
 
-  const numeric = Number(entity.value);
-  if (!Number.isNaN(numeric)) {
+  const numeric = parseLooseNumber(entity.value ?? entity.state);
+  if (Number.isFinite(numeric)) {
     const decimals = Number.isInteger(numeric)
       ? 0
       : Number.isFinite(config.decimals) ? config.decimals : 1;
@@ -181,6 +181,11 @@ export function formatSettingsOptionLabel(option) {
     "CIC + HA input": "CIC + HA-invoer",
     "OT thermostat": "OT-thermostaat",
     "Outdoor unit": "Buitenunit",
+    "Local - PT1000": "Lokaal - PT1000",
+    "Local - DS18B20": "Lokaal - DS18B20",
+    "HP1 water out (fallback)": "HP1 uitgaand water (fallback)",
+    "HP2 water out (fallback)": "HP2 uitgaand water (fallback)",
+    Unavailable: "Niet beschikbaar",
     Auto: "Auto",
     "CIC or HA input": "CIC of HA-invoer",
     "Flowmeter HP1": "Flowmeter HP1",

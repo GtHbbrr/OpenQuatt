@@ -87,6 +87,11 @@ globals:
     restore_value: false
     initial_value: '0'
 
+  - id: ${hp_id}_water_out_temp_last_update_ms
+    type: uint32_t
+    restore_value: false
+    initial_value: '0'
+
   # Modbus controller online/offline
   - id: ${hp_id}_is_online
     type: bool
@@ -710,6 +715,10 @@ sensor:
           min_value: -10
           max_value: 100
           ignore_out_of_range: true
+    on_value:
+      then:
+        - lambda: |-
+            id(${hp_id}_water_out_temp_last_update_ms) = millis();
     skip_updates: ${oq_modbus_telemetry_skip}
     web_server:
       sorting_group_id: oq_${hp_id}

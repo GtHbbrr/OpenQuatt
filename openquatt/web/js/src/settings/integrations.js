@@ -337,6 +337,10 @@ import { escapeHtml } from "../core/html.js";
     };
     const firstAvailableSourceLabel = (...values) => values.find((value) => String(value || "").trim()) || "";
     const getWaterSupplyUsedSource = () => {
+      const effectiveSource = getSettingsTextStatValue("waterSupplyTempEffectiveSource", "");
+      if (effectiveSource) {
+        return formatSettingsOptionLabel(effectiveSource);
+      }
       const source = formattedSourceValue("waterSupplySource");
       if (String(getEntityValue("waterSupplySource") || "") === "Local" && hasEntity("localWaterSupplyTempSource")) {
         const local = formattedSourceValue("localWaterSupplyTempSource");

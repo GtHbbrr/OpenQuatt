@@ -1809,6 +1809,7 @@
       ["HP1 - Active Failures List", "None"],
       ["Room Temperature Effective Source", "OT thermostat"],
       ["Room Setpoint Effective Source", "OT thermostat"],
+      ["Water Supply Temp Effective Source", "Local - PT1000"],
       ["Heating Enable Effective Source", "None"],
       ["Cooling Enable Effective Source", "HA input"],
       ["Boiler command source", "Power House"],
@@ -1848,6 +1849,8 @@
       ["Compressor cycling alert latched", false],
       ["Compressor cycling alert alternating", false],
       ["Lowflow fault active", false],
+      ["PT1000 read problem", false],
+      ["Water Supply Temp Fallback Active", false],
       ["Flow mismatch (HP1 vs HP2)", false],
       ["OT - Thermostat CH Enable", false],
       ["OT - Thermostat Status Valid", true],
@@ -2071,6 +2074,11 @@
     setBinary("Heating blocked by thermostat", heatingEnabledScenario && !heatingEnableSelected);
     setText("text_sensor", "Room Temperature Effective Source", String(getEntity("select", "Room Temperature Source")?.value || "Unknown"));
     setText("text_sensor", "Room Setpoint Effective Source", String(getEntity("select", "Room Setpoint Source")?.value || "Unknown"));
+    const waterSupplySource = String(getEntity("select", "Water Supply Source")?.value || "Unknown");
+    const localWaterSupplySource = String(getEntity("select", "Local Water Supply Temp Source")?.value || "");
+    setText("text_sensor", "Water Supply Temp Effective Source", waterSupplySource === "Local" && localWaterSupplySource
+      ? `Local - ${localWaterSupplySource}`
+      : waterSupplySource);
     setText("text_sensor", "Heating Enable Effective Source", heatingEnableSource === "Disabled" ? "None" : heatingEnableSource);
     setText("text_sensor", "Cooling Enable Effective Source", coolingEnableEffectiveSource);
     setNumber("OT - Control Setpoint", coolingScenario ? 18.0 : 30.0, "\u00B0C");
