@@ -5,6 +5,7 @@
 
 #include <esp_http_server.h>
 #include "OpenQuattFlashLayout.h"
+#include "OpenQuattUrgentFlushPolicy.h"
 #include "esp_partition.h"
 #include <freertos/FreeRTOS.h>
 #include <freertos/portmacro.h>
@@ -43,6 +44,15 @@ enum EventType : uint8_t {
   EVENT_STARTUP_INHIBIT_START = 20,
   EVENT_STARTUP_INHIBIT_CLEAR = 21,
   EVENT_STARTUP_INHIBIT_REFRESH = 22,
+  EVENT_INCIDENT_START = 23,
+  EVENT_INCIDENT_CLEAR = 24,
+  EVENT_INCIDENT_ACKNOWLEDGED = 25,
+  EVENT_HP_AVAILABILITY_CHANGE = 26,
+  EVENT_CONTROL_MODE_CHANGE = 27,
+  EVENT_BOILER_FALLBACK_START = 28,
+  EVENT_BOILER_FALLBACK_STOP = 29,
+  EVENT_HP_START_CONFIRMED = 30,
+  EVENT_HP_STOP_CONFIRMED = 31,
 };
 
 enum Subject : uint8_t {
@@ -96,6 +106,21 @@ enum ReasonCode : uint8_t {
   REASON_OIL_RETURN_RECOVERY = 53,
   REASON_CAPACITY_CAP = 54,
   REASON_STARTUP_INHIBIT = 55,
+  REASON_HP_FAULT = 56,
+  REASON_HP_PROTECTION = 57,
+  REASON_HP_PREHEAT = 58,
+  REASON_HP_LINK_LOSS = 59,
+  REASON_HP_START_FAILED = 60,
+  REASON_HP_STOP_UNCONFIRMED = 61,
+  REASON_HP_RECOVERY_WAIT = 62,
+  REASON_BOILER_FALLBACK = 64,
+  REASON_FALLBACK_BLOCKED = 65,
+  REASON_HEATING_REQUEST = 66,
+  REASON_COOLING_REQUEST = 67,
+  REASON_COMMISSIONING = 68,
+  REASON_SUPERVISORY_OVERRIDE = 69,
+  REASON_HP_PERSISTENCE_FAILURE = 70,
+  REASON_HP_RECOVERED = 71,
 };
 
 enum Severity : uint8_t {
@@ -115,6 +140,26 @@ enum DecisionState : uint8_t {
   STATE_DUO = 5,
   STATE_BLOCKED = 6,
   STATE_LIMITED = 7,
+  STATE_AVAILABLE = 8,
+  STATE_SUSPECT = 9,
+  STATE_OFFLINE = 10,
+  STATE_FAULTED = 11,
+  STATE_RECOVERING = 12,
+  STATE_STARTING = 13,
+  STATE_PREHEAT = 14,
+  STATE_FALLBACK = 15,
+};
+
+enum EventFlags : uint8_t {
+  FLAG_NONE = 0x00,
+  FLAG_LATCHED = 0x01,
+  FLAG_AUTO_CLEARABLE = 0x02,
+  FLAG_STOP_UNCONFIRMED = 0x04,
+  FLAG_FALLBACK_REQUESTED = 0x08,
+  FLAG_FALLBACK_BLOCKED = 0x10,
+  FLAG_RAW_VALUE_VALID = 0x20,
+  FLAG_MANUAL_RESET_REQUIRED = 0x40,
+  FLAG_RESTORED_AFTER_BOOT = 0x80,
 };
 
 struct DecisionEvent {
@@ -212,6 +257,9 @@ class OpenQuattDecisionLog : public Component {
   static constexpr size_t FLASH_EVENTS_PER_SLOT = 20;
   static constexpr size_t FLASH_EVENT_CAPACITY = FLASH_SLOT_COUNT * FLASH_EVENTS_PER_SLOT;
   static constexpr uint32_t RETENTION_SECONDS = 7UL * 24UL * 60UL * 60UL;
+  static constexpr uint64_t URGENT_FLUSH_COALESCE_US = 2ULL * 1000ULL * 1000ULL;
+  static constexpr uint64_t URGENT_FLUSH_MIN_INTERVAL_US = 15ULL * 1000ULL * 1000ULL;
+  static constexpr uint64_t URGENT_FLUSH_RETRY_US = 30ULL * 1000ULL * 1000ULL;
 
   static_assert(FLASH_EVENT_CAPACITY == 5120, "Decision-log flash ring capacity changed unexpectedly");
   static_assert(FLASH_PARTITION_OFFSET % FLASH_SECTOR_SIZE == 0,
@@ -291,6 +339,7 @@ class OpenQuattDecisionLog : public Component {
   uint32_t flash_last_flush_epoch_s_{0};
   uint32_t flash_stored_event_count_{0};
   uint32_t tracked_hour_start_epoch_s_{0};
+  UrgentFlushPolicy urgent_flush_{};
   mutable portMUX_TYPE mux_ = portMUX_INITIALIZER_UNLOCKED;
 
   bool time_is_valid_() const;
@@ -308,6 +357,11 @@ class OpenQuattDecisionLog : public Component {
   bool flash_switch_enabled_() const;
   bool flash_partition_available_() const;
   bool flash_archive_available_() const;
+  static bool urgent_event_(const DecisionEvent &event);
+  void request_urgent_flush_(uint32_t event_seq);
+  void clear_urgent_flush_(uint64_t now_us);
+  void complete_urgent_flush_(uint64_t now_us);
+  void process_urgent_flush_();
   bool scan_flash_archive_();
   bool read_flash_block_(uint32_t slot_index, uint32_t expected_sequence, FlashBlockInfo *info,
                          FlashEventRecord *events) const;

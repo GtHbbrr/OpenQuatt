@@ -105,6 +105,7 @@
     strategy: { domain: "select", name: "Heating Control Mode" },
     openquattEnabled: { domain: "switch", name: "OpenQuatt Enabled", optional: true },
     boilerCvAssistEnabled: { domain: "switch", name: "Boiler assist enabled", optional: true },
+    boilerFaultFallbackEnabled: { domain: "switch", name: "Boiler fallback on heat-pump fault", optional: true },
     boilerConnection: { domain: "select", name: "Boiler connection", optional: true },
     otbConnectionAutoSelected: { domain: "binary_sensor", name: "OTB - Boiler Connection Auto-selected", optional: true },
     otbConnectionMismatch: { domain: "binary_sensor", name: "OTB - Boiler Connection Mismatch", optional: true },
@@ -779,6 +780,7 @@
     "pt1000ReadProblem",
     "waterSupplyTempFallbackActive",
     "flowMismatch",
+    "boilerFaultFallbackEnabled",
     "cicPollingEnabled",
     "cicDataStale",
     "otEnabled",
@@ -928,7 +930,10 @@
   ]);
   export const CIC_COMPATIBILITY_KEYS = ["cicCompatibilityMode"];
   export const OPENTHERM_SETTING_KEYS = ["otEnabled", "otLinkProblem"];
-  export const BOILER_SETTING_KEYS = ["boilerConnection"];
+  export const BOILER_SETTING_KEYS = [
+    "boilerConnection",
+    "boilerFaultFallbackEnabled",
+  ];
   export const CIC_POLLING_SETTING_KEYS = ["cicPollingEnabled", "cicFeedUrl", "cicDataStale"];
   export const OPENTHERM_DIAGNOSTIC_KEYS = [
     "otThermostatChEnable",
@@ -1429,7 +1434,9 @@
     "usageTelemetryEnabled",
     "usageTelemetryChoiceConfigured",
     "boilerCvAssistEnabled",
+    "boilerRatedHeatPower",
     "boilerConnection",
+    "boilerFaultFallbackEnabled",
     "openquattResumeAt",
     "manualCoolingEnable",
     "coolingEnableSource",

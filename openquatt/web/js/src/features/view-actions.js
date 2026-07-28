@@ -105,6 +105,10 @@ const viewActionHandlers = {
   "toggle-installation-monitoring-details": (button, event) => {
     toggleDetails(event, button, ".oq-settings-monitoring-details", "installationMonitoringDetailsOpen");
   },
+  "toggle-compressor-limits": () => {
+    state.compressorLimitsOpen = !state.compressorLimitsOpen;
+    render();
+  },
   "toggle-integration-diagnostics": (button, event) => {
     toggleDetails(event, button, ".oq-settings-integration-diagnostics", "integrationDiagnosticsOpen");
   },

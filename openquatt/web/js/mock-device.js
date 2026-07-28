@@ -9,7 +9,8 @@
   const MOCK_TEST_VERSION = "v0.0.0-demo-pr.test";
   const mockFixtures = window.__OQ_MOCK_FIXTURES__;
   const mockEntityDefs = window.__OQ_MOCK_ENTITY_DEFS__;
-  if (!mockFixtures || !Array.isArray(mockEntityDefs)) {
+  const mockIncidentScenarios = window.__OQ_MOCK_INCIDENT_SCENARIOS__;
+  if (!mockFixtures || !Array.isArray(mockEntityDefs) || !mockIncidentScenarios) {
     throw new Error("OpenQuatt mockmetadata ontbreekt.");
   }
   const DOMAINS = new Set(mockEntityDefs.map(([domain]) => domain));
@@ -25,6 +26,15 @@
     complete: true,
     tick: 0,
     autoAnimate: true,
+    incidentSimulation: {
+      scenario: "none",
+      phaseIndex: 0,
+      actionCsrfToken: "oq-mock-incident-token-1",
+      nextActionId: 1,
+      pendingAction: null,
+      lastActionResults: {},
+      rejectedCsrfActions: {},
+    },
     compressorCyclingAlert: {
       latched: false,
       firstSeenAt: 0,
@@ -355,6 +365,222 @@
     }
     entity.value = Boolean(value);
     entity.state = Boolean(value);
+  }
+
+  function setSwitch(name, value) {
+    const entity = getEntity("switch", name);
+    if (!entity) {
+      return;
+    }
+    entity.value = Boolean(value);
+    entity.state = Boolean(value);
+  }
+
+  const FALLBACK_BLOCK_REASON_LABELS = [
+    "no block",
+    "manual override active",
+    "commissioning active",
+    "cooling active",
+    "frost protection active",
+    "no heating request",
+    "boiler fallback disabled",
+    "a heat pump is still available",
+    "heat-pump availability incomplete",
+    "fallback cause not confirmed",
+    "heat-pump stop not confirmed",
+    "flow unavailable",
+    "flow too low",
+    "supply temperature unavailable",
+    "boiler safety interlock",
+  ];
+
+  function getIncidentSimulationState() {
+    return mockIncidentScenarios.buildPhaseState(
+      state.incidentSimulation.scenario,
+      state.incidentSimulation.phaseIndex,
+      state.installation,
+    );
+  }
+
+  function isIncidentScenarioActive() {
+    return state.incidentSimulation.scenario !== "none";
+  }
+
+  function syncIncidentScenarioUrl() {
+    if (typeof window === "undefined" || !window.location || !window.history?.replaceState) {
+      return;
+    }
+    const url = new URL(window.location.href);
+    if (isIncidentScenarioActive()) {
+      url.searchParams.set("incident", state.incidentSimulation.scenario);
+      url.searchParams.set("incidentStep", String(state.incidentSimulation.phaseIndex));
+    } else {
+      url.searchParams.delete("incident");
+      url.searchParams.delete("incidentStep");
+    }
+    window.history.replaceState(window.history.state, "", url);
+  }
+
+  function resetIncidentActionState() {
+    state.incidentSimulation.pendingAction = null;
+    state.incidentSimulation.lastActionResults = {};
+    state.incidentSimulation.rejectedCsrfActions = {};
+  }
+
+  function configureIncidentScenario(scenarioId, phaseIndex = 0, options = {}) {
+    const selected = mockIncidentScenarios.getScenario(scenarioId);
+    const compatible = mockIncidentScenarios.isCompatible(selected, state.installation);
+    const next = compatible ? selected : mockIncidentScenarios.getScenario("none");
+    const selectedPhase = mockIncidentScenarios.getPhase(next, phaseIndex);
+    state.incidentSimulation.scenario = next.id;
+    state.incidentSimulation.phaseIndex = selectedPhase.index;
+    resetIncidentActionState();
+
+    if (next.id !== "none") {
+      state.scenario = next.base_scenario;
+      if (next.required_hardware) {
+        state.hardware = next.required_hardware;
+        setText("text_sensor", "OpenQuatt Hardware Profile", state.hardware);
+      }
+      if (next.boiler_transport) {
+        setText("select", "Boiler connection", next.boiler_transport);
+      }
+    } else {
+      state.boiler = "off";
+    }
+
+    if (options.syncUrl !== false) {
+      syncIncidentScenarioUrl();
+    }
+  }
+
+  function initializeIncidentScenarioFromUrl() {
+    if (typeof window === "undefined" || !window.location) {
+      return;
+    }
+    const url = new URL(window.location.href);
+    const selected = mockIncidentScenarios.getScenario(url.searchParams.get("incident"));
+    if (selected.id === "none") {
+      return;
+    }
+    if (selected.topology === "single" || selected.topology === "duo") {
+      state.installation = selected.topology;
+    }
+    if (selected.required_hardware) {
+      state.hardware = selected.required_hardware;
+    }
+    state.incidentSimulation.scenario = selected.id;
+    state.incidentSimulation.phaseIndex = mockIncidentScenarios.getPhase(
+      selected,
+      Number(url.searchParams.get("incidentStep") || 0),
+    ).index;
+    state.scenario = selected.base_scenario;
+  }
+
+  function controlModeLabel(controlMode) {
+    if (controlMode === 0) return "CM0 - Standby";
+    if (controlMode === 1) return "CM1 - Flow / transition";
+    if (controlMode === 2) return "CM2 - Heating - Heat Pump Only";
+    if (controlMode === 3) return "CM3 - Hybrid - Heat Pump + Boiler";
+    if (controlMode === 4) return "CM4 - Boiler Only - Fault fallback";
+    return `CM${controlMode}`;
+  }
+
+  function applyIncidentScenario() {
+    if (!isIncidentScenarioActive()) {
+      return;
+    }
+    const { scenario, phase } = getIncidentSimulationState();
+    const systemState = phase.system;
+    const boilerCommandActive = systemState.boiler_command_active === true;
+    const opentherm = scenario.boiler_transport === "OpenTherm";
+    state.boiler = boilerCommandActive ? "on" : "off";
+
+    if (scenario.required_hardware) {
+      state.hardware = scenario.required_hardware;
+      setText("text_sensor", "OpenQuatt Hardware Profile", state.hardware);
+    }
+    if (scenario.boiler_transport) {
+      setText("select", "Boiler connection", scenario.boiler_transport);
+    }
+
+    setText("text_sensor", "Control Mode (Label)", controlModeLabel(systemState.control_mode));
+    setSwitch("Boiler assist enabled", systemState.control_mode === 3);
+    setSwitch(
+      "Boiler fallback on heat-pump fault",
+      phase.heat_pumps.some((hp) => hp.fallback_cause_present),
+    );
+    setBinary("Boiler command valid", true);
+    setBinary("Boiler command active", boilerCommandActive);
+    setBinary("Boiler active", boilerCommandActive);
+    setText(
+      "text_sensor",
+      "Boiler command source",
+      systemState.control_mode === 4
+        ? "Hybrid incident fallback"
+        : systemState.control_mode === 3 ? "Hybrid assist" : "None",
+    );
+    setText(
+      "text_sensor",
+      "Boiler block reason",
+      FALLBACK_BLOCK_REASON_LABELS[systemState.fallback_block_reason] || "unknown",
+    );
+    setNumber("Boiler command target temperature", boilerCommandActive ? 45 : 0, "°C");
+    setNumber("Boiler command requested power", boilerCommandActive ? 1800 : 0, "W");
+    setNumber("Boiler Heat Power", boilerCommandActive ? 1800 : 0, "W");
+
+    setBinary("OTB - Boiler Link Available", opentherm);
+    setSwitch("OTB - Central Heating Command", opentherm && boilerCommandActive);
+    setBinary("OTB - Central Heating Active", opentherm && boilerCommandActive);
+    setBinary("OTB - Flame On", opentherm && boilerCommandActive);
+    setNumber("OTB - Control Setpoint Command", opentherm && boilerCommandActive ? 45 : 0, "°C");
+    setNumber("OTB - Relative Modulation", opentherm && boilerCommandActive ? 42 : 0, "%");
+
+    let runningHeatPumpCount = 0;
+    let heatPumpHeatPower = 0;
+    let heatPumpInputPower = 0;
+    phase.heat_pumps.forEach((hp) => {
+      const name = `HP${hp.index}`;
+      const running = hp.run_state === "running";
+      const failureLabels = hp.incidents
+        .filter((item) => item.runtime?.confirmed_active || item.runtime?.latched)
+        .map((item) => item.definition?.key)
+        .filter(Boolean);
+      setText("text_sensor", `${name} - Active Failures List`, failureLabels.join(", ") || "None");
+      setText("text_sensor", `${name} - Working Mode Label`, running ? "Heating" : "Standby");
+      if (running) {
+        runningHeatPumpCount += 1;
+        heatPumpHeatPower += 3100;
+        heatPumpInputPower += 940;
+        setNumber(`${name} - Power Input`, 940, "W");
+        setNumber(`${name} - Heat Power`, 3100, "W");
+        setNumber(`${name} - COP`, 3.3, "");
+        setNumber(`${name} - Compressor frequency`, 49, "Hz");
+        setNumber(`${name} - Fan speed`, 640, "rpm");
+        setNumber(`${name} - Flow`, 760, "L/h");
+      } else {
+        heatPumpInputPower += 5.2;
+        setNumber(`${name} - Power Input`, 5.2, "W");
+        setNumber(`${name} - Heat Power`, 0, "W");
+        setNumber(`${name} - COP`, 0, "");
+        setNumber(`${name} - Compressor frequency`, 0, "Hz");
+        setNumber(`${name} - Fan speed`, 0, "rpm");
+        setNumber(`${name} - Flow`, 0, "L/h");
+      }
+    });
+
+    const boilerHeatPower = boilerCommandActive ? 1800 : 0;
+    const flow = Number.isFinite(phase.entity_patch?.flowLph)
+      ? Number(phase.entity_patch.flowLph)
+      : runningHeatPumpCount > 0 ? 760 : boilerCommandActive ? 700 : 0;
+    setNumber("Total Power Input", heatPumpInputPower, "W");
+    setNumber("Total Heat Power", heatPumpHeatPower, "W");
+    setNumber("Total COP", heatPumpInputPower >= 5 ? Number((heatPumpHeatPower / heatPumpInputPower).toFixed(1)) : 0, "");
+    setNumber("System Heat Power", heatPumpHeatPower + boilerHeatPower, "W");
+    setNumber("Flow average (Selected)", flow, "L/h");
+    setNumber("Flow average (local)", flow, "L/h");
+    setNumber("Controller Flow", Math.max(0, flow - 10), "L/h");
+    setBinary("Lowflow fault active", flow < 250 && phase.system.fallback_block_reason === 12);
   }
 
   function parseDemoLogEntry(raw, index, total) {
@@ -729,6 +955,113 @@
     });
   }
 
+  function completePendingIncidentActionIfReady() {
+    const pending = state.incidentSimulation.pendingAction;
+    if (!pending) {
+      return;
+    }
+    pending.readCount += 1;
+    if (pending.readCount < pending.completeAfterReads) {
+      return;
+    }
+
+    const selected = mockIncidentScenarios.getScenario(state.incidentSimulation.scenario);
+    const targetIndex = selected.phases.findIndex((item) => item.id === pending.targetPhase);
+    if (targetIndex >= 0) {
+      state.incidentSimulation.phaseIndex = targetIndex;
+    }
+    state.incidentSimulation.lastActionResults[pending.hp] = {
+      sequence: pending.actionId,
+      request_id: pending.actionId,
+      action: pending.action,
+      ok: pending.ok,
+      result: pending.result,
+      at_ms: getIncidentSimulationState().phase.elapsed_s * 1000,
+    };
+    state.incidentSimulation.pendingAction = null;
+    applyScenario(state.scenario);
+    updateSummary();
+    syncIncidentScenarioUrl();
+  }
+
+  function buildIncidentSnapshotPayload() {
+    completePendingIncidentActionIfReady();
+    const { phase } = getIncidentSimulationState();
+    const heatPumps = clone(phase.heat_pumps);
+    heatPumps.forEach((hp) => {
+      hp.last_action_result = clone(state.incidentSimulation.lastActionResults[hp.index] || null);
+    });
+    return {
+      schema_version: 1,
+      catalog_version: 1,
+      generated_at_s: Math.floor(Date.now() / 1000),
+      action_csrf_token: state.incidentSimulation.actionCsrfToken,
+      system: clone(phase.system),
+      heat_pumps: heatPumps,
+    };
+  }
+
+  function handleIncidentSnapshot() {
+    const { phase } = getIncidentSimulationState();
+    if (phase.incident_http_status !== 200) {
+      return mockResponse(phase.incident_http_status, {
+        error: "mock_incident_endpoint_unavailable",
+      });
+    }
+    return mockResponse(200, buildIncidentSnapshotPayload());
+  }
+
+  function handleIncidentAction(pathname, init) {
+    const action = pathname.endsWith("/retry-start")
+      ? "start_failure_retry"
+      : pathname.endsWith("/confirm-odu-power-cycle")
+        ? "confirm_odu_power_cycle"
+        : "";
+    const params = parseAuthFormBody(init);
+    const hp = Number(params.get("hp"));
+    const token = String(params.get("csrf_token") || "");
+    if (!action || (hp !== 1 && hp !== 2)) {
+      return mockResponse(400, { accepted: false, result: "invalid_hp" });
+    }
+    if (token !== state.incidentSimulation.actionCsrfToken) {
+      return mockResponse(403, { accepted: false, result: "forbidden" });
+    }
+
+    const { scenario, phase } = getIncidentSimulationState();
+    const actionConfig = phase.actions?.[action];
+    if (!actionConfig) {
+      return mockResponse(409, {
+        accepted: false,
+        result: action === "start_failure_retry" ? "no_start_failure" : "no_cleared_manual_reset_latch",
+      });
+    }
+
+    const rejectionKey = `${scenario.id}:${phase.id}:${action}`;
+    if (actionConfig.reject_csrf_once && !state.incidentSimulation.rejectedCsrfActions[rejectionKey]) {
+      state.incidentSimulation.rejectedCsrfActions[rejectionKey] = true;
+      state.incidentSimulation.actionCsrfToken = `oq-mock-incident-token-${Date.now()}`;
+      return mockResponse(403, { accepted: false, result: "forbidden" });
+    }
+
+    const actionId = state.incidentSimulation.nextActionId++;
+    state.incidentSimulation.pendingAction = {
+      hp,
+      action,
+      actionId,
+      targetPhase: actionConfig.target_phase,
+      completeAfterReads: Math.max(1, Number(actionConfig.complete_after_reads) || 1),
+      readCount: 0,
+      ok: actionConfig.ok === true,
+      result: String(actionConfig.result || ""),
+    };
+    return mockResponse(202, {
+      accepted: true,
+      hp,
+      action,
+      action_id: actionId,
+    });
+  }
+
   function handleDecisionLog(url = null) {
     const nowMs = Date.now();
     if (url?.searchParams?.get("meta")) {
@@ -751,7 +1084,7 @@
     const uptimeS = Math.max(0, Math.floor((nowMs - decisionLogBootedAt) / 1000));
     let seq = 1;
     const events = [];
-    const pushEvent = (ageMinutes, eventType, subject, reason, severity, cm, from, to, valueA = 0, valueB = 0, thresholdA = 0, durationS = 0) => {
+    const pushEvent = (ageMinutes, eventType, subject, reason, severity, cm, from, to, valueA = 0, valueB = 0, thresholdA = 0, durationS = 0, flags = 0) => {
       const epochS = Math.max(0, Math.floor((nowMs - (ageMinutes * 60000)) / 1000));
       events.push({
         seq: seq++,
@@ -768,10 +1101,11 @@
         value_b: valueB,
         threshold_a: thresholdA,
         duration_s: durationS,
-        flags: 0,
+        flags,
       });
     };
 
+    if (!isIncidentScenarioActive()) {
     if (state.scenario !== "cooling_limiter_log" && state.scenario !== "cooling_stop_reasons" && state.scenario !== "heating_stop_reasons") {
       pushEvent(6 * 24 * 60 + 9 * 60, "sticky_pump_run", "PUMP", "sticky_protection", "normal", 98, "standby", "active", 60, 0, 0, 60);
       pushEvent(4 * 24 * 60 + 13 * 60, "cooling_limited", "COOLING", "dew_stop", "limited", 5, "active", "limited", 0, 4, 2);
@@ -881,6 +1215,31 @@
 
     if (state.boiler === "on" && !isCoolingScenario() && state.scenario !== "summer_idle" && !isFlowHoldScenario() && !isCandidateBlockedScenario()) {
       pushEvent(42, "boiler_assist_start", "CV", "boiler_assist", "normal", 3, "standby", "active", 348);
+    }
+    }
+
+    if (isIncidentScenarioActive()) {
+      const { phase } = getIncidentSimulationState();
+      mockIncidentScenarios
+        .collectEvents(state.incidentSimulation.scenario, state.incidentSimulation.phaseIndex)
+        .forEach((item) => {
+          const ageMinutes = Math.max(0.05, (phase.elapsed_s - item.at_s + 3) / 60);
+          pushEvent(
+            ageMinutes,
+            item.event_type,
+            item.subject,
+            item.reason,
+            item.severity,
+            item.cm,
+            item.from,
+            item.to,
+            item.value_a,
+            item.value_b,
+            item.threshold_a,
+            item.duration_s,
+            item.flags,
+          );
+        });
     }
 
     events.sort((left, right) => left.uptime_s - right.uptime_s);
@@ -1426,6 +1785,7 @@
     });
     setEntity("switch", "OpenQuatt Enabled", { value: true, state: true });
     setEntity("switch", "Boiler assist enabled", { value: true, state: true });
+    setEntity("switch", "Boiler fallback on heat-pump fault", { value: false, state: false });
     setEntity("select", "Boiler connection", {
       value: "OpenTherm",
       state: "OpenTherm",
@@ -2029,6 +2389,7 @@
     setText("text_sensor", "Summary", text);
     setText("select", "Preset", preset);
     applyDiagnosticScenario();
+    applyIncidentScenario();
   }
 
   function applyDiagnosticScenario() {
@@ -4581,6 +4942,16 @@
       if (url.pathname.endsWith("/openquatt/debug-recording/download") && method === "GET") {
         return handleDebugRecordingDownload();
       }
+      if (url.pathname.endsWith("/openquatt/incidents") && method === "GET") {
+        return handleIncidentSnapshot();
+      }
+      if (
+        (url.pathname.endsWith("/openquatt/incidents/retry-start")
+          || url.pathname.endsWith("/openquatt/incidents/confirm-odu-power-cycle"))
+        && method === "POST"
+      ) {
+        return handleIncidentAction(url.pathname, init || {});
+      }
       if (url.pathname.endsWith("/openquatt/service/status") && method === "GET") {
         return handleServiceStatus();
       }
@@ -4654,6 +5025,71 @@
       .join("");
   }
 
+  function renderIncidentScenarioOptions() {
+    const groups = new Map();
+    mockIncidentScenarios.scenarios
+      .filter((item) => mockIncidentScenarios.isCompatible(item, state.installation))
+      .forEach((item) => {
+        if (!groups.has(item.group)) {
+          groups.set(item.group, []);
+        }
+        groups.get(item.group).push(item);
+      });
+    return [...groups.entries()]
+      .map(([group, items]) => `
+        <optgroup label="${group}">
+          ${items.map((item) => `<option value="${item.id}">${item.label}</option>`).join("")}
+        </optgroup>
+      `)
+      .join("");
+  }
+
+  function renderIncidentPhaseOptions() {
+    const selected = mockIncidentScenarios.getScenario(state.incidentSimulation.scenario);
+    return selected.phases
+      .map((item, index) => `<option value="${index}">${index + 1}. ${item.label}</option>`)
+      .join("");
+  }
+
+  function renderIncidentSimulationMeta() {
+    const { scenario, phase, phaseIndex } = getIncidentSimulationState();
+    const hpBadges = phase.heat_pumps.map((hp) => (
+      `<span class="oq-helper-hub-dev-badge">HP${hp.index}: ${hp.link_state} · ${hp.availability}</span>`
+    )).join("");
+    const continuity = phase.system.boiler_output_continuous
+      ? '<span class="oq-helper-hub-dev-badge is-positive">Ketelopdracht continu</span>'
+      : "";
+    return `
+      <p class="oq-helper-hub-dev-copy">${phase.description}</p>
+      <div class="oq-helper-hub-dev-actions">
+        <button
+          class="oq-helper-hub-dev-button"
+          type="button"
+          data-oq-dev-incident-action="previous"
+          ${phaseIndex === 0 ? "disabled" : ""}
+        >Vorige</button>
+        <button
+          class="oq-helper-hub-dev-button"
+          type="button"
+          data-oq-dev-incident-action="next"
+          ${phaseIndex >= scenario.phases.length - 1 ? "disabled" : ""}
+        >Volgende</button>
+        <button
+          class="oq-helper-hub-dev-button"
+          type="button"
+          data-oq-dev-incident-action="reset"
+        >Reset storing</button>
+      </div>
+      <div class="oq-helper-hub-dev-meta">
+        <span class="oq-helper-hub-dev-badge">Stap ${phaseIndex + 1}/${scenario.phases.length}</span>
+        <span class="oq-helper-hub-dev-badge">t = ${phase.elapsed_s}s</span>
+        <span class="oq-helper-hub-dev-badge">CM${phase.system.control_mode}</span>
+        ${hpBadges}
+        ${continuity}
+      </div>
+    `;
+  }
+
   function renderDevControls() {
     return `
       <section class="oq-helper-hub-block oq-helper-hub-dev" data-oq-dev-controls>
@@ -4696,8 +5132,40 @@
             </select>
           </label>
         </div>
+        <div class="oq-helper-hub-dev-divider" role="presentation"></div>
+        <p class="oq-helper-hub-kicker">Hybrid-storingssimulator</p>
+        <div class="oq-helper-hub-dev-grid">
+          <label class="oq-helper-hub-dev-row">
+            <span class="oq-helper-hub-dev-label">Storingsscenario</span>
+            <select class="oq-helper-hub-dev-select" data-oq-dev-control="incident-scenario">
+              ${renderIncidentScenarioOptions()}
+            </select>
+          </label>
+          <label class="oq-helper-hub-dev-row">
+            <span class="oq-helper-hub-dev-label">Fase</span>
+            <select class="oq-helper-hub-dev-select" data-oq-dev-control="incident-phase">
+              ${renderIncidentPhaseOptions()}
+            </select>
+          </label>
+        </div>
+        ${renderIncidentSimulationMeta()}
       </section>
     `;
+  }
+
+  function applyIncidentSimulationControlChange() {
+    applyScenario(state.scenario);
+    updateSummary();
+    syncIncidentScenarioUrl();
+    notifyMockUpdated();
+    notifyDevControlsChanged();
+  }
+
+  function setIncidentSimulationPhase(phaseIndex) {
+    const selected = mockIncidentScenarios.getScenario(state.incidentSimulation.scenario);
+    state.incidentSimulation.phaseIndex = mockIncidentScenarios.getPhase(selected, phaseIndex).index;
+    resetIncidentActionState();
+    applyIncidentSimulationControlChange();
   }
 
   function bindDevControls(root) {
@@ -4712,6 +5180,10 @@
       installation.value = state.installation;
       installation.onchange = () => {
         setInstallationMode(installation.value);
+        const selectedIncident = mockIncidentScenarios.getScenario(state.incidentSimulation.scenario);
+        if (!mockIncidentScenarios.isCompatible(selectedIncident, state.installation)) {
+          configureIncidentScenario("none");
+        }
         applyScenario(state.scenario);
         updateSummary();
         notifyMockUpdated();
@@ -4725,6 +5197,10 @@
       hardware.onchange = () => {
         state.hardware = hardware.value;
         setEntity("text_sensor", "OpenQuatt Hardware Profile", { state: state.hardware, value: state.hardware });
+        const selectedIncident = mockIncidentScenarios.getScenario(state.incidentSimulation.scenario);
+        if (selectedIncident.required_hardware && selectedIncident.required_hardware !== state.hardware) {
+          configureIncidentScenario("none");
+        }
         syncDevMeta();
         notifyMockUpdated();
         notifyDevControlsChanged();
@@ -4779,6 +5255,37 @@
       };
     }
 
+    const incidentScenario = controlsRoot.querySelector('[data-oq-dev-control="incident-scenario"]');
+    if (incidentScenario) {
+      incidentScenario.value = state.incidentSimulation.scenario;
+      incidentScenario.onchange = () => {
+        configureIncidentScenario(incidentScenario.value);
+        applyIncidentSimulationControlChange();
+      };
+    }
+
+    const incidentPhase = controlsRoot.querySelector('[data-oq-dev-control="incident-phase"]');
+    if (incidentPhase) {
+      incidentPhase.value = String(state.incidentSimulation.phaseIndex);
+      incidentPhase.onchange = () => {
+        setIncidentSimulationPhase(Number(incidentPhase.value));
+      };
+    }
+
+    controlsRoot.querySelectorAll("[data-oq-dev-incident-action]").forEach((button) => {
+      button.onclick = () => {
+        const action = button.dataset.oqDevIncidentAction;
+        if (action === "previous") {
+          setIncidentSimulationPhase(state.incidentSimulation.phaseIndex - 1);
+        } else if (action === "next") {
+          setIncidentSimulationPhase(state.incidentSimulation.phaseIndex + 1);
+        } else if (action === "reset") {
+          configureIncidentScenario("none");
+          applyIncidentSimulationControlChange();
+        }
+      };
+    });
+
   }
 
   window.__OQ_DEV_CONTROLS__ = {
@@ -4825,6 +5332,7 @@
   });
 
   seedEntities();
+  initializeIncidentScenarioFromUrl();
   refreshAuthToken();
   refreshMqttToken();
   setInstallationMode(state.installation);

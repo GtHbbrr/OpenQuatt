@@ -68,6 +68,18 @@ button:
     web_server:
       sorting_group_id: oq_installation_monitoring
 
+  - platform: template
+    id: oq_acknowledge_recovered_hp_incidents
+    name: "Acknowledge recovered HP incidents"
+    internal: true
+    icon: mdi:check-circle-outline
+    entity_category: config
+    on_press:
+      - lambda: |-
+          id(oq_incident_manager).acknowledge_all_cleared();
+    web_server:
+      sorting_group_id: oq_installation_monitoring
+
 number:
   - platform: template
     id: oq_compressor_starts_warning_limit_2h

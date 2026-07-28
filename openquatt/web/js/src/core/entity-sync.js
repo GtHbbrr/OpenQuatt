@@ -7,6 +7,7 @@ import { updateWebServerLogState } from "./feature-state.js";
 import { getDefaultAppView, getUrlAppView, setAppView } from "./navigation.js";
 import { isFirmwareOtaQuietActive } from "./firmware-quiet.js";
 import { getInstallationMonitoringModel, syncInstallationMonitoringDetailsState } from "./installation-monitoring.js";
+import { getIncidentMonitoringFailureUpdate, getIncidentMonitoringSuccessUpdate, getIncidentMonitoringUnsupportedUpdate } from "./incident-monitoring.js";
 import { beginDeviceReconnect, clearDeviceReconnect, markDeviceReconnectRecovered, reconcileOtaEvidence } from "./device-reconnect.js";
 import { getSettingsRenderSignature } from "./render-signatures.js";
 import { isSystemSettingsGroupActive } from "./surface-state.js";
@@ -141,9 +142,14 @@ import { fetchWithTimeout } from "./browser-utils.js";
     const deferredKeys = getDeferredPrimeKeys(initialKeys);
     const initialDetail = state.appView === "settings" ? "all" : "state";
     try {
-      await refreshEntities(initialKeys, initialDetail, {
-        concurrency: initialDetail === "all" ? ENTITY_REFRESH_CONCURRENCY : FAST_VIEW_ENTITY_REFRESH_CONCURRENCY,
-      });
+      await Promise.all([
+        refreshEntities(initialKeys, initialDetail, {
+          concurrency: initialDetail === "all" ? ENTITY_REFRESH_CONCURRENCY : FAST_VIEW_ENTITY_REFRESH_CONCURRENCY,
+        }),
+        shouldRefreshIncidentMonitoringSurface()
+          ? refreshIncidentMonitoringData({ force: true })
+          : false,
+      ]);
       if (state.appView === "settings") {
         await waitForInitialSettingsReady();
       } else {
@@ -183,6 +189,7 @@ import { fetchWithTimeout } from "./browser-utils.js";
       "compressorCyclingWarning2h",
       "compressorCyclingWarning72h",
       "alternatingCompressorStartsWarning",
+      "boilerFaultFallbackEnabled",
       "commissioningStatus",
       "cm100Active",
     ],
@@ -503,7 +510,9 @@ import { fetchWithTimeout } from "./browser-utils.js";
 
   export const SERVICE_STATUS_ENDPOINT = "/openquatt/service/status";
   export const DECISION_LOG_ENDPOINT = "/openquatt/decision-log";
+  export const INCIDENT_MONITORING_ENDPOINT = "/openquatt/incidents";
   export const DECISION_LOG_REFRESH_INTERVAL_MS = 15000;
+  export const INCIDENT_MONITORING_REFRESH_INTERVAL_MS = 10000;
 
   export function getEntityRequestTimeoutMs() {
     return state.deviceReconnectMode || state.busyAction === "restartAction" || state.updateInstallBusy || state.updateInstallPhaseHint
@@ -557,6 +566,20 @@ import { fetchWithTimeout } from "./browser-utils.js";
       state.decisionLogError = "";
       state.decisionLogSignature = "";
       state.decisionLogLastFetchAt = 0;
+      state.incidentMonitoringSnapshot = null;
+      state.incidentMonitoringError = "";
+      state.incidentMonitoringUnsupported = false;
+      state.incidentMonitoringFailureCount = 0;
+      state.incidentMonitoringSignature = "";
+      state.incidentMonitoringLastFetchAt = 0;
+      state.incidentAction = {
+        hp: 0,
+        kind: "",
+        requestId: 0,
+        pending: false,
+        ok: null,
+        result: "",
+      };
       if (typeof resetWebServerLogRecoveryState === "function") {
         resetWebServerLogRecoveryState();
       } else {
@@ -756,6 +779,69 @@ import { fetchWithTimeout } from "./browser-utils.js";
       throw new Error(`decision log HTTP ${response.status}`);
     }
     return response.json();
+  }
+
+  async function fetchIncidentMonitoringPayload() {
+    const timeoutMs = getEntityRequestTimeoutMs();
+    const response = await fetchWithTimeout(
+      INCIDENT_MONITORING_ENDPOINT,
+      { cache: "no-store", headers: { "Cache-Control": "no-store" } },
+      timeoutMs,
+      `incident monitoring request timed out after ${timeoutMs}ms`,
+    );
+    if (response.status === 404) {
+      return { unsupported: true, payload: null };
+    }
+    if (!response.ok) {
+      throw new Error(`incident monitoring HTTP ${response.status}`);
+    }
+    return { unsupported: false, payload: await response.json() };
+  }
+
+  function shouldRefreshIncidentMonitoringSurface(appView = state.appView, settingsGroup = state.settingsGroup) {
+    return appView === "overview" || (appView === "settings" && settingsGroup === "service");
+  }
+
+  export async function refreshIncidentMonitoringData(options = {}) {
+    if (!shouldRefreshIncidentMonitoringSurface() && options.prefetchOverview !== true) {
+      return false;
+    }
+    const force = options.force === true;
+    const now = Date.now();
+    if (state.incidentMonitoringFetchPromise) {
+      return state.incidentMonitoringFetchPromise;
+    }
+    if (!force && state.incidentMonitoringUnsupported) {
+      return false;
+    }
+    if (!force && (now - Number(state.incidentMonitoringLastFetchAt || 0)) < INCIDENT_MONITORING_REFRESH_INTERVAL_MS) {
+      return false;
+    }
+
+    const applyUpdate = (update) => {
+      Object.assign(state, update);
+      if (update.changed) syncInstallationMonitoringDetailsState(getInstallationMonitoringModel());
+      return update.changed;
+    };
+    const request = (async () => {
+      try {
+        const result = await fetchIncidentMonitoringPayload();
+        return applyUpdate(result.unsupported
+          ? getIncidentMonitoringUnsupportedUpdate(state)
+          : getIncidentMonitoringSuccessUpdate(state, result.payload));
+      } catch (error) {
+        return applyUpdate(getIncidentMonitoringFailureUpdate(state, error));
+      }
+    })();
+    state.incidentMonitoringFetchPromise = request;
+
+    try {
+      return await request;
+    } finally {
+      if (state.incidentMonitoringFetchPromise === request) {
+        state.incidentMonitoringFetchPromise = null;
+      }
+    }
   }
 
   export function getDecisionLogSignature(payload = {}) {
@@ -1116,12 +1202,16 @@ import { fetchWithTimeout } from "./browser-utils.js";
         state.lastStaticEntitySyncAt = state.lastFastEntitySyncAt;
       }
       if (isPrefetchOverview) {
+        await refreshIncidentMonitoringData({ prefetchOverview: true });
         return;
       }
       if (isOverviewLike && !state.overviewMetadataHydrated && !state.overviewMetadataHydrating) {
         void hydrateOverviewMetadata();
       }
       const reconnectChanged = reconnectModeBefore !== state.deviceReconnectMode;
+      const incidentMonitoringChanged = shouldRefreshIncidentMonitoringSurface(syncView, state.settingsGroup)
+        ? await refreshIncidentMonitoringData({ force: options.forceIncidentMonitoring === true })
+        : false;
       const shouldDeferSupplementary = forceFast && isOverviewLike;
       const trendChanged = shouldDeferSupplementary
         ? false
@@ -1154,6 +1244,10 @@ import { fetchWithTimeout } from "./browser-utils.js";
         schedulePrimeSupplementaryData(getSupplementaryPrimeDelayMs(syncView));
       }
       if (reconnectChanged) {
+        render();
+        return;
+      }
+      if (incidentMonitoringChanged && state.appView === "settings" && state.settingsGroup === "service") {
         render();
         return;
       }

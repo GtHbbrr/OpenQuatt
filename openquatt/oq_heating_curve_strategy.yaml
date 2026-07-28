@@ -1115,6 +1115,31 @@ interval:
           #endif
           id(oq_P_hp_cap_w) = 0.0f;
           id(oq_P_deficit_w) = 0.0f;
+          const auto hp1_incident_outputs =
+              id(oq_incident_manager).get_outputs(1);
+          const int hp1_previous_applied_level =
+              id(hp1_last_applied_level);
+          const auto hp1_candidate_state =
+              oq_hp_candidate::candidate_state(
+                  hp1_incident_outputs,
+                  hp1_previous_applied_level);
+          const bool hp1_candidate_available =
+              oq_hp_candidate::may_serve_candidate(hp1_candidate_state);
+          #if OQ_TOPOLOGY_DUO
+          const auto hp2_incident_outputs =
+              id(oq_incident_manager).get_outputs(2);
+          const int hp2_previous_applied_level =
+              id(${secondary_last_applied_level_id});
+          const auto hp2_candidate_state =
+              oq_hp_candidate::candidate_state(
+                  hp2_incident_outputs,
+                  hp2_previous_applied_level);
+          const bool hp2_candidate_available =
+              oq_hp_candidate::may_serve_candidate(hp2_candidate_state);
+          #else
+          const oq_hp_candidate::HpCandidateState hp2_candidate_state;
+          const bool hp2_candidate_available = false;
+          #endif
 
           int owner = 0;
           int dispatch_hp1 = 0;
@@ -1138,6 +1163,10 @@ interval:
           const int prev_curve_post = id(oq_demand_filtered_prev);
 
           auto max_allowed_level_for_hp = [&](bool is_hp1)->int {
+            if ((is_hp1 && !hp1_candidate_available) ||
+                (!is_hp1 && !hp2_candidate_available)) {
+              return 0;
+            }
             int lvl_max = 0;
             for (int lvl = level_cap; lvl >= 1; lvl--) {
               if (level_allowed(is_hp1, lvl)) {
@@ -1160,6 +1189,10 @@ interval:
           const int prev2 = id(${secondary_last_applied_level_id});
 
           auto build_candidate = [&](int hp1_level, int hp2_level, float target_power_w)->oq_curve::DispatchCandidate {
+            if ((hp1_level > 0 && !hp1_candidate_available) ||
+                (hp2_level > 0 && !hp2_candidate_available)) {
+              return oq_curve::invalid_dispatch_candidate();
+            }
             float p1 = level_power_w(true, hp1_level);
             float p2 = level_power_w(false, hp2_level);
             if (isnan(p1) || isnan(p2)) return oq_curve::invalid_dispatch_candidate();
@@ -1177,8 +1210,13 @@ interval:
 
           const bool prev_hp1_on = (prev1 > 0);
           const bool prev_hp2_on = (prev2 > 0);
-          const int single_owner = oq_curve::pick_single_owner(
+          int single_owner = oq_curve::pick_single_owner(
               demand_active, id(oq_curve_single_owner_hp), prev_hp1_on, prev_hp2_on, lead_is_hp1);
+          if (single_owner == 1 && !hp1_candidate_available) {
+            single_owner = hp2_candidate_available ? 2 : 0;
+          } else if (single_owner == 2 && !hp2_candidate_available) {
+            single_owner = hp1_candidate_available ? 1 : 0;
+          }
           const int owner_max_single = (single_owner == 2)
               ? max_allowed_level_for_hp(false)
               : max_allowed_level_for_hp(true);
@@ -1343,11 +1381,31 @@ interval:
               id(oq_curve_single_owner_hp),
               id(oq_duo_request_hold_until_ms),
               1);
-          owner = (demand_u > 0.0f) ? 1 : 0;
-          dispatch_hp1 = std::max(0, std::min(max_level, (int) lroundf(demand_u * (float) max_level)));
+          owner = (demand_u > 0.0f && hp1_candidate_available) ? 1 : 0;
+          dispatch_hp1 = hp1_candidate_available
+              ? std::max(0, std::min(max_level, (int) lroundf(demand_u * (float) max_level)))
+              : 0;
           dispatch_hp2 = 0;
           id(oq_curve_capacity_mode_code) = (dispatch_hp1 > 0) ? 1 : 0;
           #endif
+
+          const auto suspect_topology_hold =
+              oq_hp_candidate::preserve_active_topology_during_suspect(
+                  {
+                      dispatch_hp1,
+                      dispatch_hp2,
+                      hp1_candidate_state,
+                      hp2_candidate_state,
+                      f > 0,
+                  });
+          if (suspect_topology_hold.active) {
+            dispatch_hp1 = suspect_topology_hold.hp1_level;
+            dispatch_hp2 = suspect_topology_hold.hp2_level;
+            owner = suspect_topology_hold.owner_hp;
+            id(oq_curve_capacity_mode_code) =
+                suspect_topology_hold.capacity_mode;
+            id(oq_curve_single_owner_hp) = owner;
+          }
 
           id(oq_curve_request_total_level) = dispatch_hp1 + dispatch_hp2;
           id(oq_curve_request_owner_hp) = owner;

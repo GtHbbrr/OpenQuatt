@@ -231,6 +231,8 @@ void OpenQuattDecisionLog::loop() {
     return;
   }
 
+  this->process_urgent_flush_();
+
   const uint32_t epoch_hour = (this->current_epoch_s_() / 3600UL) * 3600UL;
   if (this->tracked_hour_start_epoch_s_ == 0) {
     this->tracked_hour_start_epoch_s_ = epoch_hour;
@@ -241,8 +243,9 @@ void OpenQuattDecisionLog::loop() {
     return;
   }
 
-  if (this->flash_switch_enabled_()) {
-    this->flush_pending_events_();
+  if (this->flash_switch_enabled_() && this->flush_pending_events_()) {
+    this->complete_urgent_flush_(
+        static_cast<uint64_t>(esp_timer_get_time()));
   }
   this->tracked_hour_start_epoch_s_ = epoch_hour;
   this->initialize_current_hour_();
@@ -374,6 +377,77 @@ void OpenQuattDecisionLog::emit(uint8_t event_type,
   event.seq = this->next_seq_++;
   this->push_event_locked_(event);
   this->update_bucket_locked_(event);
+  portEXIT_CRITICAL(&this->mux_);
+
+  if (urgent_event_(event)) {
+    this->request_urgent_flush_(event.seq);
+  }
+}
+
+bool OpenQuattDecisionLog::urgent_event_(const DecisionEvent &event) {
+  switch (event.event_type) {
+    case EVENT_INCIDENT_START:
+    case EVENT_INCIDENT_CLEAR:
+      return event.severity == SEVERITY_FAULT;
+    case EVENT_INCIDENT_ACKNOWLEDGED:
+      return (event.flags & FLAG_MANUAL_RESET_REQUIRED) != 0U;
+    case EVENT_HP_AVAILABILITY_CHANGE:
+      return event.to_state == STATE_FAULTED || event.to_state == STATE_OFFLINE;
+    case EVENT_CONTROL_MODE_CHANGE:
+      return event.control_mode_code == 4 || event.value_a == 4 || event.value_b == 4;
+    case EVENT_BOILER_FALLBACK_START:
+    case EVENT_BOILER_FALLBACK_STOP:
+      return true;
+    default:
+      return false;
+  }
+}
+
+void OpenQuattDecisionLog::request_urgent_flush_(uint32_t event_seq) {
+  if (!this->flash_switch_enabled_()) {
+    return;
+  }
+  const uint64_t now_us = static_cast<uint64_t>(esp_timer_get_time());
+  portENTER_CRITICAL(&this->mux_);
+  this->urgent_flush_.request(now_us, event_seq);
+  portEXIT_CRITICAL(&this->mux_);
+}
+
+void OpenQuattDecisionLog::clear_urgent_flush_(uint64_t now_us) {
+  portENTER_CRITICAL(&this->mux_);
+  this->urgent_flush_.clear(now_us);
+  portEXIT_CRITICAL(&this->mux_);
+}
+
+void OpenQuattDecisionLog::complete_urgent_flush_(uint64_t now_us) {
+  const uint32_t persisted_event_seq = this->last_persisted_event_seq_;
+  portENTER_CRITICAL(&this->mux_);
+  this->urgent_flush_.mark_success(now_us, persisted_event_seq);
+  portEXIT_CRITICAL(&this->mux_);
+}
+
+void OpenQuattDecisionLog::process_urgent_flush_() {
+  const uint64_t now_us = static_cast<uint64_t>(esp_timer_get_time());
+  bool should_attempt = false;
+  portENTER_CRITICAL(&this->mux_);
+  should_attempt = this->urgent_flush_.should_attempt(
+      now_us, URGENT_FLUSH_COALESCE_US,
+      URGENT_FLUSH_MIN_INTERVAL_US);
+  if (should_attempt) {
+    this->urgent_flush_.mark_attempt(now_us);
+  }
+  portEXIT_CRITICAL(&this->mux_);
+
+  if (!should_attempt) {
+    return;
+  }
+  if (this->flush_pending_events_()) {
+    this->complete_urgent_flush_(now_us);
+    return;
+  }
+
+  portENTER_CRITICAL(&this->mux_);
+  this->urgent_flush_.mark_failure(now_us, URGENT_FLUSH_RETRY_US);
   portEXIT_CRITICAL(&this->mux_);
 }
 
@@ -744,7 +818,11 @@ bool OpenQuattDecisionLog::flush_pending_events_() {
   size_t pending_count = 0;
   bool wrote = false;
   const uint64_t boot_epoch_s = this->boot_epoch_s_();
-  for (size_t index = 0; index < this->event_count_; ++index) {
+  size_t event_count = 0U;
+  portENTER_CRITICAL(&this->mux_);
+  event_count = this->event_count_;
+  portEXIT_CRITICAL(&this->mux_);
+  for (size_t index = 0; index < event_count; ++index) {
     DecisionEvent event{};
     if (!this->copy_event_(index, &event) || event.seq <= this->last_persisted_event_seq_) {
       continue;
@@ -835,13 +913,21 @@ void OpenQuattDecisionLog::set_flash_enabled(bool enabled) {
   } else if (this->next_seq_ > 0) {
     this->last_persisted_event_seq_ = this->next_seq_ - 1U;
   }
+  if (!enabled) {
+    this->clear_urgent_flush_(static_cast<uint64_t>(esp_timer_get_time()));
+  }
 }
 
 bool OpenQuattDecisionLog::force_flush() {
   if (!this->flash_switch_enabled_() || !this->time_is_valid_()) {
     return false;
   }
-  return this->flush_pending_events_();
+  const bool flushed = this->flush_pending_events_();
+  if (flushed) {
+    this->complete_urgent_flush_(
+        static_cast<uint64_t>(esp_timer_get_time()));
+  }
+  return flushed;
 }
 
 bool OpenQuattDecisionLog::clear_flash_history() {
@@ -858,14 +944,19 @@ bool OpenQuattDecisionLog::clear_flash_history() {
   this->reset_flash_metadata_();
   this->last_persisted_event_seq_ = this->next_seq_ > 0 ? this->next_seq_ - 1U : 0;
   this->flash_archive_scanned_ = true;
+  this->clear_urgent_flush_(
+      static_cast<uint64_t>(esp_timer_get_time()));
   return true;
 }
 
 bool OpenQuattDecisionLog::copy_event_(size_t index, DecisionEvent *out) const {
-  if (out == nullptr || this->events_ == nullptr || index >= this->event_count_ || this->event_capacity_ == 0) {
+  if (out == nullptr) return false;
+  portENTER_CRITICAL(&this->mux_);
+  if (this->events_ == nullptr || index >= this->event_count_ ||
+      this->event_capacity_ == 0) {
+    portEXIT_CRITICAL(&this->mux_);
     return false;
   }
-  portENTER_CRITICAL(&this->mux_);
   const size_t event_index = (this->event_head_ + index) % this->event_capacity_;
   *out = this->events_[event_index];
   portEXIT_CRITICAL(&this->mux_);
@@ -873,10 +964,12 @@ bool OpenQuattDecisionLog::copy_event_(size_t index, DecisionEvent *out) const {
 }
 
 bool OpenQuattDecisionLog::copy_bucket_(size_t index, HourBucket *out) const {
-  if (out == nullptr || this->buckets_ == nullptr || index >= this->bucket_capacity_) {
+  if (out == nullptr) return false;
+  portENTER_CRITICAL(&this->mux_);
+  if (this->buckets_ == nullptr || index >= this->bucket_capacity_) {
+    portEXIT_CRITICAL(&this->mux_);
     return false;
   }
-  portENTER_CRITICAL(&this->mux_);
   *out = this->buckets_[index];
   portEXIT_CRITICAL(&this->mux_);
   return true;
@@ -920,6 +1013,15 @@ const char *OpenQuattDecisionLog::event_type_to_string_(uint8_t value) {
     case EVENT_STARTUP_INHIBIT_START: return "startup_inhibit_start";
     case EVENT_STARTUP_INHIBIT_CLEAR: return "startup_inhibit_clear";
     case EVENT_STARTUP_INHIBIT_REFRESH: return "startup_inhibit_refresh";
+    case EVENT_INCIDENT_START: return "incident_start";
+    case EVENT_INCIDENT_CLEAR: return "incident_clear";
+    case EVENT_INCIDENT_ACKNOWLEDGED: return "incident_acknowledged";
+    case EVENT_HP_AVAILABILITY_CHANGE: return "hp_availability_change";
+    case EVENT_CONTROL_MODE_CHANGE: return "control_mode_change";
+    case EVENT_BOILER_FALLBACK_START: return "boiler_fallback_start";
+    case EVENT_BOILER_FALLBACK_STOP: return "boiler_fallback_stop";
+    case EVENT_HP_START_CONFIRMED: return "hp_start_confirmed";
+    case EVENT_HP_STOP_CONFIRMED: return "hp_stop_confirmed";
     default: return "unknown";
   }
 }
@@ -977,6 +1079,21 @@ const char *OpenQuattDecisionLog::reason_to_string_(uint8_t value) {
     case REASON_OIL_RETURN_RECOVERY: return "oil_return_recovery";
     case REASON_CAPACITY_CAP: return "capacity_cap";
     case REASON_STARTUP_INHIBIT: return "startup_inhibit";
+    case REASON_HP_FAULT: return "hp_fault";
+    case REASON_HP_PROTECTION: return "hp_protection";
+    case REASON_HP_PREHEAT: return "hp_preheat";
+    case REASON_HP_LINK_LOSS: return "hp_link_loss";
+    case REASON_HP_START_FAILED: return "hp_start_failed";
+    case REASON_HP_STOP_UNCONFIRMED: return "hp_stop_unconfirmed";
+    case REASON_HP_RECOVERY_WAIT: return "hp_recovery_wait";
+    case REASON_BOILER_FALLBACK: return "boiler_fallback";
+    case REASON_FALLBACK_BLOCKED: return "fallback_blocked";
+    case REASON_HEATING_REQUEST: return "heating_request";
+    case REASON_COOLING_REQUEST: return "cooling_request";
+    case REASON_COMMISSIONING: return "commissioning";
+    case REASON_SUPERVISORY_OVERRIDE: return "supervisory_override";
+    case REASON_HP_PERSISTENCE_FAILURE: return "hp_persistence_failure";
+    case REASON_HP_RECOVERED: return "hp_recovered";
     default: return "unknown";
   }
 }
@@ -1000,6 +1117,14 @@ const char *OpenQuattDecisionLog::state_to_string_(uint8_t value) {
     case STATE_DUO: return "duo";
     case STATE_BLOCKED: return "blocked";
     case STATE_LIMITED: return "limited";
+    case STATE_AVAILABLE: return "available";
+    case STATE_SUSPECT: return "suspect";
+    case STATE_OFFLINE: return "offline";
+    case STATE_FAULTED: return "faulted";
+    case STATE_RECOVERING: return "recovering";
+    case STATE_STARTING: return "starting";
+    case STATE_PREHEAT: return "preheat";
+    case STATE_FALLBACK: return "fallback";
     default: return "unknown";
   }
 }
@@ -1046,7 +1171,9 @@ void OpenQuattDecisionLog::write_decision_log(httpd_req_t *req) const {
             writer.write_literal(R"(,"flash_enabled":)") &&
             writer.write_literal(this->flash_switch_enabled_() ? "true" : "false") &&
             writer.write_literal(R"(},"meta":{)") &&
-            writer.write_literal(R"("event_record_size":)") && writer.write_size(sizeof(DecisionEvent)) &&
+            writer.write_literal(R"("api_schema_version":2)") &&
+            writer.write_literal(R"(,"incident_catalog_version":1)") &&
+            writer.write_literal(R"(,"event_record_size":)") && writer.write_size(sizeof(DecisionEvent)) &&
             writer.write_literal(R"(,"bucket_record_size":)") && writer.write_size(sizeof(HourBucket)) &&
             writer.write_literal(R"(,"event_count":)") && writer.write_size(visible_event_count) &&
             writer.write_literal(R"(,"dropped_count":)") && writer.write_uint32(dropped_count) &&

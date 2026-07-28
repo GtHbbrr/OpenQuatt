@@ -333,7 +333,13 @@ test("integration diagnostics separates thermostat, boiler control, OTB and CiC"
 });
 
 test("settings hydration loads boiler setup and diagnostics before rendering", () => {
+  assert.ok(FAST_OVERVIEW_KEYS.includes("boilerCvAssistEnabled"));
+  assert.ok(FAST_OVERVIEW_KEYS.includes("boilerRatedHeatPower"));
+  assert.ok(FAST_OVERVIEW_KEYS.includes("boilerConnection"));
+  assert.ok(FAST_OVERVIEW_KEYS.includes("boilerFaultFallbackEnabled"));
   assert.ok(INITIAL_SETTINGS_READY_KEY_MAP.installation.includes("boilerConnection"));
+  assert.ok(INITIAL_SETTINGS_READY_KEY_MAP.installation.includes("boilerRatedHeatPower"));
+  assert.ok(INITIAL_SETTINGS_READY_KEY_MAP.installation.includes("boilerFaultFallbackEnabled"));
   assert.ok(INITIAL_SETTINGS_READY_KEY_MAP.installation.includes("otbLinkAvailable"));
   assert.ok(INITIAL_SETTINGS_READY_KEY_MAP.installation.includes("otbConnectionAutoSelected"));
   assert.ok(INITIAL_SETTINGS_READY_KEY_MAP.installation.includes("otbConnectionMismatch"));
@@ -343,6 +349,38 @@ test("settings hydration loads boiler setup and diagnostics before rendering", (
   assert.ok(SETTINGS_GROUP_KEY_MAP.installation.includes("otbConnectionMismatch"));
   assert.ok(SETTINGS_GROUP_KEY_MAP.integrations.includes("boilerCommandValid"));
   assert.ok(SETTINGS_GROUP_KEY_MAP.integrations.includes("otbChPressure"));
+  assert.ok(INITIAL_SETTINGS_READY_KEY_MAP.service.includes("boilerFaultFallbackEnabled"));
+  assert.ok(SETTINGS_GROUP_KEY_MAP.service.includes("boilerFaultFallbackEnabled"));
+});
+
+test("fault fallback setting explains the consequence of both switch states", () => {
+  assert.match(installationSource, /Automatische ketelovername bij warmtepompstoring/);
+  assert.match(installationSource, /OpenQuatt stelt dit zelf vast/);
+  assert.match(installationSource, /je hoeft niets te bevestigen/);
+  assert.match(installationSource, /Een korte communicatiedip telt niet als storing/);
+});
+
+test("fault fallback is editable in Installation but not in the shared Quick Start boiler fields", () => {
+  const fallbackSwitchMatches = installationSource.match(
+    /renderSettingsCompactSwitchControl\(\s*"boilerFaultFallbackEnabled"/g,
+  ) || [];
+  const servicePanelSource = installationSource.match(
+    /function renderInstallationMonitoringSystemPanel[\s\S]+?\n  export function getInstallationMonitoringCount/,
+  )?.[0] || "";
+
+  assert.match(
+    installationSource,
+    /renderBoilerCvFields\("oq-settings-grid oq-settings-boiler-simple-grid", true\)/,
+  );
+  assert.match(
+    quickStartSource,
+    /renderBoilerCvFields\("oq-settings-grid oq-settings-grid--quickstart oq-settings-boiler-simple-grid"\)/,
+  );
+  assert.doesNotMatch(quickStartSource, /includeFaultFallback/);
+  assert.match(servicePanelSource, /renderInstallationMonitoringStatusRow/);
+  assert.doesNotMatch(servicePanelSource, /boilerFaultFallbackEnabled/);
+  assert.doesNotMatch(servicePanelSource, /renderSettingsCompactSwitchControl/);
+  assert.equal(fallbackSwitchMatches.length, 1);
 });
 
 test("Quick Start blocks R1 after a boiler answers the safe OpenTherm probe", () => {

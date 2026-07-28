@@ -495,6 +495,16 @@
     margin: 4px auto 0;
   }
 
+  .oq-start-editor {
+    grid-template-columns: 1fr auto;
+    gap: 10px;
+  }
+
+  .oq-start-fields {
+    grid-column: 1 / -1;
+    justify-content: start;
+  }
+
   .oq-settings-generation-grid {
     grid-template-columns: 1fr;
   }

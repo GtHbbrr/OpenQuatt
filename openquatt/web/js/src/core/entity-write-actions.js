@@ -3,7 +3,8 @@ import { CURVE_POINTS, ENTITY_DEFS, FIRMWARE_ENTITY_KEYS, FLOW_SETTING_KEYS, get
 import { beginDeviceReconnect } from "./device-reconnect.js";
 import { buildEntityPath, isCurveMode } from "./domain-helpers.js";
 import { formatOpenQuattResumeDateTime, getEntityValue, normalizeDateTimeValue, normalizeNumber, normalizeTimeValue, parseLooseNumber, toDateTimeInputValue } from "./entity-store.js";
-import { getSettingsRefreshKeys, refreshEntities, syncEntities } from "./entity-sync.js";
+import { getSettingsRefreshKeys, refreshEntities, refreshIncidentMonitoringData, syncEntities } from "./entity-sync.js";
+import { postIncidentActionRequest } from "./incident-monitoring.js";
 import { setAppView } from "./navigation.js";
 import { render } from "./render-scheduler.js";
 import { state } from "./state.js";
@@ -559,6 +560,73 @@ export function queueHpWaterCalibrationApplyAnchor() {
   });
 }
 
+export async function triggerIncidentAction(hpIndex, kind) {
+  const endpoint = kind === "start_failure_retry"
+    ? "/openquatt/incidents/retry-start"
+    : kind === "confirm_odu_power_cycle"
+      ? "/openquatt/incidents/confirm-odu-power-cycle"
+      : "";
+  if (!endpoint || (hpIndex !== 1 && hpIndex !== 2)) return;
+
+  state.busyAction = `incident-${kind}-hp${hpIndex}`;
+  state.controlError = "";
+  state.controlNotice = "";
+  state.incidentAction = {
+    hp: hpIndex,
+    kind,
+    requestId: 0,
+    pending: false,
+    ok: null,
+    result: "",
+  };
+  render();
+
+  try {
+    const accepted = await postIncidentActionRequest(
+      fetch,
+      endpoint,
+      hpIndex,
+      state.incidentMonitoringSnapshot?.actionCsrfToken || "",
+      async () => {
+        await refreshIncidentMonitoringData({ force: true });
+        return state.incidentMonitoringSnapshot?.actionCsrfToken || "";
+      },
+    );
+    state.incidentAction = {
+      hp: hpIndex,
+      kind,
+      requestId: accepted.actionId,
+      pending: true,
+      ok: null,
+      result: "",
+    };
+    state.controlNotice = `Actie voor HP${hpIndex} geaccepteerd; resultaat wordt gecontroleerd.`;
+    render();
+
+    for (const delayMs of [0, 500]) {
+      if (!state.incidentAction.pending) break;
+      if (delayMs) {
+        await new Promise((resolve) => window.setTimeout(resolve, delayMs));
+      }
+      await refreshIncidentMonitoringData({ force: true });
+    }
+  } catch (error) {
+    state.incidentAction = {
+      hp: hpIndex,
+      kind,
+      requestId: 0,
+      pending: false,
+      ok: false,
+      result: "",
+      message: error.message || String(error),
+    };
+    state.controlError = `Actie voor HP${hpIndex} niet uitgevoerd. ${error.message || error}`;
+  } finally {
+    state.busyAction = "";
+    render();
+  }
+}
+
 export async function triggerNamedButton(key, options = {}) {
   const entity = ENTITY_DEFS[key];
   if (!entity) {
@@ -616,6 +684,9 @@ export async function triggerNamedButton(key, options = {}) {
         await new Promise((resolve) => window.setTimeout(resolve, refreshDelayMs));
       }
       await refreshEntities(options.refreshKeys, "state");
+    }
+    if (options.refreshIncidentMonitoring === true) {
+      await refreshIncidentMonitoringData({ force: true });
     }
   } catch (error) {
     if (key === "commissioningCm100Start") {

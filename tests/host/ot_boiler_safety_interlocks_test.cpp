@@ -22,6 +22,10 @@ oq_boiler::ControllerInput safe_input(uint32_t now_ms) {
   return oq_boiler::ControllerInput{
       true,
       true,
+      true,
+      true,
+      true,
+      true,
       false,
       false,
       false,
@@ -268,6 +272,38 @@ void test_transport_selection_guard() {
   assert(!oq_boiler::relay_must_be_off(false, false, false));
 }
 
+void test_fallback_and_flow_guards() {
+  auto command = active_command(1000);
+  command.source = oq_boiler::COMMAND_SOURCE_FALLBACK;
+
+  auto input = safe_input(1500);
+  input.assist_enabled = false;
+  auto decision = oq_boiler::evaluate(command, input);
+  assert_decision(decision, true, false, oq_boiler::BLOCK_NONE);
+
+  input = safe_input(1500);
+  input.fallback_enabled = false;
+  decision = oq_boiler::evaluate(command, input);
+  assert_decision(
+      decision, false, true, oq_boiler::BLOCK_FALLBACK_DISABLED);
+
+  input = safe_input(1500);
+  input.flow_valid = false;
+  decision = oq_boiler::evaluate(command, input);
+  assert_decision(decision, false, true, oq_boiler::BLOCK_FLOW_UNAVAILABLE);
+
+  input = safe_input(1500);
+  input.flow_sufficient = false;
+  decision = oq_boiler::evaluate(command, input);
+  assert_decision(decision, false, true, oq_boiler::BLOCK_FLOW_INSUFFICIENT);
+
+  input = safe_input(1500);
+  input.fallback_outputs_safe = false;
+  decision = oq_boiler::evaluate(command, input);
+  assert_decision(
+      decision, false, true, oq_boiler::BLOCK_HP_STOP_UNCONFIRMED);
+}
+
 void test_minimum_times_and_ownership_loss() {
   const auto command = active_command(1000);
   auto no_heat_command = command;
@@ -363,6 +399,7 @@ int main() {
   test_effective_output_target();
   test_fail_safe_priority();
   test_transport_selection_guard();
+  test_fallback_and_flow_guards();
   test_minimum_times_and_ownership_loss();
   test_commissioning_wait_state();
   return 0;

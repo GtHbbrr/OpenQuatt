@@ -4,6 +4,7 @@ import { HP_GENERATION_IMAGE_V1, HP_GENERATION_IMAGE_V2 } from "../core/embedded
 import { getInputDraftValue } from "../core/control-drafts.js";
 import { isCurveMode } from "../core/domain-helpers.js";
 import { getEntityValue, getNumberMeta, parseLooseNumber } from "../core/entity-store.js";
+import { formatIncidentOccurrenceTime, getFallbackBlockReasonLabel, getHeatPumpStatusPresentation, getIncidentActionPresentation, getIncidentCategoryLabel, getIncidentDisplayLabel, getIncidentEffectLabels, getIncidentLifecyclePresentation, getIncidentRecoveryLabel, getIncidentUserActionLabel, getSystemActionPresentation } from "../core/incident-monitoring.js";
 import { getInstallationMonitoringFailureText, getInstallationMonitoringModel, isInstallationMonitoringBinaryActive, isInstallationMonitoringFailureActive, isInstallationMonitoringIntegrationEnabled, syncInstallationMonitoringDetailsState } from "../core/installation-monitoring.js";
 import { renderNumberInputControl } from "../core/number-controls.js";
 import { state } from "../core/state.js";
@@ -13,9 +14,12 @@ import { getUpdateStatus } from "../features/firmware-update.js";
 import { getEspTemperatureLabel } from "../features/header-status.js";
 import { getWebServerLogStatusLabel } from "../features/webserver-logs.js";
 import { BOILER_OPENTHERM_CAPABILITY, getBoilerOpenThermCapability, getSupportedBoilerConnectionOptions } from "./boiler.js";
-import { getSelectEntityOptions, renderNamedActionButton, renderSettingsAdvancedDisclosure, renderSettingsChoiceOption, renderSettingsCompactSwitchControl, renderSettingsFieldCard, renderSettingsNumberField, renderSettingsSection, renderSettingsSliderField, renderSettingsSystemRow } from "./controls.js";
+import { getSelectEntityOptions, renderNamedActionButton, renderSettingsAdvancedDisclosure, renderSettingsChoiceOption, renderSettingsCompactSwitchControl, renderSettingsFieldCard, renderSettingsMiniNumberField, renderSettingsNumberField, renderSettingsSection, renderSettingsSliderField, renderSettingsSystemRow } from "./controls.js";
 import { renderSettingsHeatPumpLimiterCard } from "./heating.js";
 import { escapeHtml } from "../core/html.js";
+
+const BOILER_FAULT_FALLBACK_TITLE = "Automatische ketelovername bij warmtepompstoring";
+const BOILER_FAULT_FALLBACK_COPY = "Laat de cv-ketel overnemen als alle warmtepompen door een storing uitvallen. Dit gebeurt pas na veilige stop en geldige flow, temperatuur en ketelaansturing. OpenQuatt stelt dit zelf vast; je hoeft niets te bevestigen. Een korte communicatiedip telt niet als storing.";
 
   export function getOduRuntimeFrequencyHpIndexes() {
     return ODU_RUNTIME_FREQUENCY_HP_IDS.filter((hpIndex) => (
@@ -243,8 +247,14 @@ import { escapeHtml } from "../core/html.js";
     `;
   }
 
-  export function renderInstallationMonitoringBadge(active, activeLabel = "Aandacht", clearLabel = "OK") {
-    return `<span class="oq-settings-monitoring-badge${active ? " is-warning" : " is-clear"}">${escapeHtml(active ? activeLabel : clearLabel)}</span>`;
+  export function renderInstallationMonitoringBadge(
+    active,
+    activeLabel = "Aandacht",
+    clearLabel = "OK",
+    activeTone = "warning",
+  ) {
+    const tone = active ? activeTone : "clear";
+    return `<span class="oq-settings-monitoring-badge is-${escapeHtml(tone)}">${escapeHtml(active ? activeLabel : clearLabel)}</span>`;
   }
 
   export function renderInstallationMonitoringStatusRow({ label, value, note = "", active = false }) {
@@ -257,6 +267,257 @@ import { escapeHtml } from "../core/html.js";
         </div>
         ${renderInstallationMonitoringBadge(active)}
       </div>
+    `;
+  }
+
+  function getVisibleHpIncidents(heatPump) {
+    return (heatPump?.incidents || []).filter((incident) => (
+      incident.active
+      || incident.recovering
+      || (incident.latched && !incident.acknowledged)
+    ));
+  }
+
+  function renderInstallationMonitoringHpIncident(incident) {
+    const lifecycle = getIncidentLifecyclePresentation(incident);
+    const effects = getIncidentEffectLabels(incident.effects);
+    const firstSeen = formatIncidentOccurrenceTime(incident.firstSeenS, incident.firstSeenMs);
+    const lastSeen = formatIncidentOccurrenceTime(incident.lastSeenS, incident.lastSeenMs);
+    const details = [
+      effects.length ? ["Effect", effects.join(", ")] : null,
+      firstSeen ? ["Eerste optreden", firstSeen] : null,
+      lastSeen ? ["Laatste optreden", lastSeen] : null,
+      incident.recoveryCondition ? ["Herstel", getIncidentRecoveryLabel(incident.recoveryCondition)] : null,
+      getIncidentUserActionLabel(incident.userAction)
+        ? ["Gebruikersactie", getIncidentUserActionLabel(incident.userAction)]
+        : null,
+      incident.occurrenceCount > 1 ? ["Bevestigd", `${incident.occurrenceCount} keer sinds controllerstart`] : null,
+    ].filter(Boolean);
+    return `
+      <div class="oq-settings-monitoring-incident">
+        <div class="oq-settings-monitoring-incident-head">
+          <div>
+            <p>${escapeHtml(getIncidentCategoryLabel(incident.category))}</p>
+            <strong>${escapeHtml(getIncidentDisplayLabel(incident))}</strong>
+          </div>
+          ${renderInstallationMonitoringBadge(
+            lifecycle.tone !== "clear",
+            lifecycle.label,
+            lifecycle.label,
+            lifecycle.tone,
+          )}
+        </div>
+        ${details.length ? `<dl>${details.map(([label, value]) => (
+          `<div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd></div>`
+        )).join("")}</dl>` : ""}
+      </div>
+    `;
+  }
+
+  function renderInstallationMonitoringHeatPumpUnit(heatPump) {
+    const presentation = getHeatPumpStatusPresentation(heatPump);
+    const incidents = getVisibleHpIncidents(heatPump);
+    const retryStartRequired = incidents.some((incident) => (
+      incident.id === "1002" && incident.active
+    ));
+    const powerCycleRequired = incidents.some((incident) => (
+      !incident.active
+      && !incident.recovering
+      && incident.latched
+      && !incident.acknowledged
+      && incident.recoveryCondition === "confirmed_odu_power_cycle"
+    ));
+    const incidentAction = getIncidentActionPresentation(state.incidentAction, heatPump.index);
+    const actionPending = state.incidentAction?.pending === true;
+    return `
+      <div class="oq-settings-monitoring-rows">
+        <div class="oq-settings-monitoring-row${presentation.tone === "clear" ? "" : " is-warning"}">
+          <div>
+            <p>Warmtepomp ${escapeHtml(heatPump.index)}</p>
+            <strong>${escapeHtml(presentation.label)}</strong>
+            <span>${escapeHtml(presentation.note)}</span>
+          </div>
+          ${renderInstallationMonitoringBadge(
+            presentation.tone !== "clear",
+            presentation.tone === "fault" ? "Niet beschikbaar" : "Begrensd",
+            presentation.label,
+            presentation.tone,
+          )}
+        </div>
+        ${incidents.map(renderInstallationMonitoringHpIncident).join("")}
+        ${retryStartRequired ? `
+          <div class="oq-settings-monitoring-incident">
+            <div class="oq-settings-monitoring-incident-action">
+              <button
+                class="oq-helper-button oq-helper-button--warning"
+                type="button"
+                data-oq-action="retry-hp-start"
+                data-oq-hp-index="${heatPump.index}"
+                ${actionPending ? "disabled" : ""}
+              >${state.incidentAction?.pending && state.incidentAction.hp === heatPump.index
+                && state.incidentAction.kind === "start_failure_retry"
+                  ? "Retry wordt verwerkt..."
+                  : `Startretry HP${heatPump.index}`}</button>
+              <span>Alleen na een bevestigde veilige stop; actieve fouten, verbindingsherstel en andere startblokkades blijven gelden.</span>
+            </div>
+          </div>
+        ` : ""}
+        ${powerCycleRequired ? `
+          <div class="oq-settings-monitoring-incident">
+            <div class="oq-settings-monitoring-incident-action">
+              <button
+                class="oq-helper-button oq-helper-button--warning"
+                type="button"
+                data-oq-action="confirm-hp-power-cycle"
+                data-oq-hp-index="${heatPump.index}"
+                ${actionPending ? "disabled" : ""}
+              >${state.incidentAction?.pending && state.incidentAction.hp === heatPump.index
+                && state.incidentAction.kind === "confirm_odu_power_cycle"
+                  ? "Bevestiging wordt verwerkt..."
+                  : `ODU-powercycle HP${heatPump.index} bevestigen`}</button>
+              <span>Alleen nadat buitenunit HP${escapeHtml(heatPump.index)} werkelijk spanningsloos is geweest; dit geeft uitsluitend de herstelde safety-latch van deze HP vrij.</span>
+            </div>
+          </div>
+        ` : ""}
+        ${incidentAction.visible ? `
+          <div class="oq-settings-monitoring-incident">
+            <div class="oq-settings-monitoring-incident-head">
+              <div>
+                <p>Herstelactie</p>
+                <strong>${escapeHtml(incidentAction.label)}</strong>
+              </div>
+              ${renderInstallationMonitoringBadge(
+                incidentAction.tone !== "clear",
+                incidentAction.tone === "fault" ? "Geweigerd" : "In behandeling",
+                "Uitgevoerd",
+                incidentAction.tone,
+              )}
+            </div>
+            <span>${escapeHtml(incidentAction.copy)}</span>
+          </div>
+        ` : ""}
+      </div>
+    `;
+  }
+
+  function renderInstallationMonitoringStructuredHpPanel(monitoring) {
+    const heatPumps = monitoring.incidentMonitoring?.snapshot?.heatPumps || [];
+    if (!heatPumps.length) {
+      return "";
+    }
+    const visibleIncidents = heatPumps.flatMap(getVisibleHpIncidents);
+    const recoveredIncidents = visibleIncidents.filter((incident) => (
+      incident.latched && !incident.acknowledged && !incident.active && !incident.recovering
+    ));
+    const acknowledgeableIncidents = recoveredIncidents.filter((incident) => (
+      incident.recoveryCondition !== "confirmed_odu_power_cycle"
+    ));
+    return `
+      <article class="oq-settings-monitoring-card">
+        <header>
+          <p>Warmtepompen</p>
+          ${renderInstallationMonitoringBadge(
+            visibleIncidents.some((incident) => incident.category !== "status"),
+            "Incident",
+            "OK",
+            "warning",
+          )}
+        </header>
+        <span>Bevestigde status per warmtepomp. Een korte communicatiehapering wordt eerst gecontroleerd voordat OpenQuatt ingrijpt.</span>
+        <div class="oq-settings-monitoring-rows">
+          ${heatPumps.map(renderInstallationMonitoringHeatPumpUnit).join("")}
+        </div>
+        ${acknowledgeableIncidents.length > 0 && hasEntity("acknowledgeHpIncidents") ? `
+          <div class="oq-settings-monitoring-incident-action">
+            ${renderNamedActionButton(
+              "acknowledgeHpIncidents",
+              "Herstelde meldingen bevestigen",
+              "oq-helper-button oq-helper-button--ghost",
+            )}
+            <span>Alleen herstelde, vastgehouden meldingen verdwijnen; actieve incidenten blijven staan.</span>
+          </div>
+        ` : ""}
+      </article>
+    `;
+  }
+
+  function getInstallationMonitoringSystemReaction(system) {
+    const controlMode = Number(system?.controlMode) || 0;
+    const commandActive = Boolean(system?.boilerCommandActive);
+    const action = String(system?.action || "none");
+    const actionPresentation = getSystemActionPresentation(action);
+    if (controlMode === 3) {
+      return commandActive
+        ? {
+          title: "CM3 · CV ondersteunt",
+          copy: "De warmtepomp blijft de primaire warmtebron; de CV-ketel vult tijdelijk aan.",
+          tone: "clear",
+        }
+        : {
+          title: "CM3 · ondersteuningsrol niet actief",
+          copy: "CM3 is de regelrol, maar de ketel wordt op dit moment niet aangestuurd.",
+          tone: "warning",
+        };
+    }
+    if (controlMode === 4) {
+      return commandActive
+        ? {
+          title: "CM4 · ketelfallback aangestuurd",
+          copy: "De warmtepompen zijn niet inzetbaar; de CV-ketel krijgt de verwarmingsopdracht.",
+          tone: "fault",
+        }
+        : {
+          title: "CM4 · fallback niet actief",
+          copy: system.fallbackBlockReason
+            ? `De fallbackrol is gekozen, maar de ketel wordt niet aangestuurd. Blokkade: ${getFallbackBlockReasonLabel(system.fallbackBlockReason)}.`
+            : "De fallbackrol is gekozen, maar de ketel wordt niet aangestuurd; er is geen blokkadereden aangeleverd.",
+          tone: "fault",
+        };
+    }
+    if (action === "fallback_blocked") {
+      return {
+        title: actionPresentation.label,
+        copy: `${actionPresentation.copy} Blokkade: ${getFallbackBlockReasonLabel(system.fallbackBlockReason)}.`,
+        tone: "fault",
+      };
+    }
+    return {
+      title: controlMode >= 0 ? `CM${controlMode} · normale regeling` : "Normale regeling",
+      copy: "Er is geen bijzondere ketelreactie voor een warmtepompincident actief.",
+      tone: "clear",
+    };
+  }
+
+  function renderInstallationMonitoringSystemPanel(monitoring) {
+    const system = monitoring.incidentMonitoring?.snapshot?.system;
+    if (!system) {
+      return "";
+    }
+    const reaction = getInstallationMonitoringSystemReaction(system);
+    const continuityCopy = system.boilerCommandActive
+      && system.boilerTransition === "assist_to_fallback_continuous"
+      && system.boilerOutputContinuous === true
+      ? "Overgang CM3 → CM4: de ketelopdracht bleef volgens de controller actief en kreeg geen uit/aan-puls."
+      : "";
+    return `
+      <article class="oq-settings-monitoring-card oq-settings-monitoring-system">
+        <header>
+          <p>Systeemreactie</p>
+          ${renderInstallationMonitoringBadge(
+            reaction.tone !== "clear",
+            reaction.tone === "fault" ? "Fallback" : "Inactief",
+            "Normaal",
+            reaction.tone === "fault" ? "fault" : "warning",
+          )}
+        </header>
+        <strong class="oq-settings-monitoring-card-value">${escapeHtml(reaction.title)}</strong>
+        <span>${escapeHtml(reaction.copy)}</span>
+        ${continuityCopy ? renderInstallationMonitoringStatusRow({
+          label: "Overgang CM3 → CM4",
+          value: "Geen uit/aan-puls",
+          note: continuityCopy,
+        }) : ""}
+      </article>
     `;
   }
 
@@ -349,25 +610,16 @@ import { escapeHtml } from "../core/html.js";
     if (!hasEntity(`${prefix}CompressorStarts2h`)) {
       return "";
     }
-    return `
-      <div class="oq-settings-monitoring-compressor-unit">
-        <div>
-          <p>${escapeHtml(title)}</p>
-          <span>Laatste start: ${escapeHtml(formatInstallationMonitoringLastStart(`${prefix}CompressorLastStartAge`))}</span>
-        </div>
-        <dl>
-          <div><dt>2 uur</dt><dd>${escapeHtml(getInstallationMonitoringCount(`${prefix}CompressorStarts2h`))}</dd></div>
-          <div><dt>6 uur</dt><dd>${escapeHtml(getInstallationMonitoringCount(`${prefix}CompressorStarts6h`))}</dd></div>
-          <div><dt>24 uur</dt><dd>${escapeHtml(getInstallationMonitoringCount(`${prefix}CompressorStarts24h`))}</dd></div>
-          <div><dt>72 uur</dt><dd>${escapeHtml(getInstallationMonitoringCount(`${prefix}CompressorStarts72h`))}</dd></div>
-        </dl>
-      </div>
-    `;
+    return `<tr><th scope="row">${escapeHtml(title)}</th>
+      <td>${escapeHtml(formatInstallationMonitoringLastStart(`${prefix}CompressorLastStartAge`))}</td><td class="is-alarm">${escapeHtml(getInstallationMonitoringCount(`${prefix}CompressorStarts2h`))}</td>
+      <td>${escapeHtml(getInstallationMonitoringCount(`${prefix}CompressorStarts6h`))}</td><td>${escapeHtml(getInstallationMonitoringCount(`${prefix}CompressorStarts24h`))}</td>
+      <td class="is-alarm">${escapeHtml(getInstallationMonitoringCount(`${prefix}CompressorStarts72h`))}</td></tr>`;
   }
 
   export function renderSettingsInstallationMonitoringSection() {
     const monitoring = getInstallationMonitoringModel();
     syncInstallationMonitoringDetailsState(monitoring);
+    const structuredIncidentMonitoringAvailable = Boolean(monitoring.incidentMonitoring?.available);
     const cicPollingEnabled = isInstallationMonitoringIntegrationEnabled("cicPollingEnabled");
     const otEnabled = isInstallationMonitoringIntegrationEnabled("otEnabled");
     const hydraulicRows = [
@@ -398,7 +650,7 @@ import { escapeHtml } from "../core/html.js";
         active: otEnabled && isInstallationMonitoringBinaryActive("otLinkProblem"),
       }) : "",
     ].filter(Boolean).join("");
-    const hpRows = [
+    const hpRows = structuredIncidentMonitoringAvailable ? "" : [
       hasEntity("hp1Failures") ? renderInstallationMonitoringStatusRow({
         label: "Warmtepomp 1",
         value: getInstallationMonitoringFailureText("hp1Failures"),
@@ -428,6 +680,12 @@ import { escapeHtml } from "../core/html.js";
         <div class="oq-settings-monitoring-rows">${hpRows}</div>
       </article>
     ` : "";
+    const structuredHpPanel = structuredIncidentMonitoringAvailable
+      ? renderInstallationMonitoringStructuredHpPanel(monitoring)
+      : "";
+    const systemPanel = structuredIncidentMonitoringAvailable
+      ? renderInstallationMonitoringSystemPanel(monitoring)
+      : "";
     const connectionPanel = connectionRows ? `
       <article class="oq-settings-monitoring-card">
         <header><p>Verbindingen</p></header>
@@ -438,19 +696,24 @@ import { escapeHtml } from "../core/html.js";
     return renderSettingsSection(
       "Bewaking",
       "Installatiebewaking",
-      "Lokale diagnose voor compressorstarts, hydrauliek en verbindingen. Hiervoor is geen Home Assistant nodig.",
+      "Lokale diagnose van warmtepompincidenten, systeemreactie, compressorstarts, hydrauliek en verbindingen. Hiervoor is geen Home Assistant nodig.",
       `
-        <div class="oq-settings-monitoring-summary${monitoring.active ? " is-warning" : " is-clear"}">
+        <div class="oq-settings-monitoring-summary${monitoring.severity === "fault" ? " is-fault" : monitoring.active ? " is-warning" : " is-clear"}">
           <div>
             <p>Huidige status</p>
             <strong>${escapeHtml(monitoring.title)}</strong>
             <span>${escapeHtml(monitoring.copy)}</span>
           </div>
-          ${renderInstallationMonitoringBadge(monitoring.active, "Aandacht nodig", "Alles rustig")}
+          ${renderInstallationMonitoringBadge(
+            monitoring.active,
+            monitoring.severity === "fault" ? "Storing" : "Aandacht nodig",
+            "Alles rustig",
+            monitoring.severity === "fault" ? "fault" : "warning",
+          )}
         </div>
         <details class="oq-settings-monitoring-details"${state.installationMonitoringDetailsOpen ? " open" : ""}>
           <summary data-oq-action="toggle-installation-monitoring-details">
-            <strong>Geef details weer</strong>
+            <strong>Details en systeemreactie</strong>
           </summary>
         ${monitoring.active ? `
           <div class="oq-settings-monitoring-active-list">
@@ -459,6 +722,8 @@ import { escapeHtml } from "../core/html.js";
         ` : ""}
         <div class="oq-settings-monitoring-grid">
           <div class="oq-settings-monitoring-column">
+          ${systemPanel}
+          ${structuredHpPanel}
           <article class="oq-settings-monitoring-card">
             <header>
               <p>Compressorstarts</p>
@@ -466,26 +731,31 @@ import { escapeHtml } from "../core/html.js";
                 compressorWarningActive,
               )}
             </header>
-            <span>Gemeten starts sinds de laatste controllerherstart. 6 uur en 24 uur geven extra context; de waarschuwingen zelf gelden op 2 uur en 72 uur.</span>
+            <span>Starts sinds de laatste controllerherstart.</span>
             ${renderInstallationMonitoringCyclingIncident(monitoring)}
-            <div class="oq-settings-monitoring-compressor-list">
-              ${renderInstallationMonitoringCompressorUnit("Warmtepomp 1", "hp1")}
-              ${renderInstallationMonitoringCompressorUnit("Warmtepomp 2", "hp2")}
+            <div class="oq-starts-panel">
+              <table class="oq-starts"><thead><tr><th scope="col">Warmtepomp</th><th scope="col">Laatste</th><th scope="col" class="is-alarm">2 uur</th><th scope="col">6 uur</th><th scope="col">24 uur</th><th scope="col" class="is-alarm">72 uur</th></tr></thead>
+                <tbody>
+                  ${renderInstallationMonitoringCompressorUnit("Warmtepomp 1", "hp1")}
+                  ${renderInstallationMonitoringCompressorUnit("Warmtepomp 2", "hp2")}
+                </tbody>
+              </table>
+              ${state.compressorLimitsOpen ? `
+                <div class="oq-start-editor">
+                  <strong>Alarmgrenzen</strong>
+                  <div class="oq-start-fields" id="oq-start-fields">
+                    ${renderSettingsMiniNumberField("compressorStarts2hWarningLimit", "2 uur", "", { compact: true })}
+                    ${renderSettingsMiniNumberField("compressorStarts72hWarningLimit", "72 uur", "", { compact: true })}
+                  </div>
+                  <button type="button" class="oq-helper-button oq-helper-button--ghost oq-start-done" data-oq-action="toggle-compressor-limits" aria-expanded="true" aria-controls="oq-start-fields">Gereed</button>
+                </div>
+              ` : `
+                <button type="button" class="oq-start-summary" data-oq-action="toggle-compressor-limits" aria-expanded="false">
+                  <span><strong>Alarmgrenzen</strong><span>${Number.isNaN(compressorLimit2h) ? "—" : Math.round(compressorLimit2h)} / 2 uur · ${Number.isNaN(compressorLimit72h) ? "—" : Math.round(compressorLimit72h)} / 72 uur</span></span>
+                  <strong>Aanpassen ›</strong>
+                </button>
+              `}
             </div>
-            ${renderSettingsSliderField(
-              "compressorStarts2hWarningLimit",
-              "Alarmwaarde voor aantal starts per 2 uur",
-              "Aantal starts per warmtepomp binnen 2 uur.",
-              "oq-settings-field--compact",
-              { minLabel: "1", maxLabel: "20", valueLabel: Number.isNaN(compressorLimit2h) ? "—" : `${Math.round(compressorLimit2h)} starts / 2 uur` },
-            )}
-            ${renderSettingsSliderField(
-              "compressorStarts72hWarningLimit",
-              "Alarmwaarde voor aantal starts per 72 uur",
-              "Aantal starts per warmtepomp binnen 72 uur.",
-              "oq-settings-field--compact",
-              { minLabel: "1", maxLabel: "120", valueLabel: Number.isNaN(compressorLimit72h) ? "—" : `${Math.round(compressorLimit72h)} starts / 72 uur` },
-            )}
           </article>
           ${hpPanel}
           </div>
@@ -590,7 +860,10 @@ import { escapeHtml } from "../core/html.js";
     );
   }
 
-  export function renderBoilerCvFields(className = "oq-settings-grid oq-settings-boiler-simple-grid") {
+  export function renderBoilerCvFields(
+    className = "oq-settings-grid oq-settings-boiler-simple-grid",
+    includeFaultFallback = false,
+  ) {
     if (!hasEntity("boilerCvAssistEnabled")) {
       return "";
     }
@@ -600,6 +873,9 @@ import { escapeHtml } from "../core/html.js";
     const boilerMeta = getNumberMeta("boilerRatedHeatPower");
     const boilerValue = getInputDraftValue("boilerRatedHeatPower");
     const boilerBusy = state.loadingEntities || state.busyAction === "switch-boilerCvAssistEnabled";
+    const fallbackSettingAvailable = hasEntity("boilerFaultFallbackEnabled");
+    const fallbackEnabled = fallbackSettingAvailable && isEntityActive("boilerFaultFallbackEnabled");
+    const fallbackBusy = state.loadingEntities || state.busyAction === "switch-boilerFaultFallbackEnabled";
     const boilerConnectionAvailable = hasEntity("boilerConnection");
     const boilerConnection = boilerConnectionAvailable
       ? String(getEntityValue("boilerConnection") || "R1")
@@ -736,6 +1012,23 @@ import { escapeHtml } from "../core/html.js";
             boilerPresent && boilerPowerEntityAvailable ? "oq-settings-field--compact" : "oq-settings-field--compact is-disabled",
             boilerPowerFooter,
           ) : ""}
+          ${boilerPresent && includeFaultFallback && fallbackSettingAvailable ? renderSettingsFieldCard(
+            "boilerFaultFallbackEnabled",
+            BOILER_FAULT_FALLBACK_TITLE,
+            BOILER_FAULT_FALLBACK_COPY,
+            `
+              <div class="oq-settings-compact-switch-field">
+                ${renderSettingsCompactSwitchControl(
+                  "boilerFaultFallbackEnabled",
+                  BOILER_FAULT_FALLBACK_TITLE,
+                  fallbackEnabled,
+                  fallbackBusy,
+                )}
+              </div>
+            `,
+            "oq-settings-field--compact",
+          ) : ""}
+
           ${supportSwitchingMarkup}
         </div>
       `;
@@ -753,7 +1046,7 @@ import { escapeHtml } from "../core/html.js";
       boilerPresent
         ? "Kies hoe de ketel is aangesloten en hoeveel effectief vermogen OpenQuatt als ondersteuning mag gebruiken."
         : "Geef aan of OpenQuatt een CV-ketel of boiler als ondersteuning mag gebruiken.",
-      renderBoilerCvFields(),
+      renderBoilerCvFields("oq-settings-grid oq-settings-boiler-simple-grid", true),
     );
   }
 

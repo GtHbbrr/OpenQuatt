@@ -10,7 +10,7 @@ firmwarelog te tonen, maar om gebruikers en support te laten begrijpen:
 - of actie nodig is.
 
 De controller blijft eigenaar van de control mode. De UI gebruikt `CM0`, `CM1`, `CM2`,
-`CM3`, `CM5`, `CM98` en `CM100` alleen als context of kleine supportbadge.
+`CM3`, `CM4`, `CM5`, `CM98` en `CM100` alleen als context of kleine supportbadge.
 
 ## Kernprincipe
 
@@ -81,6 +81,11 @@ Belangrijk:
 | `candidate_blocked` | `HP1` / `HP2` | Startaanvraag tijdelijk geblokkeerd | thermal actuator |
 | `flow_hold_start` | `SYSTEM` | Voorloop, naloop of flow-hold gestart | supervisory |
 | `flow_hold_clear` | `SYSTEM` | Voorloop, naloop of flow-hold klaar | supervisory |
+| `incident_start` / `incident_clear` / `incident_acknowledged` | `HP1` / `HP2` | Levenscyclus van een HP-incident | incident manager |
+| `hp_availability_change` | `HP1` / `HP2` | Beschikbaar, verdacht, offline, gestoord of herstellend | incident manager |
+| `hp_start_confirmed` / `hp_stop_confirmed` | `HP1` / `HP2` | Fysieke terugmelding na een commando | incident manager |
+| `control_mode_change` | `SYSTEM` | Betekenisvolle modeovergang, waaronder CM4 | supervisory |
+| `boiler_fallback_start` / `boiler_fallback_stop` | `CV` | Ketel-only foutfallback gestart of gestopt | supervisory / boiler control |
 
 ### V2: aanbevolen uitbreidingen
 
@@ -126,6 +131,16 @@ er niets?" vragen beantwoorden.
 | `candidate_in_rest` | Kandidaat wacht op minimum rusttijd | `limited` |
 | `candidate_in_defrost` | Kandidaat is bezig met defrost | `limited` |
 | `candidate_unavailable` | Kandidaat technisch niet beschikbaar | `limited` |
+| `hp_fault` | Bevestigde HP-storing | `fault` |
+| `hp_protection` | HP-beveiliging begrenst of blokkeert | `limited` / `attention` |
+| `hp_preheat` | HP wacht op voorverwarming | `limited` |
+| `hp_link_loss` | HP-verbinding is na debounce verloren | `fault` |
+| `hp_start_failed` | Start is niet op tijd bevestigd | `fault` |
+| `hp_stop_unconfirmed` | Stop is nog niet veilig bevestigd | `fault` |
+| `hp_recovery_wait` | Telemetrie of foutstatus moet stabiel herstellen | `limited` |
+| `hp_recovered` | Warmtepomp is weer stabiel inzetbaar | `normal` |
+| `boiler_fallback` | CV-ketel verwarmt tijdelijk zonder HP | `attention` |
+| `fallback_blocked` | CM4 is gevraagd maar een veiligheidsvoorwaarde blokkeert | `fault` |
 
 ### Aanbevolen extra codes
 
@@ -144,11 +159,13 @@ Aanbevolen prioriteit:
 
 1. Veiligheid en bescherming  
    `dew_stop`, `frost_protection`, `flow_too_low`, `defrost_hold`,
-   `oil_return_hold`, `sensor_fallback`
+   `oil_return_hold`, `sensor_fallback`, `hp_fault`, `hp_stop_unconfirmed`,
+   `fallback_blocked`
 
 2. Beschikbaarheid van kandidaat  
    `candidate_in_rest`, `candidate_in_defrost`, `candidate_unavailable`,
-   `single_topology`, `no_candidate`
+   `single_topology`, `no_candidate`, `hp_link_loss`, `hp_start_failed`,
+   `hp_recovery_wait`
 
 3. Vraag en capaciteit  
    `better_heat`, `less_power`, `boiler_assist`, `cooling_limiter`,
@@ -179,7 +196,9 @@ is de primaire reden `candidate_in_rest` of voorlopig `min_rest_active`, niet
 | Waarom koelt hij niet ondanks koelvraag? | `cooling_limited` | `dew_stop` | "Koelen komt te dicht bij het dauwpunt. Het systeem voorkomt condens." |
 | Waarom koelt hij zachter? | `cooling_limited` | `cooling_limiter` | "Er is koelvraag, maar de veilige marge laat nu alleen een lager koelniveau toe." |
 | Waarom komt CV erbij? | `boiler_assist_start` | `boiler_assist` | "De warmtepompen leveren de basis; CV vult tijdelijk aan zolang extra vermogen nodig is." |
+| Waarom verwarmt alleen de CV-ketel? | `boiler_fallback_start` | `boiler_fallback` | "Geen warmtepomp is veilig beschikbaar. Na bevestigde stop en geldige beveiligingen neemt de CV-ketel tijdelijk over." |
 | Waarom komt CV niet erbij? | `decision_blocked` | `boiler_assist` / `soft_guard` | "CV-assist was mogelijk, maar niet vrijgegeven of geblokkeerd door een voorwaarde." |
+| Waarom start CM4 nog niet? | `decision_blocked` | `fallback_blocked` / `hp_stop_unconfirmed` | "Foutfallback wacht totdat de warmtepomp veilig gestopt is en alle installatiebeveiligingen geldig zijn." |
 | Waarom draait er iets zonder comfortvraag? | `sticky_pump_run` | `sticky_protection` | "De pomp draait kort om vastzitten na lange stilstand te voorkomen." |
 | Waarom draait er iets bij vorst? | `frost_protection_start` | `frost_protection` | "Het systeem laat water circuleren om bevriezing te voorkomen." |
 | Is dit normaal? | severity + event type | n.v.t. | `normal` is verwacht gedrag, `limited` is beschermend, `attention` vraagt supportblik. |
@@ -258,6 +277,11 @@ Deze matrix is de acceptatietest voor het concept.
 | Koeling, limiter zonder stop | `cooling_limited` met `cooling_limiter` | "Koeling begrensd", niveau/marge in details |
 | CV assist start/stop | `boiler_assist_start`, `boiler_assist_stop` | CV als tijdelijke ondersteuning, niet als storing |
 | CV assist geblokkeerd | `decision_blocked` | "CV-ketel niet vrijgegeven" of guardrail-uitleg |
+| Kort communicatiegat | geen fault/fallback-event; eventueel availability `suspect` | Draaiende HP blijft eigenaar; geen stop, Duo-wissel of CM4 |
+| Bevestigde HP-storing, Single | `incident_start`, `hp_availability_change`, `hp_stop_confirmed`, `boiler_fallback_start` | Incident, veilige stop en daarna ketel-only fallback zijn afzonderlijk verklaarbaar |
+| Eén HP gestoord, Duo | incident voor getroffen HP; gezonde HP blijft kandidaat | Geen CM4 zolang een gezonde HP veilig kan verwarmen |
+| CM3 naar CM4 | `control_mode_change`, `boiler_fallback_start` | Rol wijzigt van ondersteuning naar fallback; geen fysieke keteluitgangspuls |
+| HP hersteld | `incident_clear`, availability recovering/available, `boiler_fallback_stop` | Herstelvenster is zichtbaar; CM4 eindigt pas na stabiel herstel |
 | CM1 flow/pre/postflow | v2 `flow_hold_*` of `decision_hold` | Alleen zichtbaar als het een start/stop verklaart |
 
 ## Implementatiefasering
