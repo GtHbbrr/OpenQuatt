@@ -60,7 +60,7 @@ Package include order is intentional:
 18. `oq_sensor_sources`
 19. `oq_webserver`
 20. `oq_HP_io` (HP1 always; HP2 only on Duo)
-21. `openquatt_incident_manager` (Hybrid HP incident lifecycle and availability)
+21. `openquatt_incident_manager` (heat-pump incident lifecycle and availability)
 
 This order mirrors data dependencies and ownership boundaries.
 Hardware profiles add the matching room/setpoint/heating-enable source selectors. The Heatpump Controller Q profile also includes `oq_ot_slave`; it uses the ESP-IDF RMT-based OpenTherm runtime and is only supported on the Q profile.
@@ -79,7 +79,7 @@ OpenQuatt follows strict subsystem ownership:
 - **Safe HP mode/level writes**: `oq_thermal_actuator`
 - **Pump iPWM regulation**: `oq_flow_control`
 - **Boiler relay control**: `oq_boiler_control`
-- **Hybrid HP incident lifecycle and availability**: `openquatt_incident_manager`
+- **Heat-pump incident lifecycle and availability**: `openquatt_incident_manager`
 - **External feed ingest**: `oq_cic`
 - **External HA proxy ingest**: `oq_ha_inputs`
 - **Local DS18B20 ingest**: `oq_local_sensors`
@@ -164,9 +164,9 @@ Strategy packages compute:
 - low-flow fault timing and state
 - power cap factor (`oq_power_cap_f`)
 - silent window state
-- CM4 boiler-only fallback after confirmed Hybrid HP unavailability and safe stop
+- CM4 boiler-only fallback after confirmed heat-pump unavailability and safe stop
 
-The incident manager consumes raw Hybrid HP telemetry separately for HP1 and
+The incident manager consumes raw heat-pump telemetry separately for HP1 and
 HP2. It classifies register bits as status, protection, warning or fault, and
 derives effects such as display-only, capacity limit, start block, stop request
 and CM4 eligibility. Each incident retains active/latched state, first and last
@@ -300,7 +300,7 @@ Safety is distributed but coordinated:
 - stale feed invalidation in CIC ingest
 - conservative fallback on invalid numeric inputs
 
-CM3 is normal Hybrid boiler assistance; CM4 is boiler-only fault fallback.
+CM3 is normal boiler assistance; CM4 is boiler-only fault fallback.
 Changing between those roles must not toggle the physical relay or the
 OpenTherm CH-enable output while the output safety guards remain unchanged.
 

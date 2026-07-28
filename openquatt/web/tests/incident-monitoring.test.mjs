@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   combineInstallationMonitoringModel,
+  createIncidentActionRequestId,
   formatIncidentOccurrenceTime,
   getFallbackBlockReasonLabel,
   getHeatPumpStatusPresentation,
@@ -384,6 +385,21 @@ test("incident polling keeps last-good data through transient failures and clean
   assert.equal(unsupported.incidentMonitoringError, "");
 });
 
+test("incident polling ignores the transport timestamp when the state is unchanged", () => {
+  const first = getIncidentMonitoringSuccessUpdate({}, snapshot({
+    generated_at_s: 100,
+    heat_pumps: [{ index: 1, link_state: "healthy", available_for_start: true }],
+  }), 1000);
+  const second = getIncidentMonitoringSuccessUpdate(first, snapshot({
+    generated_at_s: 102,
+    heat_pumps: [{ index: 1, link_state: "healthy", available_for_start: true }],
+  }), 3000);
+
+  assert.equal(first.changed, true);
+  assert.equal(second.changed, false);
+  assert.equal(second.incidentMonitoringSnapshot.generatedAtS, 102);
+});
+
 test("incident snapshot normalizes action token and deferred result", () => {
   const normalized = normalizeIncidentMonitoringSnapshot(snapshot({
     action_csrf_token: "token-1",
@@ -415,7 +431,10 @@ test("incident action retries one 403 with a refreshed token and validates the 2
   const calls = [];
   const fetcher = async (_endpoint, init) => {
     const body = new URLSearchParams(init.body);
-    calls.push(body.get("csrf_token"));
+    calls.push({
+      csrf: body.get("csrf_token"),
+      requestId: body.get("request_id"),
+    });
     if (calls.length === 1) {
       return { status: 403, json: async () => ({ accepted: false, result: "forbidden" }) };
     }
@@ -434,12 +453,54 @@ test("incident action retries one 403 with a refreshed token and validates the 2
     fetcher,
     "/openquatt/incidents/confirm-odu-power-cycle",
     2,
+    91,
     "stale-token",
     async () => "fresh-token",
   );
-  assert.deepEqual(calls, ["stale-token", "fresh-token"]);
+  assert.deepEqual(calls, [
+    { csrf: "stale-token", requestId: "91" },
+    { csrf: "fresh-token", requestId: "91" },
+  ]);
   assert.equal(accepted.actionId, 91);
   assert.equal(accepted.action, "confirm_odu_power_cycle");
+});
+
+test("incident action retries a lost response with the same idempotency id", async () => {
+  const requestIds = [];
+  let callCount = 0;
+  const accepted = await postIncidentActionRequest(
+    async (_endpoint, init) => {
+      requestIds.push(new URLSearchParams(init.body).get("request_id"));
+      callCount += 1;
+      if (callCount === 1) throw new Error("connection reset");
+      return {
+        status: 202,
+        json: async () => ({
+          accepted: true,
+          duplicate: true,
+          hp: 1,
+          action: "start_failure_retry",
+          action_id: 77,
+        }),
+      };
+    },
+    "/openquatt/incidents/retry-start",
+    1,
+    77,
+    "csrf",
+  );
+  assert.deepEqual(requestIds, ["77", "77"]);
+  assert.equal(accepted.actionId, 77);
+});
+
+test("incident action request ids never use zero", () => {
+  const requestId = createIncidentActionRequestId({
+    getRandomValues(values) {
+      values[0] = 0;
+      return values;
+    },
+  });
+  assert.ok(requestId > 0);
 });
 
 test("incident action result resolves only the exact request id", () => {
@@ -490,6 +551,44 @@ test("incident action result resolves only the exact request id", () => {
   assert.equal(matching.incidentAction.ok, false);
   assert.equal(matching.incidentAction.result, "stop_not_confirmed");
   assert.match(getIncidentActionPresentation(matching.incidentAction, 1).copy, /veilig als gestopt/);
+});
+
+test("incident action result can resolve from bounded result history", () => {
+  const action = {
+    hp: 1,
+    kind: "start_failure_retry",
+    requestId: 17,
+    pending: true,
+    ok: null,
+    result: "",
+  };
+  const update = getIncidentMonitoringSuccessUpdate(
+    { incidentAction: action },
+    snapshot({
+      heat_pumps: [{
+        index: 1,
+        last_action_result: {
+          sequence: 11,
+          request_id: 18,
+          action: "confirm_odu_power_cycle",
+          ok: true,
+          result: "odu_power_cycle_confirmed",
+          at_ms: 400,
+        },
+        action_results: [{
+          sequence: 10,
+          request_id: 17,
+          action: "start_failure_retry",
+          ok: true,
+          result: "start_failure_cleared",
+          at_ms: 300,
+        }],
+      }],
+    }),
+  );
+  assert.equal(update.incidentAction.pending, false);
+  assert.equal(update.incidentAction.requestId, 17);
+  assert.equal(update.incidentAction.ok, true);
 });
 
 test("incident action presentation distinguishes pending, success and refusal", () => {

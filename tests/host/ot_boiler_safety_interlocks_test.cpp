@@ -279,7 +279,8 @@ void test_fallback_and_flow_guards() {
   auto input = safe_input(1500);
   input.assist_enabled = false;
   auto decision = oq_boiler::evaluate(command, input);
-  assert_decision(decision, true, false, oq_boiler::BLOCK_NONE);
+  assert_decision(
+      decision, false, true, oq_boiler::BLOCK_ASSIST_DISABLED);
 
   input = safe_input(1500);
   input.fallback_enabled = false;

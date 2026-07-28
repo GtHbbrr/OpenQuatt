@@ -7,12 +7,13 @@ import { fileURLToPath } from "node:url";
 
 const testDir = path.dirname(fileURLToPath(import.meta.url));
 const source = await readFile(path.join(testDir, "../js/mock-incident-scenarios.js"), "utf8");
+const mockDeviceSource = await readFile(path.join(testDir, "../js/mock-device.js"), "utf8");
 const context = { window: {} };
 vm.runInNewContext(source, context, { filename: "mock-incident-scenarios.js" });
 const catalog = context.window.__OQ_MOCK_INCIDENT_SCENARIOS__;
 const protectionStates = new Set(["clear", "limited", "start_blocked", "fault_active", "fault_recovery"]);
 
-test("Hybrid mock catalog has stable, compatible scenario and phase contracts", () => {
+test("heat-pump mock catalog has stable, compatible scenario and phase contracts", () => {
   assert.ok(catalog);
   assert.ok(catalog.scenarios.length >= 10);
   assert.equal(new Set(catalog.scenarios.map((scenario) => scenario.id)).size, catalog.scenarios.length);
@@ -35,6 +36,15 @@ test("Hybrid mock catalog has stable, compatible scenario and phase contracts", 
       });
     });
   });
+});
+
+test("incident phases do not overwrite persistent boiler settings", () => {
+  const applyStart = mockDeviceSource.indexOf("function applyIncidentScenario()");
+  const applyEnd = mockDeviceSource.indexOf("\n  function ", applyStart + 1);
+  const applySource = mockDeviceSource.slice(applyStart, applyEnd);
+  assert.ok(applyStart >= 0);
+  assert.doesNotMatch(applySource, /setSwitch\("Boiler assist enabled"/);
+  assert.doesNotMatch(applySource, /setSwitch\(\s*"Boiler fallback on heat-pump fault"/);
 });
 
 test("brief link dip never creates an incident, stop or CM4 transition", () => {

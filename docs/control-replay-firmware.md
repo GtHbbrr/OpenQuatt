@@ -87,6 +87,12 @@ Belangrijk:
 | `control_mode_change` | `SYSTEM` | Betekenisvolle modeovergang, waaronder CM4 | supervisory |
 | `boiler_fallback_start` / `boiler_fallback_stop` | `CV` | Ketel-only foutfallback gestart of gestopt | supervisory / boiler control |
 
+Voor `boiler_fallback_start` en `boiler_fallback_stop` bevat `cm` de
+actuele control mode, `value_a` de aanvoertemperatuur × 10 en `value_b`
+of de keteluitvoer tijdens de rolwisseling fysiek continu bleef. Alleen
+`control_mode_change` gebruikt `value_a` en `value_b` als vorige en
+volgende control mode.
+
 ### V2: aanbevolen uitbreidingen
 
 | Event type | Waarom toevoegen | Standaard zichtbaar? |

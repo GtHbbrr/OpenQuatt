@@ -1,13 +1,13 @@
 #include <assert.h>
 
 #include "../../openquatt/includes/control/oq_control_mode_log_logic.h"
-#include "../../openquatt/includes/control/oq_hybrid_supervisory_logic.h"
+#include "../../openquatt/includes/control/oq_hp_supervisory_logic.h"
 
 namespace {
 
-oq_hybrid_supervisory::FallbackEvaluationInputs
+oq_hp_supervisory::FallbackEvaluationInputs
 eligible_fallback_evaluation_inputs() {
-  oq_hybrid_supervisory::FallbackEvaluationInputs inputs;
+  oq_hp_supervisory::FallbackEvaluationInputs inputs;
   inputs.current_mode = 3;
   inputs.heating_demand = true;
   inputs.fallback_enabled = true;
@@ -23,8 +23,8 @@ eligible_fallback_evaluation_inputs() {
 }
 
 void test_fallback_evaluation_and_recovering_handover() {
-  using oq_hybrid_fallback::FallbackBlockReason;
-  using oq_hybrid_supervisory::evaluate_fallback;
+  using oq_hp_fallback::FallbackBlockReason;
+  using oq_hp_supervisory::evaluate_fallback;
 
   auto inputs = eligible_fallback_evaluation_inputs();
   auto evaluation = evaluate_fallback(inputs);
@@ -48,7 +48,7 @@ void test_fallback_evaluation_and_recovering_handover() {
          FallbackBlockReason::HP_AVAILABILITY_UNKNOWN);
   assert(evaluation.cm3_handover_wait);
 
-  oq_hybrid_supervisory::Cm4ResumeTracker recovering_resume;
+  oq_hp_supervisory::Cm4ResumeTracker recovering_resume;
   recovering_resume.observe_fallback_request(
       evaluation.fallback_requested, 3);
   assert(recovering_resume.resume_mode() == 3);
@@ -60,7 +60,7 @@ void test_fallback_evaluation_and_recovering_handover() {
   // Every real independent guard still prevents the CM3 hold.
   const auto recovering_inputs = inputs;
   auto assert_no_handover_hold =
-      [&](const oq_hybrid_supervisory::FallbackEvaluationInputs &candidate) {
+      [&](const oq_hp_supervisory::FallbackEvaluationInputs &candidate) {
         const auto blocked = evaluate_fallback(candidate);
         assert(blocked.fallback_requested);
         assert(!blocked.cm3_handover_wait);
@@ -105,8 +105,8 @@ void test_fallback_evaluation_and_recovering_handover() {
 }
 
 void test_heating_mode_decisions() {
-  using oq_hybrid_supervisory::HeatingModeInputs;
-  using oq_hybrid_supervisory::decide_heating_mode;
+  using oq_hp_supervisory::HeatingModeInputs;
+  using oq_hp_supervisory::decide_heating_mode;
 
   HeatingModeInputs inputs;
   inputs.current_mode = 3;
@@ -148,8 +148,8 @@ void test_heating_mode_decisions() {
 }
 
 void test_control_mode_log_classification() {
-  using oq_hybrid_supervisory::ControlModeLogCodes;
-  using oq_hybrid_supervisory::classify_control_mode_transition;
+  using oq_hp_supervisory::ControlModeLogCodes;
+  using oq_hp_supervisory::classify_control_mode_transition;
 
   const ControlModeLogCodes codes{
       {10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21},
@@ -219,9 +219,9 @@ void test_control_mode_log_classification() {
 }  // namespace
 
 int main() {
-  using oq_hybrid_supervisory::fallback_availability_is_confirmed;
-  using oq_hybrid_supervisory::Cm4ResumeTracker;
-  using oq_hybrid_supervisory::recovered_heating_mode;
+  using oq_hp_supervisory::fallback_availability_is_confirmed;
+  using oq_hp_supervisory::Cm4ResumeTracker;
+  using oq_hp_supervisory::recovered_heating_mode;
 
   assert(fallback_availability_is_confirmed(true, false, false));
   // LOST -> RECOVERING may enter CM4 only after every unavailable HP has an

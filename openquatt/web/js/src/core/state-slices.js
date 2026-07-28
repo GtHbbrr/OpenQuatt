@@ -139,6 +139,7 @@ export function createSettingsState() {
     incidentMonitoringUnsupported: false,
     incidentMonitoringFailureCount: 0,
     incidentMonitoringSignature: "",
+    incidentMonitoringRenderPending: false,
     incidentMonitoringLastFetchAt: 0,
     incidentMonitoringFetchPromise: null,
     incidentAction: {

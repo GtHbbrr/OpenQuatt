@@ -20,6 +20,7 @@ const { renderSettingsOpenThermCicSection } = await import("../js/src/settings/i
 const {
   ENTITY_DEFS,
   FAST_OVERVIEW_KEYS,
+  INSTALLATION_MONITORING_STATE_KEYS,
   OVERVIEW_KEYS,
 } = await import("../js/src/core/config.js");
 const { INITIAL_SETTINGS_READY_KEY_MAP, SETTINGS_GROUP_KEY_MAP } = await import("../js/src/core/entity-sync.js");
@@ -351,6 +352,11 @@ test("settings hydration loads boiler setup and diagnostics before rendering", (
   assert.ok(SETTINGS_GROUP_KEY_MAP.integrations.includes("otbChPressure"));
   assert.ok(INITIAL_SETTINGS_READY_KEY_MAP.service.includes("boilerFaultFallbackEnabled"));
   assert.ok(SETTINGS_GROUP_KEY_MAP.service.includes("boilerFaultFallbackEnabled"));
+  assert.equal(
+    ENTITY_DEFS.acknowledgeHpIncidents?.name,
+    "Acknowledge recovered HP incidents",
+  );
+  assert.ok(INSTALLATION_MONITORING_STATE_KEYS.includes("acknowledgeHpIncidents"));
 });
 
 test("fault fallback setting explains the consequence of both switch states", () => {

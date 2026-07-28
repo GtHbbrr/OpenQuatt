@@ -2,9 +2,9 @@
 
 #include <stdint.h>
 
-#include "oq_hybrid_fallback_logic.h"
+#include "oq_hp_fallback_logic.h"
 
-namespace oq_hybrid_supervisory {
+namespace oq_hp_supervisory {
 
 inline bool fallback_availability_is_confirmed(
     bool raw_availability_complete,
@@ -84,7 +84,7 @@ struct FallbackEvaluationInputs {
 };
 
 struct FallbackEvaluation {
-  oq_hybrid_fallback::FallbackDecision decision;
+  oq_hp_fallback::FallbackDecision decision;
   bool availability_complete = false;
   bool no_hp_available_confirmed = false;
   bool fallback_requested = false;
@@ -105,9 +105,9 @@ inline FallbackEvaluation evaluate_fallback(
       inputs.available_hp_count == 0 &&
       inputs.every_unavailable_hp_has_fallback_cause;
 
-  oq_hybrid_fallback::FallbackInputs fallback_inputs;
+  oq_hp_fallback::FallbackInputs fallback_inputs;
   fallback_inputs.current_mode =
-      static_cast<oq_hybrid_fallback::ControlMode>(inputs.current_mode);
+      static_cast<oq_hp_fallback::ControlMode>(inputs.current_mode);
   fallback_inputs.heating_demand = inputs.heating_demand;
   fallback_inputs.fallback_enabled = inputs.fallback_enabled;
   fallback_inputs.available_hp_count = inputs.available_hp_count;
@@ -125,7 +125,7 @@ inline FallbackEvaluation evaluate_fallback(
   fallback_inputs.frost_active = inputs.frost_active;
   fallback_inputs.commissioning_active = inputs.commissioning_active;
   fallback_inputs.override_active = inputs.override_active;
-  evaluation.decision = oq_hybrid_fallback::decide_cm4(fallback_inputs);
+  evaluation.decision = oq_hp_fallback::decide_cm4(fallback_inputs);
 
   if (evaluation.fallback_requested && inputs.current_mode == 3) {
     // CM3 already owns the boiler. Keep that output enabled while only the
@@ -135,7 +135,7 @@ inline FallbackEvaluation evaluate_fallback(
     fallback_inputs.hp_availability_complete = true;
     fallback_inputs.hp_output_state_safe = true;
     evaluation.cm3_handover_wait =
-        oq_hybrid_fallback::decide_cm4(fallback_inputs).cm4_allowed &&
+        oq_hp_fallback::decide_cm4(fallback_inputs).cm4_allowed &&
         !evaluation.decision.cm4_allowed;
   }
   return evaluation;
@@ -213,4 +213,4 @@ inline HeatingModeDecision decide_heating_mode(
       1, -1, true, "heating request held by flow interlock"};
 }
 
-}  // namespace oq_hybrid_supervisory
+}  // namespace oq_hp_supervisory

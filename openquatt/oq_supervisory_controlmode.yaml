@@ -242,6 +242,10 @@ switch:
     restore_mode: RESTORE_DEFAULT_ON
     optimistic: true
     entity_category: config
+    on_turn_off:
+      # This switch is the installation-level boiler-present permission in
+      # the web app. Turning it off must also revoke the hidden CM4 opt-in.
+      - switch.turn_off: oq_boiler_fault_fallback_enabled
     web_server:
       sorting_group_id: oq_control
 
@@ -1132,11 +1136,11 @@ interval:
           const char* cur_cm = id(oq_control_mode).state.c_str();
           std::string cm_transition_reason = "control decision updated";
           uint8_t cm1_event_reason = openquatt_decision_log::REASON_UNKNOWN;
-          oq_hybrid_fallback::FallbackDecision fallback_decision;
+          oq_hp_fallback::FallbackDecision fallback_decision;
           bool fallback_requested = false;
           bool no_hp_available_confirmed = false;
           bool cm3_fallback_handover_wait = false;
-          static oq_hybrid_supervisory::Cm4ResumeTracker
+          static oq_hp_supervisory::Cm4ResumeTracker
               cm4_resume_tracker;
           auto resolve_desired_cm = [&]() -> int {
             // Helper: start CM1 window
@@ -1230,10 +1234,11 @@ interval:
                     now_ms,
                     id(oq_boiler_transport_change_ms),
                     (uint32_t) (${oq_boiler_transport_settle_s} * 1000UL));
-            oq_hybrid_supervisory::FallbackEvaluationInputs fallback_inputs;
+            oq_hp_supervisory::FallbackEvaluationInputs fallback_inputs;
             fallback_inputs.current_mode = current_cm_code;
             fallback_inputs.heating_demand = heating_req;
             fallback_inputs.fallback_enabled =
+                id(oq_boiler_assist_enabled).state &&
                 id(oq_boiler_fault_fallback_enabled).state;
             fallback_inputs.available_hp_count = available_hp_count;
             fallback_inputs.raw_availability_complete =
@@ -1256,7 +1261,7 @@ interval:
             fallback_inputs.commissioning_active = commissioning_in_progress;
             fallback_inputs.override_active = override_mode != 0;
             const auto fallback_evaluation =
-                oq_hybrid_supervisory::evaluate_fallback(fallback_inputs);
+                oq_hp_supervisory::evaluate_fallback(fallback_inputs);
             fallback_decision = fallback_evaluation.decision;
             no_hp_available_confirmed =
                 fallback_evaluation.no_hp_available_confirmed;
@@ -1389,7 +1394,7 @@ interval:
                   }
                 } else if (heating_req) {
                   const auto heating_mode =
-                      oq_hybrid_supervisory::decide_heating_mode({
+                      oq_hp_supervisory::decide_heating_mode({
                           current_cm_code,
                           base_target,
                           cm3_fallback_handover_wait,
@@ -1613,7 +1618,7 @@ interval:
               fallback_requested
                   ? static_cast<uint8_t>(fallback_decision.block_reason)
                   : static_cast<uint8_t>(
-                        oq_hybrid_fallback::FallbackBlockReason::NONE));
+                        oq_hp_fallback::FallbackBlockReason::NONE));
           const bool cooling_preflow =
               desired == 1 && (cooling_req || id(oq_cm1_next_after) == 5);
           if (desired == 5 || cooling_preflow) {
@@ -1645,7 +1650,7 @@ interval:
                      desired_cm,
                      cm_transition_reason.c_str());
             if (cm_event_baseline_ready && !previous_cm.empty()) {
-              static const oq_hybrid_supervisory::ControlModeLogCodes
+              static const oq_hp_supervisory::ControlModeLogCodes
                   log_codes{
                       {
                           openquatt_decision_log::REASON_UNKNOWN,
@@ -1674,7 +1679,7 @@ interval:
                       },
                   };
               const auto transition_log =
-                  oq_hybrid_supervisory::classify_control_mode_transition(
+                  oq_hp_supervisory::classify_control_mode_transition(
                       {
                           previous_cm_code,
                           desired,

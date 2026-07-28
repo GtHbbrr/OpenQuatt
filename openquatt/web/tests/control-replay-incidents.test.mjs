@@ -105,8 +105,15 @@ test("CM3 to CM4 remains a role transition and fallback start is explicit", () =
     event_type: "boiler_fallback_start",
     reason: "boiler_fallback",
     cm: 4,
-    value_a: 3,
-    value_b: 4,
+    value_a: 350,
+    value_b: 1,
+  };
+  const fallbackStopEvent = {
+    event_type: "boiler_fallback_stop",
+    reason: "hp_recovered",
+    cm: 2,
+    value_a: 345,
+    value_b: 0,
   };
 
   assert.deepEqual(
@@ -125,5 +132,13 @@ test("CM3 to CM4 remains a role transition and fallback start is explicit", () =
   assert.equal(
     getControlReplayIncidentEventCopy(fallbackEvent, "CV-ketel").title,
     "Ketelfallback gestart (CM4)",
+  );
+  assert.deepEqual(
+    getControlReplayIncidentModeTransition(fallbackEvent, 3),
+    { from: 3, to: 4 },
+  );
+  assert.deepEqual(
+    getControlReplayIncidentModeTransition(fallbackStopEvent, 4),
+    { from: 4, to: 2 },
   );
 });

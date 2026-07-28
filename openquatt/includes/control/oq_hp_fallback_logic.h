@@ -2,7 +2,7 @@
 
 #include <stdint.h>
 
-namespace oq_hybrid_fallback {
+namespace oq_hp_fallback {
 
 enum class ControlMode : uint8_t {
   CM0 = 0,
@@ -137,4 +137,4 @@ inline const char *fallback_block_reason_name(FallbackBlockReason reason) {
   return "unknown";
 }
 
-}  // namespace oq_hybrid_fallback
+}  // namespace oq_hp_fallback

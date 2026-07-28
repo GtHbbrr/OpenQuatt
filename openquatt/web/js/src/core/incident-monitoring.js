@@ -128,6 +128,8 @@ const ACTION_RESULT_LABELS = Object.freeze({
   invalid_hp: "De gekozen warmtepomp is ongeldig.",
   hp_not_configured: "Deze warmtepomp is niet geconfigureerd.",
   queue_unavailable: "De controller kan de actie momenteel niet in de hoofdloop plaatsen.",
+  action_in_progress: "Voor deze warmtepomp wordt al een incidentactie verwerkt.",
+  invalid_request_id: "De incidentactie heeft geen geldig actienummer.",
   forbidden: "De beveiligingscontrole van de actie is mislukt.",
 });
 const FALLBACK_BLOCK_LABELS = Object.freeze([
@@ -352,6 +354,16 @@ function normalizeHeatPump(raw) {
           : protectionState === "start_blocked" ? "blocked" : "unknown";
   }
   const subject = `hp${index}`;
+  const lastActionResult = normalizeIncidentActionResult(raw.last_action_result);
+  const actionResults = Array.isArray(raw.action_results)
+    ? raw.action_results.map(normalizeIncidentActionResult).filter(Boolean)
+    : [];
+  if (lastActionResult && !actionResults.some((result) => (
+    result.requestId === lastActionResult.requestId
+    && result.action === lastActionResult.action
+  ))) {
+    actionResults.push(lastActionResult);
+  }
   return {
     index,
     subject,
@@ -362,7 +374,8 @@ function normalizeHeatPump(raw) {
     availableForStart,
     mustStop,
     faultActive: normalizeBoolean(raw.fault_active),
-    lastActionResult: normalizeIncidentActionResult(raw.last_action_result),
+    lastActionResult,
+    actionResults,
     incidents: Array.isArray(raw.incidents)
       ? raw.incidents.map((incident) => normalizeIncident(incident, subject)).filter(Boolean)
       : [],
@@ -461,8 +474,12 @@ export function getIncidentActionPresentation(action = {}, hpIndex = null) {
   if (action.pending) {
     return {
       visible: true,
-      label: `${kindLabel}: verwerking loopt`,
-      copy: "De controller heeft het verzoek geaccepteerd; OpenQuatt wacht op het resultaat met hetzelfde actienummer.",
+      label: action.outcomeUnknown
+        ? `${kindLabel}: uitkomst controleren`
+        : `${kindLabel}: verwerking loopt`,
+      copy: action.outcomeUnknown
+        ? "Het antwoord ging verloren. OpenQuatt controleert met hetzelfde actienummer of de controller de actie heeft verwerkt."
+        : "De controller heeft het verzoek geaccepteerd; OpenQuatt wacht op het resultaat met hetzelfde actienummer.",
       tone: "warning",
     };
   }
@@ -489,7 +506,13 @@ function resolveIncidentAction(snapshot, action) {
   const requestId = normalizeInteger(action?.requestId, 0);
   const hp = normalizeInteger(action?.hp, 0);
   if (!action?.pending || requestId < 1 || (hp !== 1 && hp !== 2)) return action;
-  const result = snapshot.heatPumps.find((heatPump) => heatPump.index === hp)?.lastActionResult;
+  const heatPump = snapshot.heatPumps.find(
+    (candidate) => candidate.index === hp,
+  );
+  const result = heatPump?.actionResults?.find((candidate) => (
+    candidate.requestId === requestId
+    && candidate.action === action.kind
+  )) || heatPump?.lastActionResult;
   if (!result || result.requestId !== requestId || result.action !== action.kind) return action;
   return {
     ...action,
@@ -501,15 +524,48 @@ function resolveIncidentAction(snapshot, action) {
   };
 }
 
+let fallbackIncidentActionRequestId =
+  (Date.now() >>> 0) || 1;
+
+export function createIncidentActionRequestId(
+  cryptoSource = globalThis.crypto,
+) {
+  if (cryptoSource?.getRandomValues) {
+    const values = new Uint32Array(1);
+    cryptoSource.getRandomValues(values);
+    if (values[0] !== 0) return values[0];
+  }
+  fallbackIncidentActionRequestId =
+    (fallbackIncidentActionRequestId + 1) >>> 0;
+  if (fallbackIncidentActionRequestId === 0) {
+    fallbackIncidentActionRequestId = 1;
+  }
+  return fallbackIncidentActionRequestId;
+}
+
+function incidentActionRequestError(message, definitive) {
+  const error = new Error(message);
+  error.incidentActionDefinitive = definitive;
+  return error;
+}
+
 export async function postIncidentActionRequest(
   fetcher,
   endpoint,
   hp,
+  requestId,
   csrfToken,
   refreshCsrfToken,
 ) {
   const hpIndex = normalizeInteger(hp, 0);
   if (hpIndex !== 1 && hpIndex !== 2) throw new Error(ACTION_RESULT_LABELS.invalid_hp);
+  const actionRequestId = normalizeInteger(requestId, 0);
+  if (actionRequestId < 1) {
+    throw incidentActionRequestError(
+      ACTION_RESULT_LABELS.invalid_request_id,
+      true,
+    );
+  }
   const expectedAction = endpoint.endsWith("/retry-start")
     ? "start_failure_retry"
     : endpoint.endsWith("/confirm-odu-power-cycle")
@@ -522,14 +578,39 @@ export async function postIncidentActionRequest(
     credentials: "same-origin",
     cache: "no-store",
     headers: { "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8" },
-    body: new URLSearchParams({ hp: String(hpIndex), csrf_token: String(token || "") }),
+    body: new URLSearchParams({
+      hp: String(hpIndex),
+      request_id: String(actionRequestId),
+      csrf_token: String(token || ""),
+    }),
   });
 
   let token = String(csrfToken || "");
-  let response = await post(token);
+  let response = null;
+  let networkError = null;
+  for (let attempt = 0; attempt < 2 && !response; attempt += 1) {
+    try {
+      response = await post(token);
+    } catch (error) {
+      networkError = error;
+    }
+  }
+  if (!response) {
+    throw incidentActionRequestError(
+      networkError?.message || "Geen antwoord van de controller.",
+      false,
+    );
+  }
   if (response.status === 403 && typeof refreshCsrfToken === "function") {
     token = String(await refreshCsrfToken() || "");
-    response = await post(token);
+    try {
+      response = await post(token);
+    } catch (error) {
+      throw incidentActionRequestError(
+        error?.message || "Geen antwoord van de controller.",
+        false,
+      );
+    }
   }
   let payload = {};
   try {
@@ -539,11 +620,20 @@ export async function postIncidentActionRequest(
   }
   if (response.status !== 202 || payload?.accepted !== true) {
     const result = String(payload?.result || "");
-    throw new Error(ACTION_RESULT_LABELS[result] || `Incidentactie HTTP ${response.status}`);
+    throw incidentActionRequestError(
+      ACTION_RESULT_LABELS[result]
+        || `Incidentactie HTTP ${response.status}`,
+      true,
+    );
   }
   const actionId = normalizeInteger(payload.action_id, 0);
-  if (payload.hp !== hpIndex || payload.action !== expectedAction || actionId < 1) {
-    throw new Error("De controller gaf geen geldige actiebevestiging terug.");
+  if (payload.hp !== hpIndex
+      || payload.action !== expectedAction
+      || actionId !== actionRequestId) {
+    throw incidentActionRequestError(
+      "De controller gaf geen geldige actiebevestiging terug.",
+      false,
+    );
   }
   return { hp: hpIndex, action: expectedAction, actionId, csrfToken: token };
 }
@@ -681,7 +771,10 @@ export function combineInstallationMonitoringModel(baseModel, incidentInput) {
 export function getIncidentMonitoringSuccessUpdate(current = {}, payload, now = Date.now()) {
   const snapshot = normalizeIncidentMonitoringSnapshot(payload);
   if (!snapshot.valid) throw new Error(`incident monitoring ${snapshot.error}`);
-  const signature = JSON.stringify(snapshot);
+  // generatedAtS changes on every poll but has no visual meaning. Excluding it
+  // prevents a healthy, unchanged installation from needlessly rerendering.
+  const { generatedAtS: _generatedAtS, ...stableSnapshot } = snapshot;
+  const signature = JSON.stringify(stableSnapshot);
   const incidentAction = resolveIncidentAction(snapshot, current.incidentAction || {});
   return {
     changed: current.incidentMonitoringSignature !== signature

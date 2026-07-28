@@ -33,6 +33,37 @@ bool url_path_matches(const char *url, const char *path) {
          (url[path_length] == '\0' || url[path_length] == '?');
 }
 
+uint32_t parse_positive_request_id(const std::string &value) {
+  if (value.empty()) return 0U;
+  uint32_t parsed = 0U;
+  for (const char character : value) {
+    if (character < '0' || character > '9') return 0U;
+    const uint32_t digit =
+        static_cast<uint32_t>(character - '0');
+    if (parsed >
+        (std::numeric_limits<uint32_t>::max() - digit) / 10U) {
+      return 0U;
+    }
+    parsed = parsed * 10U + digit;
+  }
+  return parsed;
+}
+
+const char *deferred_action_name(
+    OpenQuattIncidentManager::DeferredActionKind kind) {
+  switch (kind) {
+    case OpenQuattIncidentManager::DeferredActionKind::
+        START_FAILURE_RETRY:
+      return "start_failure_retry";
+    case OpenQuattIncidentManager::DeferredActionKind::
+        CONFIRM_ODU_POWER_CYCLE:
+      return "confirm_odu_power_cycle";
+    case OpenQuattIncidentManager::DeferredActionKind::NONE:
+      break;
+  }
+  return "none";
+}
+
 bool header_matches_host(const std::string &header_value,
                          const std::string &host) {
   if (host.empty() || header_value.empty()) return false;
@@ -374,6 +405,10 @@ class IncidentManagerRequestHandler : public AsyncWebHandler {
   }
 
   void handleRequest(AsyncWebServerRequest *request) override {
+    if (!this->parent_->request_is_authenticated(request)) {
+      request->requestAuthentication();
+      return;
+    }
     char url_buf[AsyncWebServerRequest::URL_BUF_SIZE];
     request->url_to(url_buf);
     const bool retry_start = url_path_matches(
@@ -405,21 +440,45 @@ class IncidentManagerRequestHandler : public AsyncWebHandler {
             R"({"accepted":false,"result":"hp_not_configured"})");
         return;
       }
-      const uint32_t request_id =
-          retry_start
-              ? this->parent_->defer_start_failure_retry(hp_index)
-              : this->parent_
-                    ->defer_odu_power_cycle_confirmation(hp_index);
+      const uint32_t request_id = parse_positive_request_id(
+          request->arg("request_id"));
       if (request_id == 0U) {
         request->send(
-            503, "application/json",
-            R"({"accepted":false,"result":"queue_unavailable"})");
+            400, "application/json",
+            R"({"accepted":false,"result":"invalid_request_id"})");
         return;
       }
-      char response[128];
+      const OpenQuattIncidentManager::DeferredActionQueueResult
+          queue_result =
+              retry_start
+                  ? this->parent_->defer_start_failure_retry(
+                        hp_index, request_id)
+                  : this->parent_
+                        ->defer_odu_power_cycle_confirmation(
+                            hp_index, request_id);
+      if (queue_result ==
+          OpenQuattIncidentManager::DeferredActionQueueResult::BUSY) {
+        request->send(
+            409, "application/json",
+            R"({"accepted":false,"result":"action_in_progress"})");
+        return;
+      }
+      if (queue_result ==
+          OpenQuattIncidentManager::DeferredActionQueueResult::INVALID) {
+        request->send(
+            400, "application/json",
+            R"({"accepted":false,"result":"invalid_request_id"})");
+        return;
+      }
+      char response[192];
       std::snprintf(
           response, sizeof(response),
-          R"({"accepted":true,"hp":%u,"action":"%s","action_id":%u})",
+          R"({"accepted":true,"duplicate":%s,"hp":%u,"action":"%s","action_id":%u})",
+          queue_result ==
+                  OpenQuattIncidentManager::
+                      DeferredActionQueueResult::DUPLICATE
+              ? "true"
+              : "false",
           hp_index,
           retry_start ? "start_failure_retry"
                       : "confirm_odu_power_cycle",
@@ -463,6 +522,9 @@ void OpenQuattIncidentManager::setup() {
 
   if (web_server_base::global_web_server_base == nullptr) {
     ESP_LOGW(TAG, "web_server_base is unavailable; incident endpoint disabled");
+  } else if (this->web_auth_ == nullptr) {
+    ESP_LOGE(TAG,
+             "Runtime web auth is unavailable; incident endpoint disabled");
   } else {
     web_server_base::global_web_server_base->add_handler(
         new IncidentManagerRequestHandler(this));
@@ -501,7 +563,7 @@ void OpenQuattIncidentManager::loop() {
 }
 
 void OpenQuattIncidentManager::dump_config() {
-  ESP_LOGCONFIG(TAG, "OpenQuatt hybrid incident manager:");
+  ESP_LOGCONFIG(TAG, "OpenQuatt heat-pump incident manager:");
   ESP_LOGCONFIG(TAG, "  Heat pumps: %u", this->configured_hp_count());
   ESP_LOGCONFIG(TAG, "  Incident catalog: %u definitions, version 1",
                 static_cast<unsigned>(oq_incidents::kHpIncidentCatalog.size()));
@@ -537,6 +599,65 @@ void OpenQuattIncidentManager::record_action_result_(
   if (unit.last_action_seq == 0U) ++unit.last_action_seq;
   unit.last_action_request_id = request_id;
   unit.last_action_at_ms = now_ms;
+
+  if (request_id == 0U) return;
+  portENTER_CRITICAL(&this->action_mux_);
+  const size_t insert_index =
+      (unit.action_result_head + unit.action_result_count) %
+      ACTION_RESULT_HISTORY_SIZE;
+  unit.action_results[insert_index] = {
+      unit.last_action, unit.last_action_result, ok,
+      unit.last_action_seq, request_id, now_ms};
+  if (unit.action_result_count < ACTION_RESULT_HISTORY_SIZE) {
+    ++unit.action_result_count;
+  } else {
+    unit.action_result_head =
+        (unit.action_result_head + 1U) %
+        ACTION_RESULT_HISTORY_SIZE;
+  }
+  if (unit.pending_action_request_id == request_id) {
+    unit.pending_action_request_id = 0U;
+    unit.pending_action_kind = DeferredActionKind::NONE;
+  }
+  portEXIT_CRITICAL(&this->action_mux_);
+}
+
+OpenQuattIncidentManager::DeferredActionQueueResult
+OpenQuattIncidentManager::queue_deferred_action_(
+    UnitState &unit, DeferredActionKind kind, uint32_t request_id) {
+  if (request_id == 0U || kind == DeferredActionKind::NONE) {
+    return DeferredActionQueueResult::INVALID;
+  }
+  const char *action = deferred_action_name(kind);
+  DeferredActionQueueResult result =
+      DeferredActionQueueResult::ACCEPTED;
+  portENTER_CRITICAL(&this->action_mux_);
+  for (size_t offset = 0U; offset < unit.action_result_count;
+       ++offset) {
+    const size_t index =
+        (unit.action_result_head + offset) %
+        ACTION_RESULT_HISTORY_SIZE;
+    const ActionResultRecord &record = unit.action_results[index];
+    if (record.request_id == request_id &&
+        std::strcmp(record.action, action) == 0) {
+      result = DeferredActionQueueResult::DUPLICATE;
+      break;
+    }
+  }
+  if (result == DeferredActionQueueResult::ACCEPTED &&
+      unit.pending_action_request_id != 0U) {
+    result =
+        unit.pending_action_request_id == request_id &&
+                unit.pending_action_kind == kind
+            ? DeferredActionQueueResult::DUPLICATE
+            : DeferredActionQueueResult::BUSY;
+  }
+  if (result == DeferredActionQueueResult::ACCEPTED) {
+    unit.pending_action_request_id = request_id;
+    unit.pending_action_kind = kind;
+  }
+  portEXIT_CRITICAL(&this->action_mux_);
+  return result;
 }
 
 bool OpenQuattIncidentManager::valid_hp_index_(uint8_t hp_index) {
@@ -788,25 +909,22 @@ OpenQuattIncidentManager::retry_start_failure(uint8_t hp_index,
   return result;
 }
 
-uint32_t OpenQuattIncidentManager::defer_start_failure_retry(
-    uint8_t hp_index) {
-  if (!this->hp_configured(hp_index)) return 0U;
-  const uint32_t request_id = this->reserve_action_request_id_();
+OpenQuattIncidentManager::DeferredActionQueueResult
+OpenQuattIncidentManager::defer_start_failure_retry(
+    uint8_t hp_index, uint32_t request_id) {
+  UnitState *unit = this->unit_(hp_index);
+  if (unit == nullptr) return DeferredActionQueueResult::INVALID;
+  const DeferredActionQueueResult queue_result =
+      this->queue_deferred_action_(
+          *unit, DeferredActionKind::START_FAILURE_RETRY,
+          request_id);
+  if (queue_result != DeferredActionQueueResult::ACCEPTED) {
+    return queue_result;
+  }
   this->defer([this, hp_index, request_id]() {
     this->retry_start_failure(hp_index, millis(), request_id);
   });
-  return request_id;
-}
-
-uint32_t OpenQuattIncidentManager::reserve_action_request_id_() {
-  uint32_t request_id =
-      this->next_action_request_id_.fetch_add(
-          1U, std::memory_order_relaxed);
-  if (request_id == 0U) {
-    request_id = this->next_action_request_id_.fetch_add(
-        1U, std::memory_order_relaxed);
-  }
-  return request_id;
+  return queue_result;
 }
 
 bool OpenQuattIncidentManager::acknowledge(
@@ -956,15 +1074,23 @@ bool OpenQuattIncidentManager::confirm_odu_power_cycle(uint8_t hp_index,
   return true;
 }
 
-uint32_t OpenQuattIncidentManager::defer_odu_power_cycle_confirmation(
-    uint8_t hp_index) {
-  if (!this->hp_configured(hp_index)) return 0U;
-  const uint32_t request_id = this->reserve_action_request_id_();
+OpenQuattIncidentManager::DeferredActionQueueResult
+OpenQuattIncidentManager::defer_odu_power_cycle_confirmation(
+    uint8_t hp_index, uint32_t request_id) {
+  UnitState *unit = this->unit_(hp_index);
+  if (unit == nullptr) return DeferredActionQueueResult::INVALID;
+  const DeferredActionQueueResult queue_result =
+      this->queue_deferred_action_(
+          *unit, DeferredActionKind::CONFIRM_ODU_POWER_CYCLE,
+          request_id);
+  if (queue_result != DeferredActionQueueResult::ACCEPTED) {
+    return queue_result;
+  }
   this->defer([this, hp_index, request_id]() {
     this->confirm_odu_power_cycle(
         hp_index, millis(), request_id);
   });
-  return request_id;
+  return queue_result;
 }
 
 uint8_t OpenQuattIncidentManager::availability_state_(
@@ -1764,6 +1890,19 @@ void OpenQuattIncidentManager::publish_snapshot_(uint32_t now_ms) {
         this->units_[slot].last_action_request_id;
     next.units[slot].last_action_at_ms =
         this->units_[slot].last_action_at_ms;
+    portENTER_CRITICAL(&this->action_mux_);
+    next.units[slot].action_result_count =
+        this->units_[slot].action_result_count;
+    for (size_t offset = 0U;
+         offset < next.units[slot].action_result_count;
+         ++offset) {
+      const size_t source_index =
+          (this->units_[slot].action_result_head + offset) %
+          ACTION_RESULT_HISTORY_SIZE;
+      next.units[slot].action_results[offset] =
+          this->units_[slot].action_results[source_index];
+    }
+    portEXIT_CRITICAL(&this->action_mux_);
   }
   portENTER_CRITICAL(&this->snapshot_mux_);
   this->published_ = next;
@@ -1873,7 +2012,30 @@ void OpenQuattIncidentManager::write_snapshot(httpd_req_t *req) const {
            write_uint(req, snapshot.units[slot].last_action_at_ms) &&
            write_raw(req, "}");
     }
-    ok = ok && write_raw(req, R"(,"incidents":[)");
+    ok = ok && write_raw(req, R"(,"action_results":[)");
+    for (size_t action_index = 0U;
+         ok &&
+         action_index <
+             snapshot.units[slot].action_result_count;
+         ++action_index) {
+      const ActionResultRecord &record =
+          snapshot.units[slot].action_results[action_index];
+      ok = (action_index == 0U || write_raw(req, ",")) &&
+           write_raw(req, R"({"sequence":)") &&
+           write_uint(req, record.sequence) &&
+           write_raw(req, R"(,"request_id":)") &&
+           write_uint(req, record.request_id) &&
+           write_raw(req, R"(,"action":)") &&
+           write_json_string(req, record.action) &&
+           write_raw(req, R"(,"ok":)") &&
+           write_bool(req, record.ok) &&
+           write_raw(req, R"(,"result":)") &&
+           write_json_string(req, record.result) &&
+           write_raw(req, R"(,"at_ms":)") &&
+           write_uint(req, record.at_ms) &&
+           write_raw(req, "}");
+    }
+    ok = ok && write_raw(req, R"(],"incidents":[)");
 
     bool first_incident = true;
     const auto write_incident =

@@ -224,7 +224,7 @@ void test_new_urgent_event_is_not_cleared_by_inflight_flush() {
   policy.mark_attempt(3000000ULL);
 
   policy.request(3100000ULL, 21U);
-  policy.mark_success(4000000ULL, 20U);
+  policy.mark_target_persisted(4000000ULL, 20U);
   assert(policy.pending());
   assert(policy.requested_event_seq() == 21U);
   assert(!policy.should_attempt(6000000ULL, kCoalesceUs,
@@ -232,7 +232,7 @@ void test_new_urgent_event_is_not_cleared_by_inflight_flush() {
   assert(policy.should_attempt(19000000ULL, kCoalesceUs,
                                kMinIntervalUs));
   policy.mark_attempt(19000000ULL);
-  policy.mark_success(20000000ULL, 21U);
+  policy.mark_target_persisted(20000000ULL, 21U);
   assert(!policy.pending());
 }
 
@@ -247,11 +247,28 @@ void test_failed_flush_obeys_retry_window_and_sequence_wrap() {
                                 15000000ULL));
   assert(policy.should_attempt(32000100U, 2000000ULL,
                                15000000ULL));
-  policy.mark_success(32000100U, 0U);
+  policy.mark_target_persisted(32000100U, 0U);
   assert(!policy.pending());
 }
 
-void test_manual_reset_fresh_install_and_edge_only_persistence() {
+void test_urgent_flush_requires_exact_target_and_protects_ring_interval() {
+  UrgentFlushPolicy policy;
+  policy.request(100U, 42U);
+  assert(policy.protects_unpersisted_sequence(40U, 39U));
+  assert(policy.protects_unpersisted_sequence(42U, 39U));
+  assert(!policy.protects_unpersisted_sequence(43U, 39U));
+  assert(!policy.protects_unpersisted_sequence(39U, 39U));
+
+  // A later sequence is not proof that the requested safety event was
+  // actually part of the flash batch.
+  policy.mark_target_persisted(200U, 43U);
+  assert(policy.pending());
+  assert(policy.requested_event_seq() == 42U);
+  policy.mark_target_persisted(300U, 42U);
+  assert(!policy.pending());
+}
+
+void test_manual_reset_missing_all_fails_closed_and_persists_recovery() {
   ManualResetLatchPersistencePolicy policy;
   ManualResetLatchStorage storage_a{};
   ManualResetLatchStorage storage_b{};
@@ -260,27 +277,28 @@ void test_manual_reset_fresh_install_and_edge_only_persistence() {
       false, storage_a, false, storage_b, false, marker,
       oq_incidents::kManualResetAllHpMask);
   assert(result ==
-         ManualResetLatchPersistencePolicy::LoadResult::FRESH_INSTALL);
+         ManualResetLatchPersistencePolicy::LoadResult::
+             RECOVERY_REQUIRED);
   assert(!policy.ready());
   assert(policy.fault_mask() ==
          oq_incidents::kManualResetAllHpMask);
   assert(policy.should_attempt_persist(100U, 60000U));
-  assert(policy.persistence_target_mask() == 0U);
+  assert(policy.persistence_target_mask() ==
+         oq_incidents::kManualResetAllHpMask);
 
-  policy.mark_persist_success(0U, 100U);
+  policy.mark_persist_success(
+      oq_incidents::kManualResetAllHpMask, 100U);
   assert(policy.ready());
+  assert(policy.persisted_mask() ==
+         oq_incidents::kManualResetAllHpMask);
   assert(policy.fault_mask() == 0U);
   assert(!policy.should_attempt_persist(101U, 60000U));
 
   policy.observe_runtime_latches(oq_incidents::kManualResetHp1Mask);
-  assert(policy.should_attempt_persist(102U, 60000U));
-  policy.mark_persist_failure(102U);
-  assert(policy.persisted_mask() == 0U);
-  assert(policy.fault_mask() ==
-         oq_incidents::kManualResetHp1Mask);
+  assert(!policy.should_attempt_persist(102U, 60000U));
   policy.observe_runtime_latches(oq_incidents::kManualResetHp1Mask);
   assert(!policy.should_attempt_persist(103U, 60000U));
-  assert(policy.should_attempt_persist(60102U, 60000U));
+  assert(!policy.should_attempt_persist(60102U, 60000U));
 }
 
 void test_manual_reset_restart_restore_and_partial_clear() {
@@ -437,7 +455,8 @@ int main() {
   test_first_urgent_flush_is_not_delayed_by_boot_interval();
   test_new_urgent_event_is_not_cleared_by_inflight_flush();
   test_failed_flush_obeys_retry_window_and_sequence_wrap();
-  test_manual_reset_fresh_install_and_edge_only_persistence();
+  test_urgent_flush_requires_exact_target_and_protects_ring_interval();
+  test_manual_reset_missing_all_fails_closed_and_persists_recovery();
   test_manual_reset_restart_restore_and_partial_clear();
   test_manual_reset_confirm_is_per_hp_and_write_failure_safe();
   test_manual_reset_ambiguous_storage_repairs_conservatively();

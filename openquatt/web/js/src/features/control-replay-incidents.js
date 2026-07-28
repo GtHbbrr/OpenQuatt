@@ -123,11 +123,15 @@ export function getControlReplayIncidentModeTransition(event, previousCm) {
     return { from: mode(event.value_a) ?? mode(previousCm), to: mode(event.value_b) ?? mode(event.cm) };
   }
   if (event?.event_type === "boiler_fallback_start") {
-    return { from: mode(event.value_a) ?? mode(previousCm), to: 4 };
+    const current = mode(event.cm);
+    return {
+      from: mode(previousCm) ?? (current === 4 ? null : current),
+      to: 4,
+    };
   }
   if (event?.event_type === "boiler_fallback_stop") {
     const current = mode(event.cm);
-    return { from: 4, to: mode(event.value_b) ?? (current === 4 ? null : current) };
+    return { from: 4, to: current === 4 ? null : current };
   }
   return null;
 }

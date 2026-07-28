@@ -260,6 +260,7 @@ class OpenQuattDecisionLog : public Component {
   static constexpr uint64_t URGENT_FLUSH_COALESCE_US = 2ULL * 1000ULL * 1000ULL;
   static constexpr uint64_t URGENT_FLUSH_MIN_INTERVAL_US = 15ULL * 1000ULL * 1000ULL;
   static constexpr uint64_t URGENT_FLUSH_RETRY_US = 30ULL * 1000ULL * 1000ULL;
+  static constexpr size_t URGENT_FLUSH_MAX_BATCHES = 4U;
 
   static_assert(FLASH_EVENT_CAPACITY == 5120, "Decision-log flash ring capacity changed unexpectedly");
   static_assert(FLASH_PARTITION_OFFSET % FLASH_SECTOR_SIZE == 0,
@@ -348,7 +349,7 @@ class OpenQuattDecisionLog : public Component {
   uint64_t boot_epoch_s_() const;
   void release_buffers_();
   void allocate_buffers_();
-  void push_event_locked_(const DecisionEvent &event);
+  bool push_event_locked_(const DecisionEvent &event);
   void update_bucket_locked_(const DecisionEvent &event);
   HourBucket *current_bucket_locked_(uint64_t uptime_s, uint32_t epoch_s, bool *created = nullptr);
   bool copy_event_(size_t index, DecisionEvent *out) const;
@@ -360,13 +361,19 @@ class OpenQuattDecisionLog : public Component {
   static bool urgent_event_(const DecisionEvent &event);
   void request_urgent_flush_(uint32_t event_seq);
   void clear_urgent_flush_(uint64_t now_us);
-  void complete_urgent_flush_(uint64_t now_us);
+  void complete_urgent_flush_(uint64_t now_us,
+                              uint32_t persisted_target_seq);
   void process_urgent_flush_();
   bool scan_flash_archive_();
   bool read_flash_block_(uint32_t slot_index, uint32_t expected_sequence, FlashBlockInfo *info,
                          FlashEventRecord *events) const;
   bool write_flash_events_(const DecisionEvent *events, size_t event_count);
-  bool flush_pending_events_();
+  bool flush_pending_events_(
+      size_t max_batches = SIZE_MAX,
+      bool urgent_target_active = false,
+      uint32_t urgent_target_seq = 0U,
+      bool *urgent_target_persisted = nullptr);
+  void record_flash_block_(const FlashBlockInfo &info);
   void restore_flash_events_();
   void initialize_current_hour_();
   void reset_flash_metadata_();

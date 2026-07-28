@@ -47,6 +47,13 @@ const actionDelegates = [
       const active = document.activeElement;
       state.focusedField = active && active.dataset ? active.dataset.oqField || "" : "";
       state.settingsInteractionLock = Boolean(active && active.closest && active.closest(".oq-ph-concept-hotspot"));
+      if (!state.focusedField
+          && state.incidentMonitoringRenderPending
+          && state.appView === "settings"
+          && state.settingsGroup === "service") {
+        state.incidentMonitoringRenderPending = false;
+        render();
+      }
     }, 0);
   }
 

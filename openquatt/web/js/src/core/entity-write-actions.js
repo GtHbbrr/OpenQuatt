@@ -4,7 +4,10 @@ import { beginDeviceReconnect } from "./device-reconnect.js";
 import { buildEntityPath, isCurveMode } from "./domain-helpers.js";
 import { formatOpenQuattResumeDateTime, getEntityValue, normalizeDateTimeValue, normalizeNumber, normalizeTimeValue, parseLooseNumber, toDateTimeInputValue } from "./entity-store.js";
 import { getSettingsRefreshKeys, refreshEntities, refreshIncidentMonitoringData, syncEntities } from "./entity-sync.js";
-import { postIncidentActionRequest } from "./incident-monitoring.js";
+import {
+  createIncidentActionRequestId,
+  postIncidentActionRequest,
+} from "./incident-monitoring.js";
 import { setAppView } from "./navigation.js";
 import { render } from "./render-scheduler.js";
 import { state } from "./state.js";
@@ -567,15 +570,26 @@ export async function triggerIncidentAction(hpIndex, kind) {
       ? "/openquatt/incidents/confirm-odu-power-cycle"
       : "";
   if (!endpoint || (hpIndex !== 1 && hpIndex !== 2)) return;
+  const matchingPendingAction = state.incidentAction?.pending
+      && state.incidentAction.hp === hpIndex
+      && state.incidentAction.kind === kind;
+  if (matchingPendingAction &&
+      !state.incidentAction.outcomeUnknown) {
+    await refreshIncidentMonitoringData({ force: true });
+    return;
+  }
 
+  const requestId = matchingPendingAction
+    ? state.incidentAction.requestId
+    : createIncidentActionRequestId();
   state.busyAction = `incident-${kind}-hp${hpIndex}`;
   state.controlError = "";
   state.controlNotice = "";
   state.incidentAction = {
     hp: hpIndex,
     kind,
-    requestId: 0,
-    pending: false,
+    requestId,
+    pending: true,
     ok: null,
     result: "",
   };
@@ -586,6 +600,7 @@ export async function triggerIncidentAction(hpIndex, kind) {
       fetch,
       endpoint,
       hpIndex,
+      requestId,
       state.incidentMonitoringSnapshot?.actionCsrfToken || "",
       async () => {
         await refreshIncidentMonitoringData({ force: true });
@@ -595,7 +610,7 @@ export async function triggerIncidentAction(hpIndex, kind) {
     state.incidentAction = {
       hp: hpIndex,
       kind,
-      requestId: accepted.actionId,
+      requestId,
       pending: true,
       ok: null,
       result: "",
@@ -603,25 +618,41 @@ export async function triggerIncidentAction(hpIndex, kind) {
     state.controlNotice = `Actie voor HP${hpIndex} geaccepteerd; resultaat wordt gecontroleerd.`;
     render();
 
-    for (const delayMs of [0, 500]) {
+  } catch (error) {
+    const definitive = error.incidentActionDefinitive === true;
+    state.incidentAction = definitive
+      ? {
+          hp: hpIndex,
+          kind,
+          requestId,
+          pending: false,
+          ok: false,
+          result: "",
+          message: error.message || String(error),
+        }
+      : {
+          hp: hpIndex,
+          kind,
+          requestId,
+          pending: true,
+          outcomeUnknown: true,
+          ok: null,
+          result: "",
+          message: error.message || String(error),
+        };
+    if (definitive) {
+      state.controlError = `Actie voor HP${hpIndex} niet uitgevoerd. ${error.message || error}`;
+    } else {
+      state.controlNotice = `Antwoord voor HP${hpIndex} ging verloren; resultaat wordt met hetzelfde actienummer gecontroleerd.`;
+    }
+  } finally {
+    for (const delayMs of [0, 500, 1500]) {
       if (!state.incidentAction.pending) break;
       if (delayMs) {
         await new Promise((resolve) => window.setTimeout(resolve, delayMs));
       }
       await refreshIncidentMonitoringData({ force: true });
     }
-  } catch (error) {
-    state.incidentAction = {
-      hp: hpIndex,
-      kind,
-      requestId: 0,
-      pending: false,
-      ok: false,
-      result: "",
-      message: error.message || String(error),
-    };
-    state.controlError = `Actie voor HP${hpIndex} niet uitgevoerd. ${error.message || error}`;
-  } finally {
     state.busyAction = "";
     render();
   }

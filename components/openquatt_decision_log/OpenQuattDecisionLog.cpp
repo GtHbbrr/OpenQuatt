@@ -243,9 +243,25 @@ void OpenQuattDecisionLog::loop() {
     return;
   }
 
-  if (this->flash_switch_enabled_() && this->flush_pending_events_()) {
+  uint32_t urgent_target_seq = 0U;
+  bool urgent_target_active = false;
+  portENTER_CRITICAL(&this->mux_);
+  if (this->urgent_flush_.pending()) {
+    urgent_target_active = true;
+    urgent_target_seq =
+        this->urgent_flush_.requested_event_seq();
+  }
+  portEXIT_CRITICAL(&this->mux_);
+  bool urgent_target_persisted = false;
+  if (this->flash_switch_enabled_() &&
+      this->flush_pending_events_(
+          SIZE_MAX, urgent_target_active,
+          urgent_target_seq,
+          &urgent_target_persisted) &&
+      urgent_target_persisted) {
     this->complete_urgent_flush_(
-        static_cast<uint64_t>(esp_timer_get_time()));
+        static_cast<uint64_t>(esp_timer_get_time()),
+        urgent_target_seq);
   }
   this->tracked_hour_start_epoch_s_ = epoch_hour;
   this->initialize_current_hour_();
@@ -373,13 +389,14 @@ void OpenQuattDecisionLog::emit(uint8_t event_type,
   event.to_state = to_state;
   event.flags = flags;
 
+  bool recorded = false;
   portENTER_CRITICAL(&this->mux_);
   event.seq = this->next_seq_++;
-  this->push_event_locked_(event);
+  recorded = this->push_event_locked_(event);
   this->update_bucket_locked_(event);
   portEXIT_CRITICAL(&this->mux_);
 
-  if (urgent_event_(event)) {
+  if (recorded && urgent_event_(event)) {
     this->request_urgent_flush_(event.seq);
   }
 }
@@ -419,30 +436,40 @@ void OpenQuattDecisionLog::clear_urgent_flush_(uint64_t now_us) {
   portEXIT_CRITICAL(&this->mux_);
 }
 
-void OpenQuattDecisionLog::complete_urgent_flush_(uint64_t now_us) {
-  const uint32_t persisted_event_seq = this->last_persisted_event_seq_;
+void OpenQuattDecisionLog::complete_urgent_flush_(
+    uint64_t now_us, uint32_t persisted_target_seq) {
   portENTER_CRITICAL(&this->mux_);
-  this->urgent_flush_.mark_success(now_us, persisted_event_seq);
+  this->urgent_flush_.mark_target_persisted(
+      now_us, persisted_target_seq);
   portEXIT_CRITICAL(&this->mux_);
 }
 
 void OpenQuattDecisionLog::process_urgent_flush_() {
   const uint64_t now_us = static_cast<uint64_t>(esp_timer_get_time());
   bool should_attempt = false;
+  uint32_t urgent_target_seq = 0U;
   portENTER_CRITICAL(&this->mux_);
   should_attempt = this->urgent_flush_.should_attempt(
       now_us, URGENT_FLUSH_COALESCE_US,
       URGENT_FLUSH_MIN_INTERVAL_US);
   if (should_attempt) {
     this->urgent_flush_.mark_attempt(now_us);
+    urgent_target_seq =
+        this->urgent_flush_.requested_event_seq();
   }
   portEXIT_CRITICAL(&this->mux_);
 
   if (!should_attempt) {
     return;
   }
-  if (this->flush_pending_events_()) {
-    this->complete_urgent_flush_(now_us);
+  bool urgent_target_persisted = false;
+  if (this->flush_pending_events_(
+          URGENT_FLUSH_MAX_BATCHES, true,
+          urgent_target_seq,
+          &urgent_target_persisted) &&
+      urgent_target_persisted) {
+    this->complete_urgent_flush_(
+        now_us, urgent_target_seq);
     return;
   }
 
@@ -451,10 +478,24 @@ void OpenQuattDecisionLog::process_urgent_flush_() {
   portEXIT_CRITICAL(&this->mux_);
 }
 
-void OpenQuattDecisionLog::push_event_locked_(const DecisionEvent &event) {
+bool OpenQuattDecisionLog::push_event_locked_(
+    const DecisionEvent &event) {
   if (this->events_ == nullptr || this->event_capacity_ == 0) {
     this->dropped_count_ = this->dropped_count_ < UINT32_MAX ? this->dropped_count_ + 1 : UINT32_MAX;
-    return;
+    return false;
+  }
+  if (this->event_count_ == this->event_capacity_ &&
+      this->urgent_flush_.protects_unpersisted_sequence(
+          this->events_[this->event_head_].seq,
+          this->last_persisted_event_seq_)) {
+    // Preserve the complete RAM interval through the newest urgent target.
+    // Dropping a later event is safer than silently overwriting a safety edge
+    // that the persistence policy still promises to flush.
+    this->dropped_count_ =
+        this->dropped_count_ < UINT32_MAX
+            ? this->dropped_count_ + 1U
+            : UINT32_MAX;
+    return false;
   }
 
   const size_t insert_index = (this->event_head_ + this->event_count_) % this->event_capacity_;
@@ -465,6 +506,7 @@ void OpenQuattDecisionLog::push_event_locked_(const DecisionEvent &event) {
     this->event_head_ = (this->event_head_ + 1) % this->event_capacity_;
     this->dropped_count_ = this->dropped_count_ < UINT32_MAX ? this->dropped_count_ + 1 : UINT32_MAX;
   }
+  return true;
 }
 
 HourBucket *OpenQuattDecisionLog::current_bucket_locked_(uint64_t uptime_s, uint32_t epoch_s, bool *created) {
@@ -805,24 +847,124 @@ bool OpenQuattDecisionLog::write_flash_events_(const DecisionEvent *events, size
     return false;
   }
 
+  FlashBlockInfo info{};
+  info.block_sequence = header.block_sequence;
+  info.write_epoch_s = header.write_epoch_s;
+  info.first_event_seq = header.first_event_seq;
+  info.first_epoch_s = header.first_epoch_s;
+  info.last_epoch_s = header.last_epoch_s;
+  info.event_count = header.event_count;
+  info.slot_index = slot_index;
+  this->record_flash_block_(info);
   this->next_flash_sequence_ = sequence + 1U;
   this->last_persisted_event_seq_ = events[event_count - 1U].seq;
   return true;
 }
 
-bool OpenQuattDecisionLog::flush_pending_events_() {
+void OpenQuattDecisionLog::record_flash_block_(
+    const FlashBlockInfo &info) {
+  if (this->flash_index_ == nullptr) return;
+  const uint32_t now_epoch_s = this->current_epoch_s_();
+  const uint32_t cutoff_epoch_s =
+      now_epoch_s > RETENTION_SECONDS
+          ? now_epoch_s - RETENTION_SECONDS
+          : 0U;
+  const bool sector_was_erased =
+      (info.slot_index % FLASH_SLOTS_PER_SECTOR) == 0U;
+  const uint32_t sector_first_slot =
+      (info.slot_index / FLASH_SLOTS_PER_SECTOR) *
+      FLASH_SLOTS_PER_SECTOR;
+  portENTER_CRITICAL(&this->mux_);
+  size_t count = this->flash_index_count_;
+  for (size_t index = 0U; index < count;) {
+    const uint32_t indexed_slot =
+        this->flash_index_[index].slot_index;
+    const bool invalidated =
+        indexed_slot == info.slot_index ||
+        (sector_was_erased &&
+         indexed_slot >= sector_first_slot &&
+         indexed_slot <
+             sector_first_slot + FLASH_SLOTS_PER_SECTOR);
+    if (!invalidated) {
+      ++index;
+      continue;
+    }
+    for (size_t move = index + 1U; move < count; ++move) {
+      this->flash_index_[move - 1U] =
+          this->flash_index_[move];
+    }
+    --count;
+  }
+  if (count == FLASH_SLOT_COUNT) {
+    for (size_t move = 1U; move < count; ++move) {
+      this->flash_index_[move - 1U] =
+          this->flash_index_[move];
+    }
+    --count;
+  }
+  size_t insert_index = 0U;
+  while (insert_index < count &&
+         this->flash_index_[insert_index].block_sequence <
+             info.block_sequence) {
+    ++insert_index;
+  }
+  for (size_t move = count; move > insert_index; --move) {
+    this->flash_index_[move] =
+        this->flash_index_[move - 1U];
+  }
+  this->flash_index_[insert_index] = info;
+  this->flash_index_count_ = count + 1U;
+  this->flash_archive_scanned_ = true;
+
+  this->flash_oldest_epoch_s_ = 0U;
+  this->flash_newest_epoch_s_ = 0U;
+  this->flash_last_flush_epoch_s_ = 0U;
+  this->flash_stored_event_count_ = 0U;
+  for (size_t index = 0U;
+       index < this->flash_index_count_; ++index) {
+    const FlashBlockInfo &entry = this->flash_index_[index];
+    if (cutoff_epoch_s > 0U &&
+        entry.last_epoch_s < cutoff_epoch_s) {
+      continue;
+    }
+    this->flash_stored_event_count_ += entry.event_count;
+    if (this->flash_oldest_epoch_s_ == 0U ||
+        entry.first_epoch_s < this->flash_oldest_epoch_s_) {
+      this->flash_oldest_epoch_s_ = entry.first_epoch_s;
+    }
+    this->flash_newest_epoch_s_ =
+        std::max(this->flash_newest_epoch_s_,
+                 entry.last_epoch_s);
+    this->flash_last_flush_epoch_s_ =
+        std::max(this->flash_last_flush_epoch_s_,
+                 entry.write_epoch_s);
+  }
+  portEXIT_CRITICAL(&this->mux_);
+}
+
+bool OpenQuattDecisionLog::flush_pending_events_(
+    size_t max_batches, bool urgent_target_active,
+    uint32_t urgent_target_seq,
+    bool *urgent_target_persisted) {
+  if (urgent_target_persisted != nullptr) {
+    *urgent_target_persisted = false;
+  }
   if (!this->flash_switch_enabled_() || !this->flash_archive_available_() || !this->time_is_valid_()) {
     return false;
   }
   std::array<DecisionEvent, FLASH_EVENTS_PER_SLOT> pending{};
   size_t pending_count = 0;
+  size_t batches_written = 0U;
+  bool pending_contains_urgent_target = false;
   bool wrote = false;
   const uint64_t boot_epoch_s = this->boot_epoch_s_();
   size_t event_count = 0U;
   portENTER_CRITICAL(&this->mux_);
   event_count = this->event_count_;
   portEXIT_CRITICAL(&this->mux_);
-  for (size_t index = 0; index < event_count; ++index) {
+  for (size_t index = 0;
+       index < event_count && batches_written < max_batches;
+       ++index) {
     DecisionEvent event{};
     if (!this->copy_event_(index, &event) || event.seq <= this->last_persisted_event_seq_) {
       continue;
@@ -831,29 +973,40 @@ bool OpenQuattDecisionLog::flush_pending_events_() {
       const uint64_t derived_epoch_s = boot_epoch_s + event.uptime_s;
       if (boot_epoch_s == 0 || derived_epoch_s > UINT32_MAX ||
           !epoch_is_sane(static_cast<uint32_t>(derived_epoch_s))) {
-        continue;
+        return false;
       }
       event.epoch_s = static_cast<uint32_t>(derived_epoch_s);
     }
+    pending_contains_urgent_target =
+        pending_contains_urgent_target ||
+        (urgent_target_active &&
+         event.seq == urgent_target_seq);
     pending[pending_count++] = event;
     if (pending_count == pending.size()) {
       if (!this->write_flash_events_(pending.data(), pending_count)) {
         return false;
       }
+      if (pending_contains_urgent_target &&
+          urgent_target_persisted != nullptr) {
+        *urgent_target_persisted = true;
+      }
       wrote = true;
+      ++batches_written;
       pending_count = 0;
+      pending_contains_urgent_target = false;
     }
   }
-  if (pending_count > 0) {
+  if (pending_count > 0 && batches_written < max_batches) {
     if (!this->write_flash_events_(pending.data(), pending_count)) {
       return false;
     }
+    if (pending_contains_urgent_target &&
+        urgent_target_persisted != nullptr) {
+      *urgent_target_persisted = true;
+    }
     wrote = true;
   }
-  if (wrote) {
-    this->scan_flash_archive_();
-  }
-  return true;
+  return wrote;
 }
 
 void OpenQuattDecisionLog::restore_flash_events_() {
@@ -922,10 +1075,23 @@ bool OpenQuattDecisionLog::force_flush() {
   if (!this->flash_switch_enabled_() || !this->time_is_valid_()) {
     return false;
   }
-  const bool flushed = this->flush_pending_events_();
-  if (flushed) {
+  bool urgent_target_active = false;
+  uint32_t urgent_target_seq = 0U;
+  portENTER_CRITICAL(&this->mux_);
+  if (this->urgent_flush_.pending()) {
+    urgent_target_active = true;
+    urgent_target_seq =
+        this->urgent_flush_.requested_event_seq();
+  }
+  portEXIT_CRITICAL(&this->mux_);
+  bool urgent_target_persisted = false;
+  const bool flushed = this->flush_pending_events_(
+      SIZE_MAX, urgent_target_active, urgent_target_seq,
+      &urgent_target_persisted);
+  if (flushed && urgent_target_persisted) {
     this->complete_urgent_flush_(
-        static_cast<uint64_t>(esp_timer_get_time()));
+        static_cast<uint64_t>(esp_timer_get_time()),
+        urgent_target_seq);
   }
   return flushed;
 }

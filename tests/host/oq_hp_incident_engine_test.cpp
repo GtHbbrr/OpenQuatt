@@ -143,6 +143,30 @@ void test_link_loss_invalidates_old_stop_confirmation() {
   assert(engine.outputs().fallback_eligible);
 }
 
+void test_link_loss_rearms_an_inflight_stop() {
+  HpIncidentEngine engine;
+  establish_healthy_link(engine, 100U);
+  confirm_stopped(engine, 60101U);
+  assert(engine.request_start(80101U));
+  engine.observe_run(frequency(80102U, 12.0F));
+  assert(engine.request_stop(90101U));
+  engine.observe_run(frequency(90102U, 0.0F));
+  assert(engine.outputs().run_state == RunState::STOPPING);
+
+  engine.observe_link_round(100100U, false);
+  engine.observe_link_round(131100U, false);
+  engine.observe_link_round(132100U, false);
+  assert(engine.outputs().link_state == LinkState::LOST);
+  assert(engine.outputs().run_state == RunState::STOP_UNCONFIRMED);
+
+  // The next actuator pass must register a new stop and generation baseline.
+  assert(engine.request_stop(132101U));
+  engine.observe_run(frequency(132102U, 0.0F));
+  assert(!engine.outputs().stop_confirmed);
+  engine.observe_run(frequency(132103U, 0.0F));
+  assert(engine.outputs().stop_confirmed);
+}
+
 void test_new_hard_fault_invalidates_old_stop_confirmation() {
   HpIncidentEngine engine;
   establish_healthy_link(engine, 100U);
@@ -154,7 +178,7 @@ void test_new_hard_fault_invalidates_old_stop_confirmation() {
   assert(engine.outputs().stop_confirmed);
   engine.observe_fault_words(words(90101U, kHardFault));
   assert(engine.outputs().fallback_cause_present);
-  assert(engine.outputs().run_state == RunState::STOPPING);
+  assert(engine.outputs().run_state == RunState::STOP_UNCONFIRMED);
   assert(!engine.outputs().stop_confirmed);
   assert(!engine.outputs().fallback_eligible);
 
@@ -163,6 +187,31 @@ void test_new_hard_fault_invalidates_old_stop_confirmation() {
   assert(!engine.outputs().stop_confirmed);
   assert(!engine.request_stop(100103U));
   engine.observe_run(frequency(110102U, 0.0F));
+  assert(engine.outputs().stop_confirmed);
+  assert(engine.outputs().fallback_eligible);
+}
+
+void test_new_hard_fault_discards_partial_stop_confirmation() {
+  HpIncidentEngine engine;
+  establish_healthy_link(engine, 100U);
+  confirm_stopped(engine, 60101U);
+  assert(engine.request_start(80101U));
+  engine.observe_run(frequency(80102U, 12.0F));
+  assert(engine.request_stop(90101U));
+  engine.observe_run(frequency(90102U, 0.0F));
+  assert(engine.outputs().run_state == RunState::STOPPING);
+
+  constexpr uint16_t kHardFault = 1U << 0U;
+  engine.observe_fault_words(words(100101U, kHardFault));
+  engine.observe_fault_words(words(110101U, kHardFault));
+  assert(engine.outputs().run_state == RunState::STOP_UNCONFIRMED);
+  assert(!engine.outputs().stop_confirmed);
+  assert(!engine.outputs().fallback_eligible);
+
+  assert(engine.request_stop(110102U));
+  engine.observe_run(frequency(110103U, 0.0F));
+  assert(!engine.outputs().stop_confirmed);
+  engine.observe_run(frequency(110104U, 0.0F));
   assert(engine.outputs().stop_confirmed);
   assert(engine.outputs().fallback_eligible);
 }
@@ -557,7 +606,9 @@ int main() {
   test_catalog_classification();
   test_short_link_dip_and_confirmed_loss();
   test_link_loss_invalidates_old_stop_confirmation();
+  test_link_loss_rearms_an_inflight_stop();
   test_new_hard_fault_invalidates_old_stop_confirmation();
+  test_new_hard_fault_discards_partial_stop_confirmation();
   test_bootstrap_dip_does_not_bypass_recovery();
   test_link_timer_handles_millis_wrap();
   test_fault_debounce_and_stale_does_not_clear();

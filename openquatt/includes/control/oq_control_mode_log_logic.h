@@ -2,7 +2,7 @@
 
 #include <stdint.h>
 
-namespace oq_hybrid_supervisory {
+namespace oq_hp_supervisory {
 
 struct ControlModeLogReasonCodes {
   uint8_t unknown = 0;
@@ -117,4 +117,4 @@ inline ControlModeLogDecision classify_control_mode_transition(
   return decision;
 }
 
-}  // namespace oq_hybrid_supervisory
+}  // namespace oq_hp_supervisory

@@ -260,7 +260,7 @@
   });
 
   const scenarios = [
-    scenario("none", "Geen Hybrid-storing", "Basis", "any", [
+    scenario("none", "Geen warmtepompstoring", "Basis", "any", [
       phase("normal", "Normaal bedrijf", "Geen actief incident; de normale bedrijfssituatie bepaalt de telemetrie.", 0, {
         heatPumps: [hp1Running()],
       }),
@@ -350,7 +350,7 @@
           event(34, "hp_stop_confirmed", "HP1", "hp_link_loss", "normal", 1, "active", "standby"),
           event(34, "incident_clear", "HP1", "hp_stop_unconfirmed", "normal", 1, "active", "standby", 1003),
           event(36, "control_mode_change", "SYSTEM", "boiler_fallback", "attention", 4, "standby", "active", 1, 4),
-          event(36, "boiler_fallback_start", "CV", "boiler_fallback", "attention", 4, "standby", "active", 1, 4),
+          event(36, "boiler_fallback_start", "CV", "boiler_fallback", "attention", 4, "standby", "active", 350, 0),
         ],
       }),
     ], { boilerTransport: "R1" }),
@@ -407,7 +407,7 @@
           event(5, "hp_availability_change", "HP1", "hp_fault", "fault", 1, "available", "faulted", 22, 1),
           event(6, "hp_stop_confirmed", "HP1", "hp_fault", "normal", 1, "active", "standby"),
           event(8, "control_mode_change", "SYSTEM", "boiler_fallback", "attention", 4, "standby", "active", 1, 4),
-          event(8, "boiler_fallback_start", "CV", "boiler_fallback", "attention", 4, "standby", "active", 1, 4),
+          event(8, "boiler_fallback_start", "CV", "boiler_fallback", "attention", 4, "standby", "active", 350, 0),
         ],
         entityPatch: {
           hp1Failure: "Condenser pressure sensor failure",
@@ -437,7 +437,7 @@
         heatPumps: [hp1Running()],
         events: [
           event(98, "hp_availability_change", "HP1", "hp_recovered", "normal", 4, "recovering", "available"),
-          event(98, "boiler_fallback_stop", "CV", "hp_recovered", "normal", 2, "active", "standby", 4, 2),
+          event(98, "boiler_fallback_stop", "CV", "hp_recovered", "normal", 2, "active", "standby", 350, 0),
           event(98, "control_mode_change", "SYSTEM", "hp_recovered", "normal", 2, "active", "standby", 4, 2),
         ],
       }),
@@ -455,7 +455,7 @@
         events: [
           event(8, "incident_start", "HP1", "hp_start_failed", "fault", 1, "standby", "active", 1002),
           event(8, "hp_availability_change", "HP1", "hp_start_failed", "fault", 1, "available", "faulted", 1002, 1),
-          event(12, "boiler_fallback_start", "CV", "boiler_fallback", "attention", 4, "standby", "active", 1, 4),
+          event(12, "boiler_fallback_start", "CV", "boiler_fallback", "attention", 4, "standby", "active", 350, 0),
         ],
         actions: {
           start_failure_retry: {
@@ -472,7 +472,7 @@
           event(16, "incident_clear", "HP1", "hp_start_failed", "normal", 4, "active", "standby", 1002),
           event(17, "hp_availability_change", "HP1", "hp_recovered", "normal", 4, "faulted", "available"),
           event(18, "hp_start_confirmed", "HP1", "hp_recovered", "normal", 2, "standby", "active"),
-          event(18, "boiler_fallback_stop", "CV", "hp_recovered", "normal", 2, "active", "standby", 4, 2),
+          event(18, "boiler_fallback_stop", "CV", "hp_recovered", "normal", 2, "active", "standby", 350, 0),
         ],
       }),
     ], { boilerTransport: "R1" }),
@@ -488,7 +488,7 @@
         heatPumps: [stoppedFaulted(1, 21, [INCIDENTS.powerCycle()])],
         events: [
           event(5, "incident_start", "HP1", "hp_fault", "fault", 1, "standby", "active", 21),
-          event(8, "boiler_fallback_start", "CV", "boiler_fallback", "attention", 4, "standby", "active", 1, 4),
+          event(8, "boiler_fallback_start", "CV", "boiler_fallback", "attention", 4, "standby", "active", 350, 0),
         ],
       }),
       phase("latched", "Oorzaak weg, latch blijft", "Na de echte ODU-powercycle kan de gebruiker deze herstelde latch bevestigen.", 24, {
@@ -524,7 +524,7 @@
         events: [
           event(28, "incident_acknowledged", "HP1", "hp_fault", "normal", 4, "active", "standby", 21),
           event(30, "hp_availability_change", "HP1", "hp_recovered", "normal", 4, "faulted", "available"),
-          event(30, "boiler_fallback_stop", "CV", "hp_recovered", "normal", 2, "active", "standby", 4, 2),
+          event(30, "boiler_fallback_stop", "CV", "hp_recovered", "normal", 2, "active", "standby", 350, 0),
         ],
       }),
     ], { boilerTransport: "R1" }),
@@ -553,7 +553,7 @@
           event(3, "incident_start", "HP1", "hp_fault", "fault", 3, "standby", "active", 22),
           event(5, "hp_stop_confirmed", "HP1", "hp_fault", "normal", 3, "active", "standby"),
           event(8, "control_mode_change", "SYSTEM", "boiler_fallback", "attention", 4, "active", "active", 3, 4),
-          event(8, "boiler_fallback_start", "CV", "boiler_fallback", "attention", 4, "active", "active", 3, 4),
+          event(8, "boiler_fallback_start", "CV", "boiler_fallback", "attention", 4, "active", "active", 350, 1),
         ],
       }),
     ], { boilerTransport: "R1" }),
@@ -582,7 +582,7 @@
           event(3, "incident_start", "HP1", "hp_fault", "fault", 3, "standby", "active", 22),
           event(5, "hp_stop_confirmed", "HP1", "hp_fault", "normal", 3, "active", "standby"),
           event(8, "control_mode_change", "SYSTEM", "boiler_fallback", "attention", 4, "active", "active", 3, 4),
-          event(8, "boiler_fallback_start", "CV", "boiler_fallback", "attention", 4, "active", "active", 3, 4),
+          event(8, "boiler_fallback_start", "CV", "boiler_fallback", "attention", 4, "active", "active", 350, 1),
         ],
       }),
     ], {
@@ -688,7 +688,7 @@
           event(14, "hp_availability_change", "HP2", "hp_fault", "fault", 1, "available", "faulted", 37, 1),
           event(15, "hp_stop_confirmed", "HP2", "hp_fault", "normal", 1, "active", "standby"),
           event(18, "control_mode_change", "SYSTEM", "boiler_fallback", "attention", 4, "standby", "active", 1, 4),
-          event(18, "boiler_fallback_start", "CV", "boiler_fallback", "attention", 4, "standby", "active", 1, 4),
+          event(18, "boiler_fallback_start", "CV", "boiler_fallback", "attention", 4, "standby", "active", 350, 0),
         ],
       }),
     ], { boilerTransport: "R1" }),

@@ -280,6 +280,10 @@ inline ControllerDecision evaluate(const BoilerCommand &command,
     decision.force_off = true;
     decision.block_reason = BLOCK_WATER_TEMP_INHIBIT;
   } else if (command.source == COMMAND_SOURCE_FALLBACK &&
+             !input.assist_enabled) {
+    decision.force_off = true;
+    decision.block_reason = BLOCK_ASSIST_DISABLED;
+  } else if (command.source == COMMAND_SOURCE_FALLBACK &&
              !input.fallback_enabled) {
     decision.force_off = true;
     decision.block_reason = BLOCK_FALLBACK_DISABLED;

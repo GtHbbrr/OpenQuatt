@@ -2,7 +2,7 @@
 
 #include "../../openquatt/includes/control/oq_boiler_control_logic.h"
 #include "../../openquatt/includes/control/oq_boiler_output_logic.h"
-#include "../../openquatt/includes/control/oq_hybrid_fallback_logic.h"
+#include "../../openquatt/includes/control/oq_hp_fallback_logic.h"
 
 namespace {
 
@@ -16,9 +16,9 @@ struct FakeHeatOutput {
   int write_count = 0;
 };
 
-oq_hybrid_fallback::FallbackInputs eligible_fallback_inputs() {
-  oq_hybrid_fallback::FallbackInputs inputs;
-  inputs.current_mode = oq_hybrid_fallback::ControlMode::CM3;
+oq_hp_fallback::FallbackInputs eligible_fallback_inputs() {
+  oq_hp_fallback::FallbackInputs inputs;
+  inputs.current_mode = oq_hp_fallback::ControlMode::CM3;
   inputs.heating_demand = true;
   inputs.fallback_enabled = true;
   inputs.available_hp_count = 0;
@@ -101,10 +101,10 @@ void test_cm3_cm4_cm3_keeps_heat_output_enabled() {
 }
 
 void test_cm4_requires_every_guard() {
-  using oq_hybrid_fallback::ControlMode;
-  using oq_hybrid_fallback::FallbackAction;
-  using oq_hybrid_fallback::FallbackBlockReason;
-  using oq_hybrid_fallback::decide_cm4;
+  using oq_hp_fallback::ControlMode;
+  using oq_hp_fallback::FallbackAction;
+  using oq_hp_fallback::FallbackBlockReason;
+  using oq_hp_fallback::decide_cm4;
 
   auto inputs = eligible_fallback_inputs();
   auto decision = decide_cm4(inputs);
@@ -154,10 +154,10 @@ void test_cm4_requires_every_guard() {
 }
 
 void test_cm4_never_competes_with_other_control_owners() {
-  using oq_hybrid_fallback::ControlMode;
-  using oq_hybrid_fallback::FallbackAction;
-  using oq_hybrid_fallback::FallbackBlockReason;
-  using oq_hybrid_fallback::decide_cm4;
+  using oq_hp_fallback::ControlMode;
+  using oq_hp_fallback::FallbackAction;
+  using oq_hp_fallback::FallbackBlockReason;
+  using oq_hp_fallback::decide_cm4;
 
   auto inputs = eligible_fallback_inputs();
   inputs.override_active = true;

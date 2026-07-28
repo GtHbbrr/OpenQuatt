@@ -571,6 +571,7 @@ import { fetchWithTimeout } from "./browser-utils.js";
       state.incidentMonitoringUnsupported = false;
       state.incidentMonitoringFailureCount = 0;
       state.incidentMonitoringSignature = "";
+      state.incidentMonitoringRenderPending = false;
       state.incidentMonitoringLastFetchAt = 0;
       state.incidentAction = {
         hp: 0,
@@ -1248,7 +1249,12 @@ import { fetchWithTimeout } from "./browser-utils.js";
         return;
       }
       if (incidentMonitoringChanged && state.appView === "settings" && state.settingsGroup === "service") {
-        render();
+        if (state.focusedField) {
+          state.incidentMonitoringRenderPending = true;
+        } else {
+          state.incidentMonitoringRenderPending = false;
+          render();
+        }
         return;
       }
       if (trendChanged && state.appView === "diagnosis" && !state.root?.querySelector(".oq-overview-trends")) {

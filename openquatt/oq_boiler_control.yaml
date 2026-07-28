@@ -577,7 +577,9 @@ interval:
                 fallback
                     ? openquatt_decision_log::REASON_BOILER_FALLBACK
                     : openquatt_decision_log::REASON_BOILER_ASSIST,
-                openquatt_decision_log::SEVERITY_NORMAL,
+                fallback
+                    ? openquatt_decision_log::SEVERITY_ATTENTION
+                    : openquatt_decision_log::SEVERITY_NORMAL,
                 (uint8_t) cm_code,
                 openquatt_decision_log::STATE_STANDBY,
                 fallback

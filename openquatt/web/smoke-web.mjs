@@ -397,7 +397,7 @@ async function checkMockFixtureContracts() {
     throw new Error("Mock fixtures are incomplete");
   }
   if (!incidentScenarios || incidentScenarios.scenarios.length < 10) {
-    throw new Error("Hybrid incident mock scenarios are incomplete");
+    throw new Error("Heat-pump incident mock scenarios are incomplete");
   }
   assertContains(buildSource, "ENTITY_DEFS", "Canonical mock entity source");
   assertContains(mockSource, "__OQ_MOCK_ENTITY_DEFS__", "Generated mock entity definitions");

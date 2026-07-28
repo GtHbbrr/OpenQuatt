@@ -29,6 +29,13 @@ class OpenQuattWebAuth : public Component {
   bool verify_current_password(const std::string &password) const { return password == this->active_password_; }
   bool is_setup_window_active() const;
   const std::string &get_csrf_token() const { return this->csrf_token_; }
+  bool request_is_authenticated(
+      AsyncWebServerRequest *request) const {
+    return !this->is_auth_enabled() ||
+           (request != nullptr &&
+            request->authenticate(this->active_username_.c_str(),
+                                  this->active_password_.c_str()));
+  }
   bool is_api_security_transport_active() const;
   bool is_api_security_key_present() const;
   bool is_api_provisioning_pending() const;

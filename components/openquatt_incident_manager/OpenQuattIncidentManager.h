@@ -1,7 +1,6 @@
 #pragma once
 
 #include <array>
-#include <atomic>
 #include <cstddef>
 #include <cstdint>
 #include <string>
@@ -12,6 +11,7 @@
 
 #include "esphome/components/globals/globals_component.h"
 #include "esphome/components/openquatt_decision_log/OpenQuattDecisionLog.h"
+#include "esphome/components/openquatt_web_auth/OpenQuattWebAuth.h"
 #include "esphome/components/time/real_time_clock.h"
 #include "esphome/core/component.h"
 #include "esphome/core/preferences.h"
@@ -29,11 +29,25 @@ namespace openquatt_incident_manager {
 class OpenQuattIncidentManager : public Component {
  public:
   using IntGlobal = globals::GlobalsComponent<int>;
+  enum class DeferredActionKind : uint8_t {
+    NONE = 0U,
+    START_FAILURE_RETRY = 1U,
+    CONFIRM_ODU_POWER_CYCLE = 2U,
+  };
+  enum class DeferredActionQueueResult : uint8_t {
+    ACCEPTED = 0U,
+    DUPLICATE = 1U,
+    BUSY = 2U,
+    INVALID = 3U,
+  };
 
   void set_clock(time::RealTimeClock *clock) { this->clock_ = clock; }
   void set_control_mode_code(IntGlobal *value) { this->control_mode_code_ = value; }
   void set_decision_log(openquatt_decision_log::OpenQuattDecisionLog *value) {
     this->decision_log_ = value;
+  }
+  void set_web_auth(openquatt_web_auth::OpenQuattWebAuth *value) {
+    this->web_auth_ = value;
   }
 
   void setup() override;
@@ -51,12 +65,14 @@ class OpenQuattIncidentManager : public Component {
   void request_stop(uint8_t hp_index, uint32_t now_ms);
   oq_incidents::StartFailureResetResult retry_start_failure(
       uint8_t hp_index, uint32_t now_ms, uint32_t request_id = 0U);
-  uint32_t defer_start_failure_retry(uint8_t hp_index);
+  DeferredActionQueueResult defer_start_failure_retry(
+      uint8_t hp_index, uint32_t request_id);
   bool acknowledge(uint8_t hp_index, oq_incidents::IncidentId incident_id);
   uint8_t acknowledge_all_cleared();
   bool confirm_odu_power_cycle(uint8_t hp_index, uint32_t now_ms,
                                uint32_t request_id = 0U);
-  uint32_t defer_odu_power_cycle_confirmation(uint8_t hp_index);
+  DeferredActionQueueResult defer_odu_power_cycle_confirmation(
+      uint8_t hp_index, uint32_t request_id);
 
   oq_incidents::DerivedOutputs get_outputs(uint8_t hp_index) const;
   bool hp_configured(uint8_t hp_index) const;
@@ -73,12 +89,18 @@ class OpenQuattIncidentManager : public Component {
   const std::string &get_action_csrf_token() const {
     return this->action_csrf_token_;
   }
+  bool request_is_authenticated(
+      AsyncWebServerRequest *request) const {
+    return this->web_auth_ != nullptr &&
+           this->web_auth_->request_is_authenticated(request);
+  }
 
  protected:
   static constexpr uint32_t LINK_ROUND_TIMEOUT_MS = 15000U;
   static constexpr uint32_t PARTIAL_FAULT_SNAPSHOT_TIMEOUT_MS = 15000U;
   static constexpr uint32_t MANUAL_RESET_PERSIST_RETRY_MS = 60000U;
   static constexpr size_t SYNTHETIC_INCIDENT_COUNT = 4U;
+  static constexpr size_t ACTION_RESULT_HISTORY_SIZE = 4U;
   static constexpr oq_incidents::IncidentId LINK_LOSS_INCIDENT_ID =
       oq_incidents::kLinkLossIncidentId;
   static constexpr oq_incidents::IncidentId START_FAILED_INCIDENT_ID =
@@ -87,6 +109,15 @@ class OpenQuattIncidentManager : public Component {
       oq_incidents::kStopUnconfirmedIncidentId;
   static constexpr oq_incidents::IncidentId PERSISTENCE_FAILURE_INCIDENT_ID =
       oq_incidents::kPersistenceFailureIncidentId;
+
+  struct ActionResultRecord {
+    const char *action{"none"};
+    const char *result{"none"};
+    bool ok{false};
+    uint32_t sequence{0U};
+    uint32_t request_id{0U};
+    uint32_t at_ms{0U};
+  };
 
   struct UnitState {
     oq_incidents::HpIncidentEngine engine{};
@@ -127,6 +158,13 @@ class OpenQuattIncidentManager : public Component {
     uint32_t last_action_seq{0U};
     uint32_t last_action_request_id{0U};
     uint32_t last_action_at_ms{0U};
+    std::array<ActionResultRecord, ACTION_RESULT_HISTORY_SIZE>
+        action_results{};
+    size_t action_result_head{0U};
+    size_t action_result_count{0U};
+    uint32_t pending_action_request_id{0U};
+    DeferredActionKind pending_action_kind{
+        DeferredActionKind::NONE};
   };
 
   struct PublishedUnit {
@@ -141,6 +179,9 @@ class OpenQuattIncidentManager : public Component {
     uint32_t last_action_seq{0U};
     uint32_t last_action_request_id{0U};
     uint32_t last_action_at_ms{0U};
+    std::array<ActionResultRecord, ACTION_RESULT_HISTORY_SIZE>
+        action_results{};
+    size_t action_result_count{0U};
   };
 
   struct PublishedSnapshot {
@@ -195,11 +236,12 @@ class OpenQuattIncidentManager : public Component {
       const oq_incidents::IncidentRuntime &current, uint32_t now_ms);
   void setup_manual_reset_persistence_(uint32_t now_ms);
   void rotate_action_csrf_token_();
-  uint32_t reserve_action_request_id_();
-  static void record_action_result_(UnitState &unit, const char *action,
-                                    const char *result, bool ok,
-                                    uint32_t now_ms,
-                                    uint32_t request_id = 0U);
+  DeferredActionQueueResult queue_deferred_action_(
+      UnitState &unit, DeferredActionKind kind, uint32_t request_id);
+  void record_action_result_(UnitState &unit, const char *action,
+                             const char *result, bool ok,
+                             uint32_t now_ms,
+                             uint32_t request_id = 0U);
   void reconcile_manual_reset_persistence_(uint32_t now_ms);
   bool persist_manual_reset_mask_(uint8_t latch_mask);
   uint8_t runtime_manual_reset_mask_() const;
@@ -211,6 +253,7 @@ class OpenQuattIncidentManager : public Component {
   time::RealTimeClock *clock_{nullptr};
   IntGlobal *control_mode_code_{nullptr};
   openquatt_decision_log::OpenQuattDecisionLog *decision_log_{nullptr};
+  openquatt_web_auth::OpenQuattWebAuth *web_auth_{nullptr};
   bool fallback_requested_{false};
   bool fallback_active_{false};
   uint8_t fallback_block_reason_{0U};
@@ -225,9 +268,9 @@ class OpenQuattIncidentManager : public Component {
   ESPPreferenceObject manual_reset_pref_b_{};
   ESPPreferenceObject manual_reset_marker_pref_{};
   std::string action_csrf_token_;
-  std::atomic<uint32_t> next_action_request_id_{1U};
   PublishedSnapshot published_{};
   PublishedSnapshot staging_{};
+  mutable portMUX_TYPE action_mux_ = portMUX_INITIALIZER_UNLOCKED;
   mutable portMUX_TYPE snapshot_mux_ = portMUX_INITIALIZER_UNLOCKED;
 };
 

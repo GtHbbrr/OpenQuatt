@@ -4,11 +4,16 @@ from esphome.components import globals as globals_component, time
 from esphome.const import CONF_ID
 
 AUTO_LOAD = ["globals", "time", "web_server_base"]
-DEPENDENCIES = ["web_server", "openquatt_decision_log"]
+DEPENDENCIES = [
+    "web_server",
+    "openquatt_decision_log",
+    "openquatt_web_auth",
+]
 
 CONF_CLOCK = "clock"
 CONF_CONTROL_MODE_CODE = "control_mode_code"
 CONF_DECISION_LOG = "decision_log"
+CONF_WEB_AUTH = "web_auth"
 
 openquatt_incident_manager_ns = cg.esphome_ns.namespace(
     "openquatt_incident_manager"
@@ -22,6 +27,11 @@ OpenQuattDecisionLog = openquatt_decision_log_ns.class_(
     "OpenQuattDecisionLog", cg.Component
 )
 
+openquatt_web_auth_ns = cg.esphome_ns.namespace("openquatt_web_auth")
+OpenQuattWebAuth = openquatt_web_auth_ns.class_(
+    "OpenQuattWebAuth", cg.Component
+)
+
 CONFIG_SCHEMA = cv.Schema(
     {
         cv.GenerateID(): cv.declare_id(OpenQuattIncidentManager),
@@ -30,6 +40,7 @@ CONFIG_SCHEMA = cv.Schema(
             globals_component.GlobalsComponent
         ),
         cv.Required(CONF_DECISION_LOG): cv.use_id(OpenQuattDecisionLog),
+        cv.Required(CONF_WEB_AUTH): cv.use_id(OpenQuattWebAuth),
     }
 ).extend(cv.COMPONENT_SCHEMA)
 
@@ -45,3 +56,5 @@ async def to_code(config):
     cg.add(var.set_control_mode_code(control_mode_code))
     decision_log = await cg.get_variable(config[CONF_DECISION_LOG])
     cg.add(var.set_decision_log(decision_log))
+    web_auth = await cg.get_variable(config[CONF_WEB_AUTH])
+    cg.add(var.set_web_auth(web_auth))

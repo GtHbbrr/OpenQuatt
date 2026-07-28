@@ -43,6 +43,7 @@ openquatt_incident_manager:
   clock: oq_time
   control_mode_code: oq_control_mode_code
   decision_log: oq_decision_log
+  web_auth: oq_web_auth_store
 
 openquatt_service_status:
   id: oq_service_status_endpoint

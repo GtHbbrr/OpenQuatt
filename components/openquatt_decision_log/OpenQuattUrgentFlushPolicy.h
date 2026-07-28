@@ -1,6 +1,6 @@
 #pragma once
 
-#include <cstdint>
+#include <stdint.h>
 
 namespace esphome {
 namespace openquatt_decision_log {
@@ -33,13 +33,13 @@ class UrgentFlushPolicy {
     this->last_attempt_us_ = now_us;
   }
 
-  void mark_success(uint64_t now_us, uint32_t persisted_event_seq) {
+  void mark_target_persisted(uint64_t now_us,
+                             uint32_t persisted_event_seq) {
     this->attempted_ = true;
     this->last_attempt_us_ = now_us;
     this->retry_after_us_ = 0U;
     if (this->pending_ &&
-        sequence_at_least_(persisted_event_seq,
-                           this->requested_event_seq_)) {
+        persisted_event_seq == this->requested_event_seq_) {
       this->pending_ = false;
       this->requested_us_ = 0U;
       this->requested_event_seq_ = 0U;
@@ -68,6 +68,12 @@ class UrgentFlushPolicy {
   bool pending() const { return this->pending_; }
   uint32_t requested_event_seq() const {
     return this->requested_event_seq_;
+  }
+  bool protects_unpersisted_sequence(
+      uint32_t sequence, uint32_t persisted_sequence) const {
+    return this->pending_ &&
+           sequence_newer_(sequence, persisted_sequence) &&
+           sequence_at_least_(this->requested_event_seq_, sequence);
   }
 
  private:

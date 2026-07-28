@@ -69,8 +69,7 @@ class ManualResetLatchPersistencePolicy {
  public:
   enum class LoadResult : uint8_t {
     RESTORED = 0U,
-    FRESH_INSTALL = 1U,
-    RECOVERY_REQUIRED = 2U,
+    RECOVERY_REQUIRED = 1U,
   };
 
   LoadResult load(bool storage_a_loaded,
@@ -108,26 +107,6 @@ class ManualResetLatchPersistencePolicy {
       return LoadResult::RESTORED;
     }
 
-    this->persisted_mask_ = 0U;
-    this->ready_ = false;
-    this->metadata_repair_pending_ = false;
-    if (!storage_a_loaded && !storage_b_loaded && !marker_loaded) {
-      // Two missing data records and a missing marker is the only state
-      // treated as a fresh install/factory reset. Data slots are written
-      // before the marker and initialization must be durable before HP
-      // availability is released.
-      this->initialization_pending_ = true;
-      this->recovery_required_ = false;
-      this->load_failed_ = false;
-      this->fault_mask_ = this->configured_hp_mask_;
-      return LoadResult::FRESH_INSTALL;
-    }
-
-    // Any partial initialization, missing redundant slot, invalid marker or
-    // corrupt record leaves the old latch state unknowable. Conservatively
-    // latch every configured HP and repair both slots plus the marker. The
-    // repaired latch is released only through the normal per-HP physical
-    // ODU power-cycle confirmation.
     this->persisted_mask_ = this->configured_hp_mask_;
     this->ready_ = false;
     this->initialization_pending_ = false;
@@ -135,6 +114,11 @@ class ManualResetLatchPersistencePolicy {
     this->recovery_required_ = true;
     this->load_failed_ = false;
     this->fault_mask_ = this->configured_hp_mask_;
+    // Missing-all is indistinguishable here from an ESPHome NVS recovery
+    // that erased the complete namespace. Treat every incomplete, absent or
+    // corrupt redundant state as unknown and fail closed. A genuinely new or
+    // factory-reset installation follows the same explicit per-HP release
+    // path after the conservative marker has been persisted.
     return LoadResult::RECOVERY_REQUIRED;
   }
 

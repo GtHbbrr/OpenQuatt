@@ -70,14 +70,10 @@ class HpIncidentEngine {
         observation.fresh[2U];
     update_fault_recovery(observation.now_ms, complete_snapshot);
     const bool hard_fault_after = hard_fault_effective();
-    if (!hard_fault_before && hard_fault_after &&
-        run_state_ == RunState::STOPPED) {
-      // A stop confirmation predating the fault cannot authorize CM4.
-      // Require a newly registered stop command and fresh physical feedback.
-      run_state_ = RunState::STOPPING;
-      stop_requested_ = false;
-      stop_request_initialized_ = false;
-      stopped_read_streak_ = 0U;
+    if (!hard_fault_before && hard_fault_after) {
+      // A complete or partial stop confirmation predating the fault cannot
+      // authorize CM4. Re-arm the stop command and its feedback generations.
+      invalidate_stop_confirmation_();
     }
     refresh_derived();
   }
@@ -505,11 +501,17 @@ class HpIncidentEngine {
     link_state_ = LinkState::LOST;
     link_recovery_rounds_ = 0U;
     recovering_from_loss_ = true;
-    stopped_read_streak_ = 0U;
     // A stop observation made before link loss is stale by definition. Always
-    // require fresh physical feedback before fallback can be authorized.
+    // re-arm the command so the manager records new feedback baselines.
+    invalidate_stop_confirmation_();
+  }
+
+  void invalidate_stop_confirmation_() {
     run_state_ = RunState::STOP_UNCONFIRMED;
     compressor_running_confirmed_ = false;
+    stop_requested_ = false;
+    stop_request_initialized_ = false;
+    stopped_read_streak_ = 0U;
   }
 
   void update_incident(const IncidentDefinition &definition, bool raw_active,

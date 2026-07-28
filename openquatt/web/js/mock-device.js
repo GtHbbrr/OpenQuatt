@@ -481,7 +481,7 @@
     if (controlMode === 0) return "CM0 - Standby";
     if (controlMode === 1) return "CM1 - Flow / transition";
     if (controlMode === 2) return "CM2 - Heating - Heat Pump Only";
-    if (controlMode === 3) return "CM3 - Hybrid - Heat Pump + Boiler";
+    if (controlMode === 3) return "CM3 - Heating - Heat Pump + Boiler";
     if (controlMode === 4) return "CM4 - Boiler Only - Fault fallback";
     return `CM${controlMode}`;
   }
@@ -505,11 +505,6 @@
     }
 
     setText("text_sensor", "Control Mode (Label)", controlModeLabel(systemState.control_mode));
-    setSwitch("Boiler assist enabled", systemState.control_mode === 3);
-    setSwitch(
-      "Boiler fallback on heat-pump fault",
-      phase.heat_pumps.some((hp) => hp.fallback_cause_present),
-    );
     setBinary("Boiler command valid", true);
     setBinary("Boiler command active", boilerCommandActive);
     setBinary("Boiler active", boilerCommandActive);
@@ -517,8 +512,8 @@
       "text_sensor",
       "Boiler command source",
       systemState.control_mode === 4
-        ? "Hybrid incident fallback"
-        : systemState.control_mode === 3 ? "Hybrid assist" : "None",
+        ? "Heat-pump incident fallback"
+        : systemState.control_mode === 3 ? "Boiler assist" : "None",
     );
     setText(
       "text_sensor",
@@ -3822,6 +3817,9 @@
     if (name === "Usage statistics") {
       setEntity("binary_sensor", "Usage statistics choice configured", { value: true, state: true });
     }
+    if (name === "Boiler assist enabled" && !enabled) {
+      setSwitch("Boiler fallback on heat-pump fault", false);
+    }
     if (name === "Quick flow test") {
       handleButtonPress(enabled ? "Quick Flow Test Start" : "Quick Flow Test Abort");
       updateSummary();
@@ -5133,7 +5131,7 @@
           </label>
         </div>
         <div class="oq-helper-hub-dev-divider" role="presentation"></div>
-        <p class="oq-helper-hub-kicker">Hybrid-storingssimulator</p>
+        <p class="oq-helper-hub-kicker">Warmtepompstoringssimulator</p>
         <div class="oq-helper-hub-dev-grid">
           <label class="oq-helper-hub-dev-row">
             <span class="oq-helper-hub-dev-label">Storingsscenario</span>

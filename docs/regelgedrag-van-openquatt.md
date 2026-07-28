@@ -54,8 +54,8 @@ In gewone taal:
 
 De ketel springt dus normaal niet op elk kort dipje direct bij.
 
-`CM4` heeft een andere betekenis. Deze stand is alleen voor foutfallback bij een
-hybride installatie. OpenQuatt gaat pas naar `CM4` wanneer:
+`CM4` heeft een andere betekenis. Deze stand is alleen voor foutfallback.
+OpenQuatt gaat pas naar `CM4` wanneer:
 
 - geen warmtepomp meer veilig beschikbaar is;
 - de fout of verbindingsuitval voldoende lang en meermaals is bevestigd;
