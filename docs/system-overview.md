@@ -109,7 +109,6 @@ Configured startup delays are relative to the ESPHome scheduler becoming active.
 | HP1 Modbus | `${oq_modbus_startup_delay_ms}` (default 0ms) | Base poll every `${oq_modbus_update_interval_s}` (default 5s), commands throttled by `${oq_modbus_command_throttle_ms}` (default 500ms) |
 | HP2 Modbus (Duo) | 2500ms | Same base cadence; the offset intentionally stages HP1 and HP2 traffic |
 | OpenTherm thermostat slave (OTT) | Component setup | Runtime validation every 2s |
-| OpenTherm boiler master (OTB) | Enabled at late boot only when `Boiler connection` is `OpenTherm` | Link/freshness checks start after 2s and run every `${oq_otb_link_watch_s}` (default 1s); command application starts after 3s and runs every `${oq_otb_command_apply_s}` (default 1s) |
 | CIC | First scheduler tick after `${cic_poll_tick_ms}` (default 5s) | Fetching only runs when CIC polling is enabled |
 | MQTT usage statistics | 90s after setup-complete, opt-in, broker configuration and network gates are all satisfied | Publishes every 1h; a boot-time network loss restarts the 90s delay |
 | Firmware manifest | `${oq_firmware_initial_check_delay_s}` (default 300s) of continuously available network without an active OTA, sampled every 5s | Automatic checks every `${oq_firmware_periodic_check_interval}` (default 4h); manual checks and real runtime channel/target changes remain immediate |
