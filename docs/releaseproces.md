@@ -76,8 +76,10 @@ Keep the source-controlled `project_version` aligned with the next intended stab
 - `project_version` in `openquatt/oq_substitutions_common.yaml` remains the user-facing firmware version.
 - `release_channel` in `openquatt/oq_substitutions_common.yaml` identifies the running channel (`main` or `dev`).
 - `release_manifest_url` selects which OTA manifest the built-in update entity uses.
-- `Firmware Update` checks the selected OTA manifest every `4h`.
-- `Firmware Update Channel` is a runtime select that switches the OTA manifest between the baked-in `main` and `dev` URLs and immediately refreshes the update entity.
+- `Firmware Update` checks the selected OTA manifest every `${oq_firmware_periodic_check_interval}` (default `4h`) through the explicit OpenQuatt scheduler; the ESPHome update component's own boot-time scheduler is disabled.
+- The first automatic manifest check waits for `${oq_firmware_initial_check_delay_s}` (default 300s) of stable network connectivity without an active OTA so it does not overlap the boot-time API, web and usage-telemetry publication waves.
+- `Firmware Update Channel` is a runtime select that switches the OTA manifest between the baked-in `main` and `dev` URLs. Restored boot state uses the delayed initial check; a real runtime change refreshes the update entity immediately.
+- `Check Firmware Updates` always requests an immediate refresh and cancels a still-pending delayed initial check.
 
 The running firmware exposes both `OpenQuatt Version` and `OpenQuatt Release Channel` in diagnostics, while `Firmware Update Channel` controls which OTA track the device should follow next.
 

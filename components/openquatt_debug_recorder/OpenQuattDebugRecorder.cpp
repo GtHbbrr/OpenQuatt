@@ -546,11 +546,11 @@ uint32_t OpenQuattDebugRecorder::capture_value_(const DebugField &field) {
     case FieldType::SYSTEM_UPTIME_MS:
       return millis();
     case FieldType::SYSTEM_FREE_HEAP:
-      return heap_caps_get_free_size(MALLOC_CAP_8BIT);
+      return heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
     case FieldType::SYSTEM_FREE_PSRAM:
       return heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
     case FieldType::SYSTEM_MIN_FREE_HEAP:
-      return heap_caps_get_minimum_free_size(MALLOC_CAP_8BIT);
+      return heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL);
 #ifdef USE_SENSOR
     case FieldType::SENSOR: {
       auto *entity = static_cast<sensor::Sensor *>(field.source);

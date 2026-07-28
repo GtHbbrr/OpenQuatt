@@ -24,6 +24,17 @@ Hier kom je meestal pas aan als:
 
 Voor gewone gebruikers geldt dus meestal: eerst runtime, bijna nooit compile-time.
 
+### Firmware-updates
+
+Na een herstart wacht OpenQuatt met de eerste automatische firmwarecontrole tot
+de netwerkverbinding vijf minuten stabiel is en er geen OTA-update actief is.
+Daarna controleert de firmware iedere vier uur opnieuw. Dit uitstel is normaal
+opstartgedrag en geen teken dat de updatefunctie niet werkt.
+
+`Check Firmware Updates` voert wel direct een controle uit. Een echte
+runtimewijziging van het firmwarekanaal of updatedoel controleert eveneens
+direct; alleen de tijdens het opstarten herstelde keuze volgt de wachttijd.
+
 Voor flowdiagnose zijn er wel twee compile-time constanten die je soms in discussies of issues terugziet:
 
 - `oq_flow_mismatch_threshold_lph`

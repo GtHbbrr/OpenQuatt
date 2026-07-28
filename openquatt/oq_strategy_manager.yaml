@@ -78,6 +78,7 @@ select:
     id: oq_heat_control_mode
     name: "Heating Control Mode"
     icon: mdi:tune-variant
+    entity_category: config
     optimistic: true
     restore_value: true
     options:

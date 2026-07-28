@@ -83,7 +83,10 @@ class OpenQuattUsageTelemetry : public switch_::Switch, public Component {
   static constexpr uint32_t SESSION_TIMEOUT_MS = 30000;
   static constexpr uint32_t RETRY_MIN_MS = 5UL * 60UL * 1000UL;
   static constexpr uint32_t RETRY_MAX_MS = 60UL * 60UL * 1000UL;
-  static constexpr uint32_t MQTT_START_TASK_STACK_SIZE = 24576;
+  // HIL boot measurements leave >22 kB unused with the former 24 kB stack.
+  // Eight kB retains >5 kB measured headroom without splitting the largest
+  // internal-heap block before esp-mqtt requests its own 12 kB task stack.
+  static constexpr uint32_t MQTT_START_TASK_STACK_SIZE = 8192;
   static constexpr uint32_t MQTT_CLEANUP_TASK_STACK_SIZE = 6144;
   static constexpr int MQTT_TASK_STACK_SIZE = 12288;
 

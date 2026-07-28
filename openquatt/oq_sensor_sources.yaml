@@ -134,6 +134,7 @@ switch:
     id: oq_manual_cooling_enable
     name: "Manual Cooling Enable"
     icon: mdi:snowflake-check
+    entity_category: config
     restore_mode: RESTORE_DEFAULT_OFF
     optimistic: true
     web_server:
