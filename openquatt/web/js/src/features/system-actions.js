@@ -1,5 +1,6 @@
+import { hasEntity } from "../core/app-shared.js";
 import { getOpenQuattPauseDraftValue, getOpenQuattPausePresetValue } from "../core/entity-store.js";
-import { commitOpenQuattRegulationPause, commitOpenQuattRegulationResumeNow, triggerNamedButton } from "../core/entity-write-actions.js";
+import { commitOpenQuattRegulationPause, commitOpenQuattRegulationResumeNow, commitSelect, triggerNamedButton } from "../core/entity-write-actions.js";
 import { render } from "../core/render-scheduler.js";
 import { state } from "../core/state.js";
 import { clearDebugRecordingDevicePollTimer, scheduleDebugRecordingDeviceStatusPoll } from "./debug-recording.js";
@@ -17,6 +18,7 @@ function closeSystemModal() {
   state.authError = "";
   state.apiSecurityNotice = "";
   state.apiSecurityError = "";
+  state.pendingControlModeOverride = "";
   clearSettingsBackupDraft();
   render();
   scheduleDebugRecordingDeviceStatusPoll();
@@ -31,6 +33,57 @@ const systemActionHandlers = {
     state.systemModal = "restart-confirm";
     render();
   },
+  "open-control-mode-override-confirm": (button) => {
+    const option = String(button.dataset.controlModeOption || "");
+    if (!["Force CM0", "Force CM1", "Force CM98"].includes(option)) {
+      return;
+    }
+    state.controlError = "";
+    state.controlNotice = "";
+    state.pendingControlModeOverride = option;
+    state.systemModal = "control-mode-override-confirm";
+    render();
+  },
+  "confirm-control-mode-override": () => {
+    const option = String(state.pendingControlModeOverride || "");
+    if (!["Force CM0", "Force CM1", "Force CM98"].includes(option)) {
+      closeSystemModal();
+      return;
+    }
+    state.pendingControlModeOverride = "";
+    state.systemModal = "";
+    return commitSelect("controlModeOverride", option);
+  },
+  "clear-control-mode-override": () => commitSelect("controlModeOverride", "Auto"),
+  "open-runtime-reset-confirm": () => {
+    state.controlError = "";
+    state.controlNotice = "";
+    state.systemModal = "runtime-reset-confirm";
+    render();
+  },
+  "confirm-runtime-reset": () => {
+    const key = hasEntity("resetRuntimeCountersHp1Hp2")
+      ? "resetRuntimeCountersHp1Hp2"
+      : hasEntity("resetRuntimeCountersHp1") ? "resetRuntimeCountersHp1" : "";
+    if (!key) {
+      closeSystemModal();
+      return;
+    }
+    return triggerNamedButton(key, {
+      successNotice: "De draaitijdbalans is teruggezet. Nieuwe tellerwaarden kunnen binnen ongeveer één minuut zichtbaar worden.",
+      errorPrefix: "Draaiurentellers resetten mislukt",
+    });
+  },
+  "open-energy-counter-reset-confirm": () => {
+    state.controlError = "";
+    state.controlNotice = "";
+    state.systemModal = "energy-counter-reset-confirm";
+    render();
+  },
+  "confirm-energy-counter-reset": () => triggerNamedButton("resetCumulativeEnergyCounters", {
+    successNotice: "De cumulatieve energietellers zijn teruggezet.",
+    errorPrefix: "Energietellers resetten mislukt",
+  }),
   "open-silent-settings-modal": () => {
     state.systemModal = "silent-settings";
     render();

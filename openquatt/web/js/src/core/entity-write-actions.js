@@ -2,7 +2,7 @@ import { hasEntity } from "./app-shared.js";
 import { CURVE_POINTS, ENTITY_DEFS, FIRMWARE_ENTITY_KEYS, FLOW_SETTING_KEYS, getOduRuntimeFrequencyButtonHp, getOduRuntimeFrequencyHpKeys, HEADER_ENTITY_KEYS, LIMIT_KEYS, ODU_RUNTIME_FREQUENCY_BUTTON_KEYS, OPENQUATT_RESUME_CLEAR_VALUE, OVERVIEW_KEYS, POWER_HOUSE_KEYS, QUICK_STEPS } from "./config.js";
 import { beginDeviceReconnect } from "./device-reconnect.js";
 import { buildEntityPath, isCurveMode } from "./domain-helpers.js";
-import { formatOpenQuattResumeDateTime, getEntityValue, normalizeDateTimeValue, normalizeNumber, normalizeTimeValue, toDateTimeInputValue } from "./entity-store.js";
+import { formatOpenQuattResumeDateTime, getEntityValue, normalizeDateTimeValue, normalizeNumber, normalizeTimeValue, parseLooseNumber, toDateTimeInputValue } from "./entity-store.js";
 import { getSettingsRefreshKeys, refreshEntities, syncEntities } from "./entity-sync.js";
 import { setAppView } from "./navigation.js";
 import { render } from "./render-scheduler.js";
@@ -73,14 +73,18 @@ async function commitUsageTelemetrySwitch(entity, enabled) {
 
 export async function commitSelect(key, option) {
   const entity = ENTITY_DEFS[key];
+  const previousEntity = state.entities[key] ? { ...state.entities[key] } : null;
+  const verifyControlModeOverride = key === "controlModeOverride";
   state.busyAction = `save-${key}`;
   state.controlNotice = "";
   state.controlError = "";
-  state.entities[key] = {
-    ...(state.entities[key] || {}),
-    state: option,
-    value: option,
-  };
+  if (!verifyControlModeOverride) {
+    state.entities[key] = {
+      ...(state.entities[key] || {}),
+      state: option,
+      value: option,
+    };
+  }
   render();
 
   try {
@@ -91,9 +95,43 @@ export async function commitSelect(key, option) {
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}`);
     }
+    if (verifyControlModeOverride) {
+      let confirmationPayload = null;
+      try {
+        const confirmationResponse = await fetch(buildEntityPath(entity.domain, entity.name), {
+          cache: "no-store",
+        });
+        if (!confirmationResponse.ok) {
+          throw new Error(`HTTP ${confirmationResponse.status}`);
+        }
+        confirmationPayload = await confirmationResponse.json();
+      } catch (error) {
+        const uncertainValue = option === "Auto"
+          ? String(previousEntity?.value ?? previousEntity?.state ?? "Force CM0")
+          : option;
+        state.entities[key] = {
+          ...(previousEntity || {}),
+          state: uncertainValue,
+          value: uncertainValue,
+        };
+        throw new Error(`de controllerstatus kon niet worden bevestigd (${error.message})`);
+      }
+      const confirmedValue = String(confirmationPayload?.value ?? confirmationPayload?.state ?? "");
+      state.entities[key] = {
+        ...(previousEntity || {}),
+        ...(confirmationPayload || {}),
+      };
+      if (confirmedValue !== option) {
+        throw new Error(`de controller meldt nog "${confirmedValue || "onbekend"}"`);
+      }
+    }
     delete state.drafts[key];
     delete state.inputDrafts[key];
-    state.controlNotice = `${entity.name} bijgewerkt.`;
+    state.controlNotice = verifyControlModeOverride
+      ? option === "Auto"
+        ? "De normale moduskeuze is weer actief."
+        : `${option} is tijdelijk actief en verloopt automatisch na maximaal 30 minuten.`
+      : `${entity.name} bijgewerkt.`;
     if (key === "firmwareUpdateChannel") {
       updateFirmwareState({ updateInstallCompleted: false, updateInstallCompletedVersion: "" });
       state.entities.firmwareUpdateChannel = {
@@ -130,11 +168,34 @@ export async function commitSelect(key, option) {
       await refreshEntities(isCurveMode(option) ? CURVE_POINTS.map((point) => point.key) : POWER_HOUSE_KEYS, "state");
     }
   } catch (error) {
+    if (!verifyControlModeOverride && previousEntity) {
+      state.entities[key] = previousEntity;
+    }
     state.controlError = `${entity.name} kon niet worden bijgewerkt. ${error.message}`;
   } finally {
     state.busyAction = "";
     render();
   }
+}
+
+export function getNumberSettingValidationError(key, value, entities = state.entities) {
+  const normalized = parseLooseNumber(value);
+  if (!Number.isFinite(normalized)) {
+    return "";
+  }
+  if (key === "boilerSupportStartThreshold") {
+    const stopThreshold = parseLooseNumber(entities.boilerSupportStopThreshold?.value ?? entities.boilerSupportStopThreshold?.state);
+    if (Number.isFinite(stopThreshold) && normalized <= stopThreshold) {
+      return `De startgrens moet hoger zijn dan de stopgrens (${stopThreshold} W).`;
+    }
+  }
+  if (key === "boilerSupportStopThreshold") {
+    const startThreshold = parseLooseNumber(entities.boilerSupportStartThreshold?.value ?? entities.boilerSupportStartThreshold?.state);
+    if (Number.isFinite(startThreshold) && normalized >= startThreshold) {
+      return `De stopgrens moet lager zijn dan de startgrens (${startThreshold} W).`;
+    }
+  }
+  return "";
 }
 
 export async function commitSwitch(key, enabled) {
@@ -199,6 +260,15 @@ export async function commitSwitch(key, enabled) {
 export async function commitNumber(key, value, successNotice = "") {
   const entity = ENTITY_DEFS[key];
   const normalized = normalizeNumber(key, value);
+  const validationError = getNumberSettingValidationError(key, normalized);
+  if (validationError) {
+    state.controlNotice = "";
+    state.controlError = validationError;
+    state.inputDrafts[key] = String(value ?? "");
+    state.drafts[key] = normalized;
+    render();
+    return;
+  }
   state.busyAction = `save-${key}`;
   state.controlNotice = "";
   state.controlError = "";

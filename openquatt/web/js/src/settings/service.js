@@ -871,6 +871,135 @@ import { renderModalShell } from "../core/modal-shell.js";
     });
   }
 
+  export function getControlModeOverrideLabel(value) {
+    const labels = {
+      Auto: "Automatische regeling",
+      "Force CM0": "CM0 · stand-by",
+      "Force CM1": "CM1 · alleen circulatie",
+      "Force CM98": "CM98 · vorstcirculatie",
+    };
+    return labels[String(value || "")] || String(value || "Onbekend");
+  }
+
+  export function renderSettingsControlModeOverridePanel() {
+    if (!hasEntity("controlModeOverride")) {
+      return "";
+    }
+
+    const currentValue = String(getEntityValue("controlModeOverride") || "Auto");
+    const active = currentValue !== "Auto";
+    const busy = state.loadingEntities || state.busyAction === "save-controlModeOverride";
+    const entity = state.entities.controlModeOverride || {};
+    const options = (Array.isArray(entity.option) ? entity.option : entity.options || [])
+      .filter((option) => ["Auto", "Force CM0", "Force CM1", "Force CM98"].includes(option));
+
+    return `
+      <div class="oq-settings-service-override${active ? " is-active" : ""}">
+        <div class="oq-settings-service-override-copy">
+          <p class="oq-helper-label">${active ? "Testmodus actief" : "Tijdelijke testmodus"}</p>
+          <h4>${escapeHtml(active ? getControlModeOverrideLabel(currentValue) : "Regelmodus tijdelijk forceren")}</h4>
+          <p>${escapeHtml(active
+            ? "De normale moduskeuze is overruled. De controller keert uiterlijk 30 minuten na activering automatisch terug naar de normale regeling."
+            : "Alleen voor een gerichte test. Een geforceerde modus omzeilt tijdelijk de normale moduskeuze en verloopt automatisch na maximaal 30 minuten.")}</p>
+        </div>
+        <div class="oq-settings-service-override-actions">
+          ${options.map((option) => {
+            if (option === "Auto") {
+              return active ? `<button class="oq-helper-button oq-helper-button--primary" type="button" data-oq-action="clear-control-mode-override" ${busy ? "disabled" : ""}>Terug naar automatisch</button>` : "";
+            }
+            if (option === currentValue) {
+              return "";
+            }
+            return `<button class="oq-helper-button oq-helper-button--ghost" type="button" data-oq-action="open-control-mode-override-confirm" data-control-mode-option="${escapeHtml(option)}" ${busy ? "disabled" : ""}>${escapeHtml(getControlModeOverrideLabel(option))}</button>`;
+          }).join("")}
+        </div>
+      </div>
+    `;
+  }
+
+  export function renderSettingsCounterServiceSection() {
+    const runtimeResetKey = hasEntity("resetRuntimeCountersHp1Hp2")
+      ? "resetRuntimeCountersHp1Hp2"
+      : hasEntity("resetRuntimeCountersHp1") ? "resetRuntimeCountersHp1" : "";
+    const hasHp1Runtime = hasEntity("hp1RuntimeHours");
+    const hasHp2Runtime = hasEntity("hp2RuntimeHours");
+    const hp1Hours = getEntityNumericValue("hp1RuntimeHours");
+    const hp2Hours = getEntityNumericValue("hp2RuntimeHours");
+    const hasRuntimeDifference = Number.isFinite(hp1Hours) && Number.isFinite(hp2Hours);
+    const runtimeDifference = hasRuntimeDifference ? Math.abs(hp1Hours - hp2Hours) : Number.NaN;
+    const runtimeDifferenceLabel = hasRuntimeDifference
+      ? `${Number.isInteger(runtimeDifference) ? runtimeDifference.toFixed(0) : runtimeDifference.toFixed(1).replace(".", ",")} h verschil`
+      : "Verschil onbekend";
+    const runtimeDifferenceDetail = hasRuntimeDifference
+      ? hp1Hours === hp2Hours
+        ? "Beide warmtepompen hebben evenveel gedraaid."
+        : `${hp1Hours > hp2Hours ? "HP1" : "HP2"} heeft meer gedraaid.`
+      : "De runtimebalans wordt geladen.";
+    const runtimeDifferenceClass = !hasRuntimeDifference || hp1Hours === hp2Hours
+      ? "is-even"
+      : hp1Hours > hp2Hours ? "is-hp1-higher" : "is-hp2-higher";
+    const runtimeDifferenceSpan = hasRuntimeDifference && Math.max(Math.abs(hp1Hours), Math.abs(hp2Hours)) > 0
+      ? Math.min(28, Math.max(8, (runtimeDifference / Math.max(Math.abs(hp1Hours), Math.abs(hp2Hours))) * 500))
+      : 0;
+    const runtimeLeadValue = hasEntity("runtimeLeadHp") ? getSettingsTextStatValue("runtimeLeadHp", "") : "";
+    const runtimeLead = ["HP1", "HP2"].includes(runtimeLeadValue) ? runtimeLeadValue : "";
+    const runtimeLeadMarkup = runtimeLead
+      ? `<span class="oq-settings-runtime-lead"><span aria-hidden="true"></span>${escapeHtml(`${runtimeLead} leidend`)}</span>`
+      : "";
+    const runtimeResetMarkup = runtimeResetKey
+      ? `<button class="oq-settings-runtime-reset" type="button" data-oq-action="open-runtime-reset-confirm" aria-label="Draaiurentellers resetten" ${state.busyAction === runtimeResetKey ? "disabled" : ""}>${state.busyAction === runtimeResetKey ? "Resetten…" : "Balans resetten"}</button>`
+      : "";
+    const runtimeMarkup = hasHp1Runtime || hasHp2Runtime
+      ? `
+        <div class="oq-settings-runtime-balance${hasHp2Runtime ? "" : " is-single"}">
+          <div class="oq-settings-runtime-balance-head">
+            <p>Runtimebalans</p>
+            <div class="oq-settings-runtime-balance-head-actions">
+              ${runtimeLeadMarkup}
+              ${runtimeResetMarkup}
+            </div>
+          </div>
+          <div class="oq-settings-runtime-balance-grid">
+            ${hasHp1Runtime ? `
+              <div class="oq-settings-runtime-metric oq-settings-runtime-metric--hp1">
+                <span>HP1</span>
+                <strong>${escapeHtml(getSettingsStatValue("hp1RuntimeHours"))}</strong>
+              </div>
+            ` : ""}
+            ${hasHp2Runtime ? `
+              <div class="oq-settings-runtime-comparison" aria-label="${escapeHtml(`${runtimeDifferenceLabel}. ${runtimeDifferenceDetail}`)}">
+                <span class="oq-settings-runtime-track ${runtimeDifferenceClass}" style="--oq-runtime-delta-span: ${runtimeDifferenceSpan.toFixed(1)}%;" aria-hidden="true"></span>
+                <strong>${escapeHtml(runtimeDifferenceLabel)}</strong>
+                <small>${escapeHtml(runtimeDifferenceDetail)}</small>
+              </div>
+              <div class="oq-settings-runtime-metric oq-settings-runtime-metric--hp2">
+                <span>HP2</span>
+                <strong>${escapeHtml(getSettingsStatValue("hp2RuntimeHours"))}</strong>
+              </div>
+            ` : `<p class="oq-settings-runtime-single-copy">Opgetelde compressorlooptijd.</p>`}
+          </div>
+        </div>
+      `
+      : "";
+
+    if (!runtimeMarkup) {
+      return "";
+    }
+
+    return renderSettingsSection(
+      "Onderhoud",
+      "Draaiuren",
+      "Bekijk de runtimebalans. Begin de interne balans alleen opnieuw na onderhoud.",
+      `
+        <div class="oq-settings-maintenance-shell" id="oq-settings-maintenance">
+          ${runtimeMarkup}
+        </div>
+      `,
+      "",
+      "oq-settings-section--maintenance",
+    );
+  }
+
   export function renderSettingsServiceSection() {
     const service = getSettingsServiceModel();
 
@@ -880,6 +1009,7 @@ import { renderModalShell } from "../core/modal-shell.js";
       "Gebruik de service-stand (controlmode CM100) voor testen, afstelling en onderhoudstaken.",
       `
         <div class="oq-settings-service-shell">
+          ${renderSettingsControlModeOverridePanel()}
           <div class="oq-settings-service-toolbar">
             <div class="oq-settings-commissioning-teaser-status">
               <span class="oq-settings-commissioning-teaser-status-label">Huidige status</span>

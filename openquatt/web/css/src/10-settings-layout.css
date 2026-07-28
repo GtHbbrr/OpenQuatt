@@ -254,6 +254,56 @@
   line-height: 1.6;
 }
 
+.oq-settings-advanced {
+  grid-column: 1 / -1;
+  margin-top: 16px;
+  overflow: visible;
+  border: 1px solid var(--oq-helper-line);
+  border-radius: var(--oq-helper-radius-lg);
+  background: var(--oq-theme-surface-1src, rgba(248, 250, 252, 0.7));
+}
+
+.oq-settings-advanced > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 15px 18px;
+  color: var(--oq-helper-ink);
+  cursor: pointer;
+  list-style: none;
+  font-weight: 800;
+}
+
+.oq-settings-advanced > summary::-webkit-details-marker {
+  display: none;
+}
+
+.oq-settings-advanced > summary::after {
+  content: "+";
+  color: var(--oq-helper-faint);
+  font-size: 1.2rem;
+  line-height: 1;
+  transition: transform 160ms ease;
+}
+
+.oq-settings-advanced[open] > summary::after {
+  transform: rotate(45deg);
+}
+
+.oq-settings-advanced-body {
+  display: grid;
+  gap: 16px;
+  padding: 16px 18px 18px;
+  border-top: 1px solid var(--oq-helper-line);
+}
+
+.oq-settings-advanced-copy {
+  margin: 0;
+  color: var(--oq-helper-soft);
+  line-height: 1.55;
+}
+
 .oq-settings-rule-groups {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

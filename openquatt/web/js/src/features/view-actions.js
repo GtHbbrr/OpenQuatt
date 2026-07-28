@@ -34,6 +34,20 @@ function toggleDetails(event, button, selector, stateKey) {
   render();
 }
 
+function toggleSettingsAdvanced(event, button) {
+  event.preventDefault();
+  const id = String(button.dataset.settingsAdvanced || "").trim();
+  if (!id) {
+    return;
+  }
+  const details = button.closest(`[data-oq-settings-advanced="${id}"]`);
+  state.settingsAdvancedOpen = {
+    ...(state.settingsAdvancedOpen || {}),
+    [id]: !(details && details.hasAttribute("open")),
+  };
+  render();
+}
+
 const viewActionHandlers = {
   "select-view": (button) => {
     if ((button.dataset.viewId || "") === "diagnosis" && !isTrendHistoryEnabled()) {
@@ -105,6 +119,9 @@ const viewActionHandlers = {
   },
   "toggle-storage-advanced": (button, event) => {
     toggleDetails(event, button, ".oq-settings-storage-advanced", "settingsStorageAdvancedOpen");
+  },
+  "toggle-settings-advanced": (button, event) => {
+    toggleSettingsAdvanced(event, button);
   },
   "open-cm100-commissioning-modal": () => openServiceSettings(),
   "open-installation-monitoring": () => openServiceSettings(),

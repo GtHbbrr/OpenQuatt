@@ -4,7 +4,7 @@ import { isCurveMode, isManualFlowMode } from "../core/domain-helpers.js";
 import { getCurveFallbackSuggestion, getEntityValue, normalizeNumber } from "../core/entity-store.js";
 import { renderNumberInputField } from "../core/number-controls.js";
 import { state } from "../core/state.js";
-import { renderSettingsChoiceOption, renderSettingsFieldCard, renderSettingsMiniNumberField, renderSettingsNumberField, renderSettingsSection, renderSettingsSelectField } from "./controls.js";
+import { renderSettingsAdvancedDisclosure, renderSettingsChoiceOption, renderSettingsFieldCard, renderSettingsMiniNumberField, renderSettingsNumberField, renderSettingsSection, renderSettingsSelectField } from "./controls.js";
 import { formatNumericState } from "../core/formatting.js";
 import { escapeHtml } from "../core/html.js";
 
@@ -38,6 +38,21 @@ import { escapeHtml } from "../core/html.js";
         ${renderSettingsNumberField("curveFallbackSupply", "Fallback-aanvoertemperatuur zonder buitentemperatuur", "Aanvoertemperatuur die gebruikt wordt als de buitentemperatuursensor niet beschikbaar is.", "oq-settings-field--curve-fallback-card", { footerMarkup: renderCurveFallbackSuggestionMarkup() })}
       </div>
     `;
+  }
+
+  export function renderHeatingCurveAdvancedFields() {
+    const fields = [
+      renderSettingsNumberField("heatingCurvePidKp", "Proportionele reactie (Kp)", "Bepaalt hoe sterk de regeling direct reageert op het verschil tussen gewenste en gemeten aanvoertemperatuur."),
+      renderSettingsNumberField("heatingCurvePidKi", "Langdurige correctie (Ki)", "Corrigeert een klein temperatuurverschil dat langere tijd blijft bestaan. Verhoog alleen in kleine stappen."),
+      renderSettingsNumberField("heatingCurvePidKd", "Demping (Kd)", "Remt snelle veranderingen af. Een te hoge waarde kan de regeling onnodig traag of onrustig maken."),
+    ].filter(Boolean).join("");
+
+    return renderSettingsAdvancedDisclosure(
+      "heating-curve",
+      "Geavanceerde stooklijnafstelling",
+      "Deze PID-waarden verfijnen de temperatuurcorrectie boven op de stooklijn. Laat ze op de standaardwaarden staan zolang de regeling stabiel reageert.",
+      fields ? `<div class="oq-settings-grid oq-settings-grid--pid">${fields}</div>` : "",
+    );
   }
 
   export function renderStrategySelectionFields(className = "oq-settings-grid") {
@@ -81,8 +96,9 @@ import { escapeHtml } from "../core/html.js";
   export function renderPowerHouseBaseFields(className = "oq-settings-grid") {
     return `
       <div class="${escapeHtml(className)}">
+        ${renderSettingsNumberField("houseColdTemp", "Koude referentietemperatuur", "Bij Quatt is -10 °C de standaard. Samen met het nominale woningvermogen bepaalt deze temperatuur hoe de warmtevraag bij koud weer wordt geschaald.")}
         ${renderSettingsNumberField("houseOutdoorMax", "Maximum heating outdoor temperature", "Bij deze buitentemperatuur is verwarmen meestal niet meer nodig.")}
-        ${renderSettingsNumberField("housePower", "Rated maximum house power", "Hoeveel warmte je woning ongeveer nodig heeft wanneer het -10°C buiten is.")}
+        ${renderSettingsNumberField("housePower", "Nominaal woningvermogen", "Hoeveel warmte je woning ongeveer nodig heeft bij de koude referentietemperatuur hierboven.")}
         ${renderPowerHouseResponseProfilesField()}
       </div>
     `;
@@ -447,14 +463,12 @@ import { escapeHtml } from "../core/html.js";
       `
         ${renderFlowSettingsFields()}
         ${flowTuning ? `
-          <div class="oq-settings-subpanel oq-settings-subpanel--nested">
-            <div class="oq-settings-subpanel-head">
-              <p class="oq-helper-label">Flow afstelling</p>
-              <h4>Flow Kp en Ki</h4>
-              <p>Deze waarden bepalen hoe stevig de flowregeling corrigeert op afwijkingen. Autotune vult hier later een voorstel voor in.</p>
-            </div>
-            ${flowTuning}
-          </div>
+          ${renderSettingsAdvancedDisclosure(
+            "flow",
+            "Geavanceerde flow-afstelling",
+            "Kp en Ki bepalen hoe stevig de flowregeling corrigeert. Gebruik bij voorkeur eerst de autotune onder Service & commissioning en wijzig daarna alleen in kleine stappen.",
+            flowTuning,
+          )}
         ` : ""}
       `,
     );
@@ -476,6 +490,7 @@ import { escapeHtml } from "../core/html.js";
             ${renderCurveGraph()}
           </div>
           ${renderSettingsCurveInputs()}
+          ${renderHeatingCurveAdvancedFields()}
         </div>
       `
       : `
@@ -567,4 +582,3 @@ import { escapeHtml } from "../core/html.js";
       </div>
     `;
   }
-
