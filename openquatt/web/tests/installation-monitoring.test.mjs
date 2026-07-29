@@ -89,3 +89,40 @@ test("OTT-linkprobleem blijft apart zichtbaar wanneer OTT niet als bron is gesel
     label: "OpenTherm-verbinding meldt een probleem",
   }]);
 });
+
+test("een verouderd incidentsnapshot wordt niet als actuele warmtepompstatus getoond", () => {
+  state.entities = {};
+  state.incidentMonitoringSnapshot = {
+    valid: true,
+    system: {
+      controlMode: 2,
+      action: "none",
+    },
+    heatPumps: [{
+      index: 1,
+      linkState: "healthy",
+      runState: "stop_unconfirmed",
+      availability: "available",
+      incidents: [],
+    }],
+    incidents: [],
+  };
+  state.incidentMonitoringError = "Incident monitoring HTTP 401";
+
+  const monitoring = getInstallationMonitoringModel();
+
+  assert.equal(monitoring.active, true);
+  assert.equal(monitoring.incidentMonitoringStale, true);
+  assert.equal(monitoring.incidentMonitoring, undefined);
+  assert.equal(monitoring.title, "Warmtepompstatus wordt vernieuwd");
+  assert.match(monitoring.copy, /Oude incidentgegevens worden niet als actueel getoond/);
+  assert.deepEqual(monitoring.problems, [{
+    key: "incident-monitoring-stale",
+    label: "Warmtepompstatus wordt opnieuw opgehaald",
+    severity: "attention",
+    source: "incident_manager",
+  }]);
+
+  state.incidentMonitoringSnapshot = null;
+  state.incidentMonitoringError = "";
+});

@@ -481,7 +481,6 @@
 
 .oq-settings-monitoring-summary p,
 .oq-settings-monitoring-card header p,
-.oq-settings-monitoring-compressor-unit p,
 .oq-settings-monitoring-row p {
   margin: 0;
 }
@@ -502,7 +501,6 @@
 
 .oq-settings-monitoring-summary span,
 .oq-settings-monitoring-card > span,
-.oq-settings-monitoring-compressor-unit span,
 .oq-settings-monitoring-row span {
   color: var(--oq-helper-soft);
   line-height: 1.45;
@@ -511,6 +509,11 @@
 .oq-settings-monitoring-summary.is-warning {
   border-color: rgba(217, 119, 6, 0.46);
   background: rgba(245, 158, 11, 0.08);
+}
+
+.oq-settings-monitoring-summary.is-fault {
+  border-color: rgba(220, 38, 38, 0.42);
+  background: rgba(239, 68, 68, 0.07);
 }
 
 .oq-settings-monitoring-badge {
@@ -534,6 +537,11 @@
 .oq-settings-monitoring-badge.is-warning {
   color: var(--oq-theme-color-3q9a, #b45309);
   background: rgba(245, 158, 11, 0.17);
+}
+
+.oq-settings-monitoring-badge.is-fault {
+  color: var(--oq-theme-color-zv8q, #b91c1c);
+  background: rgba(239, 68, 68, 0.14);
 }
 
 .oq-settings-monitoring-active-list {
@@ -633,13 +641,11 @@
   gap: 10px;
 }
 
-.oq-settings-monitoring-compressor-list,
 .oq-settings-monitoring-rows {
   display: grid;
   gap: 9px;
 }
 
-.oq-settings-monitoring-compressor-unit,
 .oq-settings-monitoring-row {
   display: flex;
   align-items: center;
@@ -651,40 +657,59 @@
   background: var(--oq-helper-card);
 }
 
-.oq-settings-monitoring-compressor-unit > div:first-child,
+.oq-settings-monitoring-system .oq-settings-monitoring-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.oq-settings-monitoring-system .oq-settings-monitoring-row > .oq-settings-compact-switch-row {
+  justify-self: end;
+  max-width: 100%;
+}
+
 .oq-settings-monitoring-row > div:first-child {
   display: grid;
   gap: 3px;
   min-width: 0;
 }
 
-.oq-settings-monitoring-compressor-unit p,
 .oq-settings-monitoring-row strong {
   color: var(--oq-helper-ink);
 }
 
-.oq-settings-monitoring-compressor-unit dl {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 10px;
-  margin: 0;
+.oq-starts-panel {
+  overflow: auto;
+  border: 1px solid var(--oq-helper-line);
+  border-radius: 14px;
+  background: var(--oq-helper-card);
 }
 
-.oq-settings-monitoring-compressor-unit dl div {
-  display: grid;
-  gap: 2px;
-  min-width: 44px;
+.oq-starts {
+  width: 100%;
+  border-collapse: collapse;
+  color: var(--oq-helper-soft);
+}
+
+.oq-starts :is(th, td) {
+  padding: 9px 12px;
   text-align: right;
 }
 
-.oq-settings-monitoring-compressor-unit dt {
-  color: var(--oq-helper-faint);
-  font-size: 0.7rem;
+.oq-starts th:first-child {
+  text-align: left;
 }
 
-.oq-settings-monitoring-compressor-unit dd {
-  margin: 0;
+.oq-starts thead th {
+  color: var(--oq-helper-faint);
+  font-size: .7rem;
+}
+
+.oq-starts tbody tr + tr {
+  border-top: 1px solid var(--oq-helper-line);
+}
+
+.oq-starts tbody th,
+.oq-starts .is-alarm {
   color: var(--oq-helper-ink);
   font-weight: 800;
 }
@@ -694,8 +719,82 @@
   background: rgba(245, 158, 11, 0.07);
 }
 
-.oq-settings-monitoring-card .oq-settings-field {
+.oq-start-summary {
+  appearance: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 11px 12px;
+  border: 0;
+  border-top: 1px solid var(--oq-helper-line);
+  background: transparent;
+  color: var(--oq-helper-soft);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.oq-start-summary > span {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+}
+
+.oq-start-summary strong,
+.oq-start-editor > strong {
+  color: var(--oq-helper-ink);
+}
+
+.oq-start-summary > strong {
+  color: var(--oq-helper-accent-deep);
+}
+
+.oq-start-summary:hover {
+  background: var(--oq-helper-accent-soft);
+}
+
+.oq-start-editor {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 18px;
   padding: 12px;
+  border-top: 1px solid rgba(249, 115, 22, 0.28);
+  background: var(--oq-helper-accent-soft);
+}
+
+.oq-start-fields {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  min-width: 0;
+}
+
+.oq-start-fields .oq-settings-mini-field {
+  grid-template-columns: 92px auto;
+  gap: 4px 8px;
+}
+
+.oq-start-fields .oq-settings-mini-copy {
+  grid-column: 1 / -1;
+}
+
+.oq-start-fields .oq-settings-mini-field::after {
+  content: "starts";
+  align-self: center;
+  color: var(--oq-helper-soft);
+  font-size: 0.84rem;
+}
+
+.oq-start-fields .oq-settings-mini-field--compact .oq-helper-control {
+  width: 92px;
+}
+
+.oq-start-done {
+  min-height: 40px;
+  border-color: rgba(234, 88, 12, 0.46);
+  color: var(--oq-helper-accent-deep);
 }
 
 .oq-settings-monitoring-incident {
@@ -760,6 +859,12 @@
   font-size: 0.78rem;
   line-height: 1.4;
   text-align: right;
+}
+
+.oq-settings-monitoring-incident > span {
+  color: var(--oq-helper-soft);
+  font-size: 0.78rem;
+  line-height: 1.4;
 }
 
 .oq-settings-service-row .oq-helper-button {

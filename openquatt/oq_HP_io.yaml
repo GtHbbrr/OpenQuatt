@@ -42,11 +42,13 @@ modbus_controller:
       then:
         - lambda: |-
             id(${hp_id}_is_online) = false;
+            id(oq_incident_manager).observe_transport(${hp_index}, false, millis());
             ESP_LOGW("quatt", "%sModbus OFFLINE", "${prefix}");
     on_online:
       then:
         - lambda: |-
             id(${hp_id}_is_online) = true;
+            id(oq_incident_manager).observe_transport(${hp_index}, true, millis());
             ESP_LOGI("quatt", "%sModbus ONLINE", "${prefix}");
 
 # ----------------------------
@@ -289,6 +291,8 @@ sensor:
       then:
         - lambda: |-
             id(${hp_id}_outside_temp_activity_ms) = millis();
+            id(oq_incident_manager).observe_working_mode(
+                ${hp_index}, x, millis());
     web_server:
       sorting_group_id: oq_${hp_id}
 
@@ -378,6 +382,8 @@ sensor:
     on_value:
       then:
         - lambda: |-
+            id(oq_incident_manager).observe_compressor_frequency(
+                ${hp_index}, x, millis());
             if (oq_diagnostics::installation_monitor().observe_compressor_frequency(
                     ${hp_index}, x, millis())) {
               ESP_LOGI("oq_diag", "%sMeasured compressor start.", "${prefix}");
@@ -1009,6 +1015,12 @@ sensor:
     value_type: U_WORD
     skip_updates: ${oq_modbus_telemetry_skip}
     internal: true
+    on_value:
+      then:
+        - lambda: |-
+            id(oq_incident_manager).observe_fault_word(
+                ${hp_index}, 2119U,
+                static_cast<uint16_t>(lroundf(x)), millis());
 
   - platform: modbus_controller
     modbus_controller_id: ${hp_id}
@@ -1018,6 +1030,12 @@ sensor:
     value_type: U_WORD
     skip_updates: ${oq_modbus_telemetry_skip}
     internal: true
+    on_value:
+      then:
+        - lambda: |-
+            id(oq_incident_manager).observe_fault_word(
+                ${hp_index}, 2120U,
+                static_cast<uint16_t>(lroundf(x)), millis());
 
   - platform: modbus_controller
     modbus_controller_id: ${hp_id}
@@ -1027,6 +1045,12 @@ sensor:
     value_type: U_WORD
     skip_updates: ${oq_modbus_telemetry_skip}
     internal: true
+    on_value:
+      then:
+        - lambda: |-
+            id(oq_incident_manager).observe_fault_word(
+                ${hp_index}, 2121U,
+                static_cast<uint16_t>(lroundf(x)), millis());
 
   # ----------------------------
   # BINARY SENSOR
@@ -1379,5 +1403,7 @@ interval:
               id(${hp_id}), esphome::modbus::ModbusRegisterType::HOLDING, 2099, 1,
               [=](esphome::modbus::ModbusRegisterType, uint16_t, const std::vector<uint8_t> &) {
                 id(${hp_id}_is_online) = true;
+                id(oq_incident_manager).observe_transport(
+                    ${hp_index}, true, millis());
               });
           id(${hp_id}).queue_command(probe);

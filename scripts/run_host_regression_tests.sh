@@ -23,10 +23,14 @@ for source in "${sources[@]}"; do
     -Wextra \
     -Werror \
     -I"${repo_root}" \
+    -I"${repo_root}/openquatt" \
     "${source}" \
     -o "${binary}"
   echo "[run] ${test_name}"
   "${binary}"
 done
+
+echo "[run] incident manager action contract"
+python3 "${repo_root}/scripts/tests/test_incident_manager_action_contract.py"
 
 echo "Host regression tests passed (${#sources[@]})."

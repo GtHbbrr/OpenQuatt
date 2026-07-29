@@ -20,6 +20,7 @@ const { renderSettingsOpenThermCicSection } = await import("../js/src/settings/i
 const {
   ENTITY_DEFS,
   FAST_OVERVIEW_KEYS,
+  INSTALLATION_MONITORING_STATE_KEYS,
   OVERVIEW_KEYS,
 } = await import("../js/src/core/config.js");
 const { INITIAL_SETTINGS_READY_KEY_MAP, SETTINGS_GROUP_KEY_MAP } = await import("../js/src/core/entity-sync.js");
@@ -28,6 +29,7 @@ const boilerOpenThermYaml = await readFile(new URL("../../oq_boiler_opentherm.ya
 const heatPumpQProfileYaml = await readFile(new URL("../../profiles/heatpump_controller_q.yaml", import.meta.url), "utf8");
 const otSlaveYaml = await readFile(new URL("../../oq_ot_slave.yaml", import.meta.url), "utf8");
 const quickStartSource = await readFile(new URL("../js/src/features/quickstart.js", import.meta.url), "utf8");
+const quickStartActionsSource = await readFile(new URL("../js/src/features/quickstart-actions.js", import.meta.url), "utf8");
 const installationSource = await readFile(new URL("../js/src/settings/installation.js", import.meta.url), "utf8");
 
 function status(overrides = {}) {
@@ -333,7 +335,13 @@ test("integration diagnostics separates thermostat, boiler control, OTB and CiC"
 });
 
 test("settings hydration loads boiler setup and diagnostics before rendering", () => {
+  assert.ok(FAST_OVERVIEW_KEYS.includes("boilerCvAssistEnabled"));
+  assert.ok(FAST_OVERVIEW_KEYS.includes("boilerRatedHeatPower"));
+  assert.ok(FAST_OVERVIEW_KEYS.includes("boilerConnection"));
+  assert.ok(FAST_OVERVIEW_KEYS.includes("boilerFaultFallbackEnabled"));
   assert.ok(INITIAL_SETTINGS_READY_KEY_MAP.installation.includes("boilerConnection"));
+  assert.ok(INITIAL_SETTINGS_READY_KEY_MAP.installation.includes("boilerRatedHeatPower"));
+  assert.ok(INITIAL_SETTINGS_READY_KEY_MAP.installation.includes("boilerFaultFallbackEnabled"));
   assert.ok(INITIAL_SETTINGS_READY_KEY_MAP.installation.includes("otbLinkAvailable"));
   assert.ok(INITIAL_SETTINGS_READY_KEY_MAP.installation.includes("otbConnectionAutoSelected"));
   assert.ok(INITIAL_SETTINGS_READY_KEY_MAP.installation.includes("otbConnectionMismatch"));
@@ -343,6 +351,54 @@ test("settings hydration loads boiler setup and diagnostics before rendering", (
   assert.ok(SETTINGS_GROUP_KEY_MAP.installation.includes("otbConnectionMismatch"));
   assert.ok(SETTINGS_GROUP_KEY_MAP.integrations.includes("boilerCommandValid"));
   assert.ok(SETTINGS_GROUP_KEY_MAP.integrations.includes("otbChPressure"));
+  assert.ok(INITIAL_SETTINGS_READY_KEY_MAP.service.includes("boilerFaultFallbackEnabled"));
+  assert.ok(SETTINGS_GROUP_KEY_MAP.service.includes("boilerFaultFallbackEnabled"));
+  assert.equal(
+    ENTITY_DEFS.acknowledgeHpIncidents?.name,
+    "Acknowledge recovered HP incidents",
+  );
+  assert.ok(INSTALLATION_MONITORING_STATE_KEYS.includes("acknowledgeHpIncidents"));
+  assert.match(
+    quickStartActionsSource,
+    /if \(stepId === "boiler"\)[\s\S]*?"boilerFaultFallbackEnabled"/,
+  );
+  assert.match(
+    quickStartActionsSource,
+    /if \(stepId === "confirm"\)[\s\S]*?"boilerFaultFallbackEnabled"/,
+  );
+});
+
+test("fault fallback setting explains the consequence of both switch states", () => {
+  assert.match(installationSource, /Automatische ketelovername bij warmtepompstoring/);
+  assert.match(installationSource, /OpenQuatt stelt dit zelf vast/);
+  assert.match(installationSource, /je hoeft niets te bevestigen/);
+  assert.match(installationSource, /Een korte communicatiedip telt niet als storing/);
+});
+
+test("fault fallback is editable in Installation and the shared Quick Start boiler fields", () => {
+  const fallbackSwitchMatches = installationSource.match(
+    /renderSettingsCompactSwitchControl\(\s*"boilerFaultFallbackEnabled"/g,
+  ) || [];
+  const servicePanelSource = installationSource.match(
+    /function renderInstallationMonitoringSystemPanel[\s\S]+?\n  export function getInstallationMonitoringCount/,
+  )?.[0] || "";
+
+  assert.match(
+    installationSource,
+    /renderBoilerCvFields\("oq-settings-grid oq-settings-boiler-simple-grid", true\)/,
+  );
+  assert.match(
+    quickStartSource,
+    /renderBoilerCvFields\("oq-settings-grid oq-settings-grid--quickstart oq-settings-boiler-simple-grid", true\)/,
+  );
+  assert.match(
+    quickStartSource,
+    /\["Automatische ketelovername bij warmtepompstoring", isEntityActive\("boilerFaultFallbackEnabled"\) \? "Aan" : "Uit"\]/,
+  );
+  assert.match(servicePanelSource, /renderInstallationMonitoringStatusRow/);
+  assert.doesNotMatch(servicePanelSource, /boilerFaultFallbackEnabled/);
+  assert.doesNotMatch(servicePanelSource, /renderSettingsCompactSwitchControl/);
+  assert.equal(fallbackSwitchMatches.length, 1);
 });
 
 test("Quick Start blocks R1 after a boiler answers the safe OpenTherm probe", () => {

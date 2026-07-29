@@ -1,6 +1,7 @@
 import { getEntityStateText, hasEntity, isEntityActive } from "./app-shared.js";
 import { getEntityValue } from "./entity-store.js";
 import { formatFailures, formatWarningFailures } from "./failure-format.js";
+import { combineInstallationMonitoringModel } from "./incident-monitoring.js";
 import { state } from "./state.js";
 
 const OT_THERMOSTAT_SOURCE_KEYS = [
@@ -39,6 +40,10 @@ export function isInstallationMonitoringFailureActive(key) {
 
 export function getInstallationMonitoringModel() {
   const problems = [];
+  const incidentMonitoringStale = Boolean(state.incidentMonitoringError);
+  const structuredIncidentMonitoringAvailable = Boolean(
+    state.incidentMonitoringSnapshot?.valid && !incidentMonitoringStale,
+  );
   const cyclingActive = isInstallationMonitoringBinaryActive("compressorCyclingWarning2h")
     || isInstallationMonitoringBinaryActive("compressorCyclingWarning72h")
     || isInstallationMonitoringBinaryActive("alternatingCompressorStartsWarning");
@@ -77,10 +82,10 @@ export function getInstallationMonitoringModel() {
       addBinaryProblem("otLinkProblem", "OpenTherm-verbinding meldt een probleem");
     }
   }
-  if (isInstallationMonitoringFailureActive("hp1Failures")) {
+  if (!structuredIncidentMonitoringAvailable && isInstallationMonitoringFailureActive("hp1Failures")) {
     problems.push({ key: "hp1Failures", label: `Warmtepomp 1: ${getInstallationMonitoringWarningFailureText("hp1Failures")}` });
   }
-  if (isInstallationMonitoringFailureActive("hp2Failures")) {
+  if (!structuredIncidentMonitoringAvailable && isInstallationMonitoringFailureActive("hp2Failures")) {
     problems.push({ key: "hp2Failures", label: `Warmtepomp 2: ${getInstallationMonitoringWarningFailureText("hp2Failures")}` });
   }
   const activeProblemCount = problems.length;
@@ -91,7 +96,7 @@ export function getInstallationMonitoringModel() {
     });
   }
 
-  return {
+  const baseModel = {
     problems,
     active: problems.length > 0,
     cyclingAlertLatched,
@@ -105,6 +110,33 @@ export function getInstallationMonitoringModel() {
       : cyclingAlertLatched
         ? "Het pendelen is hersteld. De melding blijft zichtbaar totdat je haar bevestigt."
         : "OpenQuatt ziet op dit moment geen actieve aandachtspunten in de bewaakte signalen.",
+  };
+  const combined = structuredIncidentMonitoringAvailable
+    ? combineInstallationMonitoringModel(baseModel, state.incidentMonitoringSnapshot)
+    : baseModel;
+  if (!incidentMonitoringStale) {
+    return combined;
+  }
+
+  const monitoringProblem = {
+    key: "incident-monitoring-stale",
+    label: "Warmtepompstatus wordt opnieuw opgehaald",
+    severity: "attention",
+    source: "incident_manager",
+  };
+  const staleProblems = combined.problems.some((problem) => problem.key === monitoringProblem.key)
+    ? combined.problems
+    : [monitoringProblem, ...combined.problems];
+  return {
+    ...combined,
+    active: true,
+    severity: combined.severity === "fault" ? "fault" : "attention",
+    problems: staleProblems,
+    title: combined.active ? combined.title : "Warmtepompstatus wordt vernieuwd",
+    copy: combined.active
+      ? `${combined.copy} De warmtepompstatus wordt opnieuw opgehaald en oude incidentgegevens worden niet als actueel getoond. Ververs de pagina als dit na een controllerherstart blijft staan.`
+      : "OpenQuatt haalt de actuele warmtepompstatus opnieuw op. Oude incidentgegevens worden niet als actueel getoond. Ververs de pagina als dit na een controllerherstart blijft staan.",
+    incidentMonitoringStale: true,
   };
 }
 

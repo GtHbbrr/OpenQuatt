@@ -604,18 +604,37 @@ interval:
           const bool hp1_def = id(hp1_defrost).state;
           const bool hp1_valve_def = valve_defrost_active(true);
           const bool hp1_oil_return = id(hp1_prot_oil_return).state;
+          const auto hp1_incident_outputs =
+              id(oq_incident_manager).get_outputs(1);
+          const int hp1_previous_applied_level =
+              id(hp1_last_applied_level);
+          const auto hp1_candidate_state =
+              oq_hp_candidate::candidate_state(
+                  hp1_incident_outputs,
+                  hp1_previous_applied_level);
+          const bool hp1_available =
+              oq_hp_candidate::may_serve_candidate(hp1_candidate_state);
           #if OQ_TOPOLOGY_DUO
           const bool hp2_def = id(${secondary_defrost_id}).state;
           const bool hp2_valve_def = valve_defrost_active(false);
           const bool hp2_oil_return = id(${secondary_oil_return_id}).state;
-          const bool hp2_available = true;
+          const auto hp2_incident_outputs =
+              id(oq_incident_manager).get_outputs(2);
+          const int hp2_previous_applied_level =
+              id(${secondary_last_applied_level_id});
+          const auto hp2_candidate_state =
+              oq_hp_candidate::candidate_state(
+                  hp2_incident_outputs,
+                  hp2_previous_applied_level);
+          const bool hp2_available =
+              oq_hp_candidate::may_serve_candidate(hp2_candidate_state);
           #else
           const bool hp2_def = false;
           const bool hp2_valve_def = false;
           const bool hp2_oil_return = false;
+          const oq_hp_candidate::HpCandidateState hp2_candidate_state;
           const bool hp2_available = false;
           #endif
-          const bool hp1_available = true;
 
           constexpr uint32_t defrost_owner_hold_ms = 180000UL;
           if (hp1_valve_def || hp1_prev_valve_def) hp1_defrost_owner_hold_until_ms = now_ms + defrost_owner_hold_ms;
@@ -723,7 +742,25 @@ interval:
             }
             const bool needs_dual = (f > dual_on_f) || (prefer_single && id(oq_dual_hp_enabled));
 
-            if (prefer_single && !needs_dual) {
+            if (!hp1_available && !hp2_available) {
+              oq_request::reset_dual_hold_state(
+                  id(oq_dual_hp_enabled),
+                  id(oq_dual_hp_enable_hold_elapsed_accum_min),
+                  id(oq_dual_hp_disable_hold_elapsed_accum_min),
+                  id(oq_dual_hp_emergency_hold_elapsed_accum_min));
+              request_reason_code = 11;
+            } else if (hp1_available != hp2_available) {
+              oq_request::reset_dual_hold_state(
+                  id(oq_dual_hp_enabled),
+                  id(oq_dual_hp_enable_hold_elapsed_accum_min),
+                  id(oq_dual_hp_disable_hold_elapsed_accum_min),
+                  id(oq_dual_hp_emergency_hold_elapsed_accum_min));
+              const int available_request = std::min(max_level, f);
+              hp1_req = hp1_available ? available_request : 0;
+              hp2_req = hp2_available ? available_request : 0;
+              request_owner_hp = hp1_available ? 1 : 2;
+              request_reason_code = 13;
+            } else if (prefer_single && !needs_dual) {
               if (lead_is_hp1) hp1_req = f;
               else hp2_req = f;
               request_owner_hp = lead_is_hp1 ? 1 : 2;
@@ -1032,8 +1069,12 @@ interval:
             const bool both_idle_prev = (id(hp1_last_applied_level) <= 0 && id(${secondary_last_applied_level_id}) <= 0);
             if (single_req && both_idle_prev && !(hp1_def || hp2_def) && !(hp1_valve_def || hp2_valve_def)) {
               const int req_single = (hp1_req > 0) ? hp1_req : hp2_req;
-              const bool lead_can = level_allowed(lead_is_hp1, req_single);
-              const bool lag_can = level_allowed(!lead_is_hp1, req_single);
+              const bool lead_can =
+                  (lead_is_hp1 ? hp1_available : hp2_available) &&
+                  level_allowed(lead_is_hp1, req_single);
+              const bool lag_can =
+                  (lead_is_hp1 ? hp2_available : hp1_available) &&
+                  level_allowed(!lead_is_hp1, req_single);
               if (lead_can && lag_can) {
                 if (lead_is_hp1) {
                   hp1_req = req_single;
@@ -1054,8 +1095,8 @@ interval:
           const float cap_total = publish_capacity_and_deficit(P_req_total);
           const bool perf_inputs_valid = !isnan(Tamb) && !isnan(Tsup) && level_cap > 0;
           if (!perf_inputs_valid) {
-            hp1_req = f;
-            request_reason_code = (f > 0) ? 2 : 1;
+            hp1_req = hp1_available ? f : 0;
+            request_reason_code = (hp1_req > 0) ? 2 : 11;
           } else {
             float P_target = P_req_total;
             if (isnan(P_target)) P_target = 0.0f;
@@ -1072,6 +1113,7 @@ interval:
             const float W_el_over_soft_penalty_per_W = ${oq_optimizer_penalty_per_w};
 
             for (int l1 = 0; l1 <= level_cap; l1++) {
+              if (l1 > 0 && !hp1_available) continue;
               if (l1 > 0 && !level_allowed(true, l1)) continue;
 
               float p1 = (l1 == 0) ? 0.0f : oq_perf::interp_power_th_w(l1, Tamb, Tsup);
@@ -1097,6 +1139,23 @@ interval:
           request_owner_hp = (hp1_req > 0) ? 1 : 0;
           hp2_req = 0;
           #endif
+
+          const auto suspect_topology_hold =
+              oq_hp_candidate::preserve_active_topology_during_suspect(
+                  {
+                      hp1_req,
+                      hp2_req,
+                      hp1_candidate_state,
+                      hp2_candidate_state,
+                      f > 0,
+                  });
+          if (suspect_topology_hold.active) {
+            hp1_req = suspect_topology_hold.hp1_level;
+            hp2_req = suspect_topology_hold.hp2_level;
+            request_owner_hp = suspect_topology_hold.owner_hp;
+            request_reason_code = 5;
+            publish_optimizer_reason("keep_current");
+          }
 
           id(oq_ph_request_hp1_level) = hp1_req;
           id(oq_ph_request_hp2_level) = hp2_req;

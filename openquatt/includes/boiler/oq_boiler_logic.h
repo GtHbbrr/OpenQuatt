@@ -11,6 +11,7 @@ enum CommandSource : uint8_t {
   COMMAND_SOURCE_CM3 = COMMAND_SOURCE_POWER_HOUSE,
   COMMAND_SOURCE_COMMISSIONING = 2,
   COMMAND_SOURCE_HEATING_CURVE = 3,
+  COMMAND_SOURCE_FALLBACK = 4,
 };
 
 enum BlockReason : uint8_t {
@@ -30,6 +31,10 @@ enum BlockReason : uint8_t {
   BLOCK_TRANSPORT_SETTLING = 13,
   BLOCK_AWAITING_FRESH_COMMAND = 14,
   BLOCK_CONNECTION_MISMATCH = 15,
+  BLOCK_FALLBACK_DISABLED = 16,
+  BLOCK_FLOW_UNAVAILABLE = 17,
+  BLOCK_FLOW_INSUFFICIENT = 18,
+  BLOCK_HP_STOP_UNCONFIRMED = 19,
 };
 
 struct BoilerCommand {
@@ -44,7 +49,11 @@ struct BoilerCommand {
 
 struct ControllerInput {
   bool assist_enabled;
+  bool fallback_enabled;
   bool supply_temperature_valid;
+  bool flow_valid;
+  bool flow_sufficient;
+  bool fallback_outputs_safe;
   bool boiler_inhibit_active;
   bool hard_trip_active;
   bool connection_mismatch;
@@ -270,7 +279,16 @@ inline ControllerDecision evaluate(const BoilerCommand &command,
   } else if (input.boiler_inhibit_active) {
     decision.force_off = true;
     decision.block_reason = BLOCK_WATER_TEMP_INHIBIT;
-  } else if (!input.assist_enabled) {
+  } else if (command.source == COMMAND_SOURCE_FALLBACK &&
+             !input.assist_enabled) {
+    decision.force_off = true;
+    decision.block_reason = BLOCK_ASSIST_DISABLED;
+  } else if (command.source == COMMAND_SOURCE_FALLBACK &&
+             !input.fallback_enabled) {
+    decision.force_off = true;
+    decision.block_reason = BLOCK_FALLBACK_DISABLED;
+  } else if (command.source != COMMAND_SOURCE_FALLBACK &&
+             !input.assist_enabled) {
     decision.force_off = true;
     decision.block_reason = BLOCK_ASSIST_DISABLED;
   } else if (!command.valid) {
@@ -282,6 +300,16 @@ inline ControllerDecision evaluate(const BoilerCommand &command,
   } else if (!input.supply_temperature_valid) {
     decision.force_off = true;
     decision.block_reason = BLOCK_SUPPLY_UNAVAILABLE;
+  } else if (!input.flow_valid) {
+    decision.force_off = true;
+    decision.block_reason = BLOCK_FLOW_UNAVAILABLE;
+  } else if (!input.flow_sufficient) {
+    decision.force_off = true;
+    decision.block_reason = BLOCK_FLOW_INSUFFICIENT;
+  } else if (command.source == COMMAND_SOURCE_FALLBACK &&
+             !input.fallback_outputs_safe) {
+    decision.force_off = true;
+    decision.block_reason = BLOCK_HP_STOP_UNCONFIRMED;
   } else if (!command.demand_present) {
     // Losing the owning control context (for example CM3 -> CM5) is not a
     // normal anti-cycling stop. Withdraw heat immediately, even inside the
@@ -349,6 +377,10 @@ inline const char *block_reason_text(uint8_t reason) {
     case BLOCK_TRANSPORT_SETTLING: return "boiler transport change settling";
     case BLOCK_AWAITING_FRESH_COMMAND: return "awaiting fresh boiler command";
     case BLOCK_CONNECTION_MISMATCH: return "OpenTherm boiler detected while R1 is selected";
+    case BLOCK_FALLBACK_DISABLED: return "boiler fallback disabled";
+    case BLOCK_FLOW_UNAVAILABLE: return "flow unavailable";
+    case BLOCK_FLOW_INSUFFICIENT: return "flow too low";
+    case BLOCK_HP_STOP_UNCONFIRMED: return "heat-pump stop is not confirmed";
     default: return "";
   }
 }

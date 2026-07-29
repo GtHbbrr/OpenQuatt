@@ -24,7 +24,7 @@
 #   - Has no dedicated temperature PID loop (strategy owns temperature-loop behavior)
 #   - Does not implement flow interlock (flow-control + supervisory are leading)
 #   - Does not determine Control Mode
-#   - Does not control boiler directly (boiler follows CM3)
+#   - Does not control boiler directly (boiler follows CM3/CM4)
 #   - Does not write HP working mode or compressor levels directly
 #
 # Key assumptions:
@@ -33,7 +33,7 @@
 #
 # Interaction with Control Modes:
 #   - Active in CM2/CM3 (heating)
-#   - In CM0/CM1/CM98/CM100, compressor levels are forced to 0
+#   - In CM0/CM1/CM4/CM98/CM100, compressor levels are forced to 0
 #
 # Safety / fail-safe:
 #   - With inactive CM: compressor levels 0 (no heat production)
@@ -750,7 +750,7 @@ interval:
           // =========================
           // 1b) Control Mode gating
           // CM2/CM3/CM5 may activate HPs.
-          // In CM0/CM1/CM98: force Standby + level 0 and stop further HP control.
+          // In CM0/CM1/CM4/CM98: force Standby + level 0 and stop further HP control.
           // =========================
           const bool cm_allows_hp = (cm_code == 2 || cm_code == 3 || cm_code == 5);
 

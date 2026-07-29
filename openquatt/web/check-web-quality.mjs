@@ -63,13 +63,21 @@ for (const budget of WEB_BUNDLE_BUDGETS) {
   const baseGzipBytes = gzipSync(readBundleAtRef(bundleBaseRef, budget.file)).byteLength;
   const gzipDelta = gzipBytes - baseGzipBytes;
   const ratioLimit = Math.floor(baseGzipBytes * WEB_BUNDLE_GZIP_GROWTH_LIMIT.ratio);
-  const allowedIncrease = Math.min(WEB_BUNDLE_GZIP_GROWTH_LIMIT.bytes, ratioLimit);
+  const regularAllowedIncrease = Math.min(WEB_BUNDLE_GZIP_GROWTH_LIMIT.bytes, ratioLimit);
+  const migrationAllowedIncrease = Math.max(
+    0,
+    (budget.gzipBaselineCeiling ?? 0) - baseGzipBytes,
+  );
+  const allowedIncrease = Math.max(regularAllowedIncrease, migrationAllowedIncrease);
   const deltaPercent = baseGzipBytes ? (gzipDelta / baseGzipBytes) * 100 : 0;
   const formattedDeltaPercent = `${deltaPercent >= 0 ? "+" : ""}${deltaPercent.toFixed(2)}`;
+  const migrationLimit = migrationAllowedIncrease > regularAllowedIncrease
+    ? `, migration ceiling ${budget.gzipBaselineCeiling} B`
+    : "";
   bundleReports.push(
     `${budget.file}: raw ${rawBytes} B, gzip ${gzipBytes} B, `
     + `base ${baseGzipBytes} B, delta ${formatDelta(gzipDelta)} B (${formattedDeltaPercent}%), `
-    + `limit +${allowedIncrease} B`,
+    + `limit +${allowedIncrease} B${migrationLimit}`,
   );
   if (gzipDelta > allowedIncrease) {
     budgetFailures.push(

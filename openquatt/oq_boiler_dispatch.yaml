@@ -5,8 +5,10 @@
 # Owns the transport-neutral command contract consumed by `oq_boiler_control`.
 # CM3 commands are derived from the active heating strategy. Power House asks
 # for the remaining thermal power after the selected heat-pump levels; Heating
-# Curve forwards its supply target. CM100 remains an explicit commissioning
-# command. The selected transport is not considered here.
+# Curve forwards its supply target. CM4 emits a dedicated boiler-only fallback
+# command after supervisory has confirmed heat-pump unavailability. CM100
+# remains an explicit commissioning command. The selected transport is not
+# considered here.
 #
 # This package never writes R1 or OpenTherm outputs.
 # ==============================================================================
@@ -52,7 +54,7 @@ interval:
     startup_delay: 4500ms
     then:
       - lambda: |-
-          // Phase 1: derive one transport-neutral command from CM3 or CM100.
+          // Phase 1: derive one transport-neutral command from CM3, CM4 or CM100.
           const int cm_code = id(oq_control_mode_code);
           const uint32_t now_ms = millis();
           const bool commissioning_boiler_task =
@@ -134,6 +136,12 @@ interval:
             } else {
               command.valid = false;
             }
+          } else if (cm_code == 4) {
+            command.demand_present = true;
+            command.heat_request = id(oq_strategy_heat_request_active);
+            command.requested_power_w = id(oq_boiler_rated_heat_power).state;
+            command.target_temperature_c = id(max_water_temp_limit_c).state;
+            command.source = oq_boiler::COMMAND_SOURCE_FALLBACK;
           } else if (commissioning_task_active) {
             command.demand_present = true;
             command.heat_request = id(oq_commissioning_boiler_request);

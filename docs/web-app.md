@@ -170,6 +170,8 @@ Onder `Instellingen` staan de onderdelen bewust gescheiden. Het idee is: eerst d
 
 Hier staan basiskeuzes zoals Quatt Hybrid-versie, flowregeling, boiler- of CV-ondersteuning, stille uren, watergrenzen en compressorinstellingen.
 
+`Automatische ketelovername bij warmtepompstoring` is een aparte installatiekeuze en staat standaard uit. Als je deze inschakelt, mag OpenQuatt bij een bevestigde storing van alle geconfigureerde warmtepompen overschakelen naar CM4 en de cv-ketel de verwarmingsopdracht geven. OpenQuatt doet dit alleen nadat de warmtepompen veilig zijn gestopt en flow, aanvoertemperatuur en ketelaansturing geldig zijn. Een korte communicatiedip telt niet als bevestigde storing en vraagt geen actie of bevestiging van de gebruiker.
+
 Gebruik dit deel vooral tijdens de eerste inrichting of als je installatie later verandert.
 
 ### Verwarmen
@@ -211,6 +213,8 @@ Laat dit met rust zolang OpenQuatt logisch werkt. Verander liever een instelling
 ### Service
 
 Hier staan commissioning, tests, kalibratie en andere servicetaken. Gebruik deze groep alleen voor een gerichte controle of afstelling en volg de aanwijzingen in de web-app.
+
+Onder `Installatiebewaking` zie je per warmtepomp actieve en herstellende incidenten, wat daarvan het effect op de regeling is en hoe OpenQuatt erop reageert. Herstelde gelatchte incidenten blijven zichtbaar totdat je de melding als gezien markeert. Als een storing volgens de warmtepomp een echte uit- en inschakeling van de buitenunit vereist, verschijnt een aparte knop waarmee je na uitvoering bevestigt dat de powercycle werkelijk is uitgevoerd. Het paneel toont daarnaast compressorstarts, hydraulische aandachtspunten en verbindingsstatussen. De alarmgrenzen voor compressorstarts zijn uitklapbaar en bedoeld voor incidentele aanpassing.
 
 ### Systeem
 

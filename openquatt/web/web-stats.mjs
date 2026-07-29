@@ -84,6 +84,7 @@ const devFiles = [
   path.join(webDir, "css", "src", "02-devtools.css"),
   path.join(webDir, "js", "device-wrapper.js"),
   path.join(webDir, "js", "mock-scenarios.js"),
+  path.join(webDir, "js", "mock-incident-scenarios.js"),
   path.join(webDir, "js", "mock-fixtures.js"),
   path.join(webDir, "js", "mock-device.js"),
 ];

@@ -364,6 +364,7 @@ def build_pages_site(site_dir: Path, factory_dir: Path, helper_python: Sequence[
     for relative_path in (
         "css/openquatt-preview.css",
         "js/mock-scenarios.js",
+        "js/mock-incident-scenarios.js",
         "js/mock-entity-defs.js",
         "js/mock-fixtures.js",
         "js/mock-device.js",

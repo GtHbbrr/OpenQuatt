@@ -23,7 +23,7 @@
 #   - Pump output is correctly configured for PWM
 #
 # Interaction with Control Modes:
-#   - Active in CM1/CM2/CM3/CM5/CM100 (AUTO=PI, MANUAL=fixed iPWM)
+#   - Active in CM1/CM2/CM3/CM4/CM5/CM100 (AUTO=PI, MANUAL=fixed iPWM)
 #   - CM0: early return (supervisory owns pump state in idle)
 #   - CM98: fixed frost PWM path
 #
@@ -651,7 +651,7 @@ interval:
           const bool is_cm0 = (cm_code == 0);
           const int commissioning_task_code = id(oq_commissioning_task_code);
 
-          // Flow submode select (within CM1/CM2/CM3): AUTO vs MANUAL PWM
+          // Flow submode select (within CM1/CM2/CM3/CM4): AUTO vs MANUAL PWM
           const int flow_mode_code = (id(oq_flow_control_mode).active_index().value_or(0) == 1) ? 1 : 0;
           id(oq_flow_control_mode_code) = flow_mode_code;
           const bool want_manual = (flow_mode_code == 1);
