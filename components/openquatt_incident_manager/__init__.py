@@ -5,6 +5,7 @@ from esphome.const import CONF_ID
 
 AUTO_LOAD = ["globals", "time", "web_server_base"]
 DEPENDENCIES = [
+    "psram",
     "web_server",
     "openquatt_decision_log",
     "openquatt_web_auth",

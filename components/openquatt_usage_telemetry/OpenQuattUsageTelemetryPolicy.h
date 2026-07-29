@@ -1,0 +1,136 @@
+#pragma once
+
+#include <cinttypes>
+#include <cstddef>
+#include <cstdio>
+#include <cstdint>
+#include <cstring>
+#include <string>
+
+namespace esphome {
+namespace openquatt_usage_telemetry {
+
+enum class MqttCleanupDecision : uint8_t {
+  DESTROY = 0U,
+  FORCE_DISCONNECT = 1U,
+  RETRY_STOP = 2U,
+  DESTROY_ALREADY_STOPPED = 3U,
+};
+
+class FixedBufferWriter {
+ public:
+  FixedBufferWriter(char *data, size_t capacity)
+      : data_(data), capacity_(capacity) {
+    if (this->data_ == nullptr || this->capacity_ == 0U) {
+      this->ok_ = false;
+    } else {
+      this->data_[0] = '\0';
+    }
+  }
+
+  FixedBufferWriter &operator+=(const char *value) {
+    if (value != nullptr) {
+      this->append_(value, std::strlen(value));
+    }
+    return *this;
+  }
+
+  FixedBufferWriter &operator+=(const std::string &value) {
+    this->append_(value.data(), value.size());
+    return *this;
+  }
+
+  FixedBufferWriter &operator+=(char value) {
+    this->append_(&value, 1U);
+    return *this;
+  }
+
+  void append_uint(uint64_t value) {
+    char buffer[24];
+    const int length = std::snprintf(
+        buffer, sizeof(buffer), "%" PRIu64, value);
+    if (length <= 0) {
+      this->ok_ = false;
+      return;
+    }
+    this->append_(buffer, static_cast<size_t>(length));
+  }
+
+  bool ok() const { return this->ok_; }
+  size_t size() const { return this->size_; }
+
+ private:
+  void append_(const char *value, size_t length) {
+    if (!this->ok_ || value == nullptr ||
+        length >= this->capacity_ - this->size_) {
+      this->ok_ = false;
+      return;
+    }
+    std::memcpy(this->data_ + this->size_, value, length);
+    this->size_ += length;
+    this->data_[this->size_] = '\0';
+  }
+
+  char *data_{nullptr};
+  size_t capacity_{0U};
+  size_t size_{0U};
+  bool ok_{true};
+};
+
+inline void append_json_escaped(FixedBufferWriter &output,
+                                const std::string &input) {
+  for (char c : input) {
+    switch (c) {
+      case '"':
+        output += "\\\"";
+        break;
+      case '\\':
+        output += "\\\\";
+        break;
+      case '\b':
+        output += "\\b";
+        break;
+      case '\f':
+        output += "\\f";
+        break;
+      case '\n':
+        output += "\\n";
+        break;
+      case '\r':
+        output += "\\r";
+        break;
+      case '\t':
+        output += "\\t";
+        break;
+      default:
+        if (static_cast<unsigned char>(c) < 0x20U) {
+          char buffer[7];
+          std::snprintf(
+              buffer, sizeof(buffer), "\\u%04x",
+              static_cast<unsigned char>(c));
+          output += buffer;
+        } else {
+          output += c;
+        }
+        break;
+    }
+  }
+}
+
+inline MqttCleanupDecision mqtt_cleanup_decision(
+    bool stop_succeeded, bool connected_seen, bool disconnected_seen,
+    uint8_t consecutive_stop_failures) {
+  if (stop_succeeded) {
+    return MqttCleanupDecision::DESTROY;
+  }
+  if (connected_seen && !disconnected_seen) {
+    return MqttCleanupDecision::FORCE_DISCONNECT;
+  }
+  if (consecutive_stop_failures < 2U) {
+    return MqttCleanupDecision::RETRY_STOP;
+  }
+  return MqttCleanupDecision::DESTROY_ALREADY_STOPPED;
+}
+
+}  // namespace openquatt_usage_telemetry
+}  // namespace esphome

@@ -46,6 +46,12 @@ python3 scripts/dev.py validate --jobs 2
 Begin bij voorkeur met `--jobs 2`. Meer parallelisme kan sneller zijn, maar gebruikt ook meer CPU, RAM en schijfcache.
 De eerste full-validate na een lege of opgeschoonde cache kan tijdelijk sequentieel lopen; de helper doet dat automatisch om ESP-IDF component-cache races te vermijden.
 
+## Geheugenvalidatie
+
+Een geslaagde compile en het linker-RAM-percentage bewijzen niet dat de runtimeheap veilig is. Meet bij nieuwe runtimefeatures ook de actuele en minimale interne heap, het grootste vrije block, fragmentatie, vrij PSRAM en relevante task-stack-watermarks op representatieve hardware.
+
+Vergelijk dezelfde releaseconfiguratie vóór en na de wijziging, vanaf een koude boot en onder gecombineerde HA-, web-, API-, MQTT-, Modbus-, OpenTherm- en waar relevant OTA/flashbelasting. Zie `CONTRIBUTING.md` en `docs/system-overview.md` voor de allocatieregels, meetmethode en releasecriteria.
+
 ## Flashen En Hardware
 
 Gebruik voor ESPHome upload- en logtaken de ESPHome executable uit de lokale venv:

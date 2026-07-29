@@ -5,8 +5,6 @@
 #include <cstdio>
 #include <cstring>
 #include <limits>
-#include <memory>
-#include <new>
 
 #include "esp_random.h"
 #include "esphome/components/web_server/web_server.h"
@@ -409,6 +407,12 @@ class IncidentManagerRequestHandler : public AsyncWebHandler {
       request->requestAuthentication();
       return;
     }
+    if (!this->parent_->storage_ready()) {
+      request->send(
+          503, "application/json",
+          R"({"error":"snapshot_unavailable"})");
+      return;
+    }
     char url_buf[AsyncWebServerRequest::URL_BUF_SIZE];
     request->url_to(url_buf);
     const bool retry_start = url_path_matches(
@@ -505,39 +509,71 @@ float OpenQuattIncidentManager::get_setup_priority() const {
 }
 
 void OpenQuattIncidentManager::setup() {
-  this->units_[0].configured = true;
-  this->units_[1].configured = OQ_TOPOLOGY_DUO != 0;
+  const auto register_handler = [this]() {
+    if (web_server_base::global_web_server_base == nullptr) {
+      ESP_LOGW(TAG,
+               "web_server_base is unavailable; incident endpoint disabled");
+    } else if (this->web_auth_ == nullptr) {
+      ESP_LOGE(TAG,
+               "Runtime web auth is unavailable; incident endpoint disabled");
+    } else {
+      web_server_base::global_web_server_base->add_handler(
+          new IncidentManagerRequestHandler(this));
+    }
+  };
+
+  if (!this->external_state_.allocate()) {
+    ESP_LOGE(
+        TAG,
+        "Could not allocate %u-byte incident state arena in PSRAM; "
+        "incident control remains fail-closed",
+        static_cast<unsigned>(sizeof(ExternalState)));
+    register_handler();
+    this->mark_failed();
+    return;
+  }
+  this->action_mutex_ =
+      xSemaphoreCreateMutexStatic(&this->action_mutex_storage_);
+  this->snapshot_mutex_ =
+      xSemaphoreCreateMutexStatic(&this->snapshot_mutex_storage_);
+  if (this->action_mutex_ == nullptr || this->snapshot_mutex_ == nullptr) {
+    ESP_LOGE(TAG,
+             "Could not initialize incident state synchronization; "
+             "incident control remains fail-closed");
+    this->external_state_.release();
+    this->action_mutex_ = nullptr;
+    this->snapshot_mutex_ = nullptr;
+    register_handler();
+    this->mark_failed();
+    return;
+  }
+
+  this->units_()[0].configured = true;
+  this->units_()[1].configured = OQ_TOPOLOGY_DUO != 0;
   const uint32_t now_ms = millis();
   this->rotate_action_csrf_token_();
-  for (UnitState &unit : this->units_) {
+  for (UnitState &unit : this->units_()) {
     unit.last_link_round_ms = now_ms;
   }
   this->setup_manual_reset_persistence_(now_ms);
-  for (size_t slot = 0U; slot < this->units_.size(); ++slot) {
-    if (this->units_[slot].configured) {
-      this->publish_transitions_(this->units_[slot], slot, now_ms);
+  for (size_t slot = 0U; slot < this->units_().size(); ++slot) {
+    if (this->units_()[slot].configured) {
+      this->publish_transitions_(this->units_()[slot], slot, now_ms);
     }
   }
   this->publish_snapshot_(now_ms);
+  register_handler();
 
-  if (web_server_base::global_web_server_base == nullptr) {
-    ESP_LOGW(TAG, "web_server_base is unavailable; incident endpoint disabled");
-  } else if (this->web_auth_ == nullptr) {
-    ESP_LOGE(TAG,
-             "Runtime web auth is unavailable; incident endpoint disabled");
-  } else {
-    web_server_base::global_web_server_base->add_handler(
-        new IncidentManagerRequestHandler(this));
-  }
 }
 
 void OpenQuattIncidentManager::loop() {
+  if (!this->storage_ready_()) return;
   const uint32_t now_ms = millis();
   if (elapsed_ms_(now_ms, this->last_loop_ms_) < 1000U) return;
   this->last_loop_ms_ = now_ms;
 
-  for (size_t slot = 0U; slot < this->units_.size(); ++slot) {
-    UnitState &unit = this->units_[slot];
+  for (size_t slot = 0U; slot < this->units_().size(); ++slot) {
+    UnitState &unit = this->units_()[slot];
     if (!unit.configured) continue;
 
     bool has_pending_fault_word = false;
@@ -574,19 +610,22 @@ void OpenQuattIncidentManager::dump_config() {
       TAG,
       "  ODU confirmation: POST "
       "/openquatt/incidents/confirm-odu-power-cycle");
-  ESP_LOGCONFIG(TAG, "  Snapshot heap copy: %u bytes",
+  ESP_LOGCONFIG(TAG, "  Internal control object: %u bytes",
+                static_cast<unsigned>(sizeof(OpenQuattIncidentManager)));
+  ESP_LOGCONFIG(TAG, "  PSRAM incident arena: %u bytes",
+                static_cast<unsigned>(sizeof(ExternalState)));
+  ESP_LOGCONFIG(TAG, "  PSRAM response scratch: %u bytes (preallocated)",
                 static_cast<unsigned>(sizeof(PublishedSnapshot)));
 }
 
 void OpenQuattIncidentManager::rotate_action_csrf_token_() {
-  char token[33];
   std::snprintf(
-      token, sizeof(token), "%08x%08x%08x%08x",
+      this->action_csrf_token_.data(), this->action_csrf_token_.size(),
+      "%08x%08x%08x%08x",
       static_cast<unsigned>(esp_random()),
       static_cast<unsigned>(esp_random()),
       static_cast<unsigned>(esp_random()),
       static_cast<unsigned>(esp_random()));
-  this->action_csrf_token_ = token;
 }
 
 void OpenQuattIncidentManager::record_action_result_(
@@ -601,7 +640,11 @@ void OpenQuattIncidentManager::record_action_result_(
   unit.last_action_at_ms = now_ms;
 
   if (request_id == 0U) return;
-  portENTER_CRITICAL(&this->action_mux_);
+  if (this->action_mutex_ == nullptr ||
+      xSemaphoreTake(this->action_mutex_, portMAX_DELAY) != pdTRUE) {
+    ESP_LOGE(TAG, "Could not lock incident action state");
+    return;
+  }
   const size_t insert_index =
       (unit.action_result_head + unit.action_result_count) %
       ACTION_RESULT_HISTORY_SIZE;
@@ -619,7 +662,7 @@ void OpenQuattIncidentManager::record_action_result_(
     unit.pending_action_request_id = 0U;
     unit.pending_action_kind = DeferredActionKind::NONE;
   }
-  portEXIT_CRITICAL(&this->action_mux_);
+  xSemaphoreGive(this->action_mutex_);
 }
 
 OpenQuattIncidentManager::DeferredActionQueueResult
@@ -631,7 +674,10 @@ OpenQuattIncidentManager::queue_deferred_action_(
   const char *action = deferred_action_name(kind);
   DeferredActionQueueResult result =
       DeferredActionQueueResult::ACCEPTED;
-  portENTER_CRITICAL(&this->action_mux_);
+  if (this->action_mutex_ == nullptr ||
+      xSemaphoreTake(this->action_mutex_, portMAX_DELAY) != pdTRUE) {
+    return DeferredActionQueueResult::BUSY;
+  }
   for (size_t offset = 0U; offset < unit.action_result_count;
        ++offset) {
     const size_t index =
@@ -656,7 +702,7 @@ OpenQuattIncidentManager::queue_deferred_action_(
     unit.pending_action_request_id = request_id;
     unit.pending_action_kind = kind;
   }
-  portEXIT_CRITICAL(&this->action_mux_);
+  xSemaphoreGive(this->action_mutex_);
   return result;
 }
 
@@ -673,17 +719,57 @@ uint32_t OpenQuattIncidentManager::elapsed_ms_(uint32_t now_ms,
   return static_cast<uint32_t>(now_ms - since_ms);
 }
 
+bool OpenQuattIncidentManager::storage_ready_() const {
+  return static_cast<bool>(this->external_state_) &&
+         this->action_mutex_ != nullptr &&
+         this->snapshot_mutex_ != nullptr;
+}
+
+std::array<OpenQuattIncidentManager::UnitState, 2U> &
+OpenQuattIncidentManager::units_() {
+  return this->external_state_[0].units;
+}
+
+const std::array<OpenQuattIncidentManager::UnitState, 2U> &
+OpenQuattIncidentManager::units_() const {
+  return this->external_state_[0].units;
+}
+
+OpenQuattIncidentManager::PublishedSnapshot &
+OpenQuattIncidentManager::published_snapshot_() {
+  return this->external_state_[0].snapshots[
+      this->published_snapshot_index_];
+}
+
+const OpenQuattIncidentManager::PublishedSnapshot &
+OpenQuattIncidentManager::published_snapshot_() const {
+  return this->external_state_[0].snapshots[
+      this->published_snapshot_index_];
+}
+
+OpenQuattIncidentManager::PublishedSnapshot &
+OpenQuattIncidentManager::staging_snapshot_() {
+  return this->external_state_[0].snapshots[
+      this->staging_snapshot_index_];
+}
+
+OpenQuattIncidentManager::PublishedSnapshot &
+OpenQuattIncidentManager::response_snapshot_() const {
+  return const_cast<PublishedSnapshot &>(
+      this->external_state_[0].snapshots[2U]);
+}
+
 OpenQuattIncidentManager::UnitState *OpenQuattIncidentManager::unit_(
     uint8_t hp_index) {
-  if (!valid_hp_index_(hp_index)) return nullptr;
-  UnitState &unit = this->units_[hp_slot_(hp_index)];
+  if (!this->storage_ready_() || !valid_hp_index_(hp_index)) return nullptr;
+  UnitState &unit = this->units_()[hp_slot_(hp_index)];
   return unit.configured ? &unit : nullptr;
 }
 
 const OpenQuattIncidentManager::UnitState *OpenQuattIncidentManager::unit_(
     uint8_t hp_index) const {
-  if (!valid_hp_index_(hp_index)) return nullptr;
-  const UnitState &unit = this->units_[hp_slot_(hp_index)];
+  if (!this->storage_ready_() || !valid_hp_index_(hp_index)) return nullptr;
+  const UnitState &unit = this->units_()[hp_slot_(hp_index)];
   return unit.configured ? &unit : nullptr;
 }
 
@@ -810,7 +896,7 @@ void OpenQuattIncidentManager::process_fault_snapshot_(
       ++unit.initialization_fault_snapshot_count;
     }
     bool all_snapshots_complete = true;
-    for (const UnitState &candidate : this->units_) {
+    for (const UnitState &candidate : this->units_()) {
       if (candidate.configured &&
           candidate.initialization_fault_snapshot_count <
               INITIALIZATION_FAULT_SNAPSHOT_COUNT) {
@@ -979,10 +1065,11 @@ bool OpenQuattIncidentManager::acknowledge(
 }
 
 uint8_t OpenQuattIncidentManager::acknowledge_all_cleared() {
+  if (!this->storage_ready_()) return 0U;
   uint8_t acknowledged = 0U;
   const uint32_t now_ms = millis();
-  for (size_t hp_slot = 0U; hp_slot < this->units_.size(); ++hp_slot) {
-    UnitState &unit = this->units_[hp_slot];
+  for (size_t hp_slot = 0U; hp_slot < this->units_().size(); ++hp_slot) {
+    UnitState &unit = this->units_()[hp_slot];
     if (!unit.configured) continue;
 
     for (size_t incident_slot = 0U;
@@ -1343,7 +1430,7 @@ void OpenQuattIncidentManager::publish_incident_transition_(
   const size_t bank = static_cast<size_t>(
       definition.register_address - oq_incidents::kFirstFaultRegister);
   const int16_t raw_word =
-      static_cast<int16_t>(this->units_[slot].fault_words[bank]);
+      static_cast<int16_t>(this->units_()[slot].fault_words[bank]);
 
   if (!previous.confirmed_active && current.confirmed_active) {
     this->decision_log_->emit(
@@ -1619,15 +1706,22 @@ void OpenQuattIncidentManager::publish_transitions_(
 
 oq_incidents::DerivedOutputs OpenQuattIncidentManager::get_outputs(
     uint8_t hp_index) const {
-  if (!valid_hp_index_(hp_index) ||
-      !this->units_[hp_slot_(hp_index)].configured) {
+  if (!valid_hp_index_(hp_index)) {
     return {};
   }
+  if (!this->storage_ready_()) {
+    return incident_storage_failure_outputs();
+  }
+  if (!this->units_()[hp_slot_(hp_index)].configured) return {};
+
   const size_t slot = hp_slot_(hp_index);
-  oq_incidents::DerivedOutputs outputs;
-  portENTER_CRITICAL(&this->snapshot_mux_);
-  outputs = this->published_.units[slot].outputs;
-  portEXIT_CRITICAL(&this->snapshot_mux_);
+  oq_incidents::DerivedOutputs outputs =
+      incident_storage_failure_outputs();
+  if (xSemaphoreTake(this->snapshot_mutex_, portMAX_DELAY) != pdTRUE) {
+    return outputs;
+  }
+  outputs = this->published_snapshot_().units[slot].outputs;
+  xSemaphoreGive(this->snapshot_mutex_);
   return outputs;
 }
 
@@ -1649,6 +1743,7 @@ uint8_t OpenQuattIncidentManager::available_hp_count() const {
 }
 
 bool OpenQuattIncidentManager::availability_complete() const {
+  if (!this->storage_ready_()) return false;
   const uint8_t configured_mask =
       this->configured_hp_count() == 2U
           ? oq_incidents::kManualResetAllHpMask
@@ -1771,14 +1866,14 @@ void OpenQuattIncidentManager::setup_manual_reset_persistence_(
       oq_incidents::incident_id(2120U, 4U);
   const uint8_t restored_mask =
       this->manual_reset_persistence_.persisted_mask();
-  for (size_t slot = 0U; slot < this->units_.size(); ++slot) {
-    if (!this->units_[slot].configured ||
+  for (size_t slot = 0U; slot < this->units_().size(); ++slot) {
+    if (!this->units_()[slot].configured ||
         (restored_mask & (1U << slot)) == 0U) {
       continue;
     }
-    this->units_[slot].engine.restore_power_cycle_latch(
+    this->units_()[slot].engine.restore_power_cycle_latch(
         power_cycle_incident);
-    this->units_[slot].restored_manual_reset_pending = true;
+    this->units_()[slot].restored_manual_reset_pending = true;
     ESP_LOGW(TAG, "Restored persistent manual-reset latch for HP%u",
              static_cast<unsigned>(slot + 1U));
   }
@@ -1792,13 +1887,13 @@ void OpenQuattIncidentManager::reconcile_manual_reset_persistence_(
       this->manual_reset_persistence_.persisted_mask();
   const oq_incidents::IncidentId power_cycle_incident =
       oq_incidents::incident_id(2120U, 4U);
-  for (size_t slot = 0U; slot < this->units_.size(); ++slot) {
-    if (!this->units_[slot].configured ||
+  for (size_t slot = 0U; slot < this->units_().size(); ++slot) {
+    if (!this->units_()[slot].configured ||
         (persisted_mask & (1U << slot)) == 0U ||
-        this->units_[slot].engine.has_power_cycle_latch()) {
+        this->units_()[slot].engine.has_power_cycle_latch()) {
       continue;
     }
-    this->units_[slot].engine.restore_power_cycle_latch(
+    this->units_()[slot].engine.restore_power_cycle_latch(
         power_cycle_incident);
   }
 
@@ -1869,9 +1964,10 @@ bool OpenQuattIncidentManager::persist_manual_reset_mask_(
 
 uint8_t OpenQuattIncidentManager::runtime_manual_reset_mask_() const {
   uint8_t mask = 0U;
-  for (size_t slot = 0U; slot < this->units_.size(); ++slot) {
-    if (this->units_[slot].configured &&
-        this->units_[slot].engine.has_power_cycle_latch()) {
+  if (!this->storage_ready_()) return 0U;
+  for (size_t slot = 0U; slot < this->units_().size(); ++slot) {
+    if (this->units_()[slot].configured &&
+        this->units_()[slot].engine.has_power_cycle_latch()) {
       mask |= static_cast<uint8_t>(1U << slot);
     }
   }
@@ -1880,11 +1976,12 @@ uint8_t OpenQuattIncidentManager::runtime_manual_reset_mask_() const {
 
 oq_incidents::DerivedOutputs
 OpenQuattIncidentManager::outputs_for_slot_(size_t slot) const {
-  if (slot >= this->units_.size() || !this->units_[slot].configured) {
+  if (!this->storage_ready_() || slot >= this->units_().size() ||
+      !this->units_()[slot].configured) {
     return {};
   }
   oq_incidents::DerivedOutputs outputs =
-      this->units_[slot].engine.outputs();
+      this->units_()[slot].engine.outputs();
   const uint8_t hp_mask = static_cast<uint8_t>(1U << slot);
   outputs = apply_persistence_initialization_gate(
       outputs, this->manual_reset_persistence_.initialization_pending());
@@ -1896,8 +1993,9 @@ OpenQuattIncidentManager::outputs_for_slot_(size_t slot) const {
 }
 
 void OpenQuattIncidentManager::publish_snapshot_(uint32_t now_ms) {
+  if (!this->storage_ready_()) return;
   this->reconcile_manual_reset_persistence_(now_ms);
-  PublishedSnapshot &next = this->staging_;
+  PublishedSnapshot &next = this->staging_snapshot_();
   next = {};
   next.control_mode =
       this->control_mode_code_ != nullptr
@@ -1912,65 +2010,94 @@ void OpenQuattIncidentManager::publish_snapshot_(uint32_t now_ms) {
   next.boiler_output_continuous = this->boiler_output_continuous_;
   next.generated_at_ms = now_ms;
   next.generated_at_epoch_s = this->current_epoch_s_();
-  for (size_t slot = 0U; slot < this->units_.size(); ++slot) {
-    if (!this->units_[slot].configured) continue;
+  for (size_t slot = 0U; slot < this->units_().size(); ++slot) {
+    if (!this->units_()[slot].configured) continue;
     next.units[slot].outputs = this->outputs_for_slot_(slot);
     for (size_t incident_slot = 0U;
          incident_slot < oq_incidents::kRawIncidentSlotCount;
          ++incident_slot) {
       next.units[slot].incidents[incident_slot] =
-          this->units_[slot].engine.incident(
+          this->units_()[slot].engine.incident(
               static_cast<oq_incidents::IncidentId>(incident_slot + 1U));
     }
     next.units[slot].synthetic_incidents =
-        this->units_[slot].synthetic_incidents;
+        this->units_()[slot].synthetic_incidents;
     next.units[slot].last_action =
-        this->units_[slot].last_action;
+        this->units_()[slot].last_action;
     next.units[slot].last_action_result =
-        this->units_[slot].last_action_result;
+        this->units_()[slot].last_action_result;
     next.units[slot].last_action_ok =
-        this->units_[slot].last_action_ok;
+        this->units_()[slot].last_action_ok;
     next.units[slot].last_action_seq =
-        this->units_[slot].last_action_seq;
+        this->units_()[slot].last_action_seq;
     next.units[slot].last_action_request_id =
-        this->units_[slot].last_action_request_id;
+        this->units_()[slot].last_action_request_id;
     next.units[slot].last_action_at_ms =
-        this->units_[slot].last_action_at_ms;
-    portENTER_CRITICAL(&this->action_mux_);
-    next.units[slot].action_result_count =
-        this->units_[slot].action_result_count;
-    for (size_t offset = 0U;
-         offset < next.units[slot].action_result_count;
-         ++offset) {
-      const size_t source_index =
-          (this->units_[slot].action_result_head + offset) %
-          ACTION_RESULT_HISTORY_SIZE;
-      next.units[slot].action_results[offset] =
-          this->units_[slot].action_results[source_index];
+        this->units_()[slot].last_action_at_ms;
+    if (xSemaphoreTake(this->action_mutex_, portMAX_DELAY) == pdTRUE) {
+      next.units[slot].action_result_count =
+          this->units_()[slot].action_result_count;
+      for (size_t offset = 0U;
+           offset < next.units[slot].action_result_count;
+           ++offset) {
+        const size_t source_index =
+            (this->units_()[slot].action_result_head + offset) %
+            ACTION_RESULT_HISTORY_SIZE;
+        next.units[slot].action_results[offset] =
+            this->units_()[slot].action_results[source_index];
+      }
+      xSemaphoreGive(this->action_mutex_);
+    } else {
+      next.units[slot].action_result_count = 0U;
+      ESP_LOGE(TAG, "Could not lock incident action snapshot");
     }
-    portEXIT_CRITICAL(&this->action_mux_);
   }
-  portENTER_CRITICAL(&this->snapshot_mux_);
-  this->published_ = next;
-  portEXIT_CRITICAL(&this->snapshot_mux_);
+  if (xSemaphoreTake(this->snapshot_mutex_, portMAX_DELAY) != pdTRUE) {
+    ESP_LOGE(TAG, "Could not publish incident snapshot");
+    return;
+  }
+  std::swap(this->published_snapshot_index_,
+            this->staging_snapshot_index_);
+  xSemaphoreGive(this->snapshot_mutex_);
 }
 
 void OpenQuattIncidentManager::write_snapshot(httpd_req_t *req) const {
-  std::unique_ptr<PublishedSnapshot> snapshot_storage{
-      new (std::nothrow) PublishedSnapshot{}};
-  if (snapshot_storage == nullptr) {
-    ESP_LOGE(TAG, "Could not allocate incident snapshot response copy");
+  if (!this->storage_ready_()) {
+    ESP_LOGE(TAG, "Incident snapshot storage is unavailable");
     httpd_resp_set_status(req, "503 Service Unavailable");
     httpd_resp_set_type(req, "application/json; charset=utf-8");
     httpd_resp_send(
-        req, R"({"error":"snapshot_allocation_failed"})",
+        req, R"({"error":"snapshot_unavailable"})",
         HTTPD_RESP_USE_STRLEN);
     return;
   }
-  PublishedSnapshot &snapshot = *snapshot_storage;
-  portENTER_CRITICAL(&this->snapshot_mux_);
-  snapshot = this->published_;
-  portEXIT_CRITICAL(&this->snapshot_mux_);
+  if (this->response_snapshot_in_use_.exchange(true)) {
+    httpd_resp_set_status(req, "503 Service Unavailable");
+    httpd_resp_set_type(req, "application/json; charset=utf-8");
+    httpd_resp_send(
+        req, R"({"error":"snapshot_busy"})",
+        HTTPD_RESP_USE_STRLEN);
+    return;
+  }
+  struct ResponseSnapshotClaim {
+    explicit ResponseSnapshotClaim(std::atomic<bool> *claimed)
+        : claimed(claimed) {}
+    ~ResponseSnapshotClaim() { this->claimed->store(false); }
+    std::atomic<bool> *claimed;
+  } response_claim(&this->response_snapshot_in_use_);
+
+  PublishedSnapshot &snapshot = this->response_snapshot_();
+  if (xSemaphoreTake(this->snapshot_mutex_, portMAX_DELAY) != pdTRUE) {
+    ESP_LOGE(TAG, "Could not lock incident response snapshot");
+    httpd_resp_set_status(req, "503 Service Unavailable");
+    httpd_resp_set_type(req, "application/json; charset=utf-8");
+    httpd_resp_send(
+        req, R"({"error":"snapshot_unavailable"})",
+        HTTPD_RESP_USE_STRLEN);
+    return;
+  }
+  snapshot = this->published_snapshot_();
+  xSemaphoreGive(this->snapshot_mutex_);
 
   const uint32_t generated_epoch_s =
       snapshot.generated_at_epoch_s != 0U
@@ -1980,7 +2107,7 @@ void OpenQuattIncidentManager::write_snapshot(httpd_req_t *req) const {
       write_raw(req, R"({"schema_version":1,"catalog_version":1,"generated_at_s":)") &&
       write_uint(req, generated_epoch_s) &&
       write_raw(req, R"(,"action_csrf_token":)") &&
-      write_json_string(req, this->action_csrf_token_.c_str()) &&
+      write_json_string(req, this->action_csrf_token_.data()) &&
       write_raw(req, R"(,"system":{"control_mode":)") &&
       write_uint(req, snapshot.control_mode) &&
       write_raw(req, R"(,"action":)") &&
@@ -2003,8 +2130,8 @@ void OpenQuattIncidentManager::write_snapshot(httpd_req_t *req) const {
       write_raw(req, R"(},"heat_pumps":[)");
 
   bool first_hp = true;
-  for (size_t slot = 0U; ok && slot < this->units_.size(); ++slot) {
-    if (!this->units_[slot].configured) continue;
+  for (size_t slot = 0U;
+       ok && slot < this->configured_hp_count(); ++slot) {
     const oq_incidents::DerivedOutputs &outputs =
         snapshot.units[slot].outputs;
     ok = (first_hp || write_raw(req, ",")) &&

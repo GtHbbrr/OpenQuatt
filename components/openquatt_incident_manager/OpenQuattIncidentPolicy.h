@@ -129,6 +129,23 @@ inline bool all_hp_outputs_safe_for_fallback(
   return true;
 }
 
+inline oq_incidents::DerivedOutputs incident_storage_failure_outputs() {
+  oq_incidents::DerivedOutputs outputs{};
+  outputs.protection_state =
+      oq_incidents::ProtectionState::FAULT_ACTIVE;
+  outputs.active_effects =
+      oq_incidents::IncidentEffect::DISPLAY |
+      oq_incidents::IncidentEffect::BLOCK_START |
+      oq_incidents::IncidentEffect::STOP_COMPRESSOR |
+      oq_incidents::IncidentEffect::MARK_HP_UNAVAILABLE |
+      oq_incidents::IncidentEffect::BLOCK_BOILER;
+  outputs.must_stop = true;
+  outputs.fault_active = true;
+  outputs.protection_active = true;
+  outputs.stop_unconfirmed = true;
+  return outputs;
+}
+
 inline oq_incidents::DerivedOutputs apply_persistence_safety_gate(
     oq_incidents::DerivedOutputs outputs, bool persistence_blocks) {
   if (!persistence_blocks) return outputs;
