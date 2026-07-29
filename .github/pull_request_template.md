@@ -21,6 +21,7 @@
 - [ ] Runtime/control gedrag gewijzigd
 - [ ] User-facing entities/configuratie gewijzigd
 - [ ] Hardware/Modbus/actuator/safety/thermal/boiler/flow geraakt
+- [ ] Interne heap/PSRAM/task-stacks/netwerkallocaties geraakt
 
 Toelichting:
 
@@ -42,3 +43,16 @@ Docs-impact motivatie:
 ## Validatie
 
 <!-- Wat is lokaal getest? Noem commando's/configs waar relevant. -->
+
+- [ ] Geheugenimpact gemeten op representatieve hardware
+- [ ] Geen runtime-geheugenimpact
+
+Heap/stack-impact:
+
+<!-- Indien relevant invullen:
+- static RAM-delta per relevante build:
+- baseline/candidate current + minimum internal heap:
+- largest block + fragmentatie + vrij PSRAM:
+- relevante task-stack-watermarks:
+- geteste worst-case overlap:
+-->

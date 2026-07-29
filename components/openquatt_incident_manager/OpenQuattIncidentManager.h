@@ -1,13 +1,13 @@
 #pragma once
 
 #include <array>
+#include <atomic>
 #include <cstddef>
 #include <cstdint>
-#include <string>
 
 #include <esp_http_server.h>
 #include <freertos/FreeRTOS.h>
-#include <freertos/portmacro.h>
+#include <freertos/semphr.h>
 
 #include "esphome/components/globals/globals_component.h"
 #include "esphome/components/openquatt_decision_log/OpenQuattDecisionLog.h"
@@ -16,6 +16,7 @@
 #include "esphome/core/component.h"
 #include "esphome/core/preferences.h"
 #include "OpenQuattIncidentPolicy.h"
+#include "PsramBuffer.h"
 #include "includes/incidents/oq_hp_incident_engine.h"
 #include "includes/incidents/oq_manual_reset_latch_policy.h"
 
@@ -86,8 +87,9 @@ class OpenQuattIncidentManager : public Component {
   void set_boiler_status(uint8_t role, bool command_active, bool output_continuous);
 
   void write_snapshot(httpd_req_t *req) const;
-  const std::string &get_action_csrf_token() const {
-    return this->action_csrf_token_;
+  bool storage_ready() const { return this->storage_ready_(); }
+  const char *get_action_csrf_token() const {
+    return this->action_csrf_token_.data();
   }
   bool request_is_authenticated(
       AsyncWebServerRequest *request) const {
@@ -202,6 +204,11 @@ class OpenQuattIncidentManager : public Component {
     uint32_t generated_at_epoch_s{0U};
   };
 
+  struct ExternalState {
+    std::array<UnitState, 2U> units{};
+    std::array<PublishedSnapshot, 3U> snapshots{};
+  };
+
   static bool valid_hp_index_(uint8_t hp_index);
   static size_t hp_slot_(uint8_t hp_index);
   static uint32_t elapsed_ms_(uint32_t now_ms, uint32_t since_ms);
@@ -220,6 +227,13 @@ class OpenQuattIncidentManager : public Component {
                                         uint32_t generated_at_ms,
                                         uint32_t runtime_ms);
 
+  bool storage_ready_() const;
+  std::array<UnitState, 2U> &units_();
+  const std::array<UnitState, 2U> &units_() const;
+  PublishedSnapshot &published_snapshot_();
+  const PublishedSnapshot &published_snapshot_() const;
+  PublishedSnapshot &staging_snapshot_();
+  PublishedSnapshot &response_snapshot_() const;
   UnitState *unit_(uint8_t hp_index);
   const UnitState *unit_(uint8_t hp_index) const;
   void process_fault_snapshot_(UnitState &unit, size_t slot, uint32_t now_ms,
@@ -253,7 +267,7 @@ class OpenQuattIncidentManager : public Component {
   void publish_snapshot_(uint32_t now_ms);
   uint32_t current_epoch_s_() const;
 
-  std::array<UnitState, 2U> units_{};
+  openquatt_common::PsramObjectArray<ExternalState, 1U> external_state_{};
   time::RealTimeClock *clock_{nullptr};
   IntGlobal *control_mode_code_{nullptr};
   openquatt_decision_log::OpenQuattDecisionLog *decision_log_{nullptr};
@@ -272,12 +286,19 @@ class OpenQuattIncidentManager : public Component {
   ESPPreferenceObject manual_reset_pref_a_{};
   ESPPreferenceObject manual_reset_pref_b_{};
   ESPPreferenceObject manual_reset_marker_pref_{};
-  std::string action_csrf_token_;
-  PublishedSnapshot published_{};
-  PublishedSnapshot staging_{};
-  mutable portMUX_TYPE action_mux_ = portMUX_INITIALIZER_UNLOCKED;
-  mutable portMUX_TYPE snapshot_mux_ = portMUX_INITIALIZER_UNLOCKED;
+  std::array<char, 33U> action_csrf_token_{};
+  StaticSemaphore_t action_mutex_storage_{};
+  StaticSemaphore_t snapshot_mutex_storage_{};
+  SemaphoreHandle_t action_mutex_{nullptr};
+  mutable SemaphoreHandle_t snapshot_mutex_{nullptr};
+  uint8_t published_snapshot_index_{0U};
+  uint8_t staging_snapshot_index_{1U};
+  mutable std::atomic<bool> response_snapshot_in_use_{false};
 };
+
+static_assert(
+    sizeof(OpenQuattIncidentManager) <= 512U,
+    "Large incident state must remain in the external PSRAM arena");
 
 }  // namespace openquatt_incident_manager
 }  // namespace esphome

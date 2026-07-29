@@ -9,6 +9,8 @@
 
 #include "esp_crt_bundle.h"
 #include "esp_heap_caps.h"
+#include "esp_memory_utils.h"
+#include "freertos/idf_additions.h"
 #if defined(CONFIG_IDF_TARGET_ESP32S3) && __has_include("heatpump_controller_q_hardware_revision.h")
 #include "heatpump_controller_q_hardware_revision.h"
 #define OPENQUATT_HAS_Q_HARDWARE_REVISION
@@ -28,63 +30,49 @@ namespace {
 
 static const char *const TAG = "openquatt.usage_telemetry";
 static const uint32_t STORAGE_KEY = fnv1_hash("openquatt_usage_telemetry_store");
+static constexpr size_t TELEMETRY_PAYLOAD_CAPACITY = 2048U;
 
-std::string json_escape_(const std::string &input) {
-  std::string output;
-  output.reserve(input.size() + 4);
-  for (char c : input) {
-    switch (c) {
-      case '"':
-        output += "\\\"";
-        break;
-      case '\\':
-        output += "\\\\";
-        break;
-      case '\b':
-        output += "\\b";
-        break;
-      case '\f':
-        output += "\\f";
-        break;
-      case '\n':
-        output += "\\n";
-        break;
-      case '\r':
-        output += "\\r";
-        break;
-      case '\t':
-        output += "\\t";
-        break;
-      default:
-        if (static_cast<unsigned char>(c) < 0x20U) {
-          char buffer[7];
-          std::snprintf(buffer, sizeof(buffer), "\\u%04x", static_cast<unsigned char>(c));
-          output += buffer;
-        } else {
-          output += c;
-        }
-        break;
-    }
-  }
-  return output;
+void log_heap_state_(const char *phase) {
+  const size_t free_internal =
+      heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
+  const size_t largest_internal =
+      heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL);
+  const size_t fragmentation_percent =
+      free_internal == 0U
+          ? 0U
+          : 100U - std::min<size_t>(
+                       100U,
+                       (largest_internal * 100U) / free_internal);
+  ESP_LOGD(
+      TAG,
+      "%s: heap free=%u, min=%u, largest=%u, fragmentation=%u%%, "
+      "PSRAM free=%u",
+      phase, static_cast<unsigned>(free_internal),
+      static_cast<unsigned>(
+          heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL)),
+      static_cast<unsigned>(largest_internal),
+      static_cast<unsigned>(fragmentation_percent),
+      static_cast<unsigned>(
+          heap_caps_get_free_size(MALLOC_CAP_SPIRAM)));
 }
 
 bool uuid_is_present_(const std::array<uint8_t, 16> &bytes) {
   return std::any_of(bytes.begin(), bytes.end(), [](uint8_t byte) { return byte != 0U; });
 }
 
-void append_json_key_(std::string &payload, const char *key) {
+void append_json_key_(FixedBufferWriter &payload, const char *key) {
   payload += R"(,")";
   payload += key;
   payload += R"(":)";
 }
 
-void append_json_uint_(std::string &payload, const char *key, size_t value) {
+void append_json_uint_(FixedBufferWriter &payload, const char *key,
+                       size_t value) {
   append_json_key_(payload, key);
-  payload += std::to_string(static_cast<uint64_t>(value));
+  payload.append_uint(static_cast<uint64_t>(value));
 }
 
-void append_json_optional_number_(std::string &payload, const char *key, const sensor::Sensor *source,
+void append_json_optional_number_(FixedBufferWriter &payload, const char *key, const sensor::Sensor *source,
                                   unsigned decimals) {
   append_json_key_(payload, key);
   if (source == nullptr || !source->has_state() || !std::isfinite(source->state)) {
@@ -96,7 +84,7 @@ void append_json_optional_number_(std::string &payload, const char *key, const s
   payload += value;
 }
 
-void append_json_optional_bool_(std::string &payload, const char *key, const switch_::Switch *source) {
+void append_json_optional_bool_(FixedBufferWriter &payload, const char *key, const switch_::Switch *source) {
   append_json_key_(payload, key);
   if (source == nullptr) {
     payload += "null";
@@ -105,7 +93,7 @@ void append_json_optional_bool_(std::string &payload, const char *key, const swi
   payload += source->state ? "true" : "false";
 }
 
-void append_json_optional_bool_(std::string &payload, const char *key, bool available, bool value) {
+void append_json_optional_bool_(FixedBufferWriter &payload, const char *key, bool available, bool value) {
   append_json_key_(payload, key);
   if (!available) {
     payload += "null";
@@ -114,7 +102,7 @@ void append_json_optional_bool_(std::string &payload, const char *key, bool avai
   payload += value ? "true" : "false";
 }
 
-void append_json_boiler_connection_(std::string &payload, const select::Select *source) {
+void append_json_boiler_connection_(FixedBufferWriter &payload, const select::Select *source) {
   append_json_key_(payload, "boiler_connection");
   if (source == nullptr) {
     // Firmware without the OTB transport selector can only drive the R1 on/off route.
@@ -166,10 +154,14 @@ const char *reset_reason_name_(esp_reset_reason_t reason) {
 float OpenQuattUsageTelemetry::get_setup_priority() const { return setup_priority::LATE; }
 
 void OpenQuattUsageTelemetry::setup() {
-  this->runtime_lock_ = xSemaphoreCreateMutex();
-  if (this->runtime_lock_ == nullptr) {
-    ESP_LOGE(TAG, "Failed to create usage telemetry runtime lock");
+  this->consent_mutex_ =
+      xSemaphoreCreateMutexStatic(&this->consent_mutex_storage_);
+  if (this->consent_mutex_ == nullptr) {
+    ESP_LOGE(TAG,
+             "Failed to initialize usage telemetry consent gate; "
+             "usage statistics remain disabled");
     this->publish_state(false);
+    this->mark_failed();
     return;
   }
   if (global_preferences == nullptr) {
@@ -214,13 +206,35 @@ void OpenQuattUsageTelemetry::setup() {
     }
   }
 
-  this->apply_storage_(storage);
+  if (!this->apply_storage_(storage)) {
+    ESP_LOGE(TAG,
+             "Failed to apply usage telemetry consent state; "
+             "usage statistics remain disabled");
+    this->publish_state(false);
+    this->mark_failed();
+    return;
+  }
   this->boot_publish_pending_ = this->enabled_.load();
   this->next_publish_ms_ = 0;
 }
 
 void OpenQuattUsageTelemetry::loop() {
+  if (this->start_task_complete_.exchange(false)) {
+    this->start_task_running_.store(false);
+  }
   if (this->cleanup_task_complete_.exchange(false)) {
+    if (!MQTT_WORKER_STACK_IN_PSRAM) {
+      const TaskHandle_t handle = this->worker_task_state_.get_handle();
+      if (handle != nullptr && eTaskGetState(handle) != eSuspended) {
+        // The classic-ESP32 worker publishes completion immediately before it
+        // parks itself. Do not free a static stack that may still be executing
+        // on the other core.
+        this->cleanup_task_complete_.store(true);
+        return;
+      }
+      this->worker_task_state_.deallocate();
+      this->worker_task_region_valid_ = false;
+    }
     this->complete_publish_session_();
   }
   if (this->finishing_session_.load()) {
@@ -278,10 +292,18 @@ void OpenQuattUsageTelemetry::dump_config() {
   ESP_LOGCONFIG(TAG, "  Quick Start complete: %s", YESNO(this->is_setup_complete_()));
   ESP_LOGCONFIG(TAG, "  Publish interval: %" PRIu32 " seconds", this->interval_ms_ / 1000U);
   ESP_LOGCONFIG(TAG, "  Installation ID present: %s", YESNO(!this->installation_id_.empty()));
+  ESP_LOGCONFIG(TAG, "  OpenQuatt worker stack: %u bytes in %s",
+                static_cast<unsigned>(MQTT_WORKER_TASK_STACK_SIZE),
+                MQTT_WORKER_STACK_IN_PSRAM ? "PSRAM" : "internal RAM");
 }
 
 void OpenQuattUsageTelemetry::write_state(bool state) {
   const bool current_state = this->enabled_.load();
+  if (!state && !this->set_consent_publish_blocked_(true)) {
+    ESP_LOGE(TAG, "Could not close usage telemetry consent gate");
+    this->publish_state(current_state);
+    return;
+  }
   Storage storage{};
   if (!this->load_storage_(&storage)) {
     storage.magic = STORAGE_MAGIC;
@@ -306,11 +328,30 @@ void OpenQuattUsageTelemetry::write_state(bool state) {
   storage.choice_configured = 1U;
   if (!this->save_storage_(storage)) {
     ESP_LOGE(TAG, "Could not persist usage statistics preference");
-    this->publish_state(current_state);
+    if (state) {
+      this->publish_state(current_state);
+      return;
+    }
+    // A failed opt-out write must not reopen telemetry for this boot. Keep the
+    // publish gate closed and stop any active session even though durability
+    // could not be confirmed.
+    this->enabled_.store(false);
+    this->publish_state(false);
+    this->boot_publish_pending_ = false;
+    this->next_publish_ms_ = 0U;
+    if (!this->session_active_.load()) {
+      this->clear_payload_();
+      this->payload_message_id_.clear();
+    }
+    App.wake_loop_threadsafe();
     return;
   }
 
-  this->apply_storage_(storage);
+  if (!this->apply_storage_(storage)) {
+    ESP_LOGE(TAG, "Could not apply usage statistics preference");
+    this->publish_state(current_state);
+    return;
+  }
   if (state) {
     this->consecutive_failures_ = 0;
     if (this->is_setup_complete_()) {
@@ -327,7 +368,7 @@ void OpenQuattUsageTelemetry::write_state(bool state) {
     this->boot_publish_pending_ = false;
     this->next_publish_ms_ = 0;
     if (!this->session_active_.load()) {
-      this->payload_.clear();
+      this->clear_payload_();
       this->payload_message_id_.clear();
     }
     App.wake_loop_threadsafe();
@@ -367,6 +408,22 @@ bool OpenQuattUsageTelemetry::save_storage_(const Storage &storage) {
   return this->pref_.save(&storage) && global_preferences != nullptr && global_preferences->sync();
 }
 
+bool OpenQuattUsageTelemetry::set_consent_publish_blocked_(
+    bool blocked) {
+  if (blocked) {
+    // Close the gate before waiting for an in-flight start/enqueue critical
+    // section. This makes revocation fail closed from the first instruction.
+    this->consent_publish_blocked_.store(true);
+  }
+  if (this->consent_mutex_ == nullptr ||
+      xSemaphoreTake(this->consent_mutex_, portMAX_DELAY) != pdTRUE) {
+    return false;
+  }
+  this->consent_publish_blocked_.store(blocked);
+  xSemaphoreGive(this->consent_mutex_);
+  return true;
+}
+
 bool OpenQuattUsageTelemetry::ensure_installation_id_(Storage *storage) {
   if (storage == nullptr) {
     return false;
@@ -387,7 +444,11 @@ bool OpenQuattUsageTelemetry::is_setup_complete_() const {
          this->setup_complete_sensor_->state;
 }
 
-void OpenQuattUsageTelemetry::apply_storage_(const Storage &storage) {
+bool OpenQuattUsageTelemetry::apply_storage_(const Storage &storage) {
+  if (this->consent_mutex_ == nullptr ||
+      xSemaphoreTake(this->consent_mutex_, portMAX_DELAY) != pdTRUE) {
+    return false;
+  }
   // The ID is immutable across enable/disable writes. Avoid rewriting the string while MQTT callbacks may read it.
   if (this->installation_id_bytes_ != storage.installation_id) {
     this->installation_id_bytes_ = storage.installation_id;
@@ -396,7 +457,10 @@ void OpenQuattUsageTelemetry::apply_storage_(const Storage &storage) {
   const bool enabled = storage.enabled != 0U && !this->installation_id_.empty();
   const bool choice_configured = storage.choice_configured != 0U;
   this->enabled_.store(enabled);
+  this->consent_publish_blocked_.store(!enabled);
   this->choice_configured_.store(choice_configured);
+  xSemaphoreGive(this->consent_mutex_);
+
   this->publish_state(enabled);
   if (this->installation_id_sensor_ != nullptr) {
     this->installation_id_sensor_->publish_state(this->installation_id_);
@@ -404,6 +468,7 @@ void OpenQuattUsageTelemetry::apply_storage_(const Storage &storage) {
   if (this->choice_configured_sensor_ != nullptr) {
     this->choice_configured_sensor_->publish_state(choice_configured);
   }
+  return true;
 }
 
 void OpenQuattUsageTelemetry::schedule_initial_publish_() {
@@ -437,40 +502,95 @@ void OpenQuattUsageTelemetry::start_publish_session_() {
   }
 
   this->boot_publish_pending_ = false;
+  log_heap_state_("Usage telemetry session begin");
 
-  // Reserve the cleanup worker before MQTT/TLS can consume the remaining heap.
-  // If this allocation fails, no client resources exist yet and retrying is safe.
-  if (!this->prepare_cleanup_task_()) {
+  if (this->payload_size_ == 0U && !this->build_payload_()) {
     this->start_task_running_.store(false);
     this->schedule_retry_();
     return;
   }
 
-  if (this->payload_.empty()) {
-    this->build_payload_();
+  // The same worker owns both client startup and teardown. On S3 its stack is
+  // persistent in PSRAM; classic ESP32 uses a per-session internal stack.
+  if (!this->ensure_worker_task_()) {
+    this->clear_payload_();
+    this->start_task_running_.store(false);
+    this->schedule_retry_();
+    return;
   }
+  log_heap_state_("Usage telemetry worker ready");
   this->publish_succeeded_.store(false);
   this->publish_failed_.store(false);
   this->pending_message_id_.store(-1);
   this->finishing_session_.store(false);
+  this->start_task_complete_.store(false);
   this->cleanup_task_complete_.store(false);
   this->cleanup_succeeded_.store(false);
+  this->mqtt_connected_seen_.store(false);
+  this->mqtt_disconnected_seen_.store(false);
+  this->cleanup_stop_failures_ = 0U;
+  this->cleanup_disconnect_requested_ = false;
   this->session_started_ms_ = millis();
   this->session_active_.store(true);
 
-  const BaseType_t created = xTaskCreatePinnedToCore(&OpenQuattUsageTelemetry::start_client_task_,
-                                                     "oq_usage_mqtt", MQTT_START_TASK_STACK_SIZE, this, 4, nullptr,
-                                                     tskNO_AFFINITY);
-  if (created != pdPASS) {
+  if (!this->notify_worker_(WorkerCommand::START)) {
+    this->session_active_.store(false);
     this->start_task_running_.store(false);
-    this->publish_failed_.store(true);
-    ESP_LOGE(TAG, "Failed to create usage telemetry MQTT start task");
+    this->clear_payload_();
+    this->schedule_retry_();
+    ESP_LOGE(TAG, "Failed to notify usage telemetry MQTT worker");
   }
+}
+
+bool OpenQuattUsageTelemetry::ensure_worker_task_() {
+  if (this->worker_task_state_.is_created()) {
+    return this->worker_task_region_valid_;
+  }
+  this->worker_task_region_valid_ = false;
+  if (!this->worker_task_state_.create(
+          &OpenQuattUsageTelemetry::worker_task_, "oq_usage_mqtt",
+          MQTT_WORKER_TASK_STACK_SIZE, this, 4,
+          MQTT_WORKER_STACK_IN_PSRAM)) {
+    ESP_LOGE(
+        TAG,
+        "Failed to create %u-byte usage telemetry worker in %s",
+        static_cast<unsigned>(MQTT_WORKER_TASK_STACK_SIZE),
+        MQTT_WORKER_STACK_IN_PSRAM ? "PSRAM" : "internal RAM");
+    return false;
+  }
+
+  const bool stack_is_external = esp_ptr_external_ram(
+      pxTaskGetStackStart(this->worker_task_state_.get_handle()));
+  if (stack_is_external != MQTT_WORKER_STACK_IN_PSRAM) {
+    ESP_LOGE(TAG,
+             "Usage telemetry worker stack was allocated in the wrong "
+             "memory region; worker remains parked");
+    // StaticTask owns a static stack. It must not free that stack while the
+    // freshly created task may still be entering its notification wait on the
+    // other core. Treat this impossible allocator-contract violation as a
+    // permanent telemetry failure and leave the parked task intact.
+    this->mark_failed();
+    return false;
+  }
+  this->worker_task_region_valid_ = true;
+  ESP_LOGD(TAG, "Usage telemetry worker stack: %u bytes in %s",
+           static_cast<unsigned>(MQTT_WORKER_TASK_STACK_SIZE),
+           stack_is_external ? "PSRAM" : "internal RAM");
+  return true;
+}
+
+bool OpenQuattUsageTelemetry::notify_worker_(WorkerCommand command) {
+  const TaskHandle_t handle = this->worker_task_state_.get_handle();
+  if (handle == nullptr) return false;
+  return xTaskNotify(
+             handle, static_cast<uint32_t>(command),
+             eSetValueWithOverwrite) == pdPASS;
 }
 
 bool OpenQuattUsageTelemetry::start_client_() {
   if (!this->enabled_.load() || !this->session_active_.load() || !this->is_setup_complete_() ||
-      !this->is_configured()) {
+      !this->is_configured() || this->mqtt_client_ != nullptr ||
+      this->consent_publish_blocked_.load()) {
     return false;
   }
 
@@ -497,33 +617,105 @@ bool OpenQuattUsageTelemetry::start_client_() {
     mqtt_config.credentials.authentication.password = this->password_.c_str();
   }
 
+  if (this->consent_mutex_ == nullptr ||
+      xSemaphoreTake(this->consent_mutex_, portMAX_DELAY) != pdTRUE) {
+    return false;
+  }
+  if (!this->enabled_.load() || !this->session_active_.load() ||
+      this->consent_publish_blocked_.load()) {
+    xSemaphoreGive(this->consent_mutex_);
+    return false;
+  }
+
   esp_mqtt_client_handle_t client = esp_mqtt_client_init(&mqtt_config);
   if (client == nullptr) {
+    xSemaphoreGive(this->consent_mutex_);
     ESP_LOGW(TAG, "Failed to initialize usage telemetry MQTT client");
     return false;
   }
 
-  if (xSemaphoreTake(this->runtime_lock_, portMAX_DELAY) != pdTRUE) {
-    esp_mqtt_client_destroy(client);
-    return false;
-  }
-  if (!this->enabled_.load() || !this->session_active_.load() || this->mqtt_client_ != nullptr) {
-    xSemaphoreGive(this->runtime_lock_);
+  if (!this->enabled_.load() || !this->session_active_.load() ||
+      this->consent_publish_blocked_.load()) {
+    xSemaphoreGive(this->consent_mutex_);
     esp_mqtt_client_destroy(client);
     return false;
   }
   this->mqtt_client_ = client;
-  xSemaphoreGive(this->runtime_lock_);
+  this->mqtt_client_started_ = false;
 
   esp_err_t error = esp_mqtt_client_register_event(client, MQTT_EVENT_ANY,
                                                     &OpenQuattUsageTelemetry::mqtt_event_handler_, this);
   if (error == ESP_OK) {
     error = esp_mqtt_client_start(client);
   }
+  xSemaphoreGive(this->consent_mutex_);
   if (error != ESP_OK) {
     ESP_LOGW(TAG, "Failed to start usage telemetry MQTT client: %s", esp_err_to_name(error));
+    esp_mqtt_client_destroy(client);
+    this->mqtt_client_ = nullptr;
     return false;
   }
+  this->mqtt_client_started_ = true;
+  return true;
+}
+
+bool OpenQuattUsageTelemetry::cleanup_client_() {
+  esp_mqtt_client_handle_t client = this->mqtt_client_;
+  if (client == nullptr) return true;
+
+  if (this->mqtt_client_started_) {
+    const esp_err_t error = esp_mqtt_client_stop(client);
+    if (error != ESP_OK && error != ESP_FAIL) {
+      ESP_LOGE(TAG, "Unexpected usage telemetry MQTT stop error: %s",
+               esp_err_to_name(error));
+      return false;
+    }
+    if (error != ESP_OK) {
+      ++this->cleanup_stop_failures_;
+      const MqttCleanupDecision decision = mqtt_cleanup_decision(
+          false, this->mqtt_connected_seen_.load(),
+          this->mqtt_disconnected_seen_.load(),
+          this->cleanup_stop_failures_);
+      if (decision == MqttCleanupDecision::FORCE_DISCONNECT) {
+        // A connected client may fail to construct its graceful DISCONNECT
+        // packet under memory pressure. Its own task handles DISCONNECT_BIT by
+        // aborting the transport without allocating that packet.
+        if (!this->cleanup_disconnect_requested_) {
+          ESP_LOGW(TAG,
+                   "Usage telemetry MQTT stop failed (%s); forcing "
+                   "disconnect before retry",
+                   esp_err_to_name(error));
+        }
+        esp_mqtt_client_disconnect(client);
+        this->cleanup_disconnect_requested_ = true;
+        return false;
+      }
+
+      // ESP-IDF also returns ESP_FAIL when the mqtt task has already stopped
+      // itself (for example after a transport-allocation failure). Allow one
+      // full worker interval for its STOPPED tail to finish before destroy.
+      if (decision == MqttCleanupDecision::RETRY_STOP) {
+        ESP_LOGD(TAG,
+                 "Usage telemetry MQTT task may already be stopped; "
+                 "verifying before destroy");
+        return false;
+      }
+      ESP_LOGW(TAG,
+               "Usage telemetry MQTT task stopped before cleanup; "
+               "releasing its client resources");
+    }
+  }
+
+  const esp_err_t error = esp_mqtt_client_destroy(client);
+  if (error != ESP_OK) {
+    ESP_LOGE(TAG, "Failed to destroy usage telemetry MQTT client: %s",
+             esp_err_to_name(error));
+    return false;
+  }
+  this->mqtt_client_ = nullptr;
+  this->mqtt_client_started_ = false;
+  this->cleanup_stop_failures_ = 0U;
+  this->cleanup_disconnect_requested_ = false;
   return true;
 }
 
@@ -533,25 +725,11 @@ void OpenQuattUsageTelemetry::finish_publish_session_(bool succeeded) {
     return;
   }
   this->cleanup_succeeded_.store(succeeded);
-  xTaskNotifyGive(this->cleanup_task_handle_.load());
-}
-
-bool OpenQuattUsageTelemetry::prepare_cleanup_task_() {
-  if (this->cleanup_task_running_.exchange(true)) {
-    return false;
+  if (!this->notify_worker_(WorkerCommand::CLEANUP)) {
+    this->finishing_session_.store(false);
+    this->publish_failed_.store(true);
+    ESP_LOGE(TAG, "Failed to notify usage telemetry MQTT cleanup");
   }
-
-  TaskHandle_t task_handle = nullptr;
-  const BaseType_t created = xTaskCreatePinnedToCore(&OpenQuattUsageTelemetry::cleanup_client_task_,
-                                                     "oq_usage_cleanup", MQTT_CLEANUP_TASK_STACK_SIZE, this, 4,
-                                                     &task_handle, tskNO_AFFINITY);
-  if (created != pdPASS || task_handle == nullptr) {
-    this->cleanup_task_running_.store(false);
-    ESP_LOGE(TAG, "Failed to create usage telemetry MQTT cleanup task");
-    return false;
-  }
-  this->cleanup_task_handle_.store(task_handle);
-  return true;
 }
 
 void OpenQuattUsageTelemetry::complete_publish_session_() {
@@ -565,14 +743,14 @@ void OpenQuattUsageTelemetry::complete_publish_session_() {
   this->cleanup_succeeded_.store(false);
 
   if (!this->enabled_.load()) {
-    this->payload_.clear();
+    this->clear_payload_();
     this->payload_message_id_.clear();
     this->next_publish_ms_ = 0;
     this->consecutive_failures_ = 0;
     return;
   }
   if (succeeded) {
-    this->payload_.clear();
+    this->clear_payload_();
     this->payload_message_id_.clear();
     this->consecutive_failures_ = 0;
     this->schedule_regular_publish_();
@@ -580,82 +758,129 @@ void OpenQuattUsageTelemetry::complete_publish_session_() {
   } else {
     // Refresh volatile observations for the retry, but retain the logical
     // message ID so a lost QoS 1 PUBACK remains idempotent for ingestion.
-    this->payload_.clear();
+    this->clear_payload_();
     this->schedule_retry_();
     ESP_LOGW(TAG, "Usage statistics publish failed; a bounded retry was scheduled");
   }
 }
 
-void OpenQuattUsageTelemetry::build_payload_() {
+bool OpenQuattUsageTelemetry::build_payload_() {
   const uint64_t uptime_s = static_cast<uint64_t>(esp_timer_get_time()) / 1000000ULL;
   const std::string hardware_revision = this->read_hardware_revision_();
   if (this->payload_message_id_.empty()) {
     this->payload_message_id_ = random_message_id_();
   }
 
-  this->payload_.clear();
-  this->payload_.reserve(960);
-  this->payload_ += R"({"schema_version":1,"message_id":")";
-  this->payload_ += this->payload_message_id_;
-  this->payload_ += R"(","installation_id":")";
-  this->payload_ += this->installation_id_;
-  this->payload_ += '"';
-  append_json_key_(this->payload_, "timestamp_s");
+  if (!this->publish_topic_) {
+    const char *const suffix = "/telemetry";
+    const size_t publish_topic_size =
+        this->topic_.size() + 1U + this->installation_id_.size() +
+        std::strlen(suffix);
+    if (!this->publish_topic_.allocate_external(
+            publish_topic_size + 1U)) {
+      ESP_LOGE(TAG,
+               "Failed to allocate %u-byte usage telemetry topic in PSRAM",
+               static_cast<unsigned>(publish_topic_size + 1U));
+      return false;
+    }
+    FixedBufferWriter publish_topic(
+        this->publish_topic_.data(), this->publish_topic_.size());
+    publish_topic += this->topic_;
+    publish_topic += '/';
+    publish_topic += this->installation_id_;
+    publish_topic += suffix;
+    if (!publish_topic.ok()) {
+      ESP_LOGE(TAG, "Usage telemetry topic exceeded its PSRAM buffer");
+      this->publish_topic_.release();
+      return false;
+    }
+  }
+
+  this->clear_payload_();
+  if (!this->payload_.allocate_external(
+          TELEMETRY_PAYLOAD_CAPACITY + 1U)) {
+    ESP_LOGE(TAG,
+             "Failed to allocate %u-byte usage telemetry payload in PSRAM",
+             static_cast<unsigned>(TELEMETRY_PAYLOAD_CAPACITY + 1U));
+    return false;
+  }
+  FixedBufferWriter payload(this->payload_.data(), this->payload_.size());
+  payload += R"({"schema_version":1,"message_id":")";
+  payload += this->payload_message_id_;
+  payload += R"(","installation_id":")";
+  payload += this->installation_id_;
+  payload += '"';
+  append_json_key_(payload, "timestamp_s");
   if (this->clock_ == nullptr) {
-    this->payload_ += "null";
+    payload += "null";
   } else {
     const auto now = this->clock_->now();
     if (now.is_valid()) {
-      this->payload_ += std::to_string(static_cast<uint64_t>(now.timestamp));
+      payload.append_uint(static_cast<uint64_t>(now.timestamp));
     } else {
-      this->payload_ += "null";
+      payload += "null";
     }
   }
-  this->payload_ += R"(,"uptime_s":)";
-  this->payload_ += std::to_string(uptime_s);
-  this->payload_ += R"(,"firmware_version":")";
-  this->payload_ += json_escape_(this->firmware_version_);
-  this->payload_ += R"(","release_channel":")";
-  this->payload_ += json_escape_(this->release_channel_);
-  this->payload_ += R"(","hardware_profile":")";
-  this->payload_ += json_escape_(this->hardware_profile_);
-  this->payload_ += R"(","hardware_revision":)";
+  payload += R"(,"uptime_s":)";
+  payload.append_uint(uptime_s);
+  payload += R"(,"firmware_version":")";
+  append_json_escaped(payload, this->firmware_version_);
+  payload += R"(","release_channel":")";
+  append_json_escaped(payload, this->release_channel_);
+  payload += R"(","hardware_profile":")";
+  append_json_escaped(payload, this->hardware_profile_);
+  payload += R"(","hardware_revision":)";
   if (hardware_revision.empty()) {
-    this->payload_ += "null";
+    payload += "null";
   } else {
-    this->payload_ += '"';
-    this->payload_ += hardware_revision;
-    this->payload_ += '"';
+    payload += '"';
+    payload += hardware_revision;
+    payload += '"';
   }
-  this->payload_ += R"(,"topology":")";
-  this->payload_ += json_escape_(this->topology_);
-  this->payload_ += R"(","connection":")";
-  this->payload_ += json_escape_(this->connection_);
-  this->payload_ += '"';
-  append_json_uint_(this->payload_, "heap_free_b", heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
-  append_json_uint_(this->payload_, "heap_min_free_b", heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL));
-  append_json_uint_(this->payload_, "heap_largest_block_b", heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL));
-  append_json_uint_(this->payload_, "psram_free_b", heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
-  append_json_optional_number_(this->payload_, "loop_time_ms", this->loop_time_sensor_, 0);
-  append_json_optional_number_(this->payload_, "esp_internal_temp_c", this->internal_temperature_sensor_, 1);
-  append_json_optional_number_(this->payload_, "wifi_rssi_dbm", this->wifi_signal_sensor_, 1);
-  append_json_key_(this->payload_, "reset_reason");
-  this->payload_ += '"';
-  this->payload_ += reset_reason_name_(esp_reset_reason());
-  this->payload_ += '"';
-  append_json_optional_bool_(this->payload_, "cic_polling_enabled", this->cic_polling_switch_);
-  append_json_optional_bool_(this->payload_, "cic_compatibility_enabled", this->cic_compatibility_switch_);
-  append_json_optional_bool_(this->payload_, "ot_thermostat_enabled", this->ot_thermostat_switch_);
-  append_json_optional_bool_(this->payload_, "boiler_assist_enabled", this->boiler_assist_switch_);
-  append_json_boiler_connection_(this->payload_, this->boiler_connection_select_);
-  append_json_optional_bool_(this->payload_, "mqtt_inputs_enabled", this->mqtt_config_ != nullptr,
+  payload += R"(,"topology":")";
+  append_json_escaped(payload, this->topology_);
+  payload += R"(","connection":")";
+  append_json_escaped(payload, this->connection_);
+  payload += '"';
+  append_json_uint_(payload, "heap_free_b", heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
+  append_json_uint_(payload, "heap_min_free_b", heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL));
+  append_json_uint_(payload, "heap_largest_block_b", heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL));
+  append_json_uint_(payload, "psram_free_b", heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
+  append_json_optional_number_(payload, "loop_time_ms", this->loop_time_sensor_, 0);
+  append_json_optional_number_(payload, "esp_internal_temp_c", this->internal_temperature_sensor_, 1);
+  append_json_optional_number_(payload, "wifi_rssi_dbm", this->wifi_signal_sensor_, 1);
+  append_json_key_(payload, "reset_reason");
+  payload += '"';
+  payload += reset_reason_name_(esp_reset_reason());
+  payload += '"';
+  append_json_optional_bool_(payload, "cic_polling_enabled", this->cic_polling_switch_);
+  append_json_optional_bool_(payload, "cic_compatibility_enabled", this->cic_compatibility_switch_);
+  append_json_optional_bool_(payload, "ot_thermostat_enabled", this->ot_thermostat_switch_);
+  append_json_optional_bool_(payload, "boiler_assist_enabled", this->boiler_assist_switch_);
+  append_json_boiler_connection_(payload, this->boiler_connection_select_);
+  append_json_optional_bool_(payload, "mqtt_inputs_enabled", this->mqtt_config_ != nullptr,
                              this->mqtt_config_ != nullptr && this->mqtt_config_->is_enabled());
-  append_json_optional_bool_(this->payload_, "trend_ram_enabled", this->trend_ram_switch_);
-  append_json_optional_bool_(this->payload_, "trend_flash_enabled", this->trend_flash_switch_);
-  append_json_optional_bool_(this->payload_, "decision_log_flash_enabled", this->decision_log_flash_switch_);
-  append_json_optional_bool_(this->payload_, "energy_history_flash_enabled", this->energy_history_flash_switch_);
-  append_json_optional_bool_(this->payload_, "ram_log_history_enabled", this->ram_log_history_switch_);
-  this->payload_ += '}';
+  append_json_optional_bool_(payload, "trend_ram_enabled", this->trend_ram_switch_);
+  append_json_optional_bool_(payload, "trend_flash_enabled", this->trend_flash_switch_);
+  append_json_optional_bool_(payload, "decision_log_flash_enabled", this->decision_log_flash_switch_);
+  append_json_optional_bool_(payload, "energy_history_flash_enabled", this->energy_history_flash_switch_);
+  append_json_optional_bool_(payload, "ram_log_history_enabled", this->ram_log_history_switch_);
+  payload += '}';
+
+  if (!payload.ok()) {
+    ESP_LOGE(TAG,
+             "Usage telemetry JSON exceeded its %u-byte PSRAM buffer",
+             static_cast<unsigned>(TELEMETRY_PAYLOAD_CAPACITY));
+    this->clear_payload_();
+    return false;
+  }
+  this->payload_size_ = payload.size();
+  return true;
+}
+
+void OpenQuattUsageTelemetry::clear_payload_() {
+  this->payload_.release();
+  this->payload_size_ = 0U;
 }
 
 std::string OpenQuattUsageTelemetry::read_hardware_revision_() const {
@@ -698,39 +923,56 @@ std::string OpenQuattUsageTelemetry::random_message_id_() {
   return format_uuid_(bytes);
 }
 
-void OpenQuattUsageTelemetry::start_client_task_(void *arg) {
+void OpenQuattUsageTelemetry::worker_task_(void *arg) {
   auto *self = static_cast<OpenQuattUsageTelemetry *>(arg);
-  if (self != nullptr) {
-    if (!self->start_client_()) {
-      self->publish_failed_.store(true);
+  if (self == nullptr) {
+    while (true) {
+      vTaskSuspend(nullptr);
     }
-    self->start_task_running_.store(false);
-    App.wake_loop_threadsafe();
   }
-  vTaskDelete(nullptr);
-}
 
-void OpenQuattUsageTelemetry::cleanup_client_task_(void *arg) {
-  auto *self = static_cast<OpenQuattUsageTelemetry *>(arg);
-  while (self != nullptr) {
-    ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
-    esp_mqtt_client_handle_t client = nullptr;
-    if (self->runtime_lock_ != nullptr && xSemaphoreTake(self->runtime_lock_, portMAX_DELAY) == pdTRUE) {
-      client = self->mqtt_client_;
-      self->mqtt_client_ = nullptr;
-      xSemaphoreGive(self->runtime_lock_);
+  while (true) {
+    uint32_t command_value = 0U;
+    if (xTaskNotifyWait(0U, UINT32_MAX, &command_value,
+                        portMAX_DELAY) != pdTRUE) {
+      continue;
     }
-    if (client != nullptr) {
-      esp_mqtt_client_stop(client);
-      esp_mqtt_client_destroy(client);
+
+    const WorkerCommand command =
+        static_cast<WorkerCommand>(command_value);
+    if (command == WorkerCommand::START) {
+      if (!self->start_client_()) {
+        self->publish_failed_.store(true);
+      }
+      self->start_task_complete_.store(true);
+      log_heap_state_("Usage telemetry MQTT start complete");
+      ESP_LOGD(TAG, "Usage telemetry worker stack free after start: %u bytes",
+               static_cast<unsigned>(
+                   uxTaskGetStackHighWaterMark(nullptr)));
+      App.wake_loop_threadsafe();
+      continue;
     }
-    self->cleanup_task_handle_.store(nullptr);
-    self->cleanup_task_running_.store(false);
-    self->cleanup_task_complete_.store(true);
-    App.wake_loop_threadsafe();
-    break;
+
+    if (command == WorkerCommand::CLEANUP) {
+      while (!self->cleanup_client_()) {
+        vTaskDelay(pdMS_TO_TICKS(1000U));
+      }
+      ESP_LOGD(
+          TAG,
+          "Usage telemetry worker stack free after cleanup: %u bytes",
+          static_cast<unsigned>(uxTaskGetStackHighWaterMark(nullptr)));
+      log_heap_state_("Usage telemetry MQTT cleanup complete");
+      self->cleanup_task_complete_.store(true);
+      App.wake_loop_threadsafe();
+      if (!MQTT_WORKER_STACK_IN_PSRAM) {
+        vTaskSuspend(nullptr);
+      }
+      continue;
+    }
+
+    ESP_LOGE(TAG, "Usage telemetry worker received invalid command: %u",
+             static_cast<unsigned>(command_value));
   }
-  vTaskDelete(nullptr);
 }
 
 void OpenQuattUsageTelemetry::mqtt_event_handler_(void *handler_args, esp_event_base_t base, int32_t event_id,
@@ -738,20 +980,38 @@ void OpenQuattUsageTelemetry::mqtt_event_handler_(void *handler_args, esp_event_
   (void) base;
   auto *self = static_cast<OpenQuattUsageTelemetry *>(handler_args);
   auto *event = static_cast<esp_mqtt_event_handle_t>(event_data);
-  if (self == nullptr || event == nullptr || !self->session_active_.load() || self->finishing_session_.load()) {
+  if (self == nullptr || event == nullptr) {
+    return;
+  }
+  if (event_id == MQTT_EVENT_CONNECTED) {
+    self->mqtt_connected_seen_.store(true);
+  } else if (event_id == MQTT_EVENT_DISCONNECTED) {
+    self->mqtt_disconnected_seen_.store(true);
+  }
+  if (!self->session_active_.load() || self->finishing_session_.load()) {
     return;
   }
 
   switch (event_id) {
     case MQTT_EVENT_CONNECTED: {
-      if (!self->enabled_.load()) {
+      if (self->consent_mutex_ == nullptr ||
+          xSemaphoreTake(self->consent_mutex_, portMAX_DELAY) != pdTRUE) {
         self->publish_failed_.store(true);
         break;
       }
-      self->publish_topic_ = self->topic_ + "/" + self->installation_id_ + "/telemetry";
-      const int message_id = esp_mqtt_client_enqueue(event->client, self->publish_topic_.c_str(),
-                                                     self->payload_.c_str(), static_cast<int>(self->payload_.size()),
-                                                     1, 1, true);
+      int message_id = -1;
+      if (self->enabled_.load() && self->session_active_.load() &&
+          !self->finishing_session_.load() &&
+          !self->consent_publish_blocked_.load()) {
+        message_id = esp_mqtt_client_enqueue(
+            event->client, self->publish_topic_.data(),
+            self->payload_.data(), static_cast<int>(self->payload_size_),
+            1, 1, true);
+      }
+      xSemaphoreGive(self->consent_mutex_);
+      ESP_LOGD(
+          TAG, "esp-mqtt task stack free after enqueue: %u bytes",
+          static_cast<unsigned>(uxTaskGetStackHighWaterMark(nullptr)));
       if (message_id < 0) {
         self->publish_failed_.store(true);
       } else {
@@ -762,6 +1022,10 @@ void OpenQuattUsageTelemetry::mqtt_event_handler_(void *handler_args, esp_event_
     }
     case MQTT_EVENT_PUBLISHED:
       if (event->msg_id == self->pending_message_id_.load()) {
+        ESP_LOGD(
+            TAG, "esp-mqtt task stack free after publish: %u bytes",
+            static_cast<unsigned>(
+                uxTaskGetStackHighWaterMark(nullptr)));
         self->publish_succeeded_.store(true);
         App.wake_loop_threadsafe();
       }

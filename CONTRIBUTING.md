@@ -58,6 +58,33 @@ Not everything is checked automatically. These rules remain leading during revie
 - Add comments only where intent is not immediately clear.
 - Write new and changed code comments in English, including YAML comments and `//` comments inside ESPHome lambdas.
 
+## Embedded Memory and Heap
+
+Internal DRAM is a safety and availability budget, not interchangeable with free PSRAM. Wi-Fi, lwIP, TLS, ESP-MQTT, DMA and several FreeRTOS paths still require internal memory and often a sufficiently large contiguous block.
+
+For new runtime features and material changes:
+
+- Prefer strict PSRAM allocation for large, long-lived state, history, payload and response scratch buffers when the access path is PSRAM-safe.
+- Do not silently fall back to internal RAM when that would consume reserved network or control headroom. Allocation failure must degrade explicitly and safety-relevant control must fail closed.
+- Remember that globals, `new`, `std::string` and `std::vector` do not automatically allocate in PSRAM. A containing object in PSRAM can still own internal allocations.
+- Keep ISR/DMA buffers, cache-disabled code paths and platform-restricted task stacks in compatible internal memory.
+- Reuse bounded buffers and persistent worker tasks instead of per-request large copies or repeated task create/delete cycles, but do not keep MQTT/TLS/socket resources alive merely to preserve a worker.
+- Use targeted placement before changing global options such as `CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL`.
+- Review the maximum simultaneous peak across components, not only each component in isolation.
+
+Validate memory-sensitive work with identical baseline and candidate firmware. Record at least:
+
+- current internal free heap;
+- cumulative minimum internal heap since boot;
+- largest internal free block and fragmentation;
+- free PSRAM;
+- relevant task-stack high-watermarks;
+- whether values recover after the tested operation.
+
+Measure during cold boot and realistic combined load, including the applicable HA, web, API, MQTT, Modbus, OpenTherm and OTA/flash paths. Avoid high-frequency diagnostic polling that materially changes the result. The linker RAM summary is useful for static deltas, but does not expose transient task stacks, TLS buffers or allocation peaks.
+
+An unexplained regression, allocation failure, or minimum/largest-block result without measured margin for the worst simultaneous allocation is release-blocking until investigated. Establish healthy HIL baselines per hardware profile and turn those into explicit profile budgets rather than relying on one global magic number. See `docs/system-overview.md` for the project memory model.
+
 ## Lambda Style
 
 For ESPHome lambdas, we use a narrow but strict style:

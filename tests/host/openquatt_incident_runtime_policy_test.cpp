@@ -19,6 +19,8 @@ using esphome::openquatt_incident_manager::
     apply_persistence_safety_gate;
 using esphome::openquatt_incident_manager::
     apply_persistence_initialization_gate;
+using esphome::openquatt_incident_manager::
+    incident_storage_failure_outputs;
 using esphome::openquatt_incident_manager::HpThermalCommand;
 using esphome::openquatt_incident_manager::
     link_round_timeout_elapsed;
@@ -177,6 +179,38 @@ void test_duo_fallback_coverage_fails_closed() {
                                              outputs.size()));
   assert(!all_unavailable_hps_allow_fallback(nullptr, outputs.size()));
   assert(!all_unavailable_hps_allow_fallback(outputs.data(), 0U));
+}
+
+void test_incident_storage_failure_forces_safe_outputs() {
+  const oq_incidents::DerivedOutputs outputs =
+      incident_storage_failure_outputs();
+  assert(outputs.link_state == oq_incidents::LinkState::BOOTSTRAP);
+  assert(outputs.protection_state ==
+         oq_incidents::ProtectionState::FAULT_ACTIVE);
+  assert(!outputs.available_for_start);
+  assert(outputs.must_stop);
+  assert(outputs.fault_active);
+  assert(outputs.protection_active);
+  assert(!outputs.stop_confirmed);
+  assert(outputs.stop_unconfirmed);
+  assert(!outputs.fallback_cause_present);
+  assert(!outputs.fallback_eligible);
+  assert(oq_incidents::has_effect(
+      outputs.active_effects,
+      oq_incidents::IncidentEffect::BLOCK_START));
+  assert(oq_incidents::has_effect(
+      outputs.active_effects,
+      oq_incidents::IncidentEffect::STOP_COMPRESSOR));
+  assert(oq_incidents::has_effect(
+      outputs.active_effects,
+      oq_incidents::IncidentEffect::BLOCK_BOILER));
+
+  const std::array<oq_incidents::DerivedOutputs, 1U> failed{
+      outputs};
+  assert(!all_unavailable_hps_allow_fallback(
+      failed.data(), failed.size()));
+  assert(!all_hp_outputs_safe_for_fallback(
+      failed.data(), failed.size()));
 }
 
 void test_persistence_failure_vetoes_real_fault_fallback() {
@@ -511,6 +545,7 @@ int main() {
   test_start_failure_retry_production_policy();
   test_link_round_timeout_tolerates_scan_jitter();
   test_duo_fallback_coverage_fails_closed();
+  test_incident_storage_failure_forces_safe_outputs();
   test_fallback_output_confirmation();
   test_persistence_overlay_is_fail_closed_and_causally_consistent();
   test_persistence_failure_vetoes_real_fault_fallback();

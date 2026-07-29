@@ -2,6 +2,7 @@
 
 #include <array>
 #include <atomic>
+#include <cstddef>
 #include <cstdint>
 #include <string>
 
@@ -16,7 +17,10 @@
 #include "esphome/components/time/real_time_clock.h"
 #include "esphome/core/component.h"
 #include "esphome/core/preferences.h"
+#include "esphome/core/static_task.h"
 #include "mqtt_client.h"
+#include "OpenQuattUsageTelemetryPolicy.h"
+#include "PsramBuffer.h"
 
 namespace esphome {
 namespace openquatt_mqtt_config {
@@ -83,12 +87,25 @@ class OpenQuattUsageTelemetry : public switch_::Switch, public Component {
   static constexpr uint32_t SESSION_TIMEOUT_MS = 30000;
   static constexpr uint32_t RETRY_MIN_MS = 5UL * 60UL * 1000UL;
   static constexpr uint32_t RETRY_MAX_MS = 60UL * 60UL * 1000UL;
-  // HIL boot measurements leave >22 kB unused with the former 24 kB stack.
-  // Eight kB retains >5 kB measured headroom without splitting the largest
-  // internal-heap block before esp-mqtt requests its own 12 kB task stack.
-  static constexpr uint32_t MQTT_START_TASK_STACK_SIZE = 8192;
-  static constexpr uint32_t MQTT_CLEANUP_TASK_STACK_SIZE = 6144;
+#if defined(CONFIG_IDF_TARGET_ESP32S3)
+  // PSRAM is abundant, so keep a conservative stack until HIL watermarks
+  // demonstrate that this can safely be reduced.
+  static constexpr uint32_t MQTT_WORKER_TASK_STACK_SIZE = 16384;
+  static constexpr bool MQTT_WORKER_STACK_IN_PSRAM = true;
+#else
+  // Classic ESP32 cannot safely run Wi-Fi/ROM-using tasks from a PSRAM stack.
+  static constexpr uint32_t MQTT_WORKER_TASK_STACK_SIZE = 8192;
+  static constexpr bool MQTT_WORKER_STACK_IN_PSRAM = false;
+#endif
   static constexpr int MQTT_TASK_STACK_SIZE = 12288;
+  static_assert(
+      sizeof(StackType_t) == 1U,
+      "ESP-IDF StaticTask stack sizes are configured in bytes");
+
+  enum class WorkerCommand : uint32_t {
+    START = 1U,
+    CLEANUP = 2U,
+  };
 
   struct StorageV1 {
     uint32_t magic;
@@ -114,25 +131,28 @@ class OpenQuattUsageTelemetry : public switch_::Switch, public Component {
   bool load_storage_(Storage *storage);
   bool load_legacy_storage_(StorageV1 *storage);
   bool save_storage_(const Storage &storage);
+  bool set_consent_publish_blocked_(bool blocked);
   bool ensure_installation_id_(Storage *storage);
   bool is_setup_complete_() const;
-  void apply_storage_(const Storage &storage);
+  bool apply_storage_(const Storage &storage);
   void schedule_initial_publish_();
   void schedule_immediate_publish_();
   void schedule_regular_publish_();
   void schedule_retry_();
   void start_publish_session_();
+  bool ensure_worker_task_();
+  bool notify_worker_(WorkerCommand command);
   bool start_client_();
+  bool cleanup_client_();
   void finish_publish_session_(bool succeeded);
-  bool prepare_cleanup_task_();
   void complete_publish_session_();
-  void build_payload_();
+  bool build_payload_();
+  void clear_payload_();
   std::string read_hardware_revision_() const;
   static bool time_reached_(uint32_t now_ms, uint32_t target_ms);
   static std::string format_uuid_(const std::array<uint8_t, 16> &bytes);
   static std::string random_message_id_();
-  static void start_client_task_(void *arg);
-  static void cleanup_client_task_(void *arg);
+  static void worker_task_(void *arg);
   static void mqtt_event_handler_(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data);
 
   std::string broker_;
@@ -169,19 +189,29 @@ class OpenQuattUsageTelemetry : public switch_::Switch, public Component {
   ESPPreferenceObject pref_;
   std::array<uint8_t, 16> installation_id_bytes_{};
   std::string installation_id_;
-  std::string publish_topic_;
-  std::string payload_;
+  openquatt_common::PsramBuffer<char> publish_topic_;
+  openquatt_common::PsramBuffer<char> payload_;
+  size_t payload_size_{0U};
   std::string payload_message_id_;
   esp_mqtt_client_handle_t mqtt_client_{nullptr};
-  SemaphoreHandle_t runtime_lock_{nullptr};
+  bool mqtt_client_started_{false};
+  uint8_t cleanup_stop_failures_{0U};
+  bool cleanup_disconnect_requested_{false};
+  bool worker_task_region_valid_{false};
+  StaticSemaphore_t consent_mutex_storage_{};
+  SemaphoreHandle_t consent_mutex_{nullptr};
+  StaticTask worker_task_state_{};
   std::atomic<bool> enabled_{false};
+  std::atomic<bool> consent_publish_blocked_{true};
   std::atomic<bool> choice_configured_{false};
   std::atomic<bool> session_active_{false};
   std::atomic<bool> finishing_session_{false};
   std::atomic<bool> start_task_running_{false};
-  std::atomic<bool> cleanup_task_running_{false};
+  std::atomic<bool> start_task_complete_{false};
   std::atomic<bool> cleanup_task_complete_{false};
   std::atomic<bool> cleanup_succeeded_{false};
+  std::atomic<bool> mqtt_connected_seen_{false};
+  std::atomic<bool> mqtt_disconnected_seen_{false};
   std::atomic<bool> publish_succeeded_{false};
   std::atomic<bool> publish_failed_{false};
   std::atomic<int> pending_message_id_{-1};
@@ -189,7 +219,6 @@ class OpenQuattUsageTelemetry : public switch_::Switch, public Component {
   uint32_t next_publish_ms_{0};
   uint8_t consecutive_failures_{0};
   bool boot_publish_pending_{false};
-  std::atomic<TaskHandle_t> cleanup_task_handle_{nullptr};
 };
 
 }  // namespace openquatt_usage_telemetry
