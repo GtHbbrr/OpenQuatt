@@ -252,16 +252,49 @@
   gap: 12px;
 }
 
+.oq-webserver-log-control-card {
+  align-items: center;
+  min-height: 112px;
+  padding: 14px 16px;
+}
+
+.oq-webserver-log-control-card-value {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.oq-webserver-log-control-card .oq-settings-info-button {
+  width: 22px;
+  height: 22px;
+  font-size: 0.76rem;
+}
+
+.oq-webserver-log-control-card:first-child .oq-settings-info-popover {
+  right: auto;
+  left: 0;
+}
+
+.oq-webserver-log-control-card > .oq-helper-button,
 .oq-webserver-log-level-control {
   position: relative;
   display: block;
-  flex: 0 0 220px;
-  width: min(220px, 100%);
+  flex: 0 0 190px;
+  width: min(190px, 100%);
+}
+
+.oq-webserver-log-control-card > .oq-helper-button {
+  min-height: 46px;
 }
 
 .oq-webserver-log-level-control .oq-helper-select {
   min-height: 46px;
   padding-right: 40px;
+}
+
+.oq-webserver-log-control-card--warning .oq-settings-system-row-note {
+  color: var(--oq-helper-accent-deep);
+  font-weight: 650;
 }
 
 .oq-webserver-log-modal .oq-helper-modal-copy code,

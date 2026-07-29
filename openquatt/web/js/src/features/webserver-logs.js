@@ -9,7 +9,7 @@ import { escapeHtml } from "../core/html.js";
 import { render } from "../core/render-scheduler.js";
 import { createScrollKeeper } from "../core/scroll-keeper.js";
 import { renderModalShell } from "../core/modal-shell.js";
-import { renderSettingsSystemRow } from "../settings/controls.js";
+import { renderSettingsInfoToggle } from "../settings/controls.js";
 
 export const WEB_SERVER_LOG_MAX_ENTRIES = 250;
 
@@ -466,6 +466,7 @@ export function openWebServerLogsModal() {
     updateWebServerLogState({ webServerLogEntries: seedWebServerLogDemoEntries() });
   }
   updateWebServerLogState({ webServerLogCopyMessage: "", webServerLogCopyError: "" });
+  state.settingsInfoOpen = "";
   state.systemModal = "webserver-logs";
   render();
   void refreshEntities(["webServerLogHistoryEnabled", "debugLevel"], "all", { forceFast: true }).then(() => {
@@ -935,11 +936,12 @@ export function renderWebServerLogHistoryControls() {
 
   return `
     <div class="oq-webserver-log-history-shell">
-      ${renderSettingsSystemRow({
+      ${renderWebServerLogControlCard({
         dataValue: "webserverLogHistory",
         label: "RAM log history",
         value: label,
-        note: copy,
+        infoId: "webserverLogHistory",
+        infoCopy: copy,
         action: `<button
           class="oq-helper-button oq-helper-button--ghost"
           type="button"
@@ -966,13 +968,18 @@ export function renderWebServerLoggerLevelControl() {
   const options = getWebServerLoggerLevelOptions(entity);
   const value = getWebServerLoggerLevelValue(entity);
   const busy = state.loadingEntities || Boolean(state.busyAction);
+  const warning = value === "DEBUG"
+    ? "Veel DEBUG-logging kan de web-app en Home Assistant traag of onbereikbaar maken."
+    : "";
 
   return `
-    ${renderSettingsSystemRow({
+    ${renderWebServerLogControlCard({
       dataValue: "debugLevel",
       label: "Logger level",
       value: value || "Onbekend",
-      note: "DEBUG is tijdelijk en wordt na een herstart teruggezet naar INFO. Bij veel Modbusverkeer kan DEBUG zoveel logging produceren dat de web-app en Home Assistant traag of onbereikbaar worden.",
+      infoId: "webserverLoggerLevel",
+      infoCopy: "DEBUG is tijdelijk en wordt na een herstart teruggezet naar INFO. Bij veel Modbusverkeer kan DEBUG zoveel logging produceren dat de web-app en Home Assistant traag of onbereikbaar worden.",
+      note: warning,
       action: `<label class="oq-webserver-log-level-control" aria-label="Logger level">
         <select class="oq-helper-select" data-oq-field="debugLevel" ${busy ? "disabled" : ""}>
           ${options.map((option) => `<option value="${escapeHtml(option)}" ${option === value ? "selected" : ""}>${escapeHtml(option)}</option>`).join("")}
@@ -1062,4 +1069,31 @@ export function renderWebServerLogsModal() {
       <button class="oq-helper-button oq-helper-button--primary" type="button" data-oq-action="close-system-modal">Gereed</button>
     `,
   });
+}
+
+function renderWebServerLogControlCard({
+  dataValue,
+  label,
+  value,
+  infoId,
+  infoCopy,
+  action,
+  note = "",
+}) {
+  return `
+    <div
+      class="oq-settings-system-row oq-settings-system-row--with-action oq-webserver-log-control-card${note ? " oq-webserver-log-control-card--warning" : ""}"
+      data-oq-diagnostics-row="${escapeHtml(dataValue)}"
+    >
+      <div class="oq-settings-system-row-copy">
+        <p class="oq-settings-system-row-label">${escapeHtml(label)}</p>
+        <div class="oq-webserver-log-control-card-value">
+          <strong class="oq-settings-system-row-value">${escapeHtml(value)}</strong>
+          ${renderSettingsInfoToggle(infoId, label, infoCopy)}
+        </div>
+        ${note ? `<p class="oq-settings-system-row-note">${escapeHtml(note)}</p>` : ""}
+      </div>
+      ${action}
+    </div>
+  `;
 }
