@@ -12,9 +12,25 @@ globalThis.window = {
 const { state } = await import("../js/src/core/state.js");
 const {
   getFirmwareProgressModel,
+  getFirmwareTestAssetUrls,
   isFirmwareInstallCompletionConfirmed,
   primeFirmwareInstallProgressHints,
 } = await import("../js/src/features/firmware-update.js");
+
+test("PR firmware uses deterministic release URLs without the GitHub REST API", () => {
+  const target = {
+    available: true,
+    label: "Heatpump Controller Q Duo Wi-Fi",
+    otaFileName: "openquatt-heatpump-controller-q-duo-wifi.firmware.ota.bin",
+  };
+
+  assert.deepEqual(getFirmwareTestAssetUrls(395, target), {
+    otaUrl: "https://github.com/OpenQuatt/OpenQuatt/releases/download/pr-395/openquatt-heatpump-controller-q-duo-wifi.firmware.ota.bin",
+    md5Url: "https://github.com/OpenQuatt/OpenQuatt/releases/download/pr-395/openquatt-heatpump-controller-q-duo-wifi.firmware.ota.bin.md5",
+    label: "PR 395 · Heatpump Controller Q Duo Wi-Fi",
+  });
+  assert.equal(getFirmwareTestAssetUrls("395/../../dev-latest", target), null);
+});
 
 test("a new OTA attempt ignores cached reboot progress until a post-start poll", () => {
   state.entities = {
