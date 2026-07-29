@@ -381,7 +381,7 @@
       ${a}
     </div>
   `}function Vy(){let e=Bl();if(!e)return"";let t=cm(e),r=my(e),n=o.loadingEntities||!!o.busyAction;return`
-    ${qm({dataValue:"debugLevel",label:"Logger level",value:r||"Onbekend",infoId:"webserverLoggerLevel",infoCopy:"DEBUG is tijdelijk en wordt na een herstart teruggezet naar INFO. Bij veel Modbusverkeer kan DEBUG zoveel logging produceren dat de web-app en Home Assistant traag of onbereikbaar worden.",note:r==="DEBUG"?"Veel DEBUG-logging kan de web-app en Home Assistant traag of onbereikbaar maken.":"",action:`<label class="oq-webserver-log-level-control" aria-label="Logger level">
+    ${qm({dataValue:"debugLevel",label:"Logger level",value:r||"Onbekend",infoId:"webserverLoggerLevel",infoCopy:"DEBUG is tijdelijk en wordt na een herstart teruggezet naar INFO. Bij veel Modbusverkeer kan DEBUG zoveel logging produceren dat de web-app en Home Assistant traag of onbereikbaar worden.",note:r==="DEBUG"?"DEBUG kan de web-app en Home Assistant vertragen.":"",action:`<label class="oq-webserver-log-level-control" aria-label="Logger level">
         <select class="oq-helper-select" data-oq-field="debugLevel" ${n?"disabled":""}>
           ${t.map(i=>`<option value="${s(i)}" ${i===r?"selected":""}>${s(i)}</option>`).join("")}
         </select>

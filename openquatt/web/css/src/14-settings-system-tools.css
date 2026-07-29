@@ -248,14 +248,18 @@
 .oq-webserver-log-history-shell {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr));
-  align-items: stretch;
+  align-items: start;
   gap: 12px;
 }
 
 .oq-webserver-log-control-card {
   align-items: center;
-  min-height: 112px;
-  padding: 14px 16px;
+  min-height: 0;
+  padding: 8px 12px;
+}
+
+.oq-webserver-log-control-card .oq-settings-system-row-copy {
+  gap: 2px;
 }
 
 .oq-webserver-log-control-card-value {
@@ -265,8 +269,8 @@
 }
 
 .oq-webserver-log-control-card .oq-settings-info-button {
-  width: 22px;
-  height: 22px;
+  width: 20px;
+  height: 20px;
   font-size: 0.76rem;
 }
 
@@ -284,17 +288,19 @@
 }
 
 .oq-webserver-log-control-card > .oq-helper-button {
-  min-height: 46px;
+  min-height: 40px;
 }
 
 .oq-webserver-log-level-control .oq-helper-select {
-  min-height: 46px;
+  min-height: 40px;
   padding-right: 40px;
 }
 
 .oq-webserver-log-control-card--warning .oq-settings-system-row-note {
   color: var(--oq-helper-accent-deep);
+  font-size: 0.78rem;
   font-weight: 650;
+  line-height: 1.3;
 }
 
 .oq-webserver-log-modal .oq-helper-modal-copy code,

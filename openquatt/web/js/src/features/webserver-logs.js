@@ -969,7 +969,7 @@ export function renderWebServerLoggerLevelControl() {
   const value = getWebServerLoggerLevelValue(entity);
   const busy = state.loadingEntities || Boolean(state.busyAction);
   const warning = value === "DEBUG"
-    ? "Veel DEBUG-logging kan de web-app en Home Assistant traag of onbereikbaar maken."
+    ? "DEBUG kan de web-app en Home Assistant vertragen."
     : "";
 
   return `

@@ -420,7 +420,7 @@ test("webserver log controls keep guidance behind compact info toggles", (t) => 
   assert.equal((markup.match(/oq-settings-system-row-note/g) || []).length, 0);
 });
 
-test("active DEBUG keeps its reachability warning visible", (t) => {
+test("active DEBUG keeps its performance warning visible", (t) => {
   const originalEntities = state.entities;
   const originalLoadingEntities = state.loadingEntities;
   const originalBusyAction = state.busyAction;
@@ -438,5 +438,5 @@ test("active DEBUG keeps its reachability warning visible", (t) => {
 
   const markup = renderWebServerLoggerLevelControl();
   assert.match(markup, /oq-webserver-log-control-card--warning/);
-  assert.match(markup, /Veel DEBUG-logging kan de web-app en Home Assistant traag of onbereikbaar maken\./);
+  assert.match(markup, /DEBUG kan de web-app en Home Assistant vertragen\./);
 });
