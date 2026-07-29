@@ -14,7 +14,7 @@ import { getUpdateStatus } from "../features/firmware-update.js";
 import { getEspTemperatureLabel } from "../features/header-status.js";
 import { getWebServerLogStatusLabel } from "../features/webserver-logs.js";
 import { BOILER_OPENTHERM_CAPABILITY, getBoilerOpenThermCapability, getSupportedBoilerConnectionOptions } from "./boiler.js";
-import { getSelectEntityOptions, renderNamedActionButton, renderSettingsAdvancedDisclosure, renderSettingsChoiceOption, renderSettingsCompactSwitchControl, renderSettingsFieldCard, renderSettingsMiniNumberField, renderSettingsNumberField, renderSettingsSection, renderSettingsSliderField, renderSettingsSystemRow } from "./controls.js";
+import { getSelectEntityOptions, renderNamedActionButton, renderSettingsAdvancedDisclosure, renderSettingsChoiceOption, renderSettingsCompactSwitchControl, renderSettingsFieldCard, renderSettingsMiniNumberField, renderSettingsNumberField, renderSettingsSection, renderSettingsSystemRow } from "./controls.js";
 import { renderSettingsHeatPumpLimiterCard } from "./heating.js";
 import { escapeHtml } from "../core/html.js";
 
