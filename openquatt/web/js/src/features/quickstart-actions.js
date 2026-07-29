@@ -27,6 +27,7 @@ import { render } from "../core/render-scheduler.js";
       return [...new Set([
         ...base,
         "boilerCvAssistEnabled",
+        "boilerFaultFallbackEnabled",
         "boilerConnection",
         "boilerRatedHeatPower",
         "otbLinkAvailable",
@@ -56,6 +57,7 @@ import { render } from "../core/render-scheduler.js";
         "installationTopology",
         "hpGeneration",
         "boilerCvAssistEnabled",
+        "boilerFaultFallbackEnabled",
         "boilerConnection",
         "boilerRatedHeatPower",
         ...QUICK_START_FLOW_SOURCE_KEYS,

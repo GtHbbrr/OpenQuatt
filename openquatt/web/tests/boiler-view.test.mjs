@@ -29,6 +29,7 @@ const boilerOpenThermYaml = await readFile(new URL("../../oq_boiler_opentherm.ya
 const heatPumpQProfileYaml = await readFile(new URL("../../profiles/heatpump_controller_q.yaml", import.meta.url), "utf8");
 const otSlaveYaml = await readFile(new URL("../../oq_ot_slave.yaml", import.meta.url), "utf8");
 const quickStartSource = await readFile(new URL("../js/src/features/quickstart.js", import.meta.url), "utf8");
+const quickStartActionsSource = await readFile(new URL("../js/src/features/quickstart-actions.js", import.meta.url), "utf8");
 const installationSource = await readFile(new URL("../js/src/settings/installation.js", import.meta.url), "utf8");
 
 function status(overrides = {}) {
@@ -357,6 +358,14 @@ test("settings hydration loads boiler setup and diagnostics before rendering", (
     "Acknowledge recovered HP incidents",
   );
   assert.ok(INSTALLATION_MONITORING_STATE_KEYS.includes("acknowledgeHpIncidents"));
+  assert.match(
+    quickStartActionsSource,
+    /if \(stepId === "boiler"\)[\s\S]*?"boilerFaultFallbackEnabled"/,
+  );
+  assert.match(
+    quickStartActionsSource,
+    /if \(stepId === "confirm"\)[\s\S]*?"boilerFaultFallbackEnabled"/,
+  );
 });
 
 test("fault fallback setting explains the consequence of both switch states", () => {
@@ -366,7 +375,7 @@ test("fault fallback setting explains the consequence of both switch states", ()
   assert.match(installationSource, /Een korte communicatiedip telt niet als storing/);
 });
 
-test("fault fallback is editable in Installation but not in the shared Quick Start boiler fields", () => {
+test("fault fallback is editable in Installation and the shared Quick Start boiler fields", () => {
   const fallbackSwitchMatches = installationSource.match(
     /renderSettingsCompactSwitchControl\(\s*"boilerFaultFallbackEnabled"/g,
   ) || [];
@@ -380,9 +389,12 @@ test("fault fallback is editable in Installation but not in the shared Quick Sta
   );
   assert.match(
     quickStartSource,
-    /renderBoilerCvFields\("oq-settings-grid oq-settings-grid--quickstart oq-settings-boiler-simple-grid"\)/,
+    /renderBoilerCvFields\("oq-settings-grid oq-settings-grid--quickstart oq-settings-boiler-simple-grid", true\)/,
   );
-  assert.doesNotMatch(quickStartSource, /includeFaultFallback/);
+  assert.match(
+    quickStartSource,
+    /\["Automatische ketelovername bij warmtepompstoring", isEntityActive\("boilerFaultFallbackEnabled"\) \? "Aan" : "Uit"\]/,
+  );
   assert.match(servicePanelSource, /renderInstallationMonitoringStatusRow/);
   assert.doesNotMatch(servicePanelSource, /boilerFaultFallbackEnabled/);
   assert.doesNotMatch(servicePanelSource, /renderSettingsCompactSwitchControl/);
