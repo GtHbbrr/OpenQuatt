@@ -134,5 +134,24 @@ inline oq_incidents::DerivedOutputs apply_persistence_safety_gate(
   return outputs;
 }
 
+inline oq_incidents::DerivedOutputs apply_persistence_initialization_gate(
+    oq_incidents::DerivedOutputs outputs, bool initialization_pending) {
+  if (!initialization_pending) return outputs;
+
+  outputs.available_for_start = false;
+  outputs.fallback_eligible = false;
+  outputs.active_effects |=
+      oq_incidents::IncidentEffect::BLOCK_START |
+      oq_incidents::IncidentEffect::BLOCK_BOILER;
+  if (outputs.protection_state ==
+          oq_incidents::ProtectionState::CLEAR ||
+      outputs.protection_state ==
+          oq_incidents::ProtectionState::LIMITED) {
+    outputs.protection_state =
+        oq_incidents::ProtectionState::START_BLOCKED;
+  }
+  return outputs;
+}
+
 }  // namespace openquatt_incident_manager
 }  // namespace esphome

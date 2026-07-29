@@ -15,6 +15,8 @@ using esphome::openquatt_incident_manager::
     all_unavailable_hps_allow_fallback;
 using esphome::openquatt_incident_manager::
     apply_persistence_safety_gate;
+using esphome::openquatt_incident_manager::
+    apply_persistence_initialization_gate;
 using esphome::openquatt_incident_manager::HpThermalCommand;
 using esphome::openquatt_incident_manager::
     link_round_timeout_elapsed;
@@ -268,7 +270,7 @@ void test_urgent_flush_requires_exact_target_and_protects_ring_interval() {
   assert(!policy.pending());
 }
 
-void test_manual_reset_missing_all_fails_closed_and_persists_recovery() {
+void test_manual_reset_missing_all_waits_for_observed_baseline() {
   ManualResetLatchPersistencePolicy policy;
   ManualResetLatchStorage storage_a{};
   ManualResetLatchStorage storage_b{};
@@ -278,27 +280,57 @@ void test_manual_reset_missing_all_fails_closed_and_persists_recovery() {
       oq_incidents::kManualResetAllHpMask);
   assert(result ==
          ManualResetLatchPersistencePolicy::LoadResult::
-             RECOVERY_REQUIRED);
+             INITIALIZATION_REQUIRED);
   assert(!policy.ready());
+  assert(policy.initialization_pending());
   assert(policy.fault_mask() ==
          oq_incidents::kManualResetAllHpMask);
-  assert(policy.should_attempt_persist(100U, 60000U));
-  assert(policy.persistence_target_mask() ==
-         oq_incidents::kManualResetAllHpMask);
+  assert(!policy.should_attempt_persist(100U, 60000U));
 
-  policy.mark_persist_success(
-      oq_incidents::kManualResetAllHpMask, 100U);
+  oq_incidents::DerivedOutputs outputs;
+  outputs.available_for_start = true;
+  const oq_incidents::DerivedOutputs gated =
+      apply_persistence_initialization_gate(outputs, true);
+  assert(!gated.available_for_start);
+  assert(!gated.fault_active);
+  assert(oq_incidents::has_effect(
+      gated.active_effects,
+      oq_incidents::IncidentEffect::BLOCK_BOILER));
+
+  policy.complete_initialization(0U);
+  assert(policy.should_attempt_persist(101U, 60000U));
+  assert(policy.persistence_target_mask() == 0U);
+  policy.mark_persist_success(0U, 101U);
   assert(policy.ready());
-  assert(policy.persisted_mask() ==
-         oq_incidents::kManualResetAllHpMask);
+  assert(!policy.initialization_pending());
+  assert(policy.persisted_mask() == 0U);
   assert(policy.fault_mask() == 0U);
-  assert(!policy.should_attempt_persist(101U, 60000U));
+  assert(!policy.should_attempt_persist(102U, 60000U));
 
   policy.observe_runtime_latches(oq_incidents::kManualResetHp1Mask);
-  assert(!policy.should_attempt_persist(102U, 60000U));
-  policy.observe_runtime_latches(oq_incidents::kManualResetHp1Mask);
-  assert(!policy.should_attempt_persist(103U, 60000U));
-  assert(!policy.should_attempt_persist(60102U, 60000U));
+  assert(policy.should_attempt_persist(103U, 60000U));
+  assert(policy.persistence_target_mask() ==
+         oq_incidents::kManualResetHp1Mask);
+}
+
+void test_manual_reset_v1_upgrade_rebuilds_from_observed_faults() {
+  ManualResetLatchStorage storage_a{};
+  storage_a.version = oq_incidents::kManualResetLegacyStorageVersion;
+  storage_a.latch_mask = oq_incidents::kManualResetAllHpMask;
+  ManualResetLatchStorage storage_b = storage_a;
+  ManualResetLatchMarker marker{};
+  marker.version = oq_incidents::kManualResetLegacyStorageVersion;
+
+  ManualResetLatchPersistencePolicy policy;
+  assert(policy.load(true, storage_a, true, storage_b, true, marker,
+                     oq_incidents::kManualResetAllHpMask) ==
+         ManualResetLatchPersistencePolicy::LoadResult::
+             INITIALIZATION_REQUIRED);
+  assert(policy.initialization_pending());
+  assert(policy.persisted_mask() == 0U);
+  policy.complete_initialization(oq_incidents::kManualResetHp2Mask);
+  assert(policy.persistence_target_mask() ==
+         oq_incidents::kManualResetHp2Mask);
 }
 
 void test_manual_reset_restart_restore_and_partial_clear() {
@@ -456,7 +488,8 @@ int main() {
   test_new_urgent_event_is_not_cleared_by_inflight_flush();
   test_failed_flush_obeys_retry_window_and_sequence_wrap();
   test_urgent_flush_requires_exact_target_and_protects_ring_interval();
-  test_manual_reset_missing_all_fails_closed_and_persists_recovery();
+  test_manual_reset_missing_all_waits_for_observed_baseline();
+  test_manual_reset_v1_upgrade_rebuilds_from_observed_faults();
   test_manual_reset_restart_restore_and_partial_clear();
   test_manual_reset_confirm_is_per_hp_and_write_failure_safe();
   test_manual_reset_ambiguous_storage_repairs_conservatively();

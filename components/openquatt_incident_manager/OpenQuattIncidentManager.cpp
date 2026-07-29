@@ -803,6 +803,30 @@ void OpenQuattIncidentManager::process_fault_snapshot_(
   observation.words = unit.fault_words;
   observation.fresh = unit.fault_pending;
   unit.engine.observe_fault_words(observation);
+  if (complete &&
+      this->manual_reset_persistence_.initialization_pending()) {
+    const uint8_t hp_mask = static_cast<uint8_t>(1U << slot);
+    if ((unit.fault_words[1U] & (1U << 4U)) != 0U) {
+      this->initialization_manual_reset_mask_ |= hp_mask;
+    }
+    if (unit.initialization_fault_snapshot_count <
+        INITIALIZATION_FAULT_SNAPSHOT_COUNT) {
+      ++unit.initialization_fault_snapshot_count;
+    }
+    bool all_snapshots_complete = true;
+    for (const UnitState &candidate : this->units_) {
+      if (candidate.configured &&
+          candidate.initialization_fault_snapshot_count <
+              INITIALIZATION_FAULT_SNAPSHOT_COUNT) {
+        all_snapshots_complete = false;
+        break;
+      }
+    }
+    if (all_snapshots_complete) {
+      this->manual_reset_persistence_.complete_initialization(
+          this->initialization_manual_reset_mask_);
+    }
+  }
   unit.fault_pending.fill(false);
   unit.fault_pending_since_ms = 0U;
   if (complete) {
@@ -1504,8 +1528,9 @@ void OpenQuattIncidentManager::publish_transitions_(
       unit, slot, 2U, current_outputs.stop_unconfirmed, now_ms);
   const uint8_t hp_mask = static_cast<uint8_t>(1U << slot);
   const bool persistence_failure =
-      !this->manual_reset_persistence_.ready() ||
-      (this->manual_reset_persistence_.fault_mask() & hp_mask) != 0U;
+      !this->manual_reset_persistence_.initialization_pending() &&
+      (!this->manual_reset_persistence_.ready() ||
+       (this->manual_reset_persistence_.fault_mask() & hp_mask) != 0U);
   this->publish_synthetic_incident_(
       unit, slot, 3U, persistence_failure, now_ms);
 
@@ -1717,6 +1742,12 @@ void OpenQuattIncidentManager::setup_manual_reset_persistence_(
       marker_loaded, marker, configured_mask);
   if (load_result ==
       oq_incidents::ManualResetLatchPersistencePolicy::LoadResult::
+          INITIALIZATION_REQUIRED) {
+    ESP_LOGI(TAG,
+             "Persistent manual-reset latch state needs an initial "
+             "fault-snapshot baseline");
+  } else if (load_result ==
+      oq_incidents::ManualResetLatchPersistencePolicy::LoadResult::
           RECOVERY_REQUIRED) {
     ESP_LOGE(TAG,
              "Persistent manual-reset latch state is ambiguous; all "
@@ -1843,9 +1874,12 @@ OpenQuattIncidentManager::outputs_for_slot_(size_t slot) const {
   oq_incidents::DerivedOutputs outputs =
       this->units_[slot].engine.outputs();
   const uint8_t hp_mask = static_cast<uint8_t>(1U << slot);
+  outputs = apply_persistence_initialization_gate(
+      outputs, this->manual_reset_persistence_.initialization_pending());
   const bool persistence_blocks =
-      !this->manual_reset_persistence_.ready() ||
-      (this->manual_reset_persistence_.fault_mask() & hp_mask) != 0U;
+      !this->manual_reset_persistence_.initialization_pending() &&
+      (!this->manual_reset_persistence_.ready() ||
+       (this->manual_reset_persistence_.fault_mask() & hp_mask) != 0U);
   return apply_persistence_safety_gate(outputs, persistence_blocks);
 }
 

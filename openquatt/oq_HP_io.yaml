@@ -1403,5 +1403,7 @@ interval:
               id(${hp_id}), esphome::modbus::ModbusRegisterType::HOLDING, 2099, 1,
               [=](esphome::modbus::ModbusRegisterType, uint16_t, const std::vector<uint8_t> &) {
                 id(${hp_id}_is_online) = true;
+                id(oq_incident_manager).observe_transport(
+                    ${hp_index}, true, millis());
               });
           id(${hp_id}).queue_command(probe);

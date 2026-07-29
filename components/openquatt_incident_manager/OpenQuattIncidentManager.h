@@ -99,6 +99,7 @@ class OpenQuattIncidentManager : public Component {
   static constexpr uint32_t LINK_ROUND_TIMEOUT_MS = 15000U;
   static constexpr uint32_t PARTIAL_FAULT_SNAPSHOT_TIMEOUT_MS = 15000U;
   static constexpr uint32_t MANUAL_RESET_PERSIST_RETRY_MS = 60000U;
+  static constexpr uint8_t INITIALIZATION_FAULT_SNAPSHOT_COUNT = 2U;
   static constexpr size_t SYNTHETIC_INCIDENT_COUNT = 4U;
   static constexpr size_t ACTION_RESULT_HISTORY_SIZE = 4U;
   static constexpr oq_incidents::IncidentId LINK_LOSS_INCIDENT_ID =
@@ -141,6 +142,7 @@ class OpenQuattIncidentManager : public Component {
     std::array<bool, oq_incidents::kFaultRegisterCount> fault_pending{};
     uint32_t fault_pending_since_ms{0U};
     uint32_t fault_snapshot_generation{0U};
+    uint8_t initialization_fault_snapshot_count{0U};
     uint32_t last_link_working_generation{0U};
     uint32_t last_link_frequency_generation{0U};
     uint32_t last_link_fault_generation{0U};
@@ -264,6 +266,7 @@ class OpenQuattIncidentManager : public Component {
   uint32_t last_loop_ms_{0U};
   oq_incidents::ManualResetLatchPersistencePolicy
       manual_reset_persistence_{};
+  uint8_t initialization_manual_reset_mask_{0U};
   ESPPreferenceObject manual_reset_pref_a_{};
   ESPPreferenceObject manual_reset_pref_b_{};
   ESPPreferenceObject manual_reset_marker_pref_{};

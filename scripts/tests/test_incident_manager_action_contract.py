@@ -41,6 +41,17 @@ class IncidentManagerActionContractTest(unittest.TestCase):
         self.assertNotIn("oq_confirm_odu_power_cycle_", HP_IO_YAML)
         self.assertNotIn("Confirm HP${hp_index} ODU power cycle", HP_IO_YAML)
 
+    def test_successful_recovery_probe_reports_transport_online(self) -> None:
+        probe_callback = HP_IO_YAML[
+            HP_IO_YAML.index("create_read_command(") :
+            HP_IO_YAML.index("id(${hp_id}).queue_command(probe);")
+        ]
+        self.assertIn("id(${hp_id}_is_online) = true;", probe_callback)
+        self.assertIn(
+            "id(oq_incident_manager).observe_transport(",
+            probe_callback,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
