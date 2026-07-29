@@ -201,6 +201,7 @@
     width: 100%;
   }
 
+  .oq-webserver-log-control-card > .oq-helper-button,
   .oq-webserver-log-level-control {
     flex-basis: auto;
     width: 100%;

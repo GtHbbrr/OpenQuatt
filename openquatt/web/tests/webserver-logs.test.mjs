@@ -3,7 +3,13 @@ import test from "node:test";
 
 globalThis.__OQ_PREVIEW__ = false;
 
-const { clearWebServerLogHistory, getWebServerLogClearUrl, refreshWebServerLogHistory } =
+const {
+  clearWebServerLogHistory,
+  getWebServerLogClearUrl,
+  refreshWebServerLogHistory,
+  renderWebServerLogHistoryControls,
+  renderWebServerLoggerLevelControl,
+} =
   await import("../js/src/features/webserver-logs.js");
 const { state } = await import("../js/src/core/state.js");
 
@@ -385,4 +391,52 @@ test("refreshWebServerLogHistory stores the firmware CSRF token", async (t) => {
 
   await refreshWebServerLogHistory();
   assert.equal(state.webServerLogCsrfToken, "firmware-csrf-token");
+});
+
+test("webserver log controls keep guidance behind compact info toggles", (t) => {
+  const originalEntities = state.entities;
+  const originalLoadingEntities = state.loadingEntities;
+  const originalBusyAction = state.busyAction;
+  const originalInfoOpen = state.settingsInfoOpen;
+  t.after(() => {
+    state.entities = originalEntities;
+    state.loadingEntities = originalLoadingEntities;
+    state.busyAction = originalBusyAction;
+    state.settingsInfoOpen = originalInfoOpen;
+  });
+
+  state.entities = {
+    webServerLogHistoryEnabled: { value: true },
+    debugLevel: { value: "INFO", options: ["INFO", "DEBUG"] },
+  };
+  state.loadingEntities = false;
+  state.busyAction = "";
+  state.settingsInfoOpen = "";
+
+  const markup = renderWebServerLogHistoryControls();
+  assert.match(markup, /oq-webserver-log-control-card/);
+  assert.match(markup, /data-oq-settings-info="webserverLogHistory"/);
+  assert.match(markup, /data-oq-settings-info="webserverLoggerLevel"/);
+  assert.equal((markup.match(/oq-settings-system-row-note/g) || []).length, 0);
+});
+
+test("active DEBUG keeps its performance warning visible", (t) => {
+  const originalEntities = state.entities;
+  const originalLoadingEntities = state.loadingEntities;
+  const originalBusyAction = state.busyAction;
+  t.after(() => {
+    state.entities = originalEntities;
+    state.loadingEntities = originalLoadingEntities;
+    state.busyAction = originalBusyAction;
+  });
+
+  state.entities = {
+    debugLevel: { value: "DEBUG", options: ["INFO", "DEBUG"] },
+  };
+  state.loadingEntities = false;
+  state.busyAction = "";
+
+  const markup = renderWebServerLoggerLevelControl();
+  assert.match(markup, /oq-webserver-log-control-card--warning/);
+  assert.match(markup, /DEBUG kan de web-app en Home Assistant vertragen\./);
 });
