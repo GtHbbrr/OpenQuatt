@@ -335,9 +335,11 @@ test("integration diagnostics separates thermostat, boiler control, OTB and CiC"
 test("settings hydration loads boiler setup and diagnostics before rendering", () => {
   assert.ok(INITIAL_SETTINGS_READY_KEY_MAP.installation.includes("boilerConnection"));
   assert.ok(INITIAL_SETTINGS_READY_KEY_MAP.installation.includes("otbLinkAvailable"));
+  assert.ok(INITIAL_SETTINGS_READY_KEY_MAP.installation.includes("otbConnectionAutoSelected"));
   assert.ok(INITIAL_SETTINGS_READY_KEY_MAP.installation.includes("otbConnectionMismatch"));
   assert.ok(SETTINGS_GROUP_KEY_MAP.installation.includes("boilerConnection"));
   assert.ok(SETTINGS_GROUP_KEY_MAP.installation.includes("otbLinkAvailable"));
+  assert.ok(SETTINGS_GROUP_KEY_MAP.installation.includes("otbConnectionAutoSelected"));
   assert.ok(SETTINGS_GROUP_KEY_MAP.installation.includes("otbConnectionMismatch"));
   assert.ok(SETTINGS_GROUP_KEY_MAP.integrations.includes("boilerCommandValid"));
   assert.ok(SETTINGS_GROUP_KEY_MAP.integrations.includes("otbChPressure"));
@@ -347,6 +349,22 @@ test("Quick Start blocks R1 after a boiler answers the safe OpenTherm probe", ()
   assert.match(installationSource, /OpenTherm-ketel gevonden/);
   assert.match(installationSource, /Kies OpenTherm \(OTB\)/);
   assert.match(quickStartSource, /nextDisabled:\s*boilerConnectionMismatch/);
+});
+
+test("onboarding auto-selects a detected OpenTherm boiler and explains the choice", () => {
+  assert.match(
+    boilerOpenThermYaml,
+    /should_auto_select_opentherm\(\s*result,\s*id\(oq_setup_complete\)\)/,
+  );
+  assert.match(boilerOpenThermYaml, /call\.set_option\("OpenTherm"\)/);
+  assert.match(installationSource, /boilerConnection === "OpenTherm"/);
+  assert.match(installationSource, /isEntityActive\("otbConnectionAutoSelected"\)/);
+  assert.match(installationSource, /OpenTherm-ketel gedetecteerd/);
+  assert.match(installationSource, /automatisch als ketelaansluiting geselecteerd/);
+  assert.match(
+    installationSource,
+    /boilerPresent \|\| boilerConnectionMismatch \|\| boilerConnectionAutoSelected/,
+  );
 });
 
 test("firmware publishes boiler connection mismatch transitions immediately", () => {
@@ -367,7 +385,7 @@ test("firmware publishes boiler connection mismatch transitions immediately", ()
 test("Quick Start keeps the mismatch remedy visible when boiler assist is off", () => {
   assert.match(
     installationSource,
-    /\(boilerPresent \|\| boilerConnectionMismatch\) && boilerConnectionAvailable \? renderSettingsFieldCard/,
+    /\(boilerPresent \|\| boilerConnectionMismatch \|\| boilerConnectionAutoSelected\) && boilerConnectionAvailable \? renderSettingsFieldCard/,
   );
   assert.match(installationSource, /OpenTherm-ketel gevonden/);
 });

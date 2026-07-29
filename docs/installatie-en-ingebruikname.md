@@ -104,8 +104,10 @@ Bij Waveshare en Heatpump Listener ligt `Single` of `Duo` al vast in de firmware
 
 Op Heatpump Controller Q kies je bij de CV-ketel of boiler ook de fysieke
 aansluiting: `Aan/uit (R1)` of `OpenTherm (OTB)`. Wanneer bij een R1-keuze
-tijdens het opstarten toch een OpenTherm-ketel antwoordt, blijft R1 uit en
-blokkeert Quick Start totdat je `OpenTherm (OTB)` kiest.
+tijdens Quick Start toch een OpenTherm-ketel antwoordt, selecteert OpenQuatt
+automatisch `OpenTherm (OTB)` en licht die keuze toe. Na afgeronde onboarding
+wijzigt OpenQuatt de aansluiting niet meer automatisch: bij dezelfde afwijking
+blijft R1 uit totdat je de aansluiting handmatig corrigeert.
 
 Blijkt dat je `Single` of `Duo` verkeerd hebt gekozen? Flash dan via de installer het juiste profiel voordat je verdergaat. Deze modules kunnen de setup niet vanuit Quick Start wisselen.
 
