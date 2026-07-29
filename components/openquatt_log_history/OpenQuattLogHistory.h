@@ -33,6 +33,7 @@ class OpenQuattLogHistory : public Component {
   void set_enabled(bool enabled);
   void clear_history();
   const std::string &get_csrf_token() const { return this->csrf_token_; }
+  bool storage_available() const { return static_cast<bool>(this->entries_); }
   void write_recent_logs(httpd_req_t *req) const;
 
  protected:

@@ -786,9 +786,10 @@ void OpenQuattDebugRecorder::setup() {
     return;
   }
 
-  const bool allocated = this->samples_.allocate(SAMPLE_CAPACITY) && this->fields_.allocate(FIELD_CAPACITY) &&
-                         this->string_entries_.allocate(STRING_ENTRY_CAPACITY) &&
-                         this->string_data_.allocate(STRING_DATA_BYTES);
+  const bool allocated = this->samples_.allocate_external(SAMPLE_CAPACITY) &&
+                         this->fields_.allocate_external(FIELD_CAPACITY) &&
+                         this->string_entries_.allocate_external(STRING_ENTRY_CAPACITY) &&
+                         this->string_data_.allocate_external(STRING_DATA_BYTES);
   if (!allocated || !this->available_()) {
     this->samples_.release();
     this->fields_.release();

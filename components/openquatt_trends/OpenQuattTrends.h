@@ -6,6 +6,7 @@
 
 #include <esp_http_server.h>
 #include "OpenQuattFlashLayout.h"
+#include "OpenQuattTrendsStoragePolicy.h"
 #include "esp_partition.h"
 #include "PsramBuffer.h"
 #include "esphome/components/switch/switch.h"
@@ -125,6 +126,8 @@ class OpenQuattTrends : public Component {
 
   bool capture_enabled_() const;
   bool flash_switch_enabled_() const;
+  TrendStorageCapabilities storage_capabilities_() const;
+  bool flash_archive_available_() const;
   bool time_is_valid_() const;
   uint64_t current_time_ms_() const;
   uint64_t current_epoch_offset_ms_() const;
