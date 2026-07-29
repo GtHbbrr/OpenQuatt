@@ -14,6 +14,8 @@ using esphome::openquatt_incident_manager::
 using esphome::openquatt_incident_manager::
     all_unavailable_hps_allow_fallback;
 using esphome::openquatt_incident_manager::
+    availability_baseline_ready;
+using esphome::openquatt_incident_manager::
     apply_persistence_safety_gate;
 using esphome::openquatt_incident_manager::
     apply_persistence_initialization_gate;
@@ -23,11 +25,15 @@ using esphome::openquatt_incident_manager::
 using esphome::openquatt_incident_manager::
     post_command_feedback_complete;
 using esphome::openquatt_incident_manager::
+    run_observation_is_fresh;
+using esphome::openquatt_incident_manager::
     perform_start_failure_retry;
 using esphome::openquatt_incident_manager::
     should_emit_start_confirmation;
 using esphome::openquatt_incident_manager::
     should_emit_stop_confirmation;
+using esphome::openquatt_incident_manager::
+    should_emit_operator_stop_confirmation;
 using esphome::openquatt_incident_manager::
     thermal_command_for_expected_mode;
 using oq_incidents::ManualResetLatchMarker;
@@ -62,6 +68,22 @@ void test_confirmation_audit_policy() {
   assert(!should_emit_stop_confirmation(false, false, true));
   assert(should_emit_stop_confirmation(true, false, true));
   assert(!should_emit_stop_confirmation(true, true, true));
+  assert(!should_emit_operator_stop_confirmation(false, true));
+  assert(!should_emit_operator_stop_confirmation(true, false));
+  assert(should_emit_operator_stop_confirmation(true, true));
+
+  assert(!availability_baseline_ready(
+      oq_incidents::LinkState::BOOTSTRAP, false));
+  assert(!availability_baseline_ready(
+      oq_incidents::LinkState::SUSPECT, false));
+  assert(!availability_baseline_ready(
+      oq_incidents::LinkState::RECOVERING, false));
+  assert(!availability_baseline_ready(
+      oq_incidents::LinkState::HEALTHY, true));
+  assert(availability_baseline_ready(
+      oq_incidents::LinkState::HEALTHY, false));
+  assert(availability_baseline_ready(
+      oq_incidents::LinkState::LOST, false));
 
   assert(!post_command_feedback_complete(10U, 10U, 20U, 20U));
   assert(!post_command_feedback_complete(11U, 10U, 20U, 20U));
@@ -69,6 +91,14 @@ void test_confirmation_audit_policy() {
   assert(post_command_feedback_complete(
       0U, std::numeric_limits<uint32_t>::max(),
       0U, std::numeric_limits<uint32_t>::max()));
+
+  // Passive boot observations may establish that an already-idle HP is
+  // stopped. A commanded stop still requires feedback newer than its write.
+  assert(run_observation_is_fresh(false, true, false, false));
+  assert(!run_observation_is_fresh(false, true, true, false));
+  assert(run_observation_is_fresh(false, true, true, true));
+  assert(!run_observation_is_fresh(true, false, false, false));
+  assert(run_observation_is_fresh(true, false, false, true));
 }
 
 void test_start_failure_retry_production_policy() {

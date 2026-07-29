@@ -138,6 +138,7 @@ class OpenQuattIncidentManager : public Component {
     uint32_t command_frequency_generation{0U};
     bool start_feedback_armed{false};
     bool stop_feedback_armed{false};
+    bool run_seen_since_last_confirmed_stop{false};
     std::array<uint16_t, oq_incidents::kFaultRegisterCount> fault_words{};
     std::array<bool, oq_incidents::kFaultRegisterCount> fault_pending{};
     uint32_t fault_pending_since_ms{0U};
@@ -151,6 +152,7 @@ class OpenQuattIncidentManager : public Component {
         previous_incidents{};
     oq_incidents::DerivedOutputs previous_outputs{};
     uint8_t last_reported_availability{openquatt_decision_log::STATE_UNKNOWN};
+    bool availability_reporting_initialized{false};
     std::array<oq_incidents::IncidentRuntime, SYNTHETIC_INCIDENT_COUNT>
         synthetic_incidents{};
     bool restored_manual_reset_pending{false};

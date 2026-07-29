@@ -741,13 +741,9 @@ void OpenQuattIncidentManager::observe_compressor_frequency(
           unit->command_mode_generation,
           unit->compressor_frequency_generation,
           unit->command_frequency_generation);
-  observation.fresh =
-      waiting_for_start
-          ? post_command_feedback
-          : (waiting_for_stop
-                 ? unit->stop_feedback_armed &&
-                       post_command_feedback
-                 : true);
+  observation.fresh = run_observation_is_fresh(
+      waiting_for_start, waiting_for_stop,
+      unit->stop_feedback_armed, post_command_feedback);
   observation.mode_matches_request =
       unit->working_mode_valid &&
       static_cast<uint8_t>(std::lround(unit->working_mode)) ==
@@ -1479,6 +1475,9 @@ void OpenQuattIncidentManager::publish_transitions_(
   this->reconcile_manual_reset_persistence_(now_ms);
   const oq_incidents::DerivedOutputs current_outputs =
       this->outputs_for_slot_(slot);
+  if (current_outputs.running_confirmed) {
+    unit.run_seen_since_last_confirmed_stop = true;
+  }
   if (unit.restored_manual_reset_pending &&
       this->decision_log_ != nullptr) {
     const oq_incidents::IncidentDefinition definition =
@@ -1534,6 +1533,11 @@ void OpenQuattIncidentManager::publish_transitions_(
   this->publish_synthetic_incident_(
       unit, slot, 3U, persistence_failure, now_ms);
 
+  const bool stop_confirmation_edge =
+      should_emit_stop_confirmation(
+          unit.stop_feedback_armed,
+          unit.previous_outputs.stop_confirmed,
+          current_outputs.stop_confirmed);
   if (this->decision_log_ != nullptr) {
     const uint8_t control_mode =
         this->control_mode_code_ != nullptr
@@ -1551,10 +1555,9 @@ void OpenQuattIncidentManager::publish_transitions_(
           openquatt_decision_log::STATE_STARTING,
           openquatt_decision_log::STATE_ACTIVE);
     }
-    if (should_emit_stop_confirmation(
-            unit.stop_feedback_armed,
-            unit.previous_outputs.stop_confirmed,
-            current_outputs.stop_confirmed)) {
+    if (should_emit_operator_stop_confirmation(
+            stop_confirmation_edge,
+            unit.run_seen_since_last_confirmed_stop)) {
       this->decision_log_->emit(
           openquatt_decision_log::EVENT_HP_STOP_CONFIRMED,
           event_subject_(slot), unit.stop_confirmation_reason,
@@ -1563,13 +1566,22 @@ void OpenQuattIncidentManager::publish_transitions_(
           openquatt_decision_log::STATE_STANDBY);
     }
   }
+  if (stop_confirmation_edge) {
+    unit.run_seen_since_last_confirmed_stop = false;
+  }
 
   const uint8_t availability = availability_state_(current_outputs);
-  if (availability != openquatt_decision_log::STATE_SUSPECT &&
+  if (!unit.availability_reporting_initialized) {
+    if (availability != openquatt_decision_log::STATE_SUSPECT &&
+        availability_baseline_ready(
+            current_outputs.link_state,
+            this->manual_reset_persistence_.initialization_pending())) {
+      unit.last_reported_availability = availability;
+      unit.availability_reporting_initialized = true;
+    }
+  } else if (availability != openquatt_decision_log::STATE_SUSPECT &&
       availability != unit.last_reported_availability) {
-    if (this->decision_log_ != nullptr &&
-        unit.last_reported_availability !=
-            openquatt_decision_log::STATE_UNKNOWN) {
+    if (this->decision_log_ != nullptr) {
       const oq_incidents::IncidentDefinition primary =
           oq_incidents::definition_for_id(
               current_outputs.primary_incident_id);

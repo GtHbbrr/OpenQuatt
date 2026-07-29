@@ -27,6 +27,16 @@ inline bool post_command_feedback_complete(
              frequency_generation, frequency_baseline);
 }
 
+inline bool run_observation_is_fresh(
+    bool waiting_for_start, bool waiting_for_stop,
+    bool stop_feedback_armed, bool post_command_feedback) {
+  if (waiting_for_start) return post_command_feedback;
+  if (waiting_for_stop && stop_feedback_armed) {
+    return post_command_feedback;
+  }
+  return true;
+}
+
 enum class HpThermalCommand : uint8_t {
   UNKNOWN = 0,
   HEATING = 1,
@@ -57,6 +67,21 @@ inline bool should_emit_stop_confirmation(
     bool current_stop_confirmed) {
   return stop_feedback_armed && !previous_stop_confirmed &&
          current_stop_confirmed;
+}
+
+inline bool should_emit_operator_stop_confirmation(
+    bool stop_confirmation_edge,
+    bool run_seen_since_last_confirmed_stop) {
+  return stop_confirmation_edge &&
+         run_seen_since_last_confirmed_stop;
+}
+
+inline bool availability_baseline_ready(
+    oq_incidents::LinkState link_state,
+    bool persistence_initialization_pending) {
+  if (persistence_initialization_pending) return false;
+  return link_state == oq_incidents::LinkState::HEALTHY ||
+         link_state == oq_incidents::LinkState::LOST;
 }
 
 inline oq_incidents::StartFailureResetResult perform_start_failure_retry(
