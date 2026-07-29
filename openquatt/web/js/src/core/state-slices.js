@@ -126,6 +126,8 @@ export function createSettingsState() {
     renderedSettingsGroup: "",
     settingsPageScrollRestoreToken: 0,
     settingsInfoOpen: "",
+    settingsAdvancedOpen: {},
+    pendingControlModeOverride: "",
     installationMonitoringDetailsOpen: false,
     integrationDiagnosticsOpen: false,
     oduRuntimeFrequencyDetailsOpen: false,

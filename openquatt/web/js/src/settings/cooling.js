@@ -1,6 +1,6 @@
 import { getEntityStateText, hasEntity, isEntityActive } from "../core/app-shared.js";
 import { formatValue } from "../core/entity-store.js";
-import { formatSettingsOptionLabel, renderSettingsFieldCard, renderSettingsNumberField, renderSettingsOptionCardsField, renderSettingsSection, renderSettingsSliderField, renderSettingsSwitchField } from "./controls.js";
+import { formatSettingsOptionLabel, renderSettingsAdvancedDisclosure, renderSettingsFieldCard, renderSettingsNumberField, renderSettingsOptionCardsField, renderSettingsSection, renderSettingsSliderField, renderSettingsSwitchField } from "./controls.js";
 import { escapeHtml } from "../core/html.js";
 
   export function renderSettingsCoolingFact(label, value) {
@@ -86,8 +86,19 @@ import { escapeHtml } from "../core/html.js";
     const hasFallbackDetails = hasFallbackSettings || fallbackMetricFacts.length > 0;
     const activeCoolingGuardMode = getEntityStateText("coolingGuardMode", "");
     const openFallbackDetails = activeCoolingGuardMode.toLowerCase().includes("fallback");
+    const pidFields = [
+      renderSettingsNumberField("coolingPidKp", "Proportionele reactie (Kp)", "Bepaalt hoe sterk de koelregeling direct reageert op het verschil tussen gewenste en gemeten aanvoertemperatuur."),
+      renderSettingsNumberField("coolingPidKi", "Langdurige correctie (Ki)", "Corrigeert een klein temperatuurverschil dat langere tijd blijft bestaan. Verhoog alleen in kleine stappen."),
+      renderSettingsNumberField("coolingPidKd", "Demping (Kd)", "Remt snelle veranderingen af. Een te hoge waarde kan de koelregeling onnodig traag of onrustig maken."),
+    ].filter(Boolean).join("");
+    const advancedPidMarkup = renderSettingsAdvancedDisclosure(
+      "cooling",
+      "Geavanceerde koelafstelling",
+      "Deze PID-waarden verfijnen hoe OpenQuatt het koel-aanvoerdoel volgt. Laat ze op de standaardwaarden staan zolang koeling stabiel en zonder pendelen werkt.",
+      pidFields ? `<div class="oq-settings-grid oq-settings-grid--pid">${pidFields}</div>` : "",
+    );
 
-    if (!tuningFields.length && !hasRoomRequestSettings && !hasFallbackSettings && !guardStatusPanel && !hasFallbackDetails) {
+    if (!tuningFields.length && !hasRoomRequestSettings && !hasFallbackSettings && !guardStatusPanel && !hasFallbackDetails && !advancedPidMarkup) {
       return "";
     }
 
@@ -179,6 +190,7 @@ import { escapeHtml } from "../core/html.js";
             ` : ""}
           </div>
         ` : ""}
+        ${advancedPidMarkup}
       `,
     );
   }

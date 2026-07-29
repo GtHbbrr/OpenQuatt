@@ -250,6 +250,23 @@ export function renderSettingsSelectField(key, title, copy, className = "") {
   return renderSettingsFieldCard(key, title, copy, `<label class="oq-settings-control oq-settings-control--select"><select class="oq-helper-select" data-oq-field="${escapeHtml(key)}" ${state.loadingEntities ? "disabled" : ""}>${options.map((option) => `<option value="${escapeHtml(option)}" ${option === value ? "selected" : ""}>${escapeHtml(formatSettingsOptionLabel(option))}</option>`).join("")}</select><span class="oq-settings-select-caret" aria-hidden="true"></span></label>`, className);
 }
 
+export function renderSettingsAdvancedDisclosure(id, title, copy, bodyMarkup) {
+  const body = String(bodyMarkup || "").trim();
+  if (!body) {
+    return "";
+  }
+  const open = Boolean(state.settingsAdvancedOpen?.[id]);
+  return `
+    <details class="oq-settings-advanced" data-oq-settings-advanced="${escapeHtml(id)}"${open ? " open" : ""}>
+      <summary data-oq-action="toggle-settings-advanced" data-settings-advanced="${escapeHtml(id)}">${escapeHtml(title)}</summary>
+      <div class="oq-settings-advanced-body">
+        ${copy ? `<p class="oq-settings-advanced-copy">${escapeHtml(copy)}</p>` : ""}
+        ${body}
+      </div>
+    </details>
+  `;
+}
+
 export function renderSettingsSwitchPill(key, enabled, onLabel = "Aan", offLabel = "Uit") {
   return `<span class="oq-settings-toggle-state${enabled ? " is-on" : ""}" data-oq-switch-pill="${escapeHtml(key)}" data-on-label="${escapeHtml(onLabel)}" data-off-label="${escapeHtml(offLabel)}">${escapeHtml(enabled ? onLabel : offLabel)}</span>`;
 }
@@ -483,6 +500,6 @@ export function renderSettingsTimeField(key, title, copy, className = "") {
   return renderSettingsFieldCard(key, title, copy, `<label class="oq-settings-control oq-settings-control--time"><input class="oq-helper-input oq-helper-input--time" type="time" step="60" lang="nl-NL" inputmode="numeric" data-oq-field="${escapeHtml(key)}" value="${escapeHtml(value)}" ${state.loadingEntities ? "disabled" : ""}><span class="oq-settings-time-icon" aria-hidden="true"><svg viewBox="0 0 20 20" focusable="false"><circle cx="10" cy="10" r="6.5" fill="none" stroke="currentColor" stroke-width="1.6" /><path d="M10 6.2 V10 L12.9 11.8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" /></svg></span></label>`, className || "oq-settings-field--time");
 }
 
-export function renderSettingsSection(kicker, title, copy, body, badgeMarkup = "") {
-  return `<section class="oq-settings-section"><div class="oq-settings-section-head"><div class="oq-settings-section-head-meta"><p class="oq-helper-label">${escapeHtml(kicker)}</p>${badgeMarkup ? `<div class="oq-settings-section-head-meta-badge">${badgeMarkup}</div>` : ""}</div><h3>${escapeHtml(title)}</h3><p>${escapeHtml(copy)}</p></div>${body}</section>`;
+export function renderSettingsSection(kicker, title, copy, body, badgeMarkup = "", className = "") {
+  return `<section class="oq-settings-section${className ? ` ${escapeHtml(className)}` : ""}"><div class="oq-settings-section-head"><div class="oq-settings-section-head-meta"><p class="oq-helper-label">${escapeHtml(kicker)}</p>${badgeMarkup ? `<div class="oq-settings-section-head-meta-badge">${badgeMarkup}</div>` : ""}</div><h3>${escapeHtml(title)}</h3><p>${escapeHtml(copy)}</p></div>${body}</section>`;
 }

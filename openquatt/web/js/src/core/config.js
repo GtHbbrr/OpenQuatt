@@ -110,6 +110,7 @@
     manualCoolingEnable: { domain: "switch", name: "Manual Cooling Enable", optional: true },
     cicCompatibilityMode: { domain: "switch", name: "CiC Compatibility Mode", optional: true },
     silentModeOverride: { domain: "select", name: "Silent Mode Override", optional: true },
+    controlModeOverride: { domain: "select", name: "CM Override", optional: true },
     heatingEnableSelected: { domain: "binary_sensor", name: "Heating Enable (Selected)", optional: true },
     heatingEnableValid: { domain: "binary_sensor", name: "Heating Enable Valid", optional: true },
     heatingBlockedByThermostat: { domain: "binary_sensor", name: "Heating blocked by thermostat", optional: true },
@@ -195,12 +196,16 @@
     hp1CompressorStarts72h: { domain: "sensor", name: "HP1 - Compressor starts 72h", optional: true },
     hp1CompressorLastStartAge: { domain: "sensor", name: "HP1 - Compressor last start age", optional: true },
     hp1RuntimeHours: { domain: "sensor", name: "HP1 - Runtime Hours", optional: true },
+    resetRuntimeCountersHp1: { domain: "button", name: "Reset Runtime Counters (HP1)", optional: true },
     hp2CompressorStarts2h: { domain: "sensor", name: "HP2 - Compressor starts 2h", optional: true },
     hp2CompressorStarts6h: { domain: "sensor", name: "HP2 - Compressor starts 6h", optional: true },
     hp2CompressorStarts24h: { domain: "sensor", name: "HP2 - Compressor starts 24h", optional: true },
     hp2CompressorStarts72h: { domain: "sensor", name: "HP2 - Compressor starts 72h", optional: true },
     hp2CompressorLastStartAge: { domain: "sensor", name: "HP2 - Compressor last start age", optional: true },
     hp2RuntimeHours: { domain: "sensor", name: "HP2 - Runtime Hours", optional: true },
+    resetRuntimeCountersHp1Hp2: { domain: "button", name: "Reset Runtime Counters (HP1+HP2)", optional: true },
+    runtimeLeadHp: { domain: "text_sensor", name: "Runtime lead HP", optional: true },
+    resetCumulativeEnergyCounters: { domain: "button", name: "Reset Cumulative Energy Counters", optional: true },
     lowflowFaultActive: { domain: "binary_sensor", name: "Lowflow fault active", optional: true },
     pt1000ReadProblem: { domain: "binary_sensor", name: "PT1000 read problem", optional: true },
     waterSupplyTempFallbackActive: { domain: "binary_sensor", name: "Water Supply Temp Fallback Active", optional: true },
@@ -259,6 +264,8 @@
     flowKp: { domain: "number", name: "Flow PI Kp", optional: true },
     flowKi: { domain: "number", name: "Flow PI Ki", optional: true },
     boilerRatedHeatPower: { domain: "number", name: "Boiler rated heat power", optional: true },
+    boilerSupportStartThreshold: { domain: "number", name: "CM3 deficit ON threshold", optional: true },
+    boilerSupportStopThreshold: { domain: "number", name: "CM3 deficit OFF threshold", optional: true },
     commissioningCm100Start: { domain: "button", name: "CM100 Start", optional: true },
     commissioningCm100Stop: { domain: "button", name: "CM100 Stop", optional: true },
     commissioningStatus: { domain: "text_sensor", name: "Commissioning status", optional: true },
@@ -1111,6 +1118,9 @@
     "coolingMinimumSupplyTemp",
     "coolingDemandMax",
     "coolingRestartDelta",
+    "coolingPidKp",
+    "coolingPidKi",
+    "coolingPidKd",
     "coolingRoomRequestRequired",
     "coolingRequestOnDelta",
     "coolingRequestOffDelta",
@@ -1128,9 +1138,25 @@
     "coolingFallbackMinSupplyTemp",
     "coolingEffectiveMinSupplyTemp",
   ];
-  export const CURVE_SETTING_KEYS = [...CURVE_POINTS.map((point) => point.key), "curveFallbackSupply", "curveControlProfile"];
+  export const CURVE_SETTING_KEYS = [
+    ...CURVE_POINTS.map((point) => point.key),
+    "curveFallbackSupply",
+    "curveControlProfile",
+    "heatingCurvePidKp",
+    "heatingCurvePidKi",
+    "heatingCurvePidKd",
+  ];
   export const COMPRESSOR_SETTING_KEYS = ["minRuntime", "hp1ExcludedA", "hp1ExcludedB", "hp2ExcludedA", "hp2ExcludedB"];
   export const SILENT_SETTING_KEYS = ["silentStartTime", "silentEndTime", "silentMax", "dayMax"];
+  export const BOILER_SUPPORT_SWITCHING_KEYS = ["boilerSupportStartThreshold", "boilerSupportStopThreshold"];
+  export const SERVICE_CONTROL_KEYS = [
+    "controlModeOverride",
+    "hp1RuntimeHours",
+    "hp2RuntimeHours",
+    "runtimeLeadHp",
+    "resetRuntimeCountersHp1",
+    "resetRuntimeCountersHp1Hp2",
+  ];
   export const DEBUG_RECORDING_SAMPLE_INTERVAL_MS = 10000;
   export const DEBUG_RECORDING_BUSY_RETRY_MS = 1000;
   export const DEBUG_RECORDING_LOG_LIMIT = 120;
@@ -1297,6 +1323,7 @@
     "projectVersionText",
     "releaseChannelText",
     "espInternalTemp",
+    "controlModeOverride",
   ];
   export const OVERVIEW_KEYS = [
     "strategy",
@@ -1555,6 +1582,7 @@
     {
       label: "Cumulatief",
       tone: "green",
+      counterResetKey: "resetCumulativeEnergyCounters",
       categories: [
         {
           title: "Verwarmen",
@@ -1583,6 +1611,7 @@
     "boilerCvAssistEnabled",
     "boilerRatedHeatPower",
     ...BOILER_SETTING_KEYS,
+    ...BOILER_SUPPORT_SWITCHING_KEYS,
     ...COMMISSIONING_STATE_KEYS,
     "manualCoolingEnable",
     "usageTelemetryEnabled",
@@ -1619,6 +1648,7 @@
     ...CURVE_SETTING_KEYS,
     ...COMPRESSOR_SETTING_KEYS,
     ...SILENT_SETTING_KEYS,
+    ...SERVICE_CONTROL_KEYS,
     ...ODU_RUNTIME_FREQUENCY_KEYS,
   ];
   export const SETTINGS_BACKUP_WRITABLE_DOMAINS = new Set(["number", "select", "switch", "text", "time", "datetime"]);
@@ -1637,6 +1667,7 @@
     "coolingEffectiveMinSupplyTemp",
     "statusLedsEnabled",
     "usageTelemetryEnabled",
+    "controlModeOverride",
   ]);
   // Keep this aligned with persisted UI settings. The build checks that new
   // writable settings are backed up or explicitly excluded above.
@@ -1650,6 +1681,7 @@
         "boilerCvAssistEnabled",
         "boilerRatedHeatPower",
         ...BOILER_SETTING_KEYS,
+        ...BOILER_SUPPORT_SWITCHING_KEYS,
       ],
     },
     {
@@ -1709,6 +1741,9 @@
         "curveControlProfile",
         "curveFallbackSupply",
         ...CURVE_POINTS.map((point) => point.key),
+        "heatingCurvePidKp",
+        "heatingCurvePidKi",
+        "heatingCurvePidKd",
       ],
     },
     {
@@ -1738,6 +1773,9 @@
         "coolingMinimumSupplyTemp",
         "coolingDemandMax",
         "coolingRestartDelta",
+        "coolingPidKp",
+        "coolingPidKi",
+        "coolingPidKd",
         "coolingRoomRequestRequired",
         "coolingRequestOnDelta",
         "coolingRequestOffDelta",

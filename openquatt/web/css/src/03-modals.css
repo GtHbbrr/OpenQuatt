@@ -769,6 +769,18 @@
   color: #fff;
 }
 
+.oq-helper-button--warning {
+  background: #c2410c;
+  border-color: #c2410c;
+  color: #fff;
+}
+
+.oq-helper-button--warning:hover {
+  background: #9a3412;
+  border-color: #9a3412;
+  color: #fff;
+}
+
 .oq-helper-button--ghost {
   background: var(--oq-helper-card);
 }

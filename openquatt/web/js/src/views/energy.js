@@ -63,10 +63,19 @@ import { replaceOuterHtmlIfSignatureChanged } from "./view-utils.js";
     if (!filledGroups) {
       return "";
     }
+    const counterResetKey = String(column.counterResetKey || "");
+    const counterResetMarkup = counterResetKey && hasEntity(counterResetKey)
+      ? `
+        <button class="oq-overview-energy-reset" type="button" data-oq-action="open-energy-counter-reset-confirm" aria-label="Cumulatieve energietellers resetten" ${state.busyAction === counterResetKey ? "disabled" : ""}>
+          Tellers resetten
+        </button>
+      `
+      : "";
     return `
       <article class="oq-overview-energy-column oq-overview-energy-column--${escapeHtml(column.tone)}">
         <div class="oq-overview-energy-column-copy">
           <h4>${escapeHtml(column.label)}</h4>
+          ${counterResetMarkup}
         </div>
         <div class="oq-overview-energy-groups">
           ${filledGroups}

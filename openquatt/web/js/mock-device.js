@@ -157,6 +157,7 @@
     energyHistoryWrites: 0,
     energyHistoryLastWriteAt: Date.now() - (9 * 60 * 60 * 1000),
     energyHistoryHourRetention: "180 dagen",
+    energyCountersReset: false,
     logHistoryEnabled: true,
     logHistoryEntries: [],
     debugRecording: {
@@ -1295,11 +1296,11 @@
     const systemDaily = Number((heatpumpDaily + boilerDaily).toFixed(1));
     const heatpumpCopDaily = electricalDaily > 0 ? Number((heatpumpDaily / electricalDaily).toFixed(2)) : 0;
     const heatpumpEerDaily = coolingElectricalDaily > 0 ? Number((coolingDaily / coolingElectricalDaily).toFixed(2)) : 0;
-    const electricalCumulative = single ? 286.4 : 469.5;
-    const heatpumpCumulative = single ? 1208.7 : 2048.6;
-    const coolingElectricalCumulative = coolingScenario ? (single ? 28.6 : 41.9) : 0.0;
-    const coolingCumulative = coolingScenario ? (single ? 109.4 : 163.7) : 0.0;
-    const boilerCumulative = boilerActive ? 114.8 : 0.0;
+    const electricalCumulative = state.energyCountersReset ? 0 : single ? 286.4 : 469.5;
+    const heatpumpCumulative = state.energyCountersReset ? 0 : single ? 1208.7 : 2048.6;
+    const coolingElectricalCumulative = state.energyCountersReset ? 0 : coolingScenario ? (single ? 28.6 : 41.9) : 0.0;
+    const coolingCumulative = state.energyCountersReset ? 0 : coolingScenario ? (single ? 109.4 : 163.7) : 0.0;
+    const boilerCumulative = state.energyCountersReset ? 0 : boilerActive ? 114.8 : 0.0;
     const systemCumulative = Number((heatpumpCumulative + boilerCumulative).toFixed(1));
     const heatpumpCopCumulative = electricalCumulative > 0 ? Number((heatpumpCumulative / electricalCumulative).toFixed(2)) : 0;
     const heatpumpEerCumulative = coolingElectricalCumulative > 0 ? Number((coolingCumulative / coolingElectricalCumulative).toFixed(2)) : 0;
@@ -1417,6 +1418,11 @@
       value: "Power House",
       state: "Power House",
       option: ["Power House", "Water Temperature Control (heating curve)"],
+    });
+    setEntity("select", "CM Override", {
+      value: "Auto",
+      state: "Auto",
+      option: ["Auto", "Force CM0", "Force CM1", "Force CM98"],
     });
     setEntity("switch", "OpenQuatt Enabled", { value: true, state: true });
     setEntity("switch", "Boiler assist enabled", { value: true, state: true });
@@ -1618,7 +1624,15 @@
       ["Manual iPWM", 400, 50, 850, 1, "iPWM"],
       ["Flow PI Kp", 0.35, 0, 5, 0.01, ""],
       ["Flow PI Ki", 0.05, 0, 5, 0.01, ""],
+      ["Heating Curve PID Kp", 0.28, 0, 0.8, 0.01, ""],
+      ["Heating Curve PID Ki", 0.0006, 0, 0.003, 0.0001, ""],
+      ["Heating Curve PID Kd", 0.2, 0, 0.4, 0.01, ""],
+      ["Cooling PID Kp", 3, 0, 10, 0.1, ""],
+      ["Cooling PID Ki", 0.12, 0, 2, 0.01, ""],
+      ["Cooling PID Kd", 0, 0, 2, 0.01, ""],
       ["Boiler rated heat power", 1800, 500, 10000, 100, "W"],
+      ["CM3 deficit ON threshold", 1000, 0, 10000, 50, "W"],
+      ["CM3 deficit OFF threshold", 400, 0, 10000, 50, "W"],
       ["Day max level", 10, 0, 10, 1, ""],
       ["Silent max level", 6, 0, 10, 1, ""],
       ["Maximum water temperature", 56, 25, 75, 1, "°C"],
@@ -1814,6 +1828,7 @@
       ["Cooling Enable Effective Source", "HA input"],
       ["Boiler command source", "Power House"],
       ["Boiler block reason", "no boiler heat request"],
+      ["Runtime lead HP", "HP2"],
     ].forEach(([name, value]) => {
       setEntity("text_sensor", name, { state: value, value });
     });
@@ -1891,6 +1906,8 @@
     seedOduRuntimeFrequencyEntities("HP1");
     seedHp2Entities();
     seedOduRuntimeFrequencyEntities("HP2");
+    syncRuntimeCounterEntities();
+    setEntity("button", "Reset Cumulative Energy Counters", { state: "", value: "" });
 
   }
 
@@ -1898,6 +1915,20 @@
     HP2_ENTITIES.forEach(([domain, name, payload]) => {
       setEntity(domain, name, clone(payload));
     });
+  }
+
+  function syncRuntimeCounterEntities() {
+    entities.delete(entityKey("button", "Reset Runtime Counters (HP1)"));
+    entities.delete(entityKey("button", "Reset Runtime Counters (HP1+HP2)"));
+    if (state.installation === "single") {
+      entities.delete(entityKey("text_sensor", "Runtime lead HP"));
+      setEntity("button", "Reset Runtime Counters (HP1)", { state: "", value: "" });
+      return;
+    }
+    setEntity("button", "Reset Runtime Counters (HP1+HP2)", { state: "", value: "" });
+    if (!getEntity("text_sensor", "Runtime lead HP")) {
+      setEntity("text_sensor", "Runtime lead HP", { state: "HP2", value: "HP2" });
+    }
   }
 
   function clearHp2Entities() {
@@ -1919,6 +1950,7 @@
       seedHp2Entities();
       seedOduRuntimeFrequencyEntities("HP2");
     }
+    syncRuntimeCounterEntities();
   }
 
   function syncDevMeta() {
@@ -3254,6 +3286,16 @@
       }
     }
 
+    const override = String(getEntity("select", "CM Override")?.value || "Auto");
+    if (!commissioningActive && override !== "Auto") {
+      const labels = {
+        "Force CM0": "CM0 - Standby (override)",
+        "Force CM1": "CM1 - Circulation (override)",
+        "Force CM98": "CM98 - Frost circulation (override)",
+      };
+      setText("text_sensor", "Control Mode (Label)", labels[override] || override);
+    }
+
     syncOverviewTelemetry(single);
   }
 
@@ -4096,6 +4138,15 @@
       setBinary("Manual HP active", false);
       setNumber("HP1 compressor level", 0, "");
       setNumber("HP2 compressor level", 0, "");
+    } else if (name === "Reset Runtime Counters (HP1)" || name === "Reset Runtime Counters (HP1+HP2)") {
+      setNumber("HP1 - Runtime Hours", 0, "h");
+      if (name === "Reset Runtime Counters (HP1+HP2)") {
+        setNumber("HP2 - Runtime Hours", 0, "h");
+        setText("text_sensor", "Runtime lead HP", "HP1");
+      }
+    } else if (name === "Reset Cumulative Energy Counters") {
+      state.energyCountersReset = true;
+      syncOverviewTelemetry(state.installation === "single");
     } else if (name === "Complete setup") {
       state.complete = true;
     } else if (name === "Reset setup state") {

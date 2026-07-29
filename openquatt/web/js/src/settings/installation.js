@@ -2,6 +2,7 @@ import { getEntityNumericValue, getEntityStateText, hasEntity, isEntityActive } 
 import { getOduRuntimeFrequencyControlKey, getOduRuntimeFrequencyValueKey, ODU_RUNTIME_FREQUENCY_HP_IDS, ODU_RUNTIME_FREQUENCY_LEVELS, ODU_RUNTIME_FREQUENCY_MODES } from "../core/config.js";
 import { HP_GENERATION_IMAGE_V1, HP_GENERATION_IMAGE_V2 } from "../core/embedded-assets.js";
 import { getInputDraftValue } from "../core/control-drafts.js";
+import { isCurveMode } from "../core/domain-helpers.js";
 import { getEntityValue, getNumberMeta, parseLooseNumber } from "../core/entity-store.js";
 import { getInstallationMonitoringFailureText, getInstallationMonitoringModel, isInstallationMonitoringBinaryActive, isInstallationMonitoringFailureActive, isInstallationMonitoringIntegrationEnabled, syncInstallationMonitoringDetailsState } from "../core/installation-monitoring.js";
 import { renderNumberInputControl } from "../core/number-controls.js";
@@ -12,7 +13,7 @@ import { getUpdateStatus } from "../features/firmware-update.js";
 import { getEspTemperatureLabel } from "../features/header-status.js";
 import { getWebServerLogStatusLabel } from "../features/webserver-logs.js";
 import { BOILER_OPENTHERM_CAPABILITY, getBoilerOpenThermCapability, getSupportedBoilerConnectionOptions } from "./boiler.js";
-import { getSelectEntityOptions, renderNamedActionButton, renderSettingsChoiceOption, renderSettingsCompactSwitchControl, renderSettingsFieldCard, renderSettingsNumberField, renderSettingsSection, renderSettingsSliderField, renderSettingsSystemRow } from "./controls.js";
+import { getSelectEntityOptions, renderNamedActionButton, renderSettingsAdvancedDisclosure, renderSettingsChoiceOption, renderSettingsCompactSwitchControl, renderSettingsFieldCard, renderSettingsNumberField, renderSettingsSection, renderSettingsSliderField, renderSettingsSystemRow } from "./controls.js";
 import { renderSettingsHeatPumpLimiterCard } from "./heating.js";
 import { escapeHtml } from "../core/html.js";
 
@@ -665,6 +666,26 @@ import { escapeHtml } from "../core/html.js";
           <p class="oq-settings-boiler-connection-note">OT-controle bij opstart actief.</p>
         `
       : "";
+    const supportSwitchingFields = !isCurveMode() && boilerPresent
+      ? [
+          renderSettingsNumberField(
+            "boilerSupportStartThreshold",
+            "Ondersteuning starten vanaf",
+            "Standaard 1000 W. Power House moet eerst minimaal 2 minuten zonder ketelondersteuning draaien; daarna moet het warmtetekort 5 minuten onafgebroken boven deze grens blijven.",
+          ),
+          renderSettingsNumberField(
+            "boilerSupportStopThreshold",
+            "Ondersteuning stoppen onder",
+            "Standaard 400 W. Ketelondersteuning blijft minimaal 5 minuten actief en stopt pas wanneer het warmtetekort daarna 2 minuten onder deze grens blijft.",
+          ),
+        ].filter(Boolean).join("")
+      : "";
+    const supportSwitchingMarkup = renderSettingsAdvancedDisclosure(
+      "boiler-support",
+      "Wanneer ketelondersteuning start en stopt",
+      "Alleen voor Power House. Het warmtetekort is het gevraagde woningvermogen min het maximaal beschikbare warmtepompvermogen, met minimaal 0 W. Tussen beide grenzen blijft de huidige toestand behouden. Deze waarden veranderen het ketelvermogen en de OpenTherm-aansturing niet.",
+      supportSwitchingFields ? `<div class="oq-settings-grid">${supportSwitchingFields}</div>` : "",
+    );
 
     return `
         <div class="${escapeHtml(className)}">
@@ -705,6 +726,7 @@ import { escapeHtml } from "../core/html.js";
             boilerPresent && boilerPowerEntityAvailable ? "oq-settings-field--compact" : "oq-settings-field--compact is-disabled",
             boilerPowerFooter,
           ) : ""}
+          ${supportSwitchingMarkup}
         </div>
       `;
   }
