@@ -98,6 +98,13 @@ globals:
     restore_value: false
     initial_value: 'false'
 
+  # Runtime-only UI context. The selected connection itself remains restored;
+  # this flag only explains an automatic choice made during this boot.
+  - id: oq_boiler_connection_auto_selected_state
+    type: bool
+    restore_value: false
+    initial_value: 'false'
+
 opentherm:
   - id: oq_otb_hub
     in_pin: ${oq_ot_boiler_in_pin}
@@ -316,6 +323,17 @@ switch:
 # telemetry internal. The OpenQuatt entity endpoint deliberately includes
 # internal entities, so local diagnostics retain access to that telemetry.
 binary_sensor:
+  - platform: template
+    id: oq_boiler_connection_auto_selected
+    name: "OTB - Boiler Connection Auto-selected"
+    internal: true
+    entity_category: diagnostic
+    icon: mdi:auto-fix
+    web_server:
+      sorting_group_id: oq_boiler
+    lambda: |-
+      return id(oq_boiler_connection_auto_selected_state);
+
   - platform: template
     id: oq_boiler_connection_mismatch
     name: "OTB - Boiler Connection Mismatch"
@@ -752,9 +770,28 @@ interval:
           id(oq_boiler_rearm_after_command_ms) = now_ms;
 
           if (result == oq_otb::STARTUP_PROBE_OPENTHERM_DETECTED) {
+            if (oq_otb::should_auto_select_opentherm(
+                    result, id(oq_setup_complete))) {
+              // During onboarding a matching response is positive evidence for
+              // the physical OTB route. Select it without creating heat demand;
+              // the transport selection hook keeps R1 off and resumes polling.
+              id(oq_boiler_connection_auto_selected_state) = true;
+              id(oq_boiler_connection_auto_selected).publish_state(true);
+              ESP_LOGI(
+                  "quatt.boiler",
+                  "OpenTherm boiler detected during setup; selecting OpenTherm "
+                  "automatically with CH off and TSet=0");
+              auto call = id(oq_boiler_connection).make_call();
+              call.set_option("OpenTherm");
+              call.perform();
+              return;
+            }
+
             // Fail closed and retain periodic STATUS(CH=off) traffic. The
             // mismatch is deliberately latched until OpenTherm is selected or
             // a new boot verifies the physically disconnected R1 installation.
+            id(oq_boiler_connection_auto_selected_state) = false;
+            id(oq_boiler_connection_auto_selected).publish_state(false);
             id(oq_boiler_connection_mismatch_state) = true;
             id(oq_boiler_connection_mismatch).publish_state(true);
             id(oq_boiler_block_reason_code) =
@@ -768,6 +805,8 @@ interval:
 
           // No valid STATUS response was observed during the bounded probe.
           // This is the only path that makes an R1 selection available.
+          id(oq_boiler_connection_auto_selected_state) = false;
+          id(oq_boiler_connection_auto_selected).publish_state(false);
           id(oq_boiler_connection_mismatch_state) = false;
           id(oq_boiler_connection_mismatch).publish_state(false);
           id(oq_otb_hub).on_shutdown();

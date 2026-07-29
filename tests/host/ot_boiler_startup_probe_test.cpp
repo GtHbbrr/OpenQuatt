@@ -8,6 +8,13 @@ using oq_otb::StartupProbeState;
 int main() {
   StartupProbeState state;
 
+  assert(oq_otb::should_auto_select_opentherm(
+      oq_otb::STARTUP_PROBE_OPENTHERM_DETECTED, false));
+  assert(!oq_otb::should_auto_select_opentherm(
+      oq_otb::STARTUP_PROBE_OPENTHERM_DETECTED, true));
+  assert(!oq_otb::should_auto_select_opentherm(
+      oq_otb::STARTUP_PROBE_TIMED_OUT, false));
+
   assert(state.result(0, 8000) == oq_otb::STARTUP_PROBE_IDLE);
   state.begin(1000);
   assert(state.active());

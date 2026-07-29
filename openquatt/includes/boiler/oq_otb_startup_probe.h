@@ -17,6 +17,11 @@ enum StartupProbeResult : uint8_t {
   STARTUP_PROBE_TIMED_OUT,
 };
 
+inline bool should_auto_select_opentherm(
+    StartupProbeResult result, bool setup_complete) {
+  return result == STARTUP_PROBE_OPENTHERM_DETECTED && !setup_complete;
+}
+
 class StartupProbeState {
  public:
   void begin(uint32_t now_ms) {

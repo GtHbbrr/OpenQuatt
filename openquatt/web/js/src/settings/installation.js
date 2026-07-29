@@ -613,6 +613,9 @@ import { escapeHtml } from "../core/html.js";
     const boilerConnectionMismatch =
       boilerConnection === "R1" &&
       isEntityActive("otbConnectionMismatch");
+    const boilerConnectionAutoSelected =
+      boilerConnection === "OpenTherm" &&
+      isEntityActive("otbConnectionAutoSelected");
     const boilerConnectionOptions = boilerConnectionAvailable
       ? getSupportedBoilerConnectionOptions(
           getSelectEntityOptions(state.entities.boilerConnection || {}),
@@ -654,8 +657,15 @@ import { escapeHtml } from "../core/html.js";
     const boilerPowerFooter = boilerPresent && boilerPowerEntityAvailable
       ? `<p class="oq-settings-boiler-power-note">Je kunt deze waarde altijd handmatig aanpassen.</p>`
       : "";
-    const boilerConnectionFooter = boilerConnection === "R1" && openthermBoilerSupported
-      ? boilerConnectionMismatch
+    const boilerConnectionFooter = boilerConnectionAutoSelected
+      ? `
+        <div class="oq-settings-boiler-connection-note is-success" role="status" aria-live="polite">
+          <strong>OpenTherm-ketel gedetecteerd</strong>
+          <p>OpenTherm (OTB) is automatisch als ketelaansluiting geselecteerd.</p>
+        </div>
+      `
+      : boilerConnection === "R1" && openthermBoilerSupported
+        ? boilerConnectionMismatch
         ? `
           <div class="oq-settings-boiler-connection-note is-warning" role="alert">
             <strong>OpenTherm-ketel gevonden</strong>
@@ -665,7 +675,7 @@ import { escapeHtml } from "../core/html.js";
         : `
           <p class="oq-settings-boiler-connection-note">OT-controle bij opstart actief.</p>
         `
-      : "";
+        : "";
     const supportSwitchingFields = !isCurveMode() && boilerPresent
       ? [
           renderSettingsNumberField(
@@ -701,7 +711,7 @@ import { escapeHtml } from "../core/html.js";
             "oq-settings-field--compact",
           )}
 
-          ${(boilerPresent || boilerConnectionMismatch) && boilerConnectionAvailable ? renderSettingsFieldCard(
+          ${(boilerPresent || boilerConnectionMismatch || boilerConnectionAutoSelected) && boilerConnectionAvailable ? renderSettingsFieldCard(
             "boilerConnection",
             "Ketelaansluiting",
             !openthermBoilerCapabilityKnown
