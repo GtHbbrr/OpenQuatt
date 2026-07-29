@@ -237,8 +237,6 @@ number:
     restore_value: true
     initial_value: 14.0
     entity_category: config
-    web_server:
-      sorting_group_id: oq_cooling
 
   - platform: template
     id: cooling_demand_max_f
@@ -253,8 +251,6 @@ number:
     restore_value: true
     initial_value: 4
     entity_category: config
-    web_server:
-      sorting_group_id: oq_cooling
 
   - platform: template
     id: cooling_restart_delta
@@ -269,8 +265,6 @@ number:
     restore_value: true
     initial_value: 1.0
     entity_category: config
-    web_server:
-      sorting_group_id: oq_cooling
 
   - platform: template
     id: cooling_pid_kp
@@ -284,8 +278,6 @@ number:
     restore_value: true
     initial_value: 3.0
     entity_category: config
-    web_server:
-      sorting_group_id: oq_cooling
 
   - platform: template
     id: cooling_pid_ki
@@ -299,8 +291,6 @@ number:
     restore_value: true
     initial_value: 0.12
     entity_category: config
-    web_server:
-      sorting_group_id: oq_cooling
 
   - platform: template
     id: cooling_pid_kd
@@ -314,8 +304,6 @@ number:
     restore_value: true
     initial_value: 0.0
     entity_category: config
-    web_server:
-      sorting_group_id: oq_cooling
 
 sensor:
   - platform: template
@@ -335,8 +323,6 @@ sensor:
         base_floor_c = fmaxf(base_floor_c, id(cooling_effective_min_supply_temp).state);
       }
       return base_floor_c;
-    web_server:
-      sorting_group_id: oq_cooling
 
   - platform: template
     id: cooling_supply_error
@@ -351,8 +337,6 @@ sensor:
       if (!id(oq_system_supply_temp).has_state() || isnan(id(oq_system_supply_temp).state)) return NAN;
       // Positive error means the supply is warmer than target, so more cooling may be requested.
       return id(oq_system_supply_temp).state - id(cooling_supply_target).state;
-    web_server:
-      sorting_group_id: oq_cooling
 
   - platform: template
     id: oq_cooling_demand_raw_sensor
@@ -362,8 +346,6 @@ sensor:
     state_class: measurement
     accuracy_decimals: 0
     update_interval: 5s
-    web_server:
-      sorting_group_id: oq_cooling
     lambda: |-
       return (float) id(oq_cooling_demand_raw);
 
@@ -376,8 +358,6 @@ sensor:
     accuracy_decimals: 0
     update_interval: 5s
     entity_category: diagnostic
-    web_server:
-      sorting_group_id: oq_cooling
     lambda: |-
       return (float) id(oq_cooling_base_demand_raw);
 
@@ -390,8 +370,6 @@ sensor:
     accuracy_decimals: 0
     update_interval: 5s
     entity_category: diagnostic
-    web_server:
-      sorting_group_id: oq_cooling
     lambda: |-
       return (float) id(oq_cooling_limited_demand);
 
@@ -404,8 +382,6 @@ sensor:
     accuracy_decimals: 0
     update_interval: 5s
     entity_category: diagnostic
-    web_server:
-      sorting_group_id: oq_cooling
     lambda: |-
       return (float) id(oq_cooling_limiter_allowed_max);
 
@@ -418,8 +394,6 @@ sensor:
     accuracy_decimals: 2
     update_interval: 5s
     entity_category: diagnostic
-    web_server:
-      sorting_group_id: oq_cooling
     lambda: |-
       return id(oq_cooling_buffer_gap_filtered_c);
 
@@ -432,8 +406,6 @@ sensor:
     accuracy_decimals: 2
     update_interval: 5s
     entity_category: diagnostic
-    web_server:
-      sorting_group_id: oq_cooling
     lambda: |-
       return id(oq_cooling_buffer_gap_rate_c_per_min);
 
@@ -446,8 +418,6 @@ sensor:
     accuracy_decimals: 2
     update_interval: 5s
     entity_category: diagnostic
-    web_server:
-      sorting_group_id: oq_cooling
     lambda: |-
       return id(oq_cooling_projected_gap_c);
 
@@ -459,8 +429,6 @@ sensor:
     accuracy_decimals: 0
     update_interval: 5s
     entity_category: diagnostic
-    web_server:
-      sorting_group_id: oq_cooling
     lambda: |-
       return id(oq_cooling_projection_brake_active) ? 1.0f : 0.0f;
 
@@ -473,8 +441,6 @@ sensor:
     accuracy_decimals: 2
     update_interval: 5s
     entity_category: diagnostic
-    web_server:
-      sorting_group_id: oq_cooling
     lambda: |-
       return id(oq_cooling_dew_gap_c);
 
@@ -487,8 +453,6 @@ sensor:
     accuracy_decimals: 2
     update_interval: 5s
     entity_category: diagnostic
-    web_server:
-      sorting_group_id: oq_cooling
     lambda: |-
       return id(oq_cooling_stop_buffer_gap_c);
 
@@ -500,8 +464,6 @@ sensor:
     accuracy_decimals: 0
     update_interval: 5s
     entity_category: diagnostic
-    web_server:
-      sorting_group_id: oq_cooling
     lambda: |-
       return (float) id(oq_cooling_limiter_reason_code);
 
@@ -513,8 +475,6 @@ sensor:
     accuracy_decimals: 0
     update_interval: 5s
     entity_category: diagnostic
-    web_server:
-      sorting_group_id: oq_cooling
     lambda: |-
       return (float) id(oq_cooling_stop_reason_code);
 
@@ -526,8 +486,6 @@ sensor:
     accuracy_decimals: 0
     update_interval: 5s
     entity_category: diagnostic
-    web_server:
-      sorting_group_id: oq_cooling
     lambda: |-
       return (float) id(oq_cooling_request_reason_code);
 
@@ -540,8 +498,6 @@ sensor:
     accuracy_decimals: 0
     update_interval: 5s
     entity_category: diagnostic
-    web_server:
-      sorting_group_id: oq_cooling
     lambda: |-
       return (float) id(oq_cooling_request_hp1_level);
 
@@ -554,8 +510,6 @@ sensor:
     accuracy_decimals: 0
     update_interval: 5s
     entity_category: diagnostic
-    web_server:
-      sorting_group_id: oq_cooling
     lambda: |-
       return (float) id(oq_cooling_request_hp2_level);
 
@@ -567,8 +521,6 @@ sensor:
     accuracy_decimals: 0
     update_interval: 5s
     entity_category: diagnostic
-    web_server:
-      sorting_group_id: oq_cooling
     lambda: |-
       return (float) id(oq_cooling_request_owner_hp);
 
@@ -580,8 +532,6 @@ sensor:
     accuracy_decimals: 0
     update_interval: 5s
     entity_category: diagnostic
-    web_server:
-      sorting_group_id: oq_cooling
     lambda: |-
       return (float) id(oq_cooling_owner_hp);
 
@@ -593,8 +543,6 @@ sensor:
     accuracy_decimals: 0
     update_interval: 5s
     entity_category: diagnostic
-    web_server:
-      sorting_group_id: oq_cooling
     lambda: |-
       return id(oq_cooling_water_cycle_active) ? 1.0f : 0.0f;
 

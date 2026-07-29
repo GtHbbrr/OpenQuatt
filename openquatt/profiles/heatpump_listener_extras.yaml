@@ -39,8 +39,6 @@ sensor:
     entity_category: diagnostic
     one_wire_id: listener_temp_t1_bus
     index: 0
-    web_server:
-      sorting_group_id: oq_temperatures
 
   - platform: dallas_temp
     id: listener_temp_t2
@@ -55,8 +53,6 @@ sensor:
     entity_category: diagnostic
     one_wire_id: listener_temp_t2_bus
     index: 0
-    web_server:
-      sorting_group_id: oq_temperatures
 
 output:
   - platform: gpio
@@ -72,5 +68,3 @@ switch:
     icon: mdi:electric-switch
     restore_mode: ALWAYS_OFF
     entity_category: diagnostic
-    web_server:
-      sorting_group_id: oq_system_diagnostics

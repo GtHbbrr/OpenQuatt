@@ -100,8 +100,6 @@ switch:
     turn_off_action:
       - lambda: |-
           id(oq_log_history).set_enabled(false);
-    web_server:
-      sorting_group_id: oq_system_diagnostics
 
 binary_sensor:
   - platform: gpio

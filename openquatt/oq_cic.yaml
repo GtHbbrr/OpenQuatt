@@ -33,8 +33,6 @@ switch:
     entity_category: config
     optimistic: true
     restore_mode: ${oq_cic_restore_mode_default}
-    web_server:
-      sorting_group_id: oq_cic
 
 # ----------------------------
 # FEED CONFIG
@@ -50,8 +48,6 @@ text:
     optimistic: true
     restore_value: true
     initial_value: "http://192.168.2.117:8080/beta/feed/data.json"
-    web_server:
-      sorting_group_id: oq_cic
 
 # ----------------------------
 # TELEMETRY
@@ -66,8 +62,6 @@ sensor:
     accuracy_decimals: 2
     icon: mdi:water-thermometer
     update_interval: never
-    web_server:
-      sorting_group_id: oq_temperatures
 
   - platform: template
     id: cic_control_setpoint
@@ -79,8 +73,6 @@ sensor:
     icon: mdi:thermostat
     disabled_by_default: true
     update_interval: never
-    web_server:
-      sorting_group_id: oq_cic
 
   - platform: template
     id: cic_room_setpoint
@@ -91,8 +83,6 @@ sensor:
     accuracy_decimals: 1
     icon: mdi:home-thermometer
     update_interval: never
-    web_server:
-      sorting_group_id: oq_cic
 
   - platform: template
     id: cic_room_temp
@@ -103,8 +93,6 @@ sensor:
     accuracy_decimals: 3
     icon: mdi:thermometer
     update_interval: never
-    web_server:
-      sorting_group_id: oq_cic
 
   - platform: template
     id: flow_rate_cic
@@ -115,8 +103,6 @@ sensor:
     accuracy_decimals: 1
     icon: mdi:water-pump
     update_interval: never
-    web_server:
-      sorting_group_id: oq_cic
 
   - platform: template
     id: cic_backoff_s
@@ -129,8 +115,6 @@ sensor:
     icon: mdi:timer-sand
     disabled_by_default: true
     update_interval: never
-    web_server:
-      sorting_group_id: oq_cic
 
   - platform: template
     id: cic_last_success_age_s
@@ -143,8 +127,6 @@ sensor:
     disabled_by_default: true
     icon: mdi:timeline-clock-outline
     update_interval: never
-    web_server:
-      sorting_group_id: oq_cic
 
 binary_sensor:
   - platform: template
@@ -153,8 +135,6 @@ binary_sensor:
     icon: mdi:radiator
     device_class: heat
     disabled_by_default: true
-    web_server:
-      sorting_group_id: oq_cic
 
   - platform: template
     id: cic_ch_enable_valid
@@ -162,8 +142,6 @@ binary_sensor:
     icon: mdi:check-decagram
     entity_category: diagnostic
     internal: true
-    web_server:
-      sorting_group_id: oq_cic
 
   - platform: template
     id: cic_cooling_enabled
@@ -171,8 +149,6 @@ binary_sensor:
     icon: mdi:snowflake
     device_class: cold
     disabled_by_default: true
-    web_server:
-      sorting_group_id: oq_cic
 
   - platform: template
     id: feed_ok
@@ -180,8 +156,6 @@ binary_sensor:
     icon: mdi:cloud-check
     device_class: connectivity
     disabled_by_default: true
-    web_server:
-      sorting_group_id: oq_cic
 
   - platform: template
     id: cic_data_stale
@@ -189,8 +163,6 @@ binary_sensor:
     icon: mdi:cloud-alert
     device_class: problem
     disabled_by_default: true
-    web_server:
-      sorting_group_id: oq_cic
 
 # ----------------------------
 # CUSTOM CIC FETCHER

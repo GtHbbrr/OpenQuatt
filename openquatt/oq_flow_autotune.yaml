@@ -72,8 +72,6 @@ button:
     internal: true
     icon: mdi:play-circle-outline
     entity_category: config
-    web_server:
-      sorting_group_id: oq_tuning_flow
     on_press:
       - lambda: |-
           const auto cfg = oq_flow_autotune::make_runtime_config(
@@ -90,8 +88,6 @@ button:
     internal: true
     icon: mdi:stop-circle-outline
     entity_category: config
-    web_server:
-      sorting_group_id: oq_tuning_flow
     on_press:
       - lambda: |-
           id(oq_flow_autotune_abort) = true;
@@ -102,8 +98,6 @@ button:
     internal: true
     icon: mdi:check-circle-outline
     entity_category: config
-    web_server:
-      sorting_group_id: oq_tuning_flow
     on_press:
       - lambda: |-
           // Read the suggested gains and apply them only when both are valid.

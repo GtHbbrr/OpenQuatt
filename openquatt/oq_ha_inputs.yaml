@@ -27,8 +27,6 @@ sensor:
     device_class: temperature
     state_class: measurement
     accuracy_decimals: 2
-    web_server:
-      sorting_group_id: oq_ha_inputs
 
   - platform: homeassistant
     id: water_supply_temp_ha
@@ -40,8 +38,6 @@ sensor:
     device_class: temperature
     state_class: measurement
     accuracy_decimals: 2
-    web_server:
-      sorting_group_id: oq_ha_inputs
 
   - platform: homeassistant
     id: thermostat_setpoint_ha
@@ -53,8 +49,6 @@ sensor:
     device_class: temperature
     state_class: measurement
     accuracy_decimals: 2
-    web_server:
-      sorting_group_id: oq_ha_inputs
 
   - platform: homeassistant
     id: thermostat_room_temp_ha
@@ -66,8 +60,6 @@ sensor:
     device_class: temperature
     state_class: measurement
     accuracy_decimals: 2
-    web_server:
-      sorting_group_id: oq_ha_inputs
 
   - platform: homeassistant
     id: cooling_dew_point_ha
@@ -79,8 +71,6 @@ sensor:
     device_class: temperature
     state_class: measurement
     accuracy_decimals: 2
-    web_server:
-      sorting_group_id: oq_ha_inputs
 
 binary_sensor:
   - platform: homeassistant
@@ -91,8 +81,6 @@ binary_sensor:
     disabled_by_default: true
     icon: mdi:radiator
     device_class: heat
-    web_server:
-      sorting_group_id: oq_ha_inputs
 
   - platform: homeassistant
     id: cooling_enable_ha
@@ -102,8 +90,6 @@ binary_sensor:
     disabled_by_default: true
     icon: mdi:snowflake-check
     device_class: cold
-    web_server:
-      sorting_group_id: oq_ha_inputs
 
   - platform: homeassistant
     id: outside_temp_valid_ha
@@ -111,8 +97,6 @@ binary_sensor:
     entity_id: ${ha_outside_temp_valid_entity_id}
     internal: true
     icon: mdi:check-decagram
-    web_server:
-      sorting_group_id: oq_ha_inputs
 
   - platform: homeassistant
     id: water_supply_temp_valid_ha
@@ -120,8 +104,6 @@ binary_sensor:
     entity_id: ${ha_water_supply_temp_valid_entity_id}
     internal: true
     icon: mdi:check-decagram
-    web_server:
-      sorting_group_id: oq_ha_inputs
 
   - platform: homeassistant
     id: room_setpoint_valid_ha
@@ -129,8 +111,6 @@ binary_sensor:
     entity_id: ${ha_room_setpoint_valid_entity_id}
     internal: true
     icon: mdi:check-decagram
-    web_server:
-      sorting_group_id: oq_ha_inputs
 
   - platform: homeassistant
     id: room_temp_valid_ha
@@ -138,8 +118,6 @@ binary_sensor:
     entity_id: ${ha_room_temp_valid_entity_id}
     internal: true
     icon: mdi:check-decagram
-    web_server:
-      sorting_group_id: oq_ha_inputs
 
   - platform: homeassistant
     id: heating_enable_valid_ha
@@ -147,8 +125,6 @@ binary_sensor:
     entity_id: ${ha_heating_enable_valid_entity_id}
     internal: true
     icon: mdi:check-decagram
-    web_server:
-      sorting_group_id: oq_ha_inputs
 
   - platform: homeassistant
     id: cooling_enable_valid_ha
@@ -156,8 +132,6 @@ binary_sensor:
     entity_id: ${ha_cooling_enable_valid_entity_id}
     internal: true
     icon: mdi:check-decagram
-    web_server:
-      sorting_group_id: oq_ha_inputs
 
   - platform: homeassistant
     id: cooling_dew_point_valid_ha
@@ -165,5 +139,3 @@ binary_sensor:
     entity_id: ${ha_cooling_dew_point_valid_entity_id}
     internal: true
     icon: mdi:check-decagram
-    web_server:
-      sorting_group_id: oq_ha_inputs

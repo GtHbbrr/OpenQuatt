@@ -124,8 +124,6 @@ select:
       "Cooling": 1
       "Heating": 2
     skip_updates: ${oq_modbus_target_readback_skip}
-    web_server:
-      sorting_group_id: oq_${hp_id}
 
   - platform: modbus_controller
     modbus_controller_id: ${hp_id}
@@ -150,8 +148,6 @@ select:
       "9": 9
       "10": 10
     skip_updates: ${oq_modbus_control_readback_skip}
-    web_server:
-      sorting_group_id: oq_${hp_id}
 
   - platform: modbus_controller
     modbus_controller_id: ${hp_id}
@@ -167,8 +163,6 @@ select:
       "Off": 0
       "On": 1
     skip_updates: ${oq_modbus_control_readback_skip}
-    web_server:
-      sorting_group_id: oq_${hp_id}
 
   - platform: modbus_controller
     modbus_controller_id: ${hp_id}
@@ -184,8 +178,6 @@ select:
       "Off": 0
       "On": 4096
     skip_updates: ${oq_modbus_control_readback_skip}
-    web_server:
-      sorting_group_id: oq_${hp_id}
 
 # Per-HP compressor level exclusions are modeled as up to two explicit blocked levels.
   - platform: template
@@ -209,9 +201,6 @@ select:
       - "L8 (H79/C66)"
       - "L9 (H85/C71)"
       - "L10 (H90/C74)"
-    web_server:
-      sorting_group_id: oq_advanced_hp_levels
-      sorting_weight: 41
 
   - platform: template
     id: ${hp_id}_excluded_level_b
@@ -234,9 +223,6 @@ select:
       - "L8 (H79/C66)"
       - "L9 (H85/C71)"
       - "L10 (H90/C74)"
-    web_server:
-      sorting_group_id: oq_advanced_hp_levels
-      sorting_weight: 42
 
 # ----------------------------
 # NUMBER
@@ -255,8 +241,6 @@ number:
     max_value: 1000
     mode: slider
     skip_updates: ${oq_modbus_control_readback_skip}
-    web_server:
-      sorting_group_id: oq_${hp_id}
 
 # ----------------------------
 # SENSOR
@@ -275,8 +259,6 @@ sensor:
       const float pump_speed = id(${hp_id}_pump_speed).state;
       if (isnan(pump_speed)) return {};
       return pump_speed;
-    web_server:
-      sorting_group_id: oq_${hp_id}
 
   - platform: modbus_controller
     modbus_controller_id: ${hp_id}
@@ -293,8 +275,6 @@ sensor:
             id(${hp_id}_outside_temp_activity_ms) = millis();
             id(oq_incident_manager).observe_working_mode(
                 ${hp_index}, x, millis());
-    web_server:
-      sorting_group_id: oq_${hp_id}
 
   - platform: modbus_controller
     modbus_controller_id: ${hp_id}
@@ -315,8 +295,6 @@ sensor:
           max_value: 300
           ignore_out_of_range: true
     skip_updates: ${oq_modbus_telemetry_skip}
-    web_server:
-      sorting_group_id: oq_${hp_id}
 
   - platform: modbus_controller
     modbus_controller_id: ${hp_id}
@@ -337,8 +315,6 @@ sensor:
           max_value: 16
           ignore_out_of_range: true
     skip_updates: ${oq_modbus_telemetry_skip}
-    web_server:
-      sorting_group_id: oq_${hp_id}
 
   - platform: modbus_controller
     modbus_controller_id: ${hp_id}
@@ -358,8 +334,6 @@ sensor:
           max_value: 100
           ignore_out_of_range: true
     skip_updates: ${oq_modbus_telemetry_skip}
-    web_server:
-      sorting_group_id: oq_${hp_id}
 
   - platform: modbus_controller
     modbus_controller_id: ${hp_id}
@@ -389,8 +363,6 @@ sensor:
               ESP_LOGI("oq_diag", "%sMeasured compressor start.", "${prefix}");
               id(oq_capture_compressor_cycling_alert).execute();
             }
-    web_server:
-      sorting_group_id: oq_${hp_id}
 
   - platform: modbus_controller
     modbus_controller_id: ${hp_id}
@@ -410,8 +382,6 @@ sensor:
           max_value: 1000
           ignore_out_of_range: true
     skip_updates: ${oq_modbus_telemetry_skip}
-    web_server:
-      sorting_group_id: oq_${hp_id}
 
   - platform: modbus_controller
     modbus_controller_id: ${hp_id}
@@ -431,8 +401,6 @@ sensor:
           max_value: 1000
           ignore_out_of_range: true
     skip_updates: ${oq_modbus_telemetry_skip}
-    web_server:
-      sorting_group_id: oq_${hp_id}
 
   - platform: modbus_controller
     modbus_controller_id: ${hp_id}
@@ -451,8 +419,6 @@ sensor:
           max_value: 1000
           ignore_out_of_range: true
     skip_updates: ${oq_modbus_telemetry_skip}
-    web_server:
-      sorting_group_id: oq_${hp_id}
 
   - platform: modbus_controller
     modbus_controller_id: ${hp_id}
@@ -480,8 +446,6 @@ sensor:
             const uint32_t now_ms = millis();
             id(${hp_id}_outside_temp_last_change_ms) = now_ms;
             id(${hp_id}_outside_temp_activity_ms) = now_ms;
-    web_server:
-      sorting_group_id: oq_${hp_id}
 
   - platform: modbus_controller
     modbus_controller_id: ${hp_id}
@@ -502,8 +466,6 @@ sensor:
           max_value: 100
           ignore_out_of_range: true
     skip_updates: ${oq_modbus_telemetry_skip}
-    web_server:
-      sorting_group_id: oq_${hp_id}
 
   - platform: modbus_controller
     modbus_controller_id: ${hp_id}
@@ -524,8 +486,6 @@ sensor:
           max_value: 150
           ignore_out_of_range: true
     skip_updates: ${oq_modbus_telemetry_skip}
-    web_server:
-      sorting_group_id: oq_${hp_id}
 
   - platform: modbus_controller
     modbus_controller_id: ${hp_id}
@@ -547,8 +507,6 @@ sensor:
           max_value: 100
           ignore_out_of_range: true
     skip_updates: ${oq_modbus_telemetry_skip}
-    web_server:
-      sorting_group_id: oq_${hp_id}
 
   - platform: modbus_controller
     modbus_controller_id: ${hp_id}
@@ -568,8 +526,6 @@ sensor:
           max_value: 20
           ignore_out_of_range: true
     skip_updates: ${oq_modbus_telemetry_skip}
-    web_server:
-      sorting_group_id: oq_${hp_id}
 
   - platform: modbus_controller
     modbus_controller_id: ${hp_id}
@@ -590,8 +546,6 @@ sensor:
           max_value: 60
           ignore_out_of_range: true
     skip_updates: ${oq_modbus_telemetry_skip}
-    web_server:
-      sorting_group_id: oq_${hp_id}
 
   - platform: modbus_controller
     modbus_controller_id: ${hp_id}
@@ -612,8 +566,6 @@ sensor:
     register_count: 4  # 2123 - 2127
     address: 2123
     skip_updates: ${oq_modbus_telemetry_skip}
-    web_server:
-      sorting_group_id: oq_${hp_id}
 
   - platform: modbus_controller
     modbus_controller_id: ${hp_id}
@@ -625,8 +577,6 @@ sensor:
     register_count: 4  # 2127 - 2131
     address: 2127
     skip_updates: ${oq_modbus_telemetry_skip}
-    web_server:
-      sorting_group_id: oq_${hp_id}
 
   - platform: modbus_controller
     modbus_controller_id: ${hp_id}
@@ -648,8 +598,6 @@ sensor:
           max_value: 100
           ignore_out_of_range: true
     skip_updates: ${oq_modbus_telemetry_skip}
-    web_server:
-      sorting_group_id: oq_${hp_id}
 
   - platform: modbus_controller
     modbus_controller_id: ${hp_id}
@@ -670,8 +618,6 @@ sensor:
           max_value: 100
           ignore_out_of_range: true
     skip_updates: ${oq_modbus_telemetry_skip}
-    web_server:
-      sorting_group_id: oq_${hp_id}
 
   - platform: modbus_controller
     modbus_controller_id: ${hp_id}
@@ -696,8 +642,6 @@ sensor:
           max_value: 100
           ignore_out_of_range: true
     skip_updates: ${oq_modbus_telemetry_skip}
-    web_server:
-      sorting_group_id: oq_${hp_id}
 
   - platform: modbus_controller
     modbus_controller_id: ${hp_id}
@@ -726,8 +670,6 @@ sensor:
         - lambda: |-
             id(${hp_id}_water_out_temp_last_update_ms) = millis();
     skip_updates: ${oq_modbus_telemetry_skip}
-    web_server:
-      sorting_group_id: oq_${hp_id}
 
   - platform: template
     id: ${hp_id}_water_in_temp
@@ -743,8 +685,6 @@ sensor:
       const float offset_c = id(${hp_id}_water_in_temp_offset).state;
       if (isnan(raw_c) || isnan(offset_c)) return NAN;
       return raw_c + offset_c;
-    web_server:
-      sorting_group_id: oq_${hp_id}
 
   - platform: template
     id: ${hp_id}_water_out_temp
@@ -760,8 +700,6 @@ sensor:
       const float offset_c = id(${hp_id}_water_out_temp_offset).state;
       if (isnan(raw_c) || isnan(offset_c)) return NAN;
       return raw_c + offset_c;
-    web_server:
-      sorting_group_id: oq_${hp_id}
 
   - platform: modbus_controller
     modbus_controller_id: ${hp_id}
@@ -783,8 +721,6 @@ sensor:
           max_value: 100
           ignore_out_of_range: true
     skip_updates: ${oq_modbus_telemetry_skip}
-    web_server:
-      sorting_group_id: oq_${hp_id}
 
   - platform: modbus_controller
     modbus_controller_id: ${hp_id}
@@ -802,8 +738,6 @@ sensor:
     filters:
       - multiply: 0.1
     skip_updates: ${oq_modbus_telemetry_skip}
-    web_server:
-      sorting_group_id: oq_${hp_id}
 
   - platform: modbus_controller
     modbus_controller_id: ${hp_id}
@@ -824,8 +758,6 @@ sensor:
       then:
         - lambda: |-
             id(${hp_id}_outside_temp_activity_ms) = millis();
-    web_server:
-      sorting_group_id: oq_${hp_id}
 
   - platform: template
     id: ${hp_id}_runtime_hours
@@ -837,8 +769,6 @@ sensor:
     icon: mdi:timer-outline
     lambda: |-
       return static_cast<float>(id(${hp_id}_minutes)) / 60.0f;
-    web_server:
-      sorting_group_id: oq_${hp_id}
 
   - platform: template
     id: ${hp_id}_power_input
@@ -849,8 +779,6 @@ sensor:
     state_class: measurement
     accuracy_decimals: 2
     update_interval: 10s
-    web_server:
-      sorting_group_id: oq_performance
     lambda: |-
       // Keep model coefficients exactly as before; only readability/safety is improved.
       const float standby_power_w = 5.150232354845286f;
@@ -892,8 +820,6 @@ sensor:
     state_class: measurement
     accuracy_decimals: 0
     update_interval: 10s
-    web_server:
-      sorting_group_id: oq_performance
     lambda: |-
       // Heat power follows measured HP working mode (2 = Heating), not supervisory CM.
       const float working_mode = id(${hp_id}_working_mode).state;
@@ -919,8 +845,6 @@ sensor:
     state_class: measurement
     accuracy_decimals: 0
     update_interval: 10s
-    web_server:
-      sorting_group_id: oq_performance
     lambda: |-
       // Cooling power follows measured HP working mode (1 = Cooling), not supervisory CM.
       const float working_mode = id(${hp_id}_working_mode).state;
@@ -948,8 +872,6 @@ sensor:
     state_class: measurement
     accuracy_decimals: 2
     update_interval: 10s
-    web_server:
-      sorting_group_id: oq_performance
     lambda: |-
       const float p_el_w = id(${hp_id}_power_input).state;
       const float p_th_w = id(${hp_id}_heat_power).state;
@@ -969,8 +891,6 @@ sensor:
     state_class: measurement
     accuracy_decimals: 2
     update_interval: 10s
-    web_server:
-      sorting_group_id: oq_performance
     lambda: |-
       const float p_el_w = id(${hp_id}_power_input).state;
       const float p_cool_w = id(${hp_id}_cooling_power).state;
@@ -1064,16 +984,12 @@ binary_sensor:
     disabled_by_default: true
     icon: mdi:fan-speed-1
     device_class: running
-    web_server:
-      sorting_group_id: oq_${hp_id}
 
   - platform: template
     id: ${hp_id}_bottom_plate_heater
     name: "${prefix}Bottom plate heater"
     icon: mdi:radiator
     device_class: heat
-    web_server:
-      sorting_group_id: oq_${hp_id}
 
   - platform: template
     id: ${hp_id}_crankcase_heater
@@ -1081,8 +997,6 @@ binary_sensor:
     icon: mdi:radiator
     device_class: heat
     disabled_by_default: true
-    web_server:
-      sorting_group_id: oq_${hp_id}
 
   - platform: template
     id: ${hp_id}_fan_defrost_mode
@@ -1091,8 +1005,6 @@ binary_sensor:
     disabled_by_default: true
     icon: mdi:snowflake-melt
     device_class: running
-    web_server:
-      sorting_group_id: oq_${hp_id}
 
   - platform: template
     id: ${hp_id}_fan_high_speed_mode
@@ -1101,8 +1013,6 @@ binary_sensor:
     disabled_by_default: true
     icon: mdi:fan-speed-3
     device_class: running
-    web_server:
-      sorting_group_id: oq_${hp_id}
 
   - platform: template
     id: ${hp_id}_4_way_valve
@@ -1113,8 +1023,6 @@ binary_sensor:
       then:
         - lambda: |-
             id(${hp_id}_outside_temp_activity_ms) = millis();
-    web_server:
-      sorting_group_id: oq_${hp_id}
 
   - platform: template
     id: ${hp_id}_pump_relay
@@ -1122,8 +1030,6 @@ binary_sensor:
     icon: mdi:electric-switch
     device_class: running
     disabled_by_default: true
-    web_server:
-      sorting_group_id: oq_${hp_id}
 
   - platform: modbus_controller
     modbus_controller_id: ${hp_id}
@@ -1138,8 +1044,6 @@ binary_sensor:
       then:
         - lambda: |-
             id(${hp_id}_outside_temp_activity_ms) = millis();
-    web_server:
-      sorting_group_id: oq_${hp_id}
 
   # Derived from the raw 2119 status word; this one remains a standalone binary
   # sensor because it is used by the heating strategies.
@@ -1156,8 +1060,6 @@ binary_sensor:
         return false;
       }
       return (static_cast<uint16_t>(lroundf(raw)) & 0x0008u) != 0;
-    web_server:
-      sorting_group_id: oq_hp_diagnostics
 
   - platform: template
     id: ${hp_id}_ot_fault_active
@@ -1212,8 +1114,6 @@ text_sensor:
     name: "${prefix}Working Mode Label"
     icon: mdi:state-machine
     update_interval: 10s
-    web_server:
-      sorting_group_id: oq_${hp_id}
     lambda: |-
       // Map the raw numeric Modbus mode to a dashboard-friendly label.
       const float working_mode_raw = id(${hp_id}_working_mode).state;
@@ -1241,9 +1141,6 @@ text_sensor:
     name: "${prefix}Excluded compressor levels"
     icon: mdi:speedometer-slow
     update_interval: 10s
-    web_server:
-      sorting_group_id: oq_advanced_hp_levels
-      sorting_weight: 43
     lambda: |-
       // Summarize the two exclusion selectors into one compact diagnostic label.
       const std::string a = id(${hp_id}_excluded_level_a).has_state()
@@ -1269,8 +1166,6 @@ text_sensor:
     name: "${prefix}Active Failures List"
     entity_category: diagnostic
     update_interval: 10s
-    web_server:
-      sorting_group_id: oq_hp_diagnostics
     icon: mdi:alert-circle-outline
     lambda: |-
       char s[384];
@@ -1369,8 +1264,6 @@ text_sensor:
       snprintf(buf, sizeof(buf), "%u.%u", major, minor);
       return std::string(buf);
     update_interval: never
-    web_server:
-      sorting_group_id: oq_hp_diagnostics
 
 interval:
   - interval: ${oq_modbus_update_interval_s}s

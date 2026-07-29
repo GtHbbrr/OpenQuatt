@@ -89,8 +89,6 @@ select:
       - Custom
     update_interval: 5s
     entity_category: config
-    web_server:
-      sorting_group_id: oq_power_house
     lambda: |-
       const float rise = id(ph_demand_rise_time_min).state;
       const float fall = id(ph_demand_fall_time_min).state;
@@ -136,8 +134,6 @@ number:
     optimistic: true
     initial_value: -10
     entity_category: config
-    web_server:
-      sorting_group_id: oq_power_house
 
   - platform: template
     id: house_rated_power_w
@@ -151,8 +147,6 @@ number:
     optimistic: true
     initial_value: 7020
     entity_category: config
-    web_server:
-      sorting_group_id: oq_power_house
 
   - platform: template
     id: house_zero_power_temp_c
@@ -166,8 +160,6 @@ number:
     optimistic: true
     initial_value: 16
     entity_category: config
-    web_server:
-      sorting_group_id: oq_power_house
 
   - platform: template
     id: ph_kp_w_per_k
@@ -181,8 +173,6 @@ number:
     optimistic: true
     initial_value: 3000
     entity_category: config
-    web_server:
-      sorting_group_id: oq_power_house
 
   - platform: template
     id: ph_comfort_band_below_c
@@ -196,8 +186,6 @@ number:
     optimistic: true
     initial_value: 0.1
     entity_category: config
-    web_server:
-      sorting_group_id: oq_power_house
 
   - platform: template
     id: ph_comfort_band_above_c
@@ -211,8 +199,6 @@ number:
     optimistic: true
     initial_value: 0.3
     entity_category: config
-    web_server:
-      sorting_group_id: oq_power_house
 
   - platform: template
     id: ph_demand_rise_time_min
@@ -226,8 +212,6 @@ number:
     optimistic: true
     initial_value: 8
     entity_category: config
-    web_server:
-      sorting_group_id: oq_power_house
 
   - platform: template
     id: ph_demand_fall_time_min
@@ -241,8 +225,6 @@ number:
     optimistic: true
     initial_value: 3
     entity_category: config
-    web_server:
-      sorting_group_id: oq_power_house
 
   - platform: template
     id: oq_demand_filter_ramp_up_step_min
@@ -258,8 +240,6 @@ number:
     restore_value: true
     optimistic: true
     initial_value: 1
-    web_server:
-      sorting_group_id: oq_power_house
 
 text_sensor:
   # DEBUG-RUNTIME START: Duo Power House request reason
@@ -271,8 +251,6 @@ text_sensor:
     entity_category: diagnostic
     disabled_by_default: true
     update_interval: never
-    web_server:
-      sorting_group_id: oq_power_house
     lambda: |-
       #if OQ_TOPOLOGY_DUO
       return std::string("inactive");
@@ -291,8 +269,6 @@ sensor:
     state_class: measurement
     accuracy_decimals: 0
     update_interval: ${oq_diagnostic_update_interval_s}s
-    web_server:
-      sorting_group_id: oq_power_house
     lambda: |-
       const float Tout = id(outside_temp_selected).state;
       const float Tc = id(house_cold_temp_c).state;
@@ -316,8 +292,6 @@ sensor:
     state_class: measurement
     accuracy_decimals: 0
     update_interval: ${oq_diagnostic_update_interval_s}s
-    web_server:
-      sorting_group_id: oq_power_house
     lambda: |-
       return id(oq_phouse_req_w);
 
@@ -333,8 +307,6 @@ sensor:
     update_interval: 5s
     entity_category: diagnostic
     disabled_by_default: true
-    web_server:
-      sorting_group_id: oq_power_house
     lambda: |-
       return id(oq_phouse_comfort_memory_c);
 
@@ -350,8 +322,6 @@ sensor:
     update_interval: 5s
     entity_category: diagnostic
     disabled_by_default: true
-    web_server:
-      sorting_group_id: oq_power_house
     lambda: |-
       return id(room_setpoint_selected).state + id(oq_phouse_comfort_memory_c);
 

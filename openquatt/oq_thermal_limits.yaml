@@ -60,8 +60,6 @@ number:
     optimistic: true
     initial_value: 60
     entity_category: config
-    web_server:
-      sorting_group_id: oq_heating_strategy
 
 sensor:
   # Shared abstractions and derived telemetry.
@@ -75,8 +73,6 @@ sensor:
     state_class: measurement
     accuracy_decimals: 1
     update_interval: 5s
-    web_server:
-      sorting_group_id: oq_temperatures
     lambda: |-
       // The selected supply signal owns source validity and topology fallback.
       if (id(water_supply_temp_selected).has_state()) {

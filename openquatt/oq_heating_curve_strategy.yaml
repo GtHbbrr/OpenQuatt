@@ -125,8 +125,6 @@ select:
       - Stable
     initial_option: Balanced
     entity_category: config
-    web_server:
-      sorting_group_id: oq_heating_curve
     on_value:
       then:
         - climate.pid.reset_integral_term: oq_heating_curve_pid
@@ -175,8 +173,6 @@ number:
     restore_value: true
     optimistic: true
     initial_value: 55
-    web_server:
-      sorting_group_id: oq_heating_curve
 
   - platform: template
     id: curve_tsupply_m10
@@ -190,8 +186,6 @@ number:
     restore_value: true
     optimistic: true
     initial_value: 50
-    web_server:
-      sorting_group_id: oq_heating_curve
 
   - platform: template
     id: curve_tsupply_0
@@ -205,8 +199,6 @@ number:
     restore_value: true
     optimistic: true
     initial_value: 45
-    web_server:
-      sorting_group_id: oq_heating_curve
 
   - platform: template
     id: curve_tsupply_5
@@ -220,8 +212,6 @@ number:
     restore_value: true
     optimistic: true
     initial_value: 40
-    web_server:
-      sorting_group_id: oq_heating_curve
 
   - platform: template
     id: curve_tsupply_10
@@ -235,8 +225,6 @@ number:
     restore_value: true
     optimistic: true
     initial_value: 35
-    web_server:
-      sorting_group_id: oq_heating_curve
 
   - platform: template
     id: curve_tsupply_15
@@ -250,8 +238,6 @@ number:
     restore_value: true
     optimistic: true
     initial_value: 30
-    web_server:
-      sorting_group_id: oq_heating_curve
 
   - platform: template
     id: heating_curve_pid_kp
@@ -265,8 +251,6 @@ number:
     restore_value: true
     optimistic: true
     initial_value: 0.280
-    web_server:
-      sorting_group_id: oq_heating_curve
     on_value:
       then:
         - climate.pid.set_control_parameters:
@@ -288,8 +272,6 @@ number:
     restore_value: true
     optimistic: true
     initial_value: 0.00060
-    web_server:
-      sorting_group_id: oq_heating_curve
     on_value:
       then:
         - climate.pid.set_control_parameters:
@@ -311,8 +293,6 @@ number:
     restore_value: true
     optimistic: true
     initial_value: 0.200
-    web_server:
-      sorting_group_id: oq_heating_curve
     on_value:
       then:
         - climate.pid.set_control_parameters:
@@ -334,8 +314,6 @@ number:
     restore_value: true
     optimistic: true
     initial_value: 40
-    web_server:
-      sorting_group_id: oq_heating_curve
 
 button:
   - platform: template
@@ -345,8 +323,6 @@ button:
     disabled_by_default: true
     icon: mdi:restart
     entity_category: config
-    web_server:
-      sorting_group_id: oq_heating_curve
     on_press:
       then:
         - climate.pid.reset_integral_term: oq_heating_curve_pid
@@ -373,8 +349,6 @@ climate:
     visual:
       min_temperature: 20
       max_temperature: 70
-    web_server:
-      sorting_group_id: oq_heating_curve
 
 output:
   - platform: template
@@ -689,8 +663,6 @@ sensor:
     state_class: measurement
     accuracy_decimals: 1
     update_interval: 10s
-    web_server:
-      sorting_group_id: oq_heating_curve
     lambda: |-
       // Generate the curve-mode supply target from outside temperature and room trim.
       const float outside_c = id(oq_curve_outside_temp_filtered).state;
@@ -761,8 +733,6 @@ sensor:
     accuracy_decimals: 2
     update_interval: 5s
     entity_category: diagnostic
-    web_server:
-      sorting_group_id: oq_heating_curve
     lambda: |-
       return id(oq_curve_demand_continuous);
 
@@ -777,8 +747,6 @@ sensor:
     accuracy_decimals: 0
     update_interval: 5s
     entity_category: diagnostic
-    web_server:
-      sorting_group_id: oq_heating_curve
     lambda: |-
       return (float) id(oq_demand_curve);
 
@@ -793,8 +761,6 @@ sensor:
     accuracy_decimals: 0
     update_interval: 5s
     entity_category: diagnostic
-    web_server:
-      sorting_group_id: oq_heating_curve
     lambda: |-
       return (float) id(oq_curve_request_total_level);
 
@@ -809,8 +775,6 @@ sensor:
     accuracy_decimals: 0
     update_interval: 5s
     entity_category: diagnostic
-    web_server:
-      sorting_group_id: oq_heating_curve
     lambda: |-
       return (float) id(oq_curve_dispatch_hp1_level);
 
@@ -825,8 +789,6 @@ sensor:
     accuracy_decimals: 0
     update_interval: 5s
     entity_category: diagnostic
-    web_server:
-      sorting_group_id: oq_heating_curve
     lambda: |-
       return (float) id(oq_curve_dispatch_hp2_level);
 
@@ -839,8 +801,6 @@ sensor:
     accuracy_decimals: 0
     update_interval: 5s
     entity_category: diagnostic
-    web_server:
-      sorting_group_id: oq_heating_curve
     lambda: |-
       return id(oq_curve_restart_inhibit_active) ? 1.0f : 0.0f;
 
@@ -853,8 +813,6 @@ text_sensor:
     update_interval: ${oq_diagnostic_update_interval_s}s
     entity_category: diagnostic
     disabled_by_default: true
-    web_server:
-      sorting_group_id: oq_heating_curve
     lambda: |-
       if (!id(oq_curve_heat_request_active)) return std::string("OFF");
       return (id(oq_curve_regime_code) == 1) ? std::string("HEAT") : std::string("COAST");
@@ -867,8 +825,6 @@ text_sensor:
     update_interval: ${oq_diagnostic_update_interval_s}s
     entity_category: diagnostic
     disabled_by_default: true
-    web_server:
-      sorting_group_id: oq_heating_curve
     lambda: |-
       switch (id(oq_curve_regime_code)) {
         case 1: return std::string("RECOVERY");
@@ -884,8 +840,6 @@ text_sensor:
     update_interval: ${oq_diagnostic_update_interval_s}s
     entity_category: diagnostic
     disabled_by_default: true
-    web_server:
-      sorting_group_id: oq_heating_curve
     lambda: |-
       const char *mode_name = oq_curve::capacity_mode_name(id(oq_curve_capacity_mode_code));
       return std::string(mode_name);

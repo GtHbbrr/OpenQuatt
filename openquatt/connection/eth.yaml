@@ -22,5 +22,3 @@ text_sensor:
       name: IP Address
       icon: mdi:ip-network-outline
       entity_category: diagnostic
-      web_server:
-        sorting_group_id: oq_system_diagnostics

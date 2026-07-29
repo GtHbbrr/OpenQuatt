@@ -29,8 +29,6 @@ sensor:
     update_interval: 5s
     one_wire_id: oq_local_temp_bus
     index: 0
-    web_server:
-      sorting_group_id: oq_temperatures
 
   - platform: template
     id: water_supply_temp_esp
@@ -55,5 +53,3 @@ sensor:
         return id(water_supply_temp_ds18b20).state;
       }
       return NAN;
-    web_server:
-      sorting_group_id: oq_temperatures

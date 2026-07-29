@@ -117,8 +117,6 @@ select:
       - Power House
       - Water Temperature Control (heating curve)
     initial_option: Power House
-    web_server:
-      sorting_group_id: oq_heating_strategy
     on_value:
       then:
         - climate.pid.reset_integral_term: oq_heating_curve_pid
@@ -173,8 +171,6 @@ text_sensor:
     name: "Heating Strategy"
     icon: mdi:state-machine
     update_interval: 5s
-    web_server:
-      sorting_group_id: oq_overview
     lambda: |-
       return std::string(id(oq_heat_control_mode).current_option().c_str());
 
@@ -186,8 +182,6 @@ text_sensor:
     update_interval: never
     entity_category: diagnostic
     disabled_by_default: true
-    web_server:
-      sorting_group_id: oq_heating_strategy
     lambda: |-
       return std::string("idle");
 
@@ -202,8 +196,6 @@ sensor:
     state_class: measurement
     accuracy_decimals: 1
     update_interval: 10s
-    web_server:
-      sorting_group_id: oq_temperatures
     lambda: |-
       // Prefer local sensors from HPs that are actively moving air. Idle local
       // sensors remain useful as fallback, but they are more vulnerable to sun,
@@ -259,8 +251,6 @@ sensor:
     update_interval: 5s
     entity_category: diagnostic
     disabled_by_default: true
-    web_server:
-      sorting_group_id: oq_heating_strategy
     lambda: |-
       return (float) id(oq_strategy_active_code);
 
@@ -273,8 +263,6 @@ sensor:
     update_interval: 5s
     entity_category: diagnostic
     disabled_by_default: true
-    web_server:
-      sorting_group_id: oq_heating_strategy
     lambda: |-
       return (float) id(oq_strategy_phase_code);
 
@@ -289,8 +277,6 @@ sensor:
     update_interval: 5s
     entity_category: diagnostic
     disabled_by_default: true
-    web_server:
-      sorting_group_id: oq_heating_strategy
     lambda: |-
       return id(oq_strategy_requested_power_w);
 
@@ -306,8 +292,6 @@ sensor:
     update_interval: 5s
     entity_category: diagnostic
     disabled_by_default: true
-    web_server:
-      sorting_group_id: oq_heating_strategy
     lambda: |-
       return id(oq_strategy_supply_target_temp);
 
@@ -320,8 +304,6 @@ sensor:
     update_interval: 5s
     entity_category: diagnostic
     disabled_by_default: true
-    web_server:
-      sorting_group_id: oq_heating_strategy
     lambda: |-
       return id(oq_strategy_water_limit_factor);
 
@@ -335,8 +317,6 @@ binary_sensor:
     disabled_by_default: true
     lambda: |-
       return id(oq_strategy_heat_request_active);
-    web_server:
-      sorting_group_id: oq_heating_strategy
 
   - platform: template
     id: oq_strategy_water_trip_active_sensor
@@ -346,8 +326,6 @@ binary_sensor:
     disabled_by_default: true
     lambda: |-
       return id(oq_strategy_water_trip_active);
-    web_server:
-      sorting_group_id: oq_heating_strategy
 
   - platform: template
     id: oq_strategy_water_hard_trip_active_sensor
@@ -357,8 +335,6 @@ binary_sensor:
     disabled_by_default: true
     lambda: |-
       return id(oq_strategy_water_hard_trip_active);
-    web_server:
-      sorting_group_id: oq_heating_strategy
 
 interval:
   - interval: ${oq_strategy_loop_s}s

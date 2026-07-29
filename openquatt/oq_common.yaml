@@ -637,8 +637,6 @@ text:
     max_length: 255
     disabled_by_default: true
     entity_category: config
-    web_server:
-      sorting_group_id: oq_system_diagnostics
 
   - platform: template
     name: "Firmware Test OTA MD5 URL"
@@ -651,8 +649,6 @@ text:
     max_length: 255
     disabled_by_default: true
     entity_category: config
-    web_server:
-      sorting_group_id: oq_system_diagnostics
 
 # ==============================================================================
 # DIAGNOSTIC ENTITIES
@@ -662,8 +658,6 @@ select:
     name: "Firmware Update Channel"
     id: oq_firmware_update_channel
     icon: mdi:source-branch
-    web_server:
-      sorting_group_id: oq_system_diagnostics
     entity_category: config
     optimistic: true
     restore_value: true
@@ -735,8 +729,6 @@ select:
     icon: mdi:swap-horizontal
     internal: true
     disabled_by_default: true
-    web_server:
-      sorting_group_id: oq_system_diagnostics
     entity_category: config
     optimistic: true
     restore_value: false
@@ -803,8 +795,6 @@ select:
     name: "Quatt Hybrid version"
     id: hp_generation
     icon: mdi:factory
-    web_server:
-      sorting_group_id: oq_heating_strategy
     entity_category: config
     optimistic: true
     restore_value: true
@@ -817,8 +807,6 @@ select:
     internal: true
     disabled_by_default: true
     icon: mdi:lan
-    web_server:
-      sorting_group_id: oq_system_diagnostics
     entity_category: diagnostic
     optimistic: true
     # Always recover to INFO after a reboot; DEBUG can overwhelm busy Duo installations.
@@ -843,8 +831,6 @@ select:
     name: "Uurdetail bewaren"
     id: oq_lifetime_energy_hour_retention
     icon: mdi:chart-bar
-    web_server:
-      sorting_group_id: oq_system_diagnostics
     entity_category: config
     optimistic: true
     restore_value: true
@@ -863,8 +849,6 @@ button:
     icon: mdi:test-tube
     disabled_by_default: true
     entity_category: config
-    web_server:
-      sorting_group_id: oq_system_diagnostics
     on_press:
       then:
         - if:
@@ -916,15 +900,11 @@ button:
     name: Restart
     icon: mdi:restart
     id: restart_switch
-    web_server:
-      sorting_group_id: oq_system_diagnostics
 
   - platform: safe_mode
     name: Safe mode
     icon: mdi:shield-alert
     id: safe_mode_button
-    web_server:
-      sorting_group_id: oq_system_diagnostics
 
   - platform: template
     id: oq_trend_history_flush_button
@@ -933,8 +913,6 @@ button:
     disabled_by_default: true
     icon: mdi:content-save
     entity_category: config
-    web_server:
-      sorting_group_id: oq_system_diagnostics
     on_press:
       - lambda: |-
           id(oq_trend_capture_force_once) = true;
@@ -950,8 +928,6 @@ button:
     disabled_by_default: true
     icon: mdi:content-save
     entity_category: config
-    web_server:
-      sorting_group_id: oq_system_diagnostics
     on_press:
       - lambda: |-
           id(oq_decision_log).force_flush();
@@ -963,8 +939,6 @@ button:
     disabled_by_default: true
     icon: mdi:delete-clock
     entity_category: config
-    web_server:
-      sorting_group_id: oq_system_diagnostics
     on_press:
       - lambda: |-
           id(oq_decision_log).clear_flash_history();
@@ -976,8 +950,6 @@ button:
     disabled_by_default: true
     icon: mdi:delete-clock
     entity_category: config
-    web_server:
-      sorting_group_id: oq_system_diagnostics
     on_press:
       - lambda: |-
           id(oq_energy_history_endpoint).clear_history();
@@ -989,8 +961,6 @@ button:
     disabled_by_default: true
     icon: mdi:content-save
     entity_category: config
-    web_server:
-      sorting_group_id: oq_system_diagnostics
     on_press:
       - script.execute: oq_capture_energy_history_sample
       - script.wait: oq_capture_energy_history_sample
@@ -1002,8 +972,6 @@ button:
     name: Check Firmware Updates
     icon: mdi:update
     entity_category: diagnostic
-    web_server:
-      sorting_group_id: oq_system_diagnostics
     on_press:
       - script.execute: oq_apply_firmware_update_source
       - script.wait: oq_apply_firmware_update_source
@@ -1034,8 +1002,6 @@ button:
     disabled_by_default: true
     icon: mdi:swap-horizontal-bold
     entity_category: diagnostic
-    web_server:
-      sorting_group_id: oq_system_diagnostics
     on_press:
       - if:
           condition:
@@ -1063,8 +1029,6 @@ switch:
     turn_off_action:
       - lambda: |-
           id(oq_trends_endpoint).clear_history();
-    web_server:
-      sorting_group_id: oq_system_diagnostics
 
   - platform: template
     id: oq_trend_history_flash_switch
@@ -1080,8 +1044,6 @@ switch:
     turn_off_action:
       - lambda: |-
           id(oq_trends_endpoint).set_flash_enabled(false);
-    web_server:
-      sorting_group_id: oq_system_diagnostics
 
   - platform: template
     id: oq_decision_log_flash_switch
@@ -1097,8 +1059,6 @@ switch:
     turn_off_action:
       - lambda: |-
           id(oq_decision_log).set_flash_enabled(false);
-    web_server:
-      sorting_group_id: oq_system_diagnostics
 
   - platform: template
     id: oq_lifetime_energy_history_switch
@@ -1110,16 +1070,12 @@ switch:
     restore_mode: RESTORE_DEFAULT_OFF
     turn_on_action:
       - script.execute: oq_capture_energy_history_sample
-    web_server:
-      sorting_group_id: oq_system_diagnostics
 
 binary_sensor:
   - platform: status
     name: Status
     icon: mdi:check-circle-outline
     entity_category: diagnostic
-    web_server:
-      sorting_group_id: oq_system_diagnostics
   - platform: template
     id: oq_runtime_polling_paused
     name: Runtime polling paused
@@ -1199,8 +1155,6 @@ sensor:
     entity_category: diagnostic
     lambda: |-
       return id(oq_ota_progress_pct);
-    web_server:
-      sorting_group_id: oq_system_diagnostics
 
   - platform: uptime
     name: Uptime raw
@@ -1211,8 +1165,6 @@ sensor:
     device_class: duration
     unit_of_measurement: s
     entity_category: diagnostic
-    web_server:
-      sorting_group_id: oq_system_diagnostics
 
   - platform: template
     name: Uptime
@@ -1229,8 +1181,6 @@ sensor:
         return NAN;
       }
       return id(uptime_sensor).state / 3600.0f;
-    web_server:
-      sorting_group_id: oq_system_diagnostics
 
   - platform: internal_temperature
     id: oq_esp_internal_temperature
@@ -1238,8 +1188,6 @@ sensor:
     icon: mdi:thermometer
     update_interval: 60s
     entity_category: diagnostic
-    web_server:
-      sorting_group_id: oq_system_diagnostics
 
 text_sensor:
   - platform: template
@@ -1269,8 +1217,6 @@ text_sensor:
         default:
           return {"Idle"};
       }
-    web_server:
-      sorting_group_id: oq_system_diagnostics
 
   - platform: template
     id: oq_project_version_text
@@ -1280,8 +1226,6 @@ text_sensor:
     update_interval: never
     lambda: |-
       return {"${project_version}"};
-    web_server:
-      sorting_group_id: oq_system_diagnostics
   - platform: template
     id: oq_installation_topology_text
     name: OpenQuatt Installation Topology
@@ -1295,8 +1239,6 @@ text_sensor:
       #else
       return {"single"};
       #endif
-    web_server:
-      sorting_group_id: oq_system_diagnostics
   - platform: template
     id: oq_hardware_profile_text
     name: OpenQuatt Hardware Profile
@@ -1306,8 +1248,6 @@ text_sensor:
     update_interval: never
     lambda: |-
       return {"${oq_hardware_profile}"};
-    web_server:
-      sorting_group_id: oq_system_diagnostics
   - platform: template
     id: oq_connection_text
     name: OpenQuatt Connection
@@ -1317,8 +1257,6 @@ text_sensor:
     update_interval: never
     lambda: |-
       return {"${oq_connection}"};
-    web_server:
-      sorting_group_id: oq_system_diagnostics
   - platform: template
     id: oq_release_channel_text
     name: OpenQuatt Release Channel
@@ -1327,15 +1265,11 @@ text_sensor:
     update_interval: never
     lambda: |-
       return {"${release_channel}"};
-    web_server:
-      sorting_group_id: oq_system_diagnostics
   - platform: version
     name: ESPHome Version
     icon: mdi:information-outline
     hide_timestamp: true
     entity_category: diagnostic
-    web_server:
-      sorting_group_id: oq_system_diagnostics
 
   - platform: template
     id: uptime_readable_text
@@ -1370,8 +1304,6 @@ text_sensor:
         snprintf(buffer, sizeof(buffer), "%us", static_cast<unsigned>(seconds));
       }
       return {buffer};
-    web_server:
-      sorting_group_id: oq_system_diagnostics
 
 update:
   - platform: http_request
@@ -1383,8 +1315,6 @@ update:
     update_interval: never
     icon: mdi:update
     entity_category: diagnostic
-    web_server:
-      sorting_group_id: oq_system_diagnostics
 
 # ==============================================================================
 # OVERVIEW TRENDS
