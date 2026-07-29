@@ -706,7 +706,9 @@ const BOILER_FAULT_FALLBACK_COPY = "Laat de cv-ketel overnemen als alle warmtepo
           </div>
           ${renderInstallationMonitoringBadge(
             monitoring.active,
-            monitoring.severity === "fault" ? "Storing" : "Aandacht nodig",
+            monitoring.severity === "fault"
+              ? "Storing"
+              : monitoring.incidentMonitoringStale ? "Niet actueel" : "Aandacht nodig",
             "Alles rustig",
             monitoring.severity === "fault" ? "fault" : "warning",
           )}

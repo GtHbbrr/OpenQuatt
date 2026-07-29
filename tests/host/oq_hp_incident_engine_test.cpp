@@ -383,6 +383,20 @@ void test_run_feedback_and_stale_stop_sample() {
   assert(engine.outputs().stop_confirmed);
 }
 
+void test_passive_standby_feedback_keeps_stop_confirmed() {
+  HpIncidentEngine engine;
+  establish_healthy_link(engine, 100U);
+  confirm_stopped(engine, 60101U);
+
+  engine.observe_run(frequency(80101U, 0.0F));
+  assert(engine.outputs().run_state == RunState::STOPPED);
+  assert(engine.outputs().stop_confirmed);
+
+  engine.observe_run(frequency(90101U, 0.0F));
+  assert(engine.outputs().run_state == RunState::STOPPED);
+  assert(engine.outputs().stop_confirmed);
+}
+
 void test_transient_wrong_mode_is_not_accepted_as_start() {
   HpIncidentEngine engine;
   establish_healthy_link(engine, 100U);
@@ -617,6 +631,7 @@ int main() {
   test_non_fallback_protections();
   test_preheat_does_not_hide_another_start_block();
   test_run_feedback_and_stale_stop_sample();
+  test_passive_standby_feedback_keeps_stop_confirmed();
   test_transient_wrong_mode_is_not_accepted_as_start();
   test_persistent_wrong_mode_requires_safe_stop_and_retry();
   test_stop_requires_post_command_mode_confirmation();

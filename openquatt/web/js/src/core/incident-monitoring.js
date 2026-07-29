@@ -794,8 +794,10 @@ export function getIncidentMonitoringSuccessUpdate(current = {}, payload, now = 
 export function getIncidentMonitoringFailureUpdate(current = {}, error, now = Date.now()) {
   const failureCount = Number(current.incidentMonitoringFailureCount || 0) + 1;
   const previousError = String(current.incidentMonitoringError || "");
-  const message = failureCount >= INCIDENT_MONITORING_FAILURE_THRESHOLD
-    ? String(error?.message || error || "Incidentgegevens konden niet worden bijgewerkt.")
+  const failureMessage = String(error?.message || error || "Incidentgegevens konden niet worden bijgewerkt.");
+  const authenticationFailed = /\bHTTP (?:401|403)\b/i.test(failureMessage);
+  const message = authenticationFailed || failureCount >= INCIDENT_MONITORING_FAILURE_THRESHOLD
+    ? failureMessage
     : previousError;
   return {
     changed: message !== previousError,

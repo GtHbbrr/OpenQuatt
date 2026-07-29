@@ -40,7 +40,10 @@ export function isInstallationMonitoringFailureActive(key) {
 
 export function getInstallationMonitoringModel() {
   const problems = [];
-  const structuredIncidentMonitoringAvailable = Boolean(state.incidentMonitoringSnapshot?.valid);
+  const incidentMonitoringStale = Boolean(state.incidentMonitoringError);
+  const structuredIncidentMonitoringAvailable = Boolean(
+    state.incidentMonitoringSnapshot?.valid && !incidentMonitoringStale,
+  );
   const cyclingActive = isInstallationMonitoringBinaryActive("compressorCyclingWarning2h")
     || isInstallationMonitoringBinaryActive("compressorCyclingWarning72h")
     || isInstallationMonitoringBinaryActive("alternatingCompressorStartsWarning");
@@ -111,13 +114,13 @@ export function getInstallationMonitoringModel() {
   const combined = structuredIncidentMonitoringAvailable
     ? combineInstallationMonitoringModel(baseModel, state.incidentMonitoringSnapshot)
     : baseModel;
-  if (!state.incidentMonitoringError) {
+  if (!incidentMonitoringStale) {
     return combined;
   }
 
   const monitoringProblem = {
     key: "incident-monitoring-stale",
-    label: "Incidentgegevens tijdelijk niet bijgewerkt",
+    label: "Warmtepompstatus wordt opnieuw opgehaald",
     severity: "attention",
     source: "incident_manager",
   };
@@ -129,10 +132,10 @@ export function getInstallationMonitoringModel() {
     active: true,
     severity: combined.severity === "fault" ? "fault" : "attention",
     problems: staleProblems,
-    title: combined.active ? combined.title : "Incidentgegevens tijdelijk niet bijgewerkt",
+    title: combined.active ? combined.title : "Warmtepompstatus wordt vernieuwd",
     copy: combined.active
-      ? `${combined.copy} De HP-incidentstatus is tijdelijk niet ververst.`
-      : "De laatste geldige HP-status blijft behouden; OpenQuatt probeert automatisch opnieuw.",
+      ? `${combined.copy} De warmtepompstatus wordt opnieuw opgehaald en oude incidentgegevens worden niet als actueel getoond. Ververs de pagina als dit na een controllerherstart blijft staan.`
+      : "OpenQuatt haalt de actuele warmtepompstatus opnieuw op. Oude incidentgegevens worden niet als actueel getoond. Ververs de pagina als dit na een controllerherstart blijft staan.",
     incidentMonitoringStale: true,
   };
 }

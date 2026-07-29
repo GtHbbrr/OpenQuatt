@@ -188,6 +188,14 @@ class HpIncidentEngine {
       return;
     }
 
+    if (run_state_ == RunState::STOPPED && !stop_requested_) {
+      // Repeated passive standby telemetry confirms the existing state; it
+      // must not reopen the two-read stop confirmation on every poll.
+      stopped_read_streak_ = 0U;
+      refresh_derived();
+      return;
+    }
+
     stopped_read_streak_ = saturating_increment(stopped_read_streak_);
     if (stopped_read_streak_ >=
         std::max<uint8_t>(1U, tuning_.stop_confirm_reads)) {

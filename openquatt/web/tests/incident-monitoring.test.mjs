@@ -385,6 +385,22 @@ test("incident polling keeps last-good data through transient failures and clean
   assert.equal(unsupported.incidentMonitoringError, "");
 });
 
+test("incident polling marks a stale authentication session immediately", () => {
+  const success = getIncidentMonitoringSuccessUpdate({}, snapshot({
+    heat_pumps: [{ index: 1, link_state: "healthy", available_for_start: true }],
+  }), 1000);
+  const unauthorized = getIncidentMonitoringFailureUpdate(
+    success,
+    new Error("Incident monitoring HTTP 401"),
+    2000,
+  );
+
+  assert.equal(unauthorized.incidentMonitoringFailureCount, 1);
+  assert.equal(unauthorized.incidentMonitoringError, "Incident monitoring HTTP 401");
+  assert.equal(unauthorized.incidentMonitoringSnapshot.valid, true);
+  assert.equal(unauthorized.changed, true);
+});
+
 test("incident polling ignores the transport timestamp when the state is unchanged", () => {
   const first = getIncidentMonitoringSuccessUpdate({}, snapshot({
     generated_at_s: 100,
