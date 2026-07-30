@@ -22,10 +22,9 @@ substitutions:
         id(oq_boiler_connection_mismatch_state) = false;
         id(oq_boiler_connection_mismatch).publish_state(false);
         id(boiler_relay).turn_off();
-        id(oq_otb_hub).prioritize_messages(
+        id(oq_otb_hub).start_priority_polling(
             esphome::opentherm::MessageId::STATUS,
             esphome::opentherm::MessageId::CH_SETPOINT);
-        id(oq_otb_hub).enable_loop();
       }
     }
     oq_otb::telemetry_state.reset_link_session();

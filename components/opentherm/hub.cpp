@@ -151,15 +151,14 @@ void OpenthermHub::setup() {
     return;
   }
 
-  // Ensure that there is at least one request, as we are required to
-  // communicate at least once every second. Sending the status request is
-  // good practice anyway.
+  // Ensure that, once the runtime owner starts polling, there is at least one
+  // request. Sending the status request once per second is good practice.
   this->add_repeating_message(MessageId::STATUS);
   this->write_initial_messages_(this->messages_);
   this->message_iterator_ = this->messages_.begin();
 }
 
-void OpenthermHub::on_shutdown() { this->opentherm_->stop(); }
+void OpenthermHub::on_shutdown() { this->suspend_polling(); }
 
 void OpenthermHub::prioritize_messages(MessageId first, MessageId second) {
   this->opentherm_->stop();
@@ -171,7 +170,14 @@ void OpenthermHub::prioritize_messages(MessageId first, MessageId second) {
   this->last_conversation_end_ = 0;
 }
 
+void OpenthermHub::start_priority_polling(MessageId first, MessageId second) {
+  this->polling_enabled_ = true;
+  this->prioritize_messages(first, second);
+  this->enable_loop();
+}
+
 void OpenthermHub::resume_polling() {
+  this->polling_enabled_ = true;
   this->opentherm_->stop();
   this->sending_initial_ = true;
   this->priority_sequence_active_ = false;
@@ -180,6 +186,14 @@ void OpenthermHub::resume_polling() {
   this->last_conversation_start_ = 0;
   this->last_conversation_end_ = 0;
   this->enable_loop();
+}
+
+void OpenthermHub::suspend_polling() {
+  this->polling_enabled_ = false;
+  if (this->opentherm_ != nullptr) {
+    this->opentherm_->stop();
+  }
+  this->disable_loop();
 }
 
 // Disabling clang-tidy for this particular line since it keeps removing the trailing underscore (bug?)
@@ -208,6 +222,9 @@ void OpenthermHub::write_repeating_messages_(std::vector<MessageId> &target) {  
 }
 
 void OpenthermHub::loop() {
+  if (!this->polling_enabled_) {
+    return;
+  }
   this->opentherm_->process();
   if (this->sync_mode_) {
     this->sync_loop_();

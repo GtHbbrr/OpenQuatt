@@ -64,6 +64,8 @@ class OpenthermHub final : public Component {
 
   bool sending_initial_ = true;
   bool priority_sequence_active_ = false;
+  // The OpenQuatt transport owner explicitly starts polling after restore.
+  bool polling_enabled_ = false;
   std::unordered_map<MessageId, uint8_t> configured_messages_;
   std::vector<MessageId> messages_;
   std::vector<MessageId>::const_iterator message_iterator_;
@@ -161,7 +163,10 @@ class OpenthermHub final : public Component {
   void set_sync_mode(bool sync_mode) { this->sync_mode_ = sync_mode; }
 
   void prioritize_messages(MessageId first, MessageId second);
+  void start_priority_polling(MessageId first, MessageId second);
   void resume_polling();
+  void suspend_polling();
+  bool is_polling_enabled() const { return this->polling_enabled_; }
 
   template<typename F> void add_on_before_send_callback(F &&callback) {
     this->before_send_callback_.add(std::forward<F>(callback));
