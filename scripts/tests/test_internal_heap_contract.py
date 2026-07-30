@@ -39,6 +39,27 @@ TELEMETRY_POLICY = (
     / "openquatt_usage_telemetry"
     / "OpenQuattUsageTelemetryPolicy.h"
 ).read_text()
+LOG_HISTORY_CPP = (
+    ROOT
+    / "components"
+    / "openquatt_log_history"
+    / "OpenQuattLogHistory.cpp"
+).read_text()
+DEBUG_RECORDER_CPP = (
+    ROOT
+    / "components"
+    / "openquatt_debug_recorder"
+    / "OpenQuattDebugRecorder.cpp"
+).read_text()
+TRENDS_CPP = (
+    ROOT / "components" / "openquatt_trends" / "OpenQuattTrends.cpp"
+).read_text()
+LOG_HISTORY_HEADER = (
+    ROOT
+    / "components"
+    / "openquatt_log_history"
+    / "OpenQuattLogHistory.h"
+).read_text()
 
 
 class InternalHeapPlacementContractTest(unittest.TestCase):
@@ -120,6 +141,60 @@ class InternalHeapPlacementContractTest(unittest.TestCase):
         )
         self.assertIn("eSetValueWithOverwrite", TELEMETRY_CPP)
         self.assertNotIn("eSetValueWithoutOverwrite", TELEMETRY_CPP)
+
+    def test_large_diagnostic_buffers_never_fall_back_to_internal_heap(self) -> None:
+        self.assertIn(
+            "this->entries_.allocate_external(ENTRY_CAPACITY)",
+            LOG_HISTORY_CPP,
+        )
+        self.assertIn(
+            "snapshot.allocate_external(snapshot_capacity)",
+            LOG_HISTORY_CPP,
+        )
+        self.assertIn(
+            "this->samples_.allocate_external(SAMPLE_CAPACITY)",
+            DEBUG_RECORDER_CPP,
+        )
+        self.assertIn(
+            "this->fields_.allocate_external(FIELD_CAPACITY)",
+            DEBUG_RECORDER_CPP,
+        )
+        self.assertIn(
+            "this->string_entries_.allocate_external(STRING_ENTRY_CAPACITY)",
+            DEBUG_RECORDER_CPP,
+        )
+        self.assertIn(
+            "this->string_data_.allocate_external(STRING_DATA_BYTES)",
+            DEBUG_RECORDER_CPP,
+        )
+        self.assertIn(
+            "this->ram_history_.allocate_external(RAM_CAPACITY)",
+            TRENDS_CPP,
+        )
+        self.assertIn(
+            "this->flash_index_.allocate_external(FLASH_SLOT_COUNT)",
+            TRENDS_CPP,
+        )
+
+    def test_optional_history_allocation_failures_are_explicit(self) -> None:
+        self.assertIn("bool storage_available() const", LOG_HISTORY_HEADER)
+        self.assertIn('"503 Service Unavailable"', LOG_HISTORY_CPP)
+        self.assertIn('"psram_unavailable"', LOG_HISTORY_CPP)
+
+        load_archive = TRENDS_CPP[
+            TRENDS_CPP.index("void OpenQuattTrends::load_archive_if_needed_()"):
+            TRENDS_CPP.index("void OpenQuattTrends::push_ram_sample_")
+        ]
+        merge_archive = TRENDS_CPP[
+            TRENDS_CPP.index("bool OpenQuattTrends::merge_flash_history_into_ram_()"):
+            TRENDS_CPP.index("bool OpenQuattTrends::clear_flash_archive_()")
+        ]
+        self.assertIn("!this->flash_archive_available_()", load_archive)
+        self.assertIn("!this->flash_archive_available_()", merge_archive)
+        self.assertLess(
+            merge_archive.index("!this->flash_archive_available_()"),
+            merge_archive.index("this->ram_head_ = 0"),
+        )
 
 
 if __name__ == "__main__":

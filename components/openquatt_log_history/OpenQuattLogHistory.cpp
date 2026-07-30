@@ -332,6 +332,10 @@ class OpenQuattLogHistoryRequestHandler : public AsyncWebHandler {
         request->send(403, "application/json", R"({"ok":false,"error":"forbidden"})");
         return;
       }
+      if (!this->parent_->storage_available()) {
+        request->send(503, "application/json", R"({"ok":false,"available":false,"error":"psram_unavailable"})");
+        return;
+      }
       this->parent_->clear_history();
       request->send(200, "application/json", R"({"ok":true})");
       return;
@@ -713,7 +717,7 @@ void OpenQuattLogHistory::setup() {
     this->enabled_ = this->enabled_switch_->state;
   }
 
-  if (!this->entries_.allocate(ENTRY_CAPACITY)) {
+  if (!this->entries_.allocate_external(ENTRY_CAPACITY)) {
     ESP_LOGE(TAG, "Failed to allocate log history buffer in PSRAM");
   }
   this->rotate_csrf_token_();
@@ -765,6 +769,11 @@ void OpenQuattLogHistory::write_recent_logs(httpd_req_t *req) const {
   if (req == nullptr) {
     return;
   }
+  if (!this->storage_available()) {
+    httpd_resp_set_status(req, "503 Service Unavailable");
+    httpd_resp_sendstr(req, R"({"ok":false,"available":false,"error":"psram_unavailable"})");
+    return;
+  }
 
   size_t snapshot_capacity = 0;
   if (!this->lock_history_()) {
@@ -776,7 +785,7 @@ void OpenQuattLogHistory::write_recent_logs(httpd_req_t *req) const {
   this->unlock_history_();
 
   PsramBuffer<LogEntry> snapshot;
-  if (!snapshot.allocate(snapshot_capacity)) {
+  if (!snapshot.allocate_external(snapshot_capacity)) {
     ESP_LOGW(TAG, "Failed to allocate recent log snapshot");
     httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Unable to snapshot recent logs");
     return;
