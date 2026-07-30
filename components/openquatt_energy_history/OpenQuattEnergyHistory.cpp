@@ -229,6 +229,10 @@ class OpenQuattEnergyHistoryRequestHandler : public AsyncWebHandler {
   void handleRequest(AsyncWebServerRequest *request) override {
     char url_buf[AsyncWebServerRequest::URL_BUF_SIZE];
     request->url_to(url_buf);
+    if (!this->parent_->runtime_storage_ready()) {
+      request->send(503, "application/json", R"({"ok":false,"error":"psram_unavailable"})");
+      return;
+    }
     if (url_path_matches(url_buf, "/energy/history/import")) {
       if (!this->passes_same_origin_(request) || !this->passes_csrf_(request)) {
         request->send(409, "application/json", R"({"ok":false,"error":"forbidden"})");
@@ -261,6 +265,16 @@ class OpenQuattEnergyHistoryRequestHandler : public AsyncWebHandler {
 
 void OpenQuattEnergyHistory::setup() {
   this->rotate_csrf_token_();
+
+  if (!this->external_state_storage_.allocate()) {
+    ESP_LOGE(TAG, "Could not allocate %u-byte energy history state in PSRAM",
+             static_cast<unsigned>(sizeof(ExternalState)));
+    this->mark_failed();
+    if (web_server_base::global_web_server_base != nullptr) {
+      web_server_base::global_web_server_base->add_handler(new OpenQuattEnergyHistoryRequestHandler(this));
+    }
+    return;
+  }
 
   if (web_server_base::global_web_server_base == nullptr) {
     ESP_LOGE(TAG, "global_web_server_base is unavailable");
@@ -316,6 +330,9 @@ bool OpenQuattEnergyHistory::force_flush() {
 }
 
 void OpenQuattEnergyHistory::refresh_hourly_retention() {
+  if (!this->runtime_storage_ready()) {
+    return;
+  }
   this->configure_hour_flash_window_();
   this->scan_hour_archive_();
 }
@@ -324,6 +341,9 @@ void OpenQuattEnergyHistory::dump_config() {
   ESP_LOGCONFIG(TAG, "OpenQuatt energy history");
   ESP_LOGCONFIG(TAG, "  Clock: %s", this->clock_ == nullptr ? "<missing>" : "configured");
   ESP_LOGCONFIG(TAG, "  Enabled switch: %s", this->enabled_switch_ == nullptr ? "<missing>" : "configured");
+  ESP_LOGCONFIG(TAG, "  Runtime state: %s (%u bytes)",
+                this->runtime_storage_ready() ? "PSRAM" : "<allocation failed>",
+                static_cast<unsigned>(sizeof(ExternalState)));
   ESP_LOGCONFIG(TAG, "  Flash partition: %s", this->is_partition_ready_() ? "configured" : "<missing>");
   ESP_LOGCONFIG(TAG, "  Flash window: %u KiB / %u slots", static_cast<unsigned>(this->flash_total_bytes_ / 1024U),
                 static_cast<unsigned>(this->flash_slot_count_));
@@ -375,7 +395,7 @@ uint8_t OpenQuattEnergyHistory::get_current_hour_() const {
 }
 
 bool OpenQuattEnergyHistory::is_partition_ready_() const {
-  return this->partition_available_ && this->flash_partition_ != nullptr;
+  return this->runtime_storage_ready() && this->partition_available_ && this->flash_partition_ != nullptr;
 }
 
 uint32_t OpenQuattEnergyHistory::encode_kwh_(float value) {
@@ -654,7 +674,8 @@ void OpenQuattEnergyHistory::configure_hour_flash_window_() {
 }
 
 bool OpenQuattEnergyHistory::is_hour_partition_ready_() const {
-  return this->hour_partition_available_ && this->flash_partition_ != nullptr && this->hour_flash_slot_count_ > 0U;
+  return this->runtime_storage_ready() && this->hour_partition_available_ && this->flash_partition_ != nullptr &&
+         this->hour_flash_slot_count_ > 0U;
 }
 
 bool OpenQuattEnergyHistory::read_hour_day_record_(uint32_t slot_index, EnergyHistoryHourDayRecord *record) const {
@@ -672,7 +693,10 @@ bool OpenQuattEnergyHistory::hour_day_record_valid_(const EnergyHistoryHourDayRe
 }
 
 bool OpenQuattEnergyHistory::scan_archive_() {
-  std::memset(this->stored_day_bitmap_, 0, sizeof(this->stored_day_bitmap_));
+  if (!this->runtime_storage_ready()) {
+    return false;
+  }
+  std::memset(this->state_()->stored_day_bitmap, 0, sizeof(this->state_()->stored_day_bitmap));
   if (!this->is_partition_ready_()) {
     this->record_count_ = 0;
     this->stored_day_count_ = 0;
@@ -697,8 +721,8 @@ bool OpenQuattEnergyHistory::scan_archive_() {
     if (!this->read_record_(slot_index, &record) || !this->record_valid_(record)) {
       continue;
     }
-    if (!date_bitmap_get_(this->stored_day_bitmap_, record.date_key)) {
-      date_bitmap_set_(this->stored_day_bitmap_, record.date_key);
+    if (!date_bitmap_get_(this->state_()->stored_day_bitmap, record.date_key)) {
+      date_bitmap_set_(this->state_()->stored_day_bitmap, record.date_key);
       ++stored_day_count;
     }
     if (!found || record.sequence < min_sequence) {
@@ -728,7 +752,11 @@ bool OpenQuattEnergyHistory::scan_archive_() {
 }
 
 bool OpenQuattEnergyHistory::scan_hour_archive_() {
-  std::memset(this->stored_hour_day_bitmap_, 0, sizeof(this->stored_hour_day_bitmap_));
+  if (!this->runtime_storage_ready()) {
+    return false;
+  }
+  std::memset(this->state_()->stored_hour_day_bitmap, 0,
+              sizeof(this->state_()->stored_hour_day_bitmap));
   if (!this->is_hour_partition_ready_()) {
     this->hour_flash_record_count_ = 0;
     this->hour_flash_stored_day_count_ = 0;
@@ -752,8 +780,8 @@ bool OpenQuattEnergyHistory::scan_hour_archive_() {
     if (!this->read_hour_day_record_(slot_index, &record) || !this->hour_day_record_valid_(record)) {
       continue;
     }
-    if (!date_bitmap_get_(this->stored_hour_day_bitmap_, record.date_key)) {
-      date_bitmap_set_(this->stored_hour_day_bitmap_, record.date_key);
+    if (!date_bitmap_get_(this->state_()->stored_hour_day_bitmap, record.date_key)) {
+      date_bitmap_set_(this->state_()->stored_hour_day_bitmap, record.date_key);
       ++stored_day_count;
     }
     if (!found || record.sequence > max_sequence) {
@@ -827,14 +855,14 @@ bool OpenQuattEnergyHistory::write_record_(uint32_t date_key, const EnergyHistor
     this->scan_archive_();
   } else {
     ++this->next_sequence_;
-    date_bitmap_set_(this->stored_day_bitmap_, date_key);
+    date_bitmap_set_(this->state_()->stored_day_bitmap, date_key);
   }
   return true;
 }
 
 bool OpenQuattEnergyHistory::snapshot_hour_day_values_(uint32_t date_key, EnergyHistoryValues hours[24],
                                                        uint32_t *hour_mask) const {
-  if (hours == nullptr || hour_mask == nullptr || date_key == 0U) {
+  if (!this->runtime_storage_ready() || hours == nullptr || hour_mask == nullptr || date_key == 0U) {
     return false;
   }
 
@@ -844,7 +872,7 @@ bool OpenQuattEnergyHistory::snapshot_hour_day_values_(uint32_t date_key, Energy
                                       UNKNOWN_WH, UNKNOWN_WH, UNKNOWN_WH};
   }
 
-  for (const auto &record : this->hour_records_) {
+  for (const auto &record : this->state_()->hour_records) {
     if (!record.valid || record.date_key != date_key || record.hour > 23U || !record_has_values_(record.values)) {
       continue;
     }
@@ -860,7 +888,7 @@ bool OpenQuattEnergyHistory::write_hour_day_record_(uint32_t date_key, bool part
     return false;
   }
 
-  auto *hours = this->hour_snapshot_values_;
+  auto *hours = this->state_()->hour_snapshot_values;
   uint32_t hour_mask = 0;
   if (!this->snapshot_hour_day_values_(date_key, hours, &hour_mask)) {
     return false;
@@ -969,7 +997,7 @@ bool OpenQuattEnergyHistory::write_hour_day_import_record_(uint32_t date_key, ui
     this->scan_hour_archive_();
   } else {
     ++this->next_hour_flash_sequence_;
-    date_bitmap_set_(this->stored_hour_day_bitmap_, date_key);
+    date_bitmap_set_(this->state_()->stored_hour_day_bitmap, date_key);
   }
   return true;
 }
@@ -989,7 +1017,7 @@ OpenQuattEnergyHistory::EnergyHistoryValues OpenQuattEnergyHistory::delta_values
 
 void OpenQuattEnergyHistory::restore_current_day_hours_(uint32_t date_key, uint8_t current_hour,
                                                         const EnergyHistoryValues &current_values) {
-  if (date_key == 0U || current_hour > 23U) {
+  if (!this->runtime_storage_ready() || date_key == 0U || current_hour > 23U) {
     return;
   }
 
@@ -1044,12 +1072,12 @@ void OpenQuattEnergyHistory::restore_current_day_hours_(uint32_t date_key, uint8
 }
 
 void OpenQuattEnergyHistory::capture_hour_delta_(uint32_t date_key, uint8_t hour, const EnergyHistoryValues &values) {
-  if (date_key == 0 || hour > 23 || !record_has_values_(values)) {
+  if (!this->runtime_storage_ready() || date_key == 0 || hour > 23 || !record_has_values_(values)) {
     return;
   }
 
   EnergyHistoryHourRecord *record = nullptr;
-  for (auto &candidate : this->hour_records_) {
+  for (auto &candidate : this->state_()->hour_records) {
     if (candidate.valid && candidate.date_key == date_key && candidate.hour == hour) {
       record = &candidate;
       break;
@@ -1057,7 +1085,7 @@ void OpenQuattEnergyHistory::capture_hour_delta_(uint32_t date_key, uint8_t hour
   }
 
   if (record == nullptr) {
-    record = &this->hour_records_[this->next_hour_sequence_ % HOURLY_SLOT_COUNT];
+    record = &this->state_()->hour_records[this->next_hour_sequence_ % HOURLY_SLOT_COUNT];
     record->sequence = this->next_hour_sequence_++;
     record->date_key = date_key;
     record->hour = hour;
@@ -1077,8 +1105,11 @@ void OpenQuattEnergyHistory::capture_hour_delta_(uint32_t date_key, uint8_t hour
 }
 
 uint32_t OpenQuattEnergyHistory::get_hour_record_count_() const {
+  if (!this->runtime_storage_ready()) {
+    return 0;
+  }
   uint32_t count = 0;
-  for (const auto &record : this->hour_records_) {
+  for (const auto &record : this->state_()->hour_records) {
     if (record.valid && record_has_values_(record.values)) {
       ++count;
     }
@@ -1087,7 +1118,10 @@ uint32_t OpenQuattEnergyHistory::get_hour_record_count_() const {
 }
 
 void OpenQuattEnergyHistory::clear_hour_records_() {
-  std::memset(this->hour_records_, 0, sizeof(this->hour_records_));
+  if (!this->runtime_storage_ready()) {
+    return;
+  }
+  std::memset(this->state_()->hour_records, 0, sizeof(this->state_()->hour_records));
   this->next_hour_sequence_ = 0;
   this->has_last_hour_sample_ = false;
   this->last_hour_sample_date_key_ = 0;
@@ -1100,7 +1134,7 @@ void OpenQuattEnergyHistory::capture_day_totals(float electrical_input_kwh, floa
                                                 float cooling_input_kwh, float heatpump_heat_output_kwh,
                                                 float heatpump_cooling_output_kwh, float boiler_heat_output_kwh,
                                                 float system_heat_output_kwh) {
-  if (!this->enabled_() || !this->time_is_valid_()) {
+  if (!this->runtime_storage_ready() || !this->enabled_() || !this->time_is_valid_()) {
     return;
   }
 
@@ -1263,7 +1297,7 @@ std::string OpenQuattEnergyHistory::import_history_records(const std::string &re
         continue;
       }
 
-      if (date_bitmap_get_(this->stored_day_bitmap_, date_key)) {
+      if (date_bitmap_get_(this->state_()->stored_day_bitmap, date_key)) {
         ++duplicates;
         continue;
       }
@@ -1298,8 +1332,9 @@ std::string OpenQuattEnergyHistory::import_history_records(const std::string &re
       }
 
       for (uint8_t hour = 0; hour < 24U; ++hour) {
-        this->hour_import_values_[hour] = EnergyHistoryValues{UNKNOWN_WH, UNKNOWN_WH, UNKNOWN_WH, UNKNOWN_WH,
-                                                              UNKNOWN_WH, UNKNOWN_WH, UNKNOWN_WH};
+        this->state_()->hour_import_values[hour] =
+            EnergyHistoryValues{UNKNOWN_WH, UNKNOWN_WH, UNKNOWN_WH, UNKNOWN_WH,
+                                UNKNOWN_WH, UNKNOWN_WH, UNKNOWN_WH};
       }
 
       bool valid = true;
@@ -1310,7 +1345,7 @@ std::string OpenQuattEnergyHistory::import_history_records(const std::string &re
         const size_t fields_per_hour = compact_quatt_hour_day ? 3U : (compact_hour_day ? 4U : 7U);
         const size_t offset = 3U + (static_cast<size_t>(hour) * fields_per_hour);
         uint32_t parsed_values[7]{};
-        auto &values = this->hour_import_values_[hour];
+        auto &values = this->state_()->hour_import_values[hour];
         if (compact_quatt_hour_day) {
           valid = parse_import_uint32_(fields[offset], &parsed_values[0]) &&
                   parse_import_uint32_(fields[offset + 1U], &parsed_values[3]) &&
@@ -1348,12 +1383,12 @@ std::string OpenQuattEnergyHistory::import_history_records(const std::string &re
         continue;
       }
 
-      if (date_bitmap_get_(this->stored_hour_day_bitmap_, date_key)) {
+      if (date_bitmap_get_(this->state_()->stored_hour_day_bitmap, date_key)) {
         ++duplicates;
         continue;
       }
 
-      if (this->write_hour_day_import_record_(date_key, hour_mask, this->hour_import_values_, false)) {
+      if (this->write_hour_day_import_record_(date_key, hour_mask, this->state_()->hour_import_values, false)) {
         ++hour_written;
       } else {
         ++skipped;
@@ -1407,42 +1442,46 @@ bool OpenQuattEnergyHistory::write_export_record_(ChunkedTextWriter *writer, uin
 }
 
 void OpenQuattEnergyHistory::clear_export_hour_marks_() {
-  std::memset(this->export_hour_date_keys_, 0, sizeof(this->export_hour_date_keys_));
-  std::memset(this->export_hour_masks_, 0, sizeof(this->export_hour_masks_));
+  if (!this->runtime_storage_ready()) {
+    return;
+  }
+  std::memset(this->state_()->export_hour_date_keys, 0,
+              sizeof(this->state_()->export_hour_date_keys));
+  std::memset(this->state_()->export_hour_masks, 0, sizeof(this->state_()->export_hour_masks));
 }
 
 bool OpenQuattEnergyHistory::export_hour_marked_(uint32_t date_key, uint8_t hour) const {
-  if (!date_key_valid_(date_key) || hour > 23U) {
+  if (!this->runtime_storage_ready() || !date_key_valid_(date_key) || hour > 23U) {
     return false;
   }
 
   const uint32_t bit = 1UL << hour;
   for (size_t index = 0; index < EXPORT_HOUR_DATE_COUNT; ++index) {
-    const uint32_t stored_date_key = this->export_hour_date_keys_[index];
+    const uint32_t stored_date_key = this->state_()->export_hour_date_keys[index];
     if (stored_date_key == 0U) {
       return false;
     }
     if (stored_date_key == date_key) {
-      return (this->export_hour_masks_[index] & bit) != 0U;
+      return (this->state_()->export_hour_masks[index] & bit) != 0U;
     }
   }
   return false;
 }
 
 bool OpenQuattEnergyHistory::mark_export_hour_(uint32_t date_key, uint8_t hour) {
-  if (!date_key_valid_(date_key) || hour > 23U) {
+  if (!this->runtime_storage_ready() || !date_key_valid_(date_key) || hour > 23U) {
     return false;
   }
 
   const uint32_t bit = 1UL << hour;
   for (size_t index = 0; index < EXPORT_HOUR_DATE_COUNT; ++index) {
-    if (this->export_hour_date_keys_[index] == date_key) {
-      this->export_hour_masks_[index] |= bit;
+    if (this->state_()->export_hour_date_keys[index] == date_key) {
+      this->state_()->export_hour_masks[index] |= bit;
       return true;
     }
-    if (this->export_hour_date_keys_[index] == 0U) {
-      this->export_hour_date_keys_[index] = date_key;
-      this->export_hour_masks_[index] = bit;
+    if (this->state_()->export_hour_date_keys[index] == 0U) {
+      this->state_()->export_hour_date_keys[index] = date_key;
+      this->state_()->export_hour_masks[index] = bit;
       return true;
     }
   }
@@ -1450,7 +1489,7 @@ bool OpenQuattEnergyHistory::mark_export_hour_(uint32_t date_key, uint8_t hour) 
 }
 
 void OpenQuattEnergyHistory::write_history_export(httpd_req_t *req) {
-  if (req == nullptr) {
+  if (req == nullptr || !this->runtime_storage_ready()) {
     return;
   }
 
@@ -1487,7 +1526,7 @@ void OpenQuattEnergyHistory::write_history_export(httpd_req_t *req) {
   }
 
   bool first_day = true;
-  std::memset(this->export_date_bitmap_, 0, sizeof(this->export_date_bitmap_));
+  std::memset(this->state_()->export_date_bitmap, 0, sizeof(this->state_()->export_date_bitmap));
   if (include_days) {
     if (this->has_current_day_ && record_has_values_(this->current_values_) &&
         date_key_in_range_(this->active_date_key_, from_date_key, to_date_key)) {
@@ -1495,7 +1534,7 @@ void OpenQuattEnergyHistory::write_history_export(httpd_req_t *req) {
         ESP_LOGW(TAG, "Failed to write current energy export day record");
         return;
       }
-      date_bitmap_set_(this->export_date_bitmap_, this->active_date_key_);
+      date_bitmap_set_(this->state_()->export_date_bitmap, this->active_date_key_);
     }
 
     if (this->flash_slot_count_ > 0U) {
@@ -1510,10 +1549,10 @@ void OpenQuattEnergyHistory::write_history_export(httpd_req_t *req) {
             !date_key_in_range_(record.date_key, from_date_key, to_date_key)) {
           continue;
         }
-        if (date_bitmap_get_(this->export_date_bitmap_, record.date_key)) {
+        if (date_bitmap_get_(this->state_()->export_date_bitmap, record.date_key)) {
           continue;
         }
-        date_bitmap_set_(this->export_date_bitmap_, record.date_key);
+        date_bitmap_set_(this->state_()->export_date_bitmap, record.date_key);
         if (!this->write_export_record_(&writer, record.date_key, -1, record.values, &first_day)) {
           ESP_LOGW(TAG, "Failed to write energy history export day record");
           return;
@@ -1535,7 +1574,7 @@ void OpenQuattEnergyHistory::write_history_export(httpd_req_t *req) {
     const uint32_t live_start_sequence =
         this->next_hour_sequence_ > live_slot_count ? this->next_hour_sequence_ - live_slot_count : 0U;
     for (uint32_t sequence = live_start_sequence; sequence < this->next_hour_sequence_; ++sequence) {
-      const auto &record = this->hour_records_[sequence % live_slot_count];
+      const auto &record = this->state_()->hour_records[sequence % live_slot_count];
       if (!record.valid || !record_has_values_(record.values) || record.sequence != sequence ||
           !date_key_in_range_(record.date_key, from_date_key, to_date_key) ||
           this->export_hour_marked_(record.date_key, record.hour)) {
@@ -1583,7 +1622,7 @@ void OpenQuattEnergyHistory::write_history_export(httpd_req_t *req) {
 }
 
 void OpenQuattEnergyHistory::write_history(httpd_req_t *req) {
-  if (req == nullptr) {
+  if (req == nullptr || !this->runtime_storage_ready()) {
     return;
   }
 
@@ -1686,7 +1725,7 @@ void OpenQuattEnergyHistory::write_history(httpd_req_t *req) {
       }
     }
 
-    for (const auto &record : this->hour_records_) {
+    for (const auto &record : this->state_()->hour_records) {
       if (!record.valid || !record_has_values_(record.values) ||
           !date_key_in_range_(record.date_key, from_date_key, to_date_key)) {
         continue;

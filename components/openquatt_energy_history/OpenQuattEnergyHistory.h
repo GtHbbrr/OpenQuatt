@@ -6,6 +6,7 @@
 
 #include <esp_http_server.h>
 #include "OpenQuattFlashLayout.h"
+#include "PsramBuffer.h"
 #include "esphome/components/select/select.h"
 #include "esp_partition.h"
 #include "esphome/components/switch/switch.h"
@@ -17,6 +18,7 @@ namespace esphome {
 namespace openquatt_energy_history {
 
 using openquatt_common::OpenQuattFlashLayout;
+using openquatt_common::PsramObjectArray;
 
 class ChunkedTextWriter;
 
@@ -50,6 +52,7 @@ class OpenQuattEnergyHistory : public Component {
   std::string get_last_write_label() const;
   float get_storage_kib() const;
   uint32_t get_write_count() const;
+  bool runtime_storage_ready() const { return static_cast<bool>(this->external_state_storage_); }
 
  protected:
   static constexpr uint32_t RECORD_MAGIC = 0x3148454F;  // "OEH1"
@@ -123,6 +126,24 @@ class OpenQuattEnergyHistory : public Component {
   static_assert(sizeof(EnergyHistoryHourDayRecord) <= HOUR_FLASH_SLOT_SIZE,
                 "Energy history hour day record must fit in one slot");
 
+  struct ExternalState {
+    EnergyHistoryHourRecord hour_records[HOURLY_SLOT_COUNT];
+    EnergyHistoryValues hour_snapshot_values[24];
+    EnergyHistoryValues hour_import_values[24];
+    uint8_t stored_day_bitmap[DATE_BITMAP_BYTES];
+    uint8_t stored_hour_day_bitmap[DATE_BITMAP_BYTES];
+    uint8_t export_date_bitmap[DATE_BITMAP_BYTES];
+    uint32_t export_hour_date_keys[EXPORT_HOUR_DATE_COUNT];
+    uint32_t export_hour_masks[EXPORT_HOUR_DATE_COUNT];
+  };
+
+  static constexpr size_t EXTERNAL_STATE_BYTES =
+      (sizeof(EnergyHistoryHourRecord) * HOURLY_SLOT_COUNT) + (sizeof(EnergyHistoryValues) * 24U * 2U) +
+      (DATE_BITMAP_BYTES * 3U) + (sizeof(uint32_t) * EXPORT_HOUR_DATE_COUNT * 2U);
+  static_assert(sizeof(ExternalState) == EXTERNAL_STATE_BYTES, "External energy history state must stay packed");
+
+  ExternalState *state_() { return this->external_state_storage_.data(); }
+  const ExternalState *state_() const { return this->external_state_storage_.data(); }
   bool enabled_() const;
   bool time_is_valid_() const;
   uint64_t current_time_ms_() const;
@@ -206,7 +227,7 @@ class OpenQuattEnergyHistory : public Component {
   uint8_t last_hour_sample_hour_{0};
   EnergyHistoryValues last_hour_sample_values_{UNKNOWN_WH, UNKNOWN_WH, UNKNOWN_WH, UNKNOWN_WH,
                                                UNKNOWN_WH, UNKNOWN_WH, UNKNOWN_WH};
-  EnergyHistoryHourRecord hour_records_[HOURLY_SLOT_COUNT]{};
+  PsramObjectArray<ExternalState, 1U> external_state_storage_{};
   uint32_t next_hour_sequence_{0};
   uint32_t next_hour_flash_sequence_{0};
   uint32_t hour_flash_record_count_{0};
@@ -214,15 +235,10 @@ class OpenQuattEnergyHistory : public Component {
   uint32_t hour_flash_oldest_date_key_{0};
   uint32_t hour_flash_newest_date_key_{0};
   uint32_t hour_flash_last_write_timestamp_s_{0};
-  EnergyHistoryValues hour_snapshot_values_[24]{};
-  EnergyHistoryValues hour_import_values_[24]{};
+  // These buffers are direct esp_partition read/write operands and must remain
+  // in internal RAM while the flash cache can be disabled.
   EnergyHistoryHourDayRecord hour_flash_record_buffer_{};
   uint8_t hour_flash_slot_buffer_[HOUR_FLASH_SLOT_SIZE]{};
-  uint8_t stored_day_bitmap_[DATE_BITMAP_BYTES]{};
-  uint8_t stored_hour_day_bitmap_[DATE_BITMAP_BYTES]{};
-  uint8_t export_date_bitmap_[DATE_BITMAP_BYTES]{};
-  uint32_t export_hour_date_keys_[EXPORT_HOUR_DATE_COUNT]{};
-  uint32_t export_hour_masks_[EXPORT_HOUR_DATE_COUNT]{};
 
   uint32_t next_sequence_{0};
   uint32_t record_count_{0};
@@ -231,6 +247,9 @@ class OpenQuattEnergyHistory : public Component {
   uint32_t newest_date_key_{0};
   uint32_t last_write_timestamp_s_{0};
 };
+
+static_assert(sizeof(OpenQuattEnergyHistory) <= 2304U,
+              "Large energy history state must remain outside the static internal-RAM component");
 
 }  // namespace openquatt_energy_history
 }  // namespace esphome

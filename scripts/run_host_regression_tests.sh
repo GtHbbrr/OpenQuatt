@@ -30,6 +30,9 @@ for source in "${sources[@]}"; do
   "${binary}"
 done
 
+echo "[run] energy history memory contract"
+python3 "${repo_root}/scripts/tests/test_energy_history_memory_contract.py"
+
 echo "[run] incident manager action contract"
 python3 "${repo_root}/scripts/tests/test_incident_manager_action_contract.py"
 
