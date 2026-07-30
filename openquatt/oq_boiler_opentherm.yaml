@@ -39,7 +39,7 @@ esphome:
             id(oq_otb_startup_probe_active) = false;
             id(oq_boiler_connection_mismatch_state) = false;
             id(oq_boiler_connection_mismatch).publish_state(false);
-            id(oq_otb_hub).enable_loop();
+            id(oq_otb_hub).resume_polling();
           } else {
             // Before R1 can become available, actively check whether an
             // OpenTherm boiler is physically responding. STATUS(CH=off) and
@@ -50,10 +50,9 @@ esphome:
             id(oq_boiler_connection_mismatch_state) = false;
             id(oq_boiler_connection_mismatch).publish_state(false);
             id(boiler_relay).turn_off();
-            id(oq_otb_hub).prioritize_messages(
+            id(oq_otb_hub).start_priority_polling(
                 esphome::opentherm::MessageId::STATUS,
                 esphome::opentherm::MessageId::CH_SETPOINT);
-            id(oq_otb_hub).enable_loop();
           }
   on_shutdown:
     priority: 700
@@ -666,7 +665,32 @@ interval:
     startup_delay: 1s
     then:
       - lambda: |-
-          if (!id(oq_otb_startup_probe_active)) return;
+          const bool startup_probe_active =
+              oq_otb::startup_probe_state.active();
+          if (id(oq_otb_startup_probe_active) != startup_probe_active) {
+            ESP_LOGW(
+                "quatt.boiler",
+                "Correcting stale OpenTherm startup-probe mirror");
+            id(oq_otb_startup_probe_active) = startup_probe_active;
+          }
+
+          const bool opentherm_selected =
+              id(oq_boiler_connection).has_state() &&
+              id(oq_boiler_connection).current_option() == "OpenTherm";
+          const bool keep_polling = oq_otb::should_keep_opentherm_polling(
+              opentherm_selected,
+              startup_probe_active,
+              id(oq_boiler_connection_mismatch_state));
+          if (!keep_polling) {
+            if (id(oq_otb_hub).is_polling_enabled()) {
+              ESP_LOGW(
+                  "quatt.boiler",
+                  "Stopping stray OpenTherm polling while R1 is selected");
+              id(oq_otb_hub).suspend_polling();
+            }
+            return;
+          }
+          if (!startup_probe_active) return;
 
           const uint32_t now_ms = millis();
           const auto result = oq_otb::startup_probe_state.result(
@@ -725,8 +749,7 @@ interval:
           id(oq_boiler_connection_auto_selected).publish_state(false);
           id(oq_boiler_connection_mismatch_state) = false;
           id(oq_boiler_connection_mismatch).publish_state(false);
-          id(oq_otb_hub).on_shutdown();
-          id(oq_otb_hub).disable_loop();
+          id(oq_otb_hub).suspend_polling();
           oq_otb::telemetry_state.reset_link_session();
           id(oq_otb_link_initialized) = true;
           id(oq_otb_link_available_state) = false;

@@ -22,6 +22,12 @@ inline bool should_auto_select_opentherm(
   return result == STARTUP_PROBE_OPENTHERM_DETECTED && !setup_complete;
 }
 
+inline bool should_keep_opentherm_polling(
+    bool opentherm_selected, bool startup_probe_active,
+    bool connection_mismatch) {
+  return opentherm_selected || startup_probe_active || connection_mismatch;
+}
+
 class StartupProbeState {
  public:
   void begin(uint32_t now_ms) {
