@@ -47,8 +47,6 @@ button:
     internal: true
     icon: mdi:play-circle-outline
     entity_category: config
-    web_server:
-      sorting_group_id: oq_boiler
     on_press:
       - lambda: |-
           oq_boiler_task::runtime().start(oq_boiler_task::default_config(), (uint32_t) millis());
@@ -59,8 +57,6 @@ button:
     internal: true
     icon: mdi:stop-circle-outline
     entity_category: config
-    web_server:
-      sorting_group_id: oq_boiler
     on_press:
       - lambda: |-
           oq_boiler_task::runtime().abort_or_clear();
@@ -71,8 +67,6 @@ button:
     internal: true
     icon: mdi:check-circle-outline
     entity_category: config
-    web_server:
-      sorting_group_id: oq_boiler
     on_press:
       - lambda: |-
           // Round the applied boiler rating to the nearest 100 W for a cleaner persistent setting.
@@ -103,8 +97,6 @@ number:
     optimistic: true
     initial_value: 6000
     entity_category: config
-    web_server:
-      sorting_group_id: oq_boiler
 
 # ----------------------------
 # MAIN LOOP

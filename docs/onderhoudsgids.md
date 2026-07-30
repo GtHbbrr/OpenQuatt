@@ -29,9 +29,11 @@ This guide keeps the configuration maintainable and predictable while preserving
   - `oq_ha_inputs`: fixed Home Assistant proxy sensor ingest
   - `oq_local_sensors`: local DS18B20 ingest
   - `oq_sensor_sources`: runtime source selectors and selected-source synthesis (`*_selected`)
-  - `oq_webserver`: grouping/exposure for ESPHome web UI
+  - `oq_webserver`: authenticated OpenQuatt web UI
   - `oq_HP_io`: per-HP Modbus IO entities and actuators
 - Keep one change type per batch: formatting, comments, or logic.
+- Do not add `web_server.sorting_groups`, `sorting_group_id` or `sorting_weight`. The OpenQuatt SPA owns entity
+  layout, while ESPHome stores this unused metadata in dynamic internal-heap maps.
 - Preserve package include order in `openquatt/oq_packages.yaml` unless dependencies are intentionally redesigned.
 - If you add/remove packages or user-facing entities, update the affected docs in the same PR:
   - `README.md`

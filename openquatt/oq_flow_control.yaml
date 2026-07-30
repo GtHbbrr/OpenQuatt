@@ -89,8 +89,6 @@ number:
     entity_category: config
     unit_of_measurement: "L/h"
     mode: slider
-    web_server:
-      sorting_group_id: oq_control
     min_value: 0
     max_value: 1500
     step: 10
@@ -105,8 +103,6 @@ number:
     entity_category: config
     unit_of_measurement: "L/h"
     mode: slider
-    web_server:
-      sorting_group_id: oq_control
     min_value: 0
     max_value: 1500
     step: 10
@@ -127,8 +123,6 @@ number:
     initial_value: 400
     restore_value: true
     optimistic: true
-    web_server:
-      sorting_group_id: oq_control
 
   - platform: template
     id: oq_flow_frost_pwm
@@ -138,8 +132,6 @@ number:
     icon: mdi:snowflake
     unit_of_measurement: "iPWM"
     mode: slider
-    web_server:
-      sorting_group_id: oq_tuning_flow
     min_value: 50
     max_value: 850
     step: 10
@@ -155,8 +147,6 @@ number:
     icon: mdi:rocket-launch-outline
     unit_of_measurement: "iPWM"
     mode: slider
-    web_server:
-      sorting_group_id: oq_tuning_flow
     min_value: 50
     max_value: 850
     step: 1
@@ -171,8 +161,6 @@ number:
     icon: mdi:alpha-k-circle-outline
     entity_category: config
     mode: slider
-    web_server:
-      sorting_group_id: oq_tuning_flow
     min_value: ${oq_flow_kp_min}
     max_value: ${oq_flow_kp_max}
     step: 0.001
@@ -187,8 +175,6 @@ number:
     icon: mdi:alpha-i-circle-outline
     entity_category: config
     mode: slider
-    web_server:
-      sorting_group_id: oq_tuning_flow
     min_value: ${oq_flow_ki_min}
     max_value: ${oq_flow_ki_max}
     step: 0.0001
@@ -213,8 +199,6 @@ select:
     initial_option: Flow Setpoint
     restore_value: true
     optimistic: true
-    web_server:
-      sorting_group_id: oq_control
 
 # ----------------------------
 # SENSORS
@@ -228,8 +212,6 @@ sensor:
     unit_of_measurement: "L/h"
     device_class: volume_flow_rate
     state_class: measurement
-    web_server:
-      sorting_group_id: oq_hydraulics
     accuracy_decimals: 0
     update_interval: 1s
     lambda: |-
@@ -282,8 +264,6 @@ binary_sensor:
     icon: mdi:alert-circle-outline
     device_class: problem
     entity_category: diagnostic
-    web_server:
-      sorting_group_id: oq_hydraulics
     lambda: |-
       static bool state = false;
       static bool mismatch_timer_running = false;
@@ -343,8 +323,6 @@ text_sensor:
     id: oq_flow_mode
     name: "Flow Mode"
     icon: mdi:state-machine
-    web_server:
-      sorting_group_id: oq_hydraulics
 
 # ----------------------------
 # CONTROL LOOPS

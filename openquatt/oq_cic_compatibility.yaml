@@ -28,5 +28,3 @@ switch:
     entity_category: config
     optimistic: true
     restore_mode: ${oq_cic_compat_restore_mode_default}
-    web_server:
-      sorting_group_id: oq_cic_compatibility

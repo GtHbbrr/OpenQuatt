@@ -117,8 +117,6 @@ number:
     initial_value: 0
     entity_category: config
     disabled_by_default: true
-    web_server:
-      sorting_group_id: oq_temperatures
 
   - platform: template
     id: hp1_water_out_temp_offset
@@ -135,8 +133,6 @@ number:
     initial_value: 0
     entity_category: config
     disabled_by_default: true
-    web_server:
-      sorting_group_id: oq_temperatures
 
   - platform: template
     id: hp2_water_in_temp_offset
@@ -153,8 +149,6 @@ number:
     initial_value: 0
     entity_category: config
     disabled_by_default: true
-    web_server:
-      sorting_group_id: oq_temperatures
 
   - platform: template
     id: hp2_water_out_temp_offset
@@ -171,8 +165,6 @@ number:
     initial_value: 0
     entity_category: config
     disabled_by_default: true
-    web_server:
-      sorting_group_id: oq_temperatures
 
   - platform: template
     id: oq_hp_calibration_hp1_water_in_offset_suggested
@@ -189,8 +181,6 @@ number:
     initial_value: 0
     entity_category: diagnostic
     disabled_by_default: true
-    web_server:
-      sorting_group_id: oq_temperatures
 
   - platform: template
     id: oq_hp_calibration_hp1_water_out_offset_suggested
@@ -207,8 +197,6 @@ number:
     initial_value: 0
     entity_category: diagnostic
     disabled_by_default: true
-    web_server:
-      sorting_group_id: oq_temperatures
 
   - platform: template
     id: oq_hp_calibration_hp2_water_in_offset_suggested
@@ -225,8 +213,6 @@ number:
     initial_value: 0
     entity_category: diagnostic
     disabled_by_default: true
-    web_server:
-      sorting_group_id: oq_temperatures
 
   - platform: template
     id: oq_hp_calibration_hp2_water_out_offset_suggested
@@ -243,8 +229,6 @@ number:
     initial_value: 0
     entity_category: diagnostic
     disabled_by_default: true
-    web_server:
-      sorting_group_id: oq_temperatures
 
 button:
   - platform: template
@@ -254,8 +238,6 @@ button:
     icon: mdi:thermometer-sync
     entity_category: config
     disabled_by_default: true
-    web_server:
-      sorting_group_id: oq_temperatures
     on_press:
       - lambda: |-
           oq_hp_water_calibration::runtime().start(
@@ -269,8 +251,6 @@ button:
     icon: mdi:stop-circle-outline
     entity_category: config
     disabled_by_default: true
-    web_server:
-      sorting_group_id: oq_temperatures
     on_press:
       - lambda: |-
           oq_hp_water_calibration::runtime().abort_or_clear();
@@ -282,8 +262,6 @@ button:
     icon: mdi:check-circle-outline
     entity_category: config
     disabled_by_default: true
-    web_server:
-      sorting_group_id: oq_temperatures
     on_press:
       - lambda: |-
           oq_hp_water_calibration::runtime().apply(

@@ -35,8 +35,6 @@ switch:
     entity_category: config
     optimistic: true
     restore_mode: RESTORE_DEFAULT_ON
-    web_server:
-      sorting_group_id: oq_system_diagnostics
 
 binary_sensor:
   - platform: template

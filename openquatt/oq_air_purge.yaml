@@ -62,8 +62,6 @@ button:
     internal: true
     icon: mdi:water-pump
     entity_category: config
-    web_server:
-      sorting_group_id: oq_hydraulics
     on_press:
       - lambda: |-
           oq_air_purge::runtime().start(
@@ -76,8 +74,6 @@ button:
     internal: true
     icon: mdi:stop-circle-outline
     entity_category: config
-    web_server:
-      sorting_group_id: oq_hydraulics
     on_press:
       - lambda: |-
           oq_air_purge::runtime().abort_or_clear();
@@ -91,8 +87,6 @@ switch:
     entity_category: config
     optimistic: true
     restore_mode: RESTORE_DEFAULT_ON
-    web_server:
-      sorting_group_id: oq_hydraulics
 
 # ----------------------------
 # MAIN LOOP

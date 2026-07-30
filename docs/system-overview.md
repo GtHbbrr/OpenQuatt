@@ -360,16 +360,12 @@ smallest partition and at runtime against the partition actually present.
 
 ## 10. UI and Observability Organization
 
-`oq_webserver.yaml` defines stable sorting groups used across packages:
+The OpenQuatt SPA owns the layout of built-in entities. Built-in packages deliberately do not attach ESPHome
+`sorting_group_id` or `sorting_weight` metadata: ESPHome stores one dynamic map entry for every expanded entity
+assignment, while the OpenQuatt SPA does not consume that metadata.
 
-- Quick Start and Overview
-- System Control, Heating Strategy, Heating Curve, Power House, Cooling
-- Sensor Selection, OpenTherm, CIC Feed, HA Inputs
-- Temperatures, Flow & Pump, Flow Tuning, Performance, Boiler
-- HP1, HP2, Advanced HP Levels
-- System Diagnostics and HP Diagnostics
-
-This keeps ESPHome web UI and Home Assistant mapping coherent.
+`oq_webserver.yaml` therefore defines no ESPHome sorting groups. The native ESPHome fallback remains functional but
+uses its default order. Home Assistant entity mapping is unaffected.
 
 ## 11. Engineering Notes
 

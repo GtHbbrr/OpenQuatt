@@ -38,9 +38,3 @@ packages:
       cic_compat_hp_id: "hp1"
       cic_compat_label: "HP1"
       cic_compat_device_address: "${cic_compat_modbus_address_hp1}"
-
-web_server:
-  sorting_groups:
-    - id: oq_cic_compatibility
-      name: "CiC Compatibility"
-      sorting_weight: 52

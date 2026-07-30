@@ -84,8 +84,6 @@ select:
       - CIC
       - HA input
     initial_option: Local
-    web_server:
-      sorting_group_id: oq_sensor_selection
 
   - platform: template
     name: "Flow Source"
@@ -98,8 +96,6 @@ select:
       - Outdoor unit
       - CIC
     initial_option: Outdoor unit
-    web_server:
-      sorting_group_id: oq_sensor_selection
 
   - platform: template
     name: "Outdoor Unit Flow Mode"
@@ -114,8 +110,6 @@ select:
       - Flowmeter HP2
       - Local aggregate HP1/HP2
     initial_option: Local aggregate HP1/HP2
-    web_server:
-      sorting_group_id: oq_sensor_selection
 
   - platform: template
     name: "Outside Temperature Source"
@@ -130,8 +124,6 @@ select:
       - HA input
       - MQTT
     initial_option: Auto
-    web_server:
-      sorting_group_id: oq_sensor_selection
 
 switch:
   - platform: template
@@ -141,8 +133,6 @@ switch:
     entity_category: config
     restore_mode: RESTORE_DEFAULT_OFF
     optimistic: true
-    web_server:
-      sorting_group_id: oq_control
 
 binary_sensor:
   - platform: template
@@ -155,8 +145,6 @@ binary_sensor:
       return id(oq_water_supply_temp_fallback_runtime_active);
     filters:
       - delayed_on: 15s
-    web_server:
-      sorting_group_id: oq_sensor_selection
 
   - platform: template
     id: heating_enable_valid
@@ -180,8 +168,6 @@ binary_sensor:
       if (source == "MQTT") return id(mqtt_heating_enable_valid).has_state() && id(mqtt_heating_enable_valid).state &&
                                   id(mqtt_heating_enable).has_state();
       return false;
-    web_server:
-      sorting_group_id: oq_sensor_selection
 
   - platform: template
     id: heating_enable_selected
@@ -200,8 +186,6 @@ binary_sensor:
       if (source == "HA input") return id(heating_enable_ha).state;
       if (source == "MQTT") return id(mqtt_heating_enable).state;
       return false;
-    web_server:
-      sorting_group_id: oq_sensor_selection
 
   - platform: template
     id: cooling_enable_valid
@@ -226,8 +210,6 @@ binary_sensor:
       if (source == "MQTT") return id(mqtt_cooling_enable_valid).has_state() && id(mqtt_cooling_enable_valid).state &&
                                   id(mqtt_cooling_enable).has_state();
       return false;
-    web_server:
-      sorting_group_id: oq_sensor_selection
 
   - platform: template
     id: heating_blocked_by_thermostat
@@ -238,8 +220,6 @@ binary_sensor:
     lambda: |-
       if (!id(heating_enable_source).has_state() || id(heating_enable_source).current_option() == "Disabled") return false;
       return id(oq_enabled).state && id(oq_strategy_heat_request_active) && !id(heating_enable_selected).state;
-    web_server:
-      sorting_group_id: oq_sensor_selection
 
   - platform: template
     id: cooling_enable_selected
@@ -266,8 +246,6 @@ binary_sensor:
       if (source == "HA input") return id(cooling_enable_ha).state;
       if (source == "MQTT") return id(mqtt_cooling_enable).state;
       return false;
-    web_server:
-      sorting_group_id: oq_sensor_selection
 
 text_sensor:
   - platform: template
@@ -276,8 +254,6 @@ text_sensor:
     icon: mdi:source-branch
     entity_category: diagnostic
     update_interval: never
-    web_server:
-      sorting_group_id: oq_sensor_selection
 
   - platform: template
     id: oq_heating_enable_effective_source
@@ -291,8 +267,6 @@ text_sensor:
       if (source == "Disabled") return {"None"};
       if (!id(heating_enable_valid).state) return {"None"};
       return {source.c_str()};
-    web_server:
-      sorting_group_id: oq_sensor_selection
 
   - platform: template
     id: oq_room_temperature_effective_source
@@ -303,8 +277,6 @@ text_sensor:
       if (!id(room_temp_source).has_state()) return {"Unknown"};
       return {id(room_temp_source).current_option().c_str()};
     entity_category: diagnostic
-    web_server:
-      sorting_group_id: oq_sensor_selection
 
   - platform: template
     id: oq_room_setpoint_effective_source
@@ -315,8 +287,6 @@ text_sensor:
       if (!id(room_setpoint_source).has_state()) return {"Unknown"};
       return {id(room_setpoint_source).current_option().c_str()};
     entity_category: diagnostic
-    web_server:
-      sorting_group_id: oq_sensor_selection
 
   - platform: template
     id: oq_cooling_enable_effective_source
@@ -356,8 +326,6 @@ text_sensor:
       if (source == "HA input") return {with_manual(valid && id(cooling_enable_ha).state ? "HA input" : "None")};
       if (source == "MQTT") return {with_manual(valid && id(mqtt_cooling_enable).state ? "MQTT" : "None")};
       return {"Unknown"};
-    web_server:
-      sorting_group_id: oq_sensor_selection
 
   - platform: template
     id: oq_selected_input_hold_active
@@ -383,8 +351,6 @@ text_sensor:
 
       if (active.empty()) active = "None";
       return {active};
-    web_server:
-      sorting_group_id: oq_sensor_selection
 
 sensor:
   - platform: template
@@ -484,8 +450,6 @@ sensor:
 
       publish_effective_source("Unavailable");
       return NAN;
-    web_server:
-      sorting_group_id: oq_temperatures
 
   - platform: template
     id: flow_rate_selected
@@ -531,8 +495,6 @@ sensor:
         return NAN;
       }
       return NAN;
-    web_server:
-      sorting_group_id: oq_hydraulics
 
   - platform: template
     id: outside_temp_selected
@@ -594,8 +556,6 @@ sensor:
       }
 
       return NAN;
-    web_server:
-      sorting_group_id: oq_temperatures
 
   - platform: template
     id: room_temp_selected
@@ -652,8 +612,6 @@ sensor:
       }
 
       return NAN;
-    web_server:
-      sorting_group_id: oq_temperatures
 
   - platform: template
     id: room_setpoint_selected
@@ -710,5 +668,3 @@ sensor:
       }
 
       return NAN;
-    web_server:
-      sorting_group_id: oq_temperatures

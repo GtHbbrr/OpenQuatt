@@ -75,8 +75,6 @@ text_sensor:
     update_interval: never
     entity_category: diagnostic
     disabled_by_default: true
-    web_server:
-      sorting_group_id: oq_heating_strategy
     lambda: |-
       return std::string("init");
 

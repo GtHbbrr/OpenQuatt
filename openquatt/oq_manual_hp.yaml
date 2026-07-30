@@ -58,8 +58,6 @@ select:
       - "Heating"
       - "Cooling"
     entity_category: config
-    web_server:
-      sorting_group_id: oq_hydraulics
     set_action:
       - lambda: |-
           oq_manual_hp::runtime().set_mode(1, x.str(), (float) ${oq_cm_min_flow_lph});
@@ -77,8 +75,6 @@ select:
       - "Heating"
       - "Cooling"
     entity_category: config
-    web_server:
-      sorting_group_id: oq_hydraulics
     set_action:
       - lambda: |-
           oq_manual_hp::runtime().set_mode(2, x.str(), (float) ${oq_cm_min_flow_lph});
@@ -97,8 +93,6 @@ number:
     optimistic: true
     initial_value: 0
     entity_category: config
-    web_server:
-      sorting_group_id: oq_hydraulics
 
   - platform: template
     id: oq_manual_hp2_level
@@ -113,8 +107,6 @@ number:
     optimistic: true
     initial_value: 0
     entity_category: config
-    web_server:
-      sorting_group_id: oq_hydraulics
 
 button:
   - platform: template
@@ -123,8 +115,6 @@ button:
     internal: true
     icon: mdi:heat-pump-outline
     entity_category: config
-    web_server:
-      sorting_group_id: oq_hydraulics
     on_press:
       - lambda: |-
           oq_manual_hp::runtime().start();
@@ -135,8 +125,6 @@ button:
     internal: true
     icon: mdi:stop-circle-outline
     entity_category: config
-    web_server:
-      sorting_group_id: oq_hydraulics
     on_press:
       - lambda: |-
           oq_manual_hp::runtime().abort_or_clear();

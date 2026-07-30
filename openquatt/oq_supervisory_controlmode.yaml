@@ -216,8 +216,6 @@ select:
     restore_value: false
     optimistic: true
     entity_category: config
-    web_server:
-      sorting_group_id: oq_control
 
   - platform: template
     id: oq_silent_mode_override
@@ -231,8 +229,6 @@ select:
     initial_option: "Schedule"
     restore_value: true
     optimistic: true
-    web_server:
-      sorting_group_id: oq_control
 
 switch:
   - platform: template
@@ -246,8 +242,6 @@ switch:
       # This switch is the installation-level boiler-present permission in
       # the web app. Turning it off must also revoke the hidden CM4 opt-in.
       - switch.turn_off: oq_boiler_fault_fallback_enabled
-    web_server:
-      sorting_group_id: oq_control
 
   - platform: template
     id: oq_boiler_fault_fallback_enabled
@@ -258,8 +252,6 @@ switch:
     restore_mode: RESTORE_DEFAULT_OFF
     optimistic: true
     entity_category: config
-    web_server:
-      sorting_group_id: oq_control
 
   - platform: template
     id: oq_enabled
@@ -273,8 +265,6 @@ switch:
         - datetime.datetime.set:
             id: oq_openquatt_resume_at
             datetime: "2000-01-01 00:00:00"
-    web_server:
-      sorting_group_id: oq_control
 # ----------------------------
 # TUNING
 # ----------------------------
@@ -291,8 +281,6 @@ number:
     restore_value: true
     initial_value: 6
     entity_category: config
-    web_server:
-      sorting_group_id: oq_control
 
   - platform: template
     id: oq_day_max_level
@@ -305,8 +293,6 @@ number:
     restore_value: true
     initial_value: 10
     entity_category: config
-    web_server:
-      sorting_group_id: oq_control
 
   - platform: template
     id: oq_cm3_deficit_on_w
@@ -320,8 +306,6 @@ number:
     restore_value: true
     initial_value: 1000
     entity_category: config
-    web_server:
-      sorting_group_id: oq_control
 
   - platform: template
     id: oq_cm3_deficit_off_w
@@ -335,8 +319,6 @@ number:
     restore_value: true
     initial_value: 400
     entity_category: config
-    web_server:
-      sorting_group_id: oq_control
 
   - platform: template
     id: oq_low_load_dyn_off_factor
@@ -351,8 +333,6 @@ number:
     restore_value: true
     initial_value: 0.75
     entity_category: config
-    web_server:
-      sorting_group_id: oq_control
 
   - platform: template
     id: oq_low_load_dyn_on_factor
@@ -367,8 +347,6 @@ number:
     restore_value: true
     initial_value: 1.0
     entity_category: config
-    web_server:
-      sorting_group_id: oq_control
 
   - platform: template
     id: oq_low_load_min_hysteresis_w
@@ -384,8 +362,6 @@ number:
     restore_value: true
     initial_value: 200
     entity_category: config
-    web_server:
-      sorting_group_id: oq_control
 
   - platform: template
     id: oq_low_load_reentry_block_s
@@ -401,8 +377,6 @@ number:
     restore_value: true
     initial_value: 300
     entity_category: config
-    web_server:
-      sorting_group_id: oq_control
 # ----------------------------
 # SCHEDULE INPUTS
 # ----------------------------
@@ -415,8 +389,6 @@ datetime:
     restore_value: true
     initial_value: "19:00:00"
     entity_category: config
-    web_server:
-      sorting_group_id: oq_control
 
   - platform: template
     id: oq_silent_end_time
@@ -426,8 +398,6 @@ datetime:
     restore_value: true
     initial_value: "07:00:00"
     entity_category: config
-    web_server:
-      sorting_group_id: oq_control
 
   - platform: template
     id: oq_openquatt_resume_at
@@ -437,8 +407,6 @@ datetime:
     restore_value: true
     initial_value: "2000-01-01 00:00:00"
     entity_category: config
-    web_server:
-      sorting_group_id: oq_control
 # ----------------------------
 # DIAGNOSTICS
 # ----------------------------
@@ -449,8 +417,6 @@ binary_sensor:
     icon: mdi:weather-night
     device_class: running
     entity_category: diagnostic
-    web_server:
-      sorting_group_id: oq_overview
 
   - platform: template
     id: oq_sticky_active
@@ -458,8 +424,6 @@ binary_sensor:
     icon: mdi:timer-cog
     device_class: running
     entity_category: diagnostic
-    web_server:
-      sorting_group_id: oq_overview
 
   - platform: template
     id: oq_lowflow_fault_active_bs
@@ -467,8 +431,6 @@ binary_sensor:
     icon: mdi:water-alert
     device_class: problem
     entity_category: diagnostic
-    web_server:
-      sorting_group_id: oq_system_diagnostics
 
   - platform: template
     id: oq_time_valid
@@ -478,16 +440,12 @@ binary_sensor:
     icon: mdi:clock-check
     device_class: connectivity
     entity_category: diagnostic
-    web_server:
-      sorting_group_id: oq_system_diagnostics
 
 text_sensor:
   - platform: template
     id: oq_control_mode
     name: "Control Mode"
     icon: mdi:state-machine
-    web_server:
-      sorting_group_id: oq_system_diagnostics
 
   - platform: template
     id: oq_control_mode_label
@@ -495,8 +453,6 @@ text_sensor:
     icon: mdi:format-list-bulleted
     update_interval: never
     entity_category: diagnostic
-    web_server:
-      sorting_group_id: oq_overview
 
   - platform: template
     id: oq_time_now_hhmm
@@ -505,8 +461,6 @@ text_sensor:
     icon: mdi:clock-outline
     update_interval: never
     entity_category: diagnostic
-    web_server:
-      sorting_group_id: oq_system_diagnostics
 
   - platform: template
     id: oq_silent_window_hhmm
@@ -516,8 +470,6 @@ text_sensor:
     icon: mdi:calendar-clock
     update_interval: never
     entity_category: diagnostic
-    web_server:
-      sorting_group_id: oq_system_diagnostics
 
   - platform: template
     id: oq_silent_status
@@ -527,8 +479,6 @@ text_sensor:
     icon: mdi:information-outline
     update_interval: never
     entity_category: diagnostic
-    web_server:
-      sorting_group_id: oq_system_diagnostics
 
   # DEBUG-RUNTIME START: Power House low-load diagnostics
   - platform: template
@@ -539,8 +489,6 @@ text_sensor:
     update_interval: ${oq_diagnostic_update_interval_s}s
     entity_category: diagnostic
     disabled_by_default: true
-    web_server:
-      sorting_group_id: oq_system_diagnostics
     lambda: |-
       // Read the active threshold set from diagnostics.
       const float pmin = id(oq_low_load_pmin_dyn_w);
@@ -571,8 +519,6 @@ sensor:
     state_class: measurement
     accuracy_decimals: 0
     update_interval: ${oq_diagnostic_update_interval_s}s
-    web_server:
-      sorting_group_id: oq_overview
     lambda: |-
       #if OQ_TOPOLOGY_DUO
       return (float) id(oq_power_cap_f);

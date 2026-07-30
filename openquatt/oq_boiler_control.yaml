@@ -145,8 +145,6 @@ select:
       - R1
       - OpenTherm
     initial_option: R1
-    web_server:
-      sorting_group_id: oq_control
     on_value:
       then:
         - lambda: |-
@@ -198,8 +196,6 @@ switch:
     icon: mdi:water-boiler
     restore_mode: ALWAYS_OFF
     entity_category: diagnostic
-    web_server:
-      sorting_group_id: oq_boiler
 
 binary_sensor:
   - platform: template
@@ -208,8 +204,6 @@ binary_sensor:
     icon: mdi:fire
     device_class: heat
     entity_category: diagnostic
-    web_server:
-      sorting_group_id: oq_boiler
     lambda: |-
       return id(oq_boiler_transport_active);
 
@@ -218,8 +212,6 @@ binary_sensor:
     name: "Boiler command valid"
     icon: mdi:check-decagram
     entity_category: diagnostic
-    web_server:
-      sorting_group_id: oq_boiler
     lambda: |-
       // Report validity and freshness as one diagnostic contract.
       return id(oq_boiler_command_valid) &&
@@ -242,8 +234,6 @@ binary_sensor:
     icon: mdi:radiator
     device_class: heat
     entity_category: diagnostic
-    web_server:
-      sorting_group_id: oq_boiler
     lambda: |-
       return id(oq_boiler_output_request);
 
@@ -259,8 +249,6 @@ sensor:
     entity_category: diagnostic
     disabled_by_default: true
     update_interval: 1s
-    web_server:
-      sorting_group_id: oq_boiler
     lambda: |-
       return id(oq_boiler_command_target_temperature_c);
 
@@ -275,8 +263,6 @@ sensor:
     entity_category: diagnostic
     disabled_by_default: true
     update_interval: 1s
-    web_server:
-      sorting_group_id: oq_boiler
     lambda: |-
       return id(oq_boiler_command_requested_power_w);
 
@@ -289,8 +275,6 @@ sensor:
     entity_category: diagnostic
     internal: true
     update_interval: 1s
-    web_server:
-      sorting_group_id: oq_boiler
     lambda: |-
       const uint32_t updated_ms = id(oq_boiler_command_updated_ms);
       if (updated_ms == 0) return NAN;
@@ -305,8 +289,6 @@ sensor:
     state_class: measurement
     accuracy_decimals: 0
     update_interval: 5s
-    web_server:
-      sorting_group_id: oq_boiler
     lambda: |-
       // Diagnostic estimate only; transport activity is the confirmation
       // signal for both R1 and OpenTherm and also covers CM4 fallback.
@@ -335,8 +317,6 @@ text_sensor:
     entity_category: diagnostic
     disabled_by_default: true
     update_interval: 1s
-    web_server:
-      sorting_group_id: oq_boiler
     lambda: |-
       // Keep the diagnostic label aligned with the transport-neutral source.
       switch (id(oq_boiler_command_source_code)) {
@@ -359,8 +339,6 @@ text_sensor:
     entity_category: diagnostic
     disabled_by_default: true
     update_interval: 1s
-    web_server:
-      sorting_group_id: oq_boiler
     lambda: |-
       const char *reason = oq_boiler::block_reason_text(id(oq_boiler_block_reason_code));
       return {reason[0] == '\0' ? "None" : reason};
