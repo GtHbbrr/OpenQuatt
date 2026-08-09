@@ -42,9 +42,7 @@ jobs:
       - name: Install web build dependencies
         run: npm ci
 
-      - name: Check generated web bundles
-        env:
-          OPENQUATT_WEB_BUNDLE_BASE_REF: ${{ github.event.pull_request.base.sha }}
+      - name: Build and test web bundles
         run: npm run check:web
 
       - name: Run web smoke checks

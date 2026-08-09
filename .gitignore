@@ -12,7 +12,9 @@ node_modules/
 tmp/
 .tmp/
 openquatt/web/css/openquatt-preview.css
+openquatt/web/css/openquatt-app.css
 openquatt/web/js/openquatt-preview.js
+openquatt/web/js/openquatt-app.js
 openquatt/web/js/mock-entity-defs.js
 .cache/
 .venv/
