@@ -9,7 +9,7 @@ const serviceCss = await readFile(new URL("../css/src/12-settings-service.css", 
 
 test("compressor starts render as one compact table row with alarm windows emphasized", () => {
   const rowRenderer = installationSource.match(
-    /export function renderInstallationMonitoringCompressorUnit[\s\S]+?\n  }\n\n  export function renderSettingsInstallationMonitoringSection/,
+    /export function renderInstallationMonitoringCompressorUnit[\s\S]+?return `<tr><th scope="row">[\s\S]+?<\/tr>`;/,
   )?.[0] || "";
   assert.match(rowRenderer, /<tr>/);
   assert.match(rowRenderer, /<th scope="row">/);
