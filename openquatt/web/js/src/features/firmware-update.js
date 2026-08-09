@@ -523,6 +523,9 @@ import { render } from "../core/render-scheduler.js";
         if (latest) {
           return !latest.includes("-dev");
         }
+        // release_url is set and is not a dev release; sufficient proof for main channel
+        // even when latest_version is absent (e.g. state="no_update" on topology/connection switch)
+        return true;
       }
       return latest ? !latest.includes("-dev") : false;
     }
