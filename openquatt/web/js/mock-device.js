@@ -23,6 +23,8 @@
     connection: "wifi",
     boiler: "off",
     diagnostics: "clear",
+    auxTempGateOn: false,
+    auxRelayLastMode: 0,
     complete: true,
     tick: 0,
     autoAnimate: true,
@@ -1718,6 +1720,65 @@
     setNumber("Boiler Thermal Energy Cumulative", boilerCumulative, "kWh");
     setNumber("System Thermal Energy Daily", systemDaily, "kWh");
     setNumber("System Thermal Energy Cumulative", systemCumulative, "kWh");
+    syncAuxRelayState(supplyTemp);
+  }
+
+  // Mirrors the firmware aux-relay decision (oq_aux_relay_control.yaml) for the demo.
+  function syncAuxRelayState(supplyTemp) {
+    const auxFunction = String(getEntity("select", "Aux Relay Function")?.value || "Disabled");
+    const cmLabel = String(getEntity("text_sensor", "Control Mode (Label)")?.value || "");
+    const heatingActive = cmLabel.startsWith("CM2") || cmLabel.startsWith("CM3");
+    const coolingActive = cmLabel.startsWith("CM5");
+    const modeCode = coolingActive ? 1 : (heatingActive ? 2 : 0);
+    if (modeCode !== state.auxRelayLastMode) {
+      state.auxTempGateOn = false;
+      state.auxRelayLastMode = modeCode;
+    }
+
+    let relayOn = false;
+    let status = "Disabled";
+    if (auxFunction === "Heating demand") {
+      relayOn = heatingActive;
+      status = relayOn ? "Heating demand active" : "No heating demand";
+    } else if (auxFunction === "Cooling demand") {
+      relayOn = coolingActive;
+      status = relayOn ? "Cooling demand active" : "No cooling demand";
+    } else if (auxFunction === "Heating or cooling demand") {
+      relayOn = heatingActive || coolingActive;
+      status = heatingActive ? "Heating demand active" : coolingActive ? "Cooling demand active" : "No thermal demand";
+    }
+
+    const gateEnabled = isSwitchEnabled("Aux Relay Wait For Supply Temp");
+    if (!gateEnabled || !relayOn) {
+      state.auxTempGateOn = false;
+    } else if (Number.isNaN(supplyTemp)) {
+      state.auxTempGateOn = false;
+      status = "Supply temperature unavailable";
+      relayOn = false;
+    } else {
+      const hysteresis = Number(getEntity("number", "Aux Relay Temp Hysteresis")?.value ?? 2);
+      if (modeCode === 2) {
+        const startTemp = Number(getEntity("number", "Aux Relay Heating Start Temp")?.value ?? 30);
+        if (supplyTemp >= startTemp) {
+          state.auxTempGateOn = true;
+        } else if (supplyTemp <= startTemp - hysteresis) {
+          state.auxTempGateOn = false;
+        }
+        if (!state.auxTempGateOn) status = "Waiting for warm water";
+      } else {
+        const startTemp = Number(getEntity("number", "Aux Relay Cooling Start Temp")?.value ?? 18);
+        if (supplyTemp <= startTemp) {
+          state.auxTempGateOn = true;
+        } else if (supplyTemp >= startTemp + hysteresis) {
+          state.auxTempGateOn = false;
+        }
+        if (!state.auxTempGateOn) status = "Waiting for cold water";
+      }
+      relayOn = state.auxTempGateOn;
+    }
+
+    setBinary("Aux relay active", relayOn);
+    setText("text_sensor", "Aux relay status", status);
   }
 
   function seedEntities() {
@@ -1788,6 +1849,7 @@
     });
     setEntity("switch", "Manual Cooling Enable", { value: false, state: false });
     setEntity("switch", "Cooling Room Request Required", { value: true, state: true });
+    setEntity("switch", "Aux Relay Wait For Supply Temp", { value: false, state: false });
     setEntity("switch", "CIC - Enable polling", { value: false, state: false });
     setEntity("switch", "Status LEDs enabled", { value: true, state: true });
     setEntity("switch", "Usage statistics", { value: false, state: false });
@@ -1914,6 +1976,11 @@
       state: "Auto",
       option: ["Auto", "Local", "Outdoor unit"],
     });
+    setEntity("select", "Aux Relay Function", {
+      value: "Disabled",
+      state: "Disabled",
+      option: ["Disabled", "Heating demand", "Cooling demand", "Heating or cooling demand"],
+    });
     setEntity("select", "Outdoor Unit Flow Mode", {
       value: "Local aggregate HP1/HP2",
       state: "Local aggregate HP1/HP2",
@@ -2008,6 +2075,9 @@
       ["Cooling Request On Delta", 0.4, 0, 2, 0.1, "°C"],
       ["Cooling Request Off Delta", 0.1, 0, 2, 0.1, "°C"],
       ["Cooling Safety Margin", 2, 0, 4, 0.1, "°C"],
+      ["Aux Relay Heating Start Temp", 30, 20, 60, 0.5, "°C"],
+      ["Aux Relay Cooling Start Temp", 18, 8, 25, 0.5, "°C"],
+      ["Aux Relay Temp Hysteresis", 2, 0.5, 5, 0.5, "°C"],
       ["Curve Tsupply @ -20°C", 48, 20, 70, 1, "°C"],
       ["Curve Tsupply @ -10°C", 43, 20, 70, 1, "°C"],
       ["Curve Tsupply @ 0°C", 38, 20, 70, 1, "°C"],
