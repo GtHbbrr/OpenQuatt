@@ -1727,7 +1727,7 @@
   function syncAuxRelayState(supplyTemp) {
     const auxFunction = String(getEntity("select", "Aux Relay Function")?.value || "Disabled");
     const cmLabel = String(getEntity("text_sensor", "Control Mode (Label)")?.value || "");
-    const heatingActive = cmLabel.startsWith("CM2") || cmLabel.startsWith("CM3");
+    const heatingActive = cmLabel.startsWith("CM2") || cmLabel.startsWith("CM3") || cmLabel.startsWith("CM4");
     const coolingActive = cmLabel.startsWith("CM5");
     const modeCode = coolingActive ? 1 : (heatingActive ? 2 : 0);
     if (modeCode !== state.auxRelayLastMode) {

@@ -14,7 +14,8 @@
 # What this package DOES do:
 #   - Switch the auxiliary relay via the configured pin (`controller_aux_relay_pin`)
 #   - Expose a persistent function selector (default: Disabled)
-#   - Follow effective heating (CM2/CM3) and cooling (CM5) decisions
+#   - Follow effective heating (CM2/CM3/CM4) and cooling (CM5) decisions,
+#     including the CM1 pre/postflow destination mode
 #   - Optionally wait for a suitable supply-water temperature (switch), with hysteresis
 #   - Publish relay state and a short status/reason for diagnostics
 #
@@ -24,15 +25,17 @@
 #   - Does not react to frost protection (CM98) or commissioning (CM100)
 #
 # Key assumptions:
-#   - `oq_control_mode_code` is the final system decision (supervisory owner)
+#   - `oq_control_mode_code` and `oq_cm1_next_after` are the final system
+#     decision (supervisory owner)
 #   - `oq_system_supply_temp` is the shared supply-water abstraction; NaN means
 #     no valid source and the supply-temperature gate must fail OFF
 #   - Only hardware profiles that expose an auxiliary relay include this file
 #
 # Interaction with Control Modes:
-#   - CM2/CM3 -> effective heating demand for the relay functions
+#   - CM2/CM3/CM4 -> effective heating demand for the relay functions
 #   - CM5 -> effective cooling demand for the relay functions
-#   - CM0/CM1/CM98/CM100 -> no thermal demand; relay OFF
+#   - CM1 -> follows the pre/postflow destination (CM2/CM4 heating, CM5 cooling)
+#   - CM0/CM98/CM100 -> no thermal demand; relay OFF
 #
 # Safety / fail-safe:
 #   - Relay restores ALWAYS_OFF and stays OFF until the control loop runs
@@ -76,7 +79,7 @@ output:
 switch:
   - platform: output
     id: controller_aux_relay
-    name: "Aux relay"
+    name: "Aux relay (R2)"
     internal: true
     disabled_by_default: true
     output: controller_aux_relay_out
@@ -159,6 +162,7 @@ binary_sensor:
     name: "Aux relay active"
     icon: mdi:electric-switch
     device_class: running
+    disabled_by_default: true
     entity_category: diagnostic
 
 text_sensor:
@@ -166,6 +170,7 @@ text_sensor:
     id: oq_aux_relay_status
     name: "Aux relay status"
     icon: mdi:information-outline
+    disabled_by_default: true
     entity_category: diagnostic
     update_interval: never
 
@@ -179,8 +184,16 @@ interval:
       - lambda: |-
           // Phase 1: read inputs (final supervisory decision + configuration).
           const int cm_code = id(oq_control_mode_code);
-          const bool heating_active = (cm_code == 2) || (cm_code == 3);
-          const bool cooling_active = (cm_code == 5);
+          const int cm1_next_code = id(oq_cm1_next_after);
+          // CM2/CM3/CM4 produce heat; CM5 cools. During CM1 pre/postflow the
+          // destination mode counts, so equipment powered via R2 (for example
+          // a circulation pump) is already available while flow is established.
+          const bool heating_active =
+              (cm_code == 2) || (cm_code == 3) || (cm_code == 4) ||
+              (cm_code == 1 && (cm1_next_code == 2 || cm1_next_code == 4));
+          const bool cooling_active =
+              (cm_code == 5) ||
+              (cm_code == 1 && cm1_next_code == 5);
           const std::string function_option =
               id(oq_aux_relay_function).has_state()
                   ? id(oq_aux_relay_function).current_option()

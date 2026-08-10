@@ -1162,7 +1162,9 @@
     "heatingCurvePidKd",
   ];
   export const COMPRESSOR_SETTING_KEYS = ["minRuntime", "hp1ExcludedA", "hp1ExcludedB", "hp2ExcludedA", "hp2ExcludedB"];
-  export const AUX_RELAY_SETTING_KEYS = ["auxRelayFunction", "auxWaitForSupplyTemp", "auxHeatingStartTemp", "auxCoolingStartTemp", "auxTempHysteresis"];
+  // Restore order: gate + thresholds first, the function last, so a backup
+  // restore cannot energize the relay with stale gate settings in between.
+  export const AUX_RELAY_SETTING_KEYS = ["auxWaitForSupplyTemp", "auxHeatingStartTemp", "auxCoolingStartTemp", "auxTempHysteresis", "auxRelayFunction"];
   export const AUX_RELAY_STATE_KEYS = ["auxRelayActive", "auxRelayStatus"];
   export const SILENT_SETTING_KEYS = ["silentStartTime", "silentEndTime", "silentMax", "dayMax"];
   export const BOILER_SUPPORT_SWITCHING_KEYS = ["boilerSupportStartThreshold", "boilerSupportStopThreshold"];
