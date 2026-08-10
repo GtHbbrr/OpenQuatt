@@ -167,6 +167,7 @@ export function formatSettingsOptionLabel(option) {
     "Heating demand": "Warmtevraag",
     "Cooling demand": "Koelvraag",
     "Heating or cooling demand": "Warmte- of koelvraag",
+    "External control": "Externe bediening",
     "Dew point required": "Dauwpuntmeting vereist",
     "Dew point": "Dauwpunt",
     "Dew point (MQTT)": "Dauwpunt (MQTT)",

@@ -165,7 +165,7 @@ Belangrijke instellingen:
 - `Aux Relay Cooling Start Temp`
 - `Aux Relay Temp Hysteresis`
 
-Met `Aux Relay Function` volgt R2 de effectieve warmte- of koelvraag van OpenQuatt, bijvoorbeeld om een fancoil, pomp of klep mee te schakelen. Met de schakelaar `Aux Relay Wait For Supply Temp` wacht R2 daarnaast tot het aanvoerwater warm of koud genoeg is; de hysterese voorkomt snel aan/uit schakelen rond de grens. Zonder vraag, met de functie op `Niet gebruiken`, of zonder geldige aanvoertemperatuur (als de schakelaar aan staat) blijft R2 uit. De actuele toestand en reden zie je onder **Instellingen → Installatie → Hulprelais (R2)**.
+Met `Aux Relay Function` volgt R2 de effectieve warmte- of koelvraag van OpenQuatt, bijvoorbeeld om een fancoil, pomp of klep mee te schakelen. Met de schakelaar `Aux Relay Wait For Supply Temp` wacht R2 daarnaast tot het aanvoerwater warm of koud genoeg is; de hysterese voorkomt snel aan/uit schakelen rond de grens. Kies `Externe bediening` om R2 zelf te schakelen via bijvoorbeeld Home Assistant of de REST-API; in de automatische functies worden externe schakelcommando's genegeerd. Zonder vraag, met de functie op `Niet gebruiken`, of zonder geldige aanvoertemperatuur (als de schakelaar aan staat) blijft R2 uit. De actuele toestand en reden zie je onder **Instellingen → Installatie → Hulprelais (R2)**.
 
 ## Welke meetwaarden wil je meestal zien?
 

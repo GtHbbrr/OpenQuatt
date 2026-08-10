@@ -1737,7 +1737,10 @@
 
     let relayOn = false;
     let status = "Disabled";
-    if (auxFunction === "Heating demand") {
+    if (auxFunction === "External control") {
+      relayOn = isSwitchEnabled("Aux relay (R2)");
+      status = "External control";
+    } else if (auxFunction === "Heating demand") {
       relayOn = heatingActive;
       status = relayOn ? "Heating demand active" : "No heating demand";
     } else if (auxFunction === "Cooling demand") {
@@ -1850,6 +1853,7 @@
     setEntity("switch", "Manual Cooling Enable", { value: false, state: false });
     setEntity("switch", "Cooling Room Request Required", { value: true, state: true });
     setEntity("switch", "Aux Relay Wait For Supply Temp", { value: false, state: false });
+    setEntity("switch", "Aux relay (R2)", { value: false, state: false });
     setEntity("switch", "CIC - Enable polling", { value: false, state: false });
     setEntity("switch", "Status LEDs enabled", { value: true, state: true });
     setEntity("switch", "Usage statistics", { value: false, state: false });
@@ -1979,7 +1983,7 @@
     setEntity("select", "Aux Relay Function", {
       value: "Disabled",
       state: "Disabled",
-      option: ["Disabled", "Heating demand", "Cooling demand", "Heating or cooling demand"],
+      option: ["Disabled", "Heating demand", "Cooling demand", "Heating or cooling demand", "External control"],
     });
     setEntity("select", "Outdoor Unit Flow Mode", {
       value: "Local aggregate HP1/HP2",

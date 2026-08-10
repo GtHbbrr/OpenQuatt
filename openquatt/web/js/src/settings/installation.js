@@ -1065,6 +1065,7 @@ const BOILER_FAULT_FALLBACK_COPY = "Laat de cv-ketel overnemen als alle warmtepo
       "No cooling demand": "Geen koelvraag",
       "Heating demand active": "Warmtevraag actief",
       "Cooling demand active": "Koelvraag actief",
+      "External control": "Externe bediening",
       "Waiting for warm water": "Wacht op warm aanvoerwater",
       "Waiting for cold water": "Wacht op koud aanvoerwater",
       "Supply temperature unavailable": "Aanvoertemperatuur niet beschikbaar",
@@ -1078,7 +1079,9 @@ const BOILER_FAULT_FALLBACK_COPY = "Laat de cv-ketel overnemen als alle warmtepo
       return "";
     }
 
-    const tempGateEnabled = hasEntity("auxWaitForSupplyTemp") && isEntityActive("auxWaitForSupplyTemp");
+    const functionValue = String(getEntityValue("auxRelayFunction") || "Disabled");
+    const demandFunctionSelected = functionValue !== "Disabled" && functionValue !== "External control";
+    const tempGateEnabled = demandFunctionSelected && hasEntity("auxWaitForSupplyTemp") && isEntityActive("auxWaitForSupplyTemp");
     const relayOn = hasEntity("auxRelayActive") && isEntityActive("auxRelayActive");
     const statusText = hasEntity("auxRelayStatus") ? formatAuxRelayStatus(getEntityStateText("auxRelayStatus", "")) : "";
     const statusPanel = hasEntity("auxRelayActive") || statusText ? renderSettingsFieldCard(
@@ -1096,17 +1099,17 @@ const BOILER_FAULT_FALLBACK_COPY = "Laat de cv-ketel overnemen als alle warmtepo
       renderSettingsSelectField(
         "auxRelayFunction",
         "Functie",
-        "Kies wat relais R2 volgt. R2 volgt de effectieve warmte- of koelvraag van OpenQuatt.",
+        "Kies wat relais R2 volgt. R2 volgt de effectieve warmte- of koelvraag van OpenQuatt, of kies Externe bediening om R2 via bijvoorbeeld Home Assistant of de REST-API te schakelen.",
       ),
       statusPanel,
-      renderSettingsSwitchField(
+      demandFunctionSelected ? renderSettingsSwitchField(
         "auxWaitForSupplyTemp",
         "Wacht op aanvoertemperatuur",
         "Aan: R2 schakelt bij vraag pas in zodra het aanvoerwater op temperatuur is (warm genoeg bij verwarmen, koud genoeg bij koelen).",
         "R2 wacht op de startdrempels hieronder.",
         "R2 schakelt direct bij vraag, ongeacht de watertemperatuur.",
         "oq-settings-field--span-2",
-      ),
+      ) : "",
       tempGateEnabled ? renderSettingsNumberField("auxHeatingStartTemp", "Startdrempel verwarmen", "Bij warmtevraag schakelt R2 pas in zodra het aanvoerwater minstens deze temperatuur heeft.") : "",
       tempGateEnabled ? renderSettingsNumberField("auxCoolingStartTemp", "Startdrempel koelen", "Bij koelvraag schakelt R2 pas in zodra het aanvoerwater maximaal deze temperatuur heeft.") : "",
       tempGateEnabled ? renderSettingsNumberField("auxTempHysteresis", "Hysterese aanvoertemperatuur", "Marge waarmee de startdrempel weer verlaten moet worden voordat R2 uitschakelt. Voorkomt snel aan/uit schakelen rond de grens.") : "",
