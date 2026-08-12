@@ -153,6 +153,20 @@ Kies je expliciet `MQTT`, houd er dan rekening mee dat de MQTT-buitentemperatuur
 
 Voor `Cooling Dew Point Source` is `Auto` meestal ook de veiligste keuze. OpenQuatt gebruikt dan de hoogste geldige dauwpuntwaarde van Home Assistant en MQTT. Kies `Home Assistant` of `MQTT` alleen als je die bron expliciet wilt vereisen.
 
+### 6. Hulprelais R2 (alleen Heatpump Controller Q-edition)
+
+Deze groep bestaat alleen op hardware met een tweede relais (R2) en staat standaard uit.
+
+Belangrijke instellingen:
+
+- `Aux Relay Function`
+- `Aux Relay Wait For Supply Temp`
+- `Aux Relay Heating Start Temp`
+- `Aux Relay Cooling Start Temp`
+- `Aux Relay Temp Hysteresis`
+
+Met `Aux Relay Function` volgt R2 de effectieve warmte- of koelvraag van OpenQuatt, bijvoorbeeld om een fancoil, pomp of klep mee te schakelen. Met de schakelaar `Aux Relay Wait For Supply Temp` wacht R2 daarnaast tot het aanvoerwater warm of koud genoeg is; de hysterese voorkomt snel aan/uit schakelen rond de grens. Kies `Externe bediening` om R2 zelf te schakelen via bijvoorbeeld Home Assistant of de REST-API; in de automatische functies worden externe schakelcommando's genegeerd. Zonder vraag, met de functie op `Niet gebruiken`, of zonder geldige aanvoertemperatuur (als de schakelaar aan staat) blijft R2 uit. De actuele toestand en reden zie je onder **Instellingen → Installatie → Hulprelais (R2)**.
+
 ## Welke meetwaarden wil je meestal zien?
 
 ### Voor comfort en strategie

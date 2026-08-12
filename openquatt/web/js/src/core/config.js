@@ -363,6 +363,13 @@
     boilerCommandSource: { domain: "text_sensor", name: "Boiler command source", optional: true },
     boilerBlockReason: { domain: "text_sensor", name: "Boiler block reason", optional: true },
     boilerHeatPower: { domain: "sensor", name: "Boiler Heat Power", optional: true },
+    auxRelayFunction: { domain: "select", name: "Aux Relay Function", optional: true },
+    auxWaitForSupplyTemp: { domain: "switch", name: "Aux Relay Wait For Supply Temp", optional: true },
+    auxHeatingStartTemp: { domain: "number", name: "Aux Relay Heating Start Temp", optional: true },
+    auxCoolingStartTemp: { domain: "number", name: "Aux Relay Cooling Start Temp", optional: true },
+    auxTempHysteresis: { domain: "number", name: "Aux Relay Temp Hysteresis", optional: true },
+    auxRelayActive: { domain: "binary_sensor", name: "Aux relay active", optional: true },
+    auxRelayStatus: { domain: "text_sensor", name: "Aux relay status", optional: true },
     systemHeatPower: { domain: "sensor", name: "System Heat Power", optional: true },
     flowSelected: { domain: "sensor", name: "Flow average (Selected)" },
     flowLocal: { domain: "sensor", name: "Flow average (local)", optional: true },
@@ -1155,6 +1162,10 @@
     "heatingCurvePidKd",
   ];
   export const COMPRESSOR_SETTING_KEYS = ["minRuntime", "hp1ExcludedA", "hp1ExcludedB", "hp2ExcludedA", "hp2ExcludedB"];
+  // Restore order: gate + thresholds first, the function last, so a backup
+  // restore cannot energize the relay with stale gate settings in between.
+  export const AUX_RELAY_SETTING_KEYS = ["auxWaitForSupplyTemp", "auxHeatingStartTemp", "auxCoolingStartTemp", "auxTempHysteresis", "auxRelayFunction"];
+  export const AUX_RELAY_STATE_KEYS = ["auxRelayActive", "auxRelayStatus"];
   export const SILENT_SETTING_KEYS = ["silentStartTime", "silentEndTime", "silentMax", "dayMax"];
   export const BOILER_SUPPORT_SWITCHING_KEYS = ["boilerSupportStartThreshold", "boilerSupportStopThreshold"];
   export const SERVICE_CONTROL_KEYS = [
@@ -1623,6 +1634,8 @@
     "boilerRatedHeatPower",
     ...BOILER_SETTING_KEYS,
     ...BOILER_SUPPORT_SWITCHING_KEYS,
+    ...AUX_RELAY_SETTING_KEYS,
+    ...AUX_RELAY_STATE_KEYS,
     ...COMMISSIONING_STATE_KEYS,
     "manualCoolingEnable",
     "usageTelemetryEnabled",
@@ -1693,6 +1706,7 @@
         "boilerRatedHeatPower",
         ...BOILER_SETTING_KEYS,
         ...BOILER_SUPPORT_SWITCHING_KEYS,
+        ...AUX_RELAY_SETTING_KEYS,
       ],
     },
     {
