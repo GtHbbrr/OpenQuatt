@@ -11,12 +11,9 @@ int main() {
   assert(state.last_response_id() == -1);
   assert(strcmp(state.last_response_type_name(), "Never") == 0);
   assert(!state.field_is_valid(oq_otb::FIELD_CH_WATER_PRESSURE));
-  assert(state.response_payload_is_usable(
-      18, oq_otb::MESSAGE_TYPE_READ_ACK));
-  assert(!state.response_payload_is_usable(
-      18, oq_otb::MESSAGE_TYPE_WRITE_ACK));
-  assert(state.response_payload_is_usable(
-      1, oq_otb::MESSAGE_TYPE_WRITE_ACK));
+  assert(state.response_payload_is_usable(18, oq_otb::MESSAGE_TYPE_READ_ACK));
+  assert(!state.response_payload_is_usable(18, oq_otb::MESSAGE_TYPE_WRITE_ACK));
+  assert(state.response_payload_is_usable(1, oq_otb::MESSAGE_TYPE_WRITE_ACK));
 
   // Optional negative acknowledgements do not take down the transport, but
   // the mandatory STATUS field must be valid and fresh for safe actuation.
@@ -97,27 +94,14 @@ int main() {
   state.record_log_message(1001, "opentherm", "Unrelated warning");
   assert(state.transport_error_count() == 0);
 
-  state.record_log_message(
-      1010, "opentherm",
-      "Protocol error occured while receiving response: NO_TRANSITION");
-  state.record_log_message(
-      1020, "opentherm",
-      "Protocol error occured while receiving response: NO_CHANGE_TOO_LONG");
-  state.record_log_message(
-      1030, "opentherm",
-      "Protocol error occured while receiving response: INVALID_STOP_BIT");
-  state.record_log_message(
-      1040, "opentherm",
-      "Protocol error occured while receiving response: PARITY_ERROR");
-  state.record_log_message(
-      1050, "opentherm", "Timeout while waiting for response from device");
-  state.record_log_message(
-      1060, "opentherm", "Hub timeout triggered during send");
-  state.record_log_message(
-      1070, "opentherm", "Hub timeout triggered during receive");
-  state.record_log_message(
-      1080, "opentherm",
-      "Error occured while manipulating timer (TIMER_START_ERROR): ESP_FAIL");
+  state.record_log_message(1010, "opentherm", "Protocol error occured while receiving response: NO_TRANSITION");
+  state.record_log_message(1020, "opentherm", "Protocol error occured while receiving response: NO_CHANGE_TOO_LONG");
+  state.record_log_message(1030, "opentherm", "Protocol error occured while receiving response: INVALID_STOP_BIT");
+  state.record_log_message(1040, "opentherm", "Protocol error occured while receiving response: PARITY_ERROR");
+  state.record_log_message(1050, "opentherm", "Timeout while waiting for response from device");
+  state.record_log_message(1060, "opentherm", "Hub timeout triggered during send");
+  state.record_log_message(1070, "opentherm", "Hub timeout triggered during receive");
+  state.record_log_message(1080, "opentherm", "Error occured while manipulating timer (TIMER_START_ERROR): ESP_FAIL");
 
   assert(state.transport_error_count() == 8);
   assert(state.protocol_error_count() == 4);

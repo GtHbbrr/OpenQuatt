@@ -18,20 +18,20 @@ using openquatt_common::PsramBuffer;
 
 class OpenQuattDebugRecorder : public Component {
  public:
-  void set_clock(time::RealTimeClock *clock) { this->clock_ = clock; }
+  void set_clock(time::RealTimeClock* clock) { this->clock_ = clock; }
 
   void setup() override;
   void loop() override;
   void dump_config() override;
   float get_setup_priority() const override;
 
-  bool configure(const std::string &entities, bool reset);
+  bool configure(const std::string& entities, bool reset);
   bool start(uint32_t duration_s);
   bool start_rolling();
   void freeze();
   void stop();
-  void write_status(httpd_req_t *req) const;
-  void write_recording(httpd_req_t *req) const;
+  void write_status(httpd_req_t* req) const;
+  void write_recording(httpd_req_t* req) const;
 
  protected:
   static constexpr uint32_t SAMPLE_INTERVAL_MS = 10000;
@@ -66,7 +66,7 @@ class OpenQuattDebugRecorder : public Component {
     char name[FIELD_NAME_BYTES]{};
     char unit[FIELD_UNIT_BYTES]{};
     FieldType type{FieldType::UNKNOWN};
-    void *source{nullptr};
+    void* source{nullptr};
   };
 
   struct StringEntry {
@@ -82,7 +82,7 @@ class OpenQuattDebugRecorder : public Component {
 
   static constexpr size_t SAMPLE_CAPACITY = BUFFER_BYTES / sizeof(DebugSample);
 
-  time::RealTimeClock *clock_{nullptr};
+  time::RealTimeClock* clock_{nullptr};
   PsramBuffer<DebugSample> samples_{};
   PsramBuffer<DebugField> fields_{};
   PsramBuffer<StringEntry> string_entries_{};
@@ -124,10 +124,10 @@ class OpenQuattDebugRecorder : public Component {
   void clear_strings_();
   bool compact_strings_();
   void capture_sample_();
-  uint32_t capture_value_(const DebugField &field);
-  uint32_t intern_string_(const char *value, size_t length);
-  const StringEntry *string_at_(uint32_t index) const;
-  const DebugSample *sample_at_(size_t index) const;
+  uint32_t capture_value_(const DebugField& field);
+  uint32_t intern_string_(const char* value, size_t length);
+  const StringEntry* string_at_(uint32_t index) const;
+  const DebugSample* sample_at_(size_t index) const;
 };
 
 }  // namespace openquatt_debug_recorder

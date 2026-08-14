@@ -17,14 +17,12 @@ enum StartupProbeResult : uint8_t {
   STARTUP_PROBE_TIMED_OUT,
 };
 
-inline bool should_auto_select_opentherm(
-    StartupProbeResult result, bool setup_complete) {
+inline bool should_auto_select_opentherm(StartupProbeResult result, bool setup_complete) {
   return result == STARTUP_PROBE_OPENTHERM_DETECTED && !setup_complete;
 }
 
-inline bool should_keep_opentherm_polling(
-    bool opentherm_selected, bool startup_probe_active,
-    bool connection_mismatch) {
+inline bool should_keep_opentherm_polling(bool opentherm_selected, bool startup_probe_active,
+                                          bool connection_mismatch) {
   return opentherm_selected || startup_probe_active || connection_mismatch;
 }
 
@@ -39,14 +37,11 @@ class StartupProbeState {
 
   void end() { this->active_ = false; }
 
-  void record_request(
-      uint8_t message_id, uint8_t message_type,
-      uint8_t value_hb, uint8_t value_lb) {
-    (void) value_lb;
+  void record_request(uint8_t message_id, uint8_t message_type, uint8_t value_hb, uint8_t value_lb) {
+    (void)value_lb;
     if (!this->active_) return;
 
-    if (message_id == STARTUP_PROBE_ID_STATUS &&
-        message_type == STARTUP_PROBE_TYPE_READ_DATA &&
+    if (message_id == STARTUP_PROBE_ID_STATUS && message_type == STARTUP_PROBE_TYPE_READ_DATA &&
         (value_hb & 0x01U) == 0U) {
       this->safe_status_sent_ = true;
     }
@@ -55,10 +50,9 @@ class StartupProbeState {
   void record_response(uint8_t message_id, uint8_t message_type) {
     if (!this->active_ || !this->safe_status_sent_) return;
 
-    const bool valid_status_response =
-        message_type == STARTUP_PROBE_TYPE_READ_ACK ||
-        message_type == STARTUP_PROBE_TYPE_DATA_INVALID ||
-        message_type == STARTUP_PROBE_TYPE_UNKNOWN_DATAID;
+    const bool valid_status_response = message_type == STARTUP_PROBE_TYPE_READ_ACK ||
+                                       message_type == STARTUP_PROBE_TYPE_DATA_INVALID ||
+                                       message_type == STARTUP_PROBE_TYPE_UNKNOWN_DATAID;
     if (message_id == STARTUP_PROBE_ID_STATUS && valid_status_response) {
       this->opentherm_detected_ = true;
     }
@@ -69,8 +63,7 @@ class StartupProbeState {
     if (this->opentherm_detected_) {
       return STARTUP_PROBE_OPENTHERM_DETECTED;
     }
-    if (timeout_ms == 0 ||
-        (uint32_t) (now_ms - this->started_ms_) >= timeout_ms) {
+    if (timeout_ms == 0 || (uint32_t)(now_ms - this->started_ms_) >= timeout_ms) {
       return STARTUP_PROBE_TIMED_OUT;
     }
     return STARTUP_PROBE_RUNNING;

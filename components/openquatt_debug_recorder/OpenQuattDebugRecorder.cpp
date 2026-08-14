@@ -33,11 +33,11 @@
 namespace esphome {
 namespace openquatt_debug_recorder {
 
-static const char *const TAG = "openquatt.debug_recorder";
+static const char* const TAG = "openquatt.debug_recorder";
 
 namespace {
 
-bool url_path_matches(const char *url, const char *path) {
+bool url_path_matches(const char* url, const char* path) {
   if (url == nullptr || path == nullptr) {
     return false;
   }
@@ -45,7 +45,7 @@ bool url_path_matches(const char *url, const char *path) {
   return std::strncmp(url, path, path_len) == 0 && (url[path_len] == '\0' || url[path_len] == '?');
 }
 
-uint32_t parse_uint_arg(AsyncWebServerRequest *request, const char *name, uint32_t fallback) {
+uint32_t parse_uint_arg(AsyncWebServerRequest* request, const char* name, uint32_t fallback) {
   if (request == nullptr || name == nullptr) {
     return fallback;
   }
@@ -53,7 +53,7 @@ uint32_t parse_uint_arg(AsyncWebServerRequest *request, const char *name, uint32
   if (raw.empty()) {
     return fallback;
   }
-  char *end = nullptr;
+  char* end = nullptr;
   const unsigned long value = std::strtoul(raw.c_str(), &end, 10);
   if (end == raw.c_str()) {
     return fallback;
@@ -61,7 +61,7 @@ uint32_t parse_uint_arg(AsyncWebServerRequest *request, const char *name, uint32
   return static_cast<uint32_t>(value);
 }
 
-bool copy_text(char *destination, size_t capacity, const char *source, size_t length) {
+bool copy_text(char* destination, size_t capacity, const char* source, size_t length) {
   if (destination == nullptr || capacity == 0 || source == nullptr || length >= capacity) {
     return false;
   }
@@ -70,7 +70,7 @@ bool copy_text(char *destination, size_t capacity, const char *source, size_t le
   return true;
 }
 
-bool ascii_equals_ignore_case(const char *value, size_t length, const char *expected) {
+bool ascii_equals_ignore_case(const char* value, size_t length, const char* expected) {
   const size_t expected_length = std::strlen(expected);
   if (value == nullptr || length != expected_length) {
     return false;
@@ -91,13 +91,13 @@ bool ascii_equals_ignore_case(const char *value, size_t length, const char *expe
   return true;
 }
 
-bool string_is_missing(const char *value, size_t length) {
+bool string_is_missing(const char* value, size_t length) {
   return length == 0 || ascii_equals_ignore_case(value, length, "unknown") ||
          ascii_equals_ignore_case(value, length, "unavailable") || ascii_equals_ignore_case(value, length, "nan") ||
          ascii_equals_ignore_case(value, length, "invalid");
 }
 
-uint32_t hash_string(const char *value, size_t length) {
+uint32_t hash_string(const char* value, size_t length) {
   uint32_t hash = 2166136261U;
   for (size_t index = 0; index < length; ++index) {
     hash ^= static_cast<uint8_t>(value[index]);
@@ -106,8 +106,9 @@ uint32_t hash_string(const char *value, size_t length) {
   return hash;
 }
 
-template<typename EntitiesT> void *find_entity_in(const EntitiesT &entities, const char *name) {
-  for (auto *entity : entities) {
+template <typename EntitiesT>
+void* find_entity_in(const EntitiesT& entities, const char* name) {
+  for (auto* entity : entities) {
     if (entity != nullptr && entity->get_name() == name) {
       return entity;
     }
@@ -117,18 +118,18 @@ template<typename EntitiesT> void *find_entity_in(const EntitiesT &entities, con
 
 class ChunkedJsonWriter {
  public:
-  explicit ChunkedJsonWriter(httpd_req_t *req) : req_(req) { this->buffer_.allocate(BUFFER_SIZE); }
+  explicit ChunkedJsonWriter(httpd_req_t* req) : req_(req) { this->buffer_.allocate(BUFFER_SIZE); }
 
   bool write_char(char c) { return this->write_bytes_(&c, 1); }
 
-  bool write_literal(const char *text) {
+  bool write_literal(const char* text) {
     if (text == nullptr) {
       return true;
     }
     return this->write_bytes_(text, std::strlen(text));
   }
 
-  bool write_json_string(const char *value, size_t length) {
+  bool write_json_string(const char* value, size_t length) {
     if (!this->write_char('"')) {
       return false;
     }
@@ -208,12 +209,12 @@ class ChunkedJsonWriter {
  private:
   static constexpr size_t BUFFER_SIZE = 512;
 
-  bool write_bytes_(const char *data, size_t length) {
+  bool write_bytes_(const char* data, size_t length) {
     if (!this->buffer_) {
       return false;
     }
     size_t remaining = length;
-    const char *cursor = data;
+    const char* cursor = data;
     while (remaining > 0) {
       if (this->used_ == BUFFER_SIZE && !this->flush()) {
         return false;
@@ -227,16 +228,16 @@ class ChunkedJsonWriter {
     return true;
   }
 
-  httpd_req_t *req_;
+  httpd_req_t* req_;
   PsramBuffer<char> buffer_{};
   size_t used_{0};
 };
 
 class OpenQuattDebugRecorderRequestHandler : public AsyncWebHandler {
  public:
-  explicit OpenQuattDebugRecorderRequestHandler(OpenQuattDebugRecorder *parent) : parent_(parent) {}
+  explicit OpenQuattDebugRecorderRequestHandler(OpenQuattDebugRecorder* parent) : parent_(parent) {}
 
-  bool canHandle(AsyncWebServerRequest *request) const override {
+  bool canHandle(AsyncWebServerRequest* request) const override {
     char url_buf[AsyncWebServerRequest::URL_BUF_SIZE];
     request->url_to(url_buf);
     if (url_path_matches(url_buf, "/openquatt/debug-recording/status")) {
@@ -254,7 +255,7 @@ class OpenQuattDebugRecorderRequestHandler : public AsyncWebHandler {
     return false;
   }
 
-  void handleRequest(AsyncWebServerRequest *request) override {
+  void handleRequest(AsyncWebServerRequest* request) override {
     char url_buf[AsyncWebServerRequest::URL_BUF_SIZE];
     request->url_to(url_buf);
 
@@ -298,7 +299,7 @@ class OpenQuattDebugRecorderRequestHandler : public AsyncWebHandler {
       return;
     }
 
-    httpd_req_t *req = *request;
+    httpd_req_t* req = *request;
     httpd_resp_set_status(req, HTTPD_200);
     httpd_resp_set_type(req, "application/json; charset=utf-8");
     httpd_resp_set_hdr(req, "Cache-Control", "no-store");
@@ -310,15 +311,15 @@ class OpenQuattDebugRecorderRequestHandler : public AsyncWebHandler {
   }
 
  protected:
-  void send_status_(AsyncWebServerRequest *request) const {
-    httpd_req_t *req = *request;
+  void send_status_(AsyncWebServerRequest* request) const {
+    httpd_req_t* req = *request;
     httpd_resp_set_status(req, HTTPD_200);
     httpd_resp_set_type(req, "application/json; charset=utf-8");
     httpd_resp_set_hdr(req, "Cache-Control", "no-store");
     this->parent_->write_status(req);
   }
 
-  OpenQuattDebugRecorder *parent_;
+  OpenQuattDebugRecorder* parent_;
 };
 
 }  // namespace
@@ -377,9 +378,10 @@ uint32_t OpenQuattDebugRecorder::retained_duration_s_() const {
   if (this->count_ == 0) {
     return 0;
   }
-  const DebugSample *first = this->sample_at_(0);
-  const DebugSample *last = this->sample_at_(this->count_ - 1);
-  return first != nullptr && last != nullptr && last->offset_s >= first->offset_s ? last->offset_s - first->offset_s : 0;
+  const DebugSample* first = this->sample_at_(0);
+  const DebugSample* last = this->sample_at_(this->count_ - 1);
+  return first != nullptr && last != nullptr && last->offset_s >= first->offset_s ? last->offset_s - first->offset_s
+                                                                                  : 0;
 }
 
 uint32_t OpenQuattDebugRecorder::retention_capacity_s_() const {
@@ -419,7 +421,7 @@ bool OpenQuattDebugRecorder::compact_strings_() {
 
   // Rolling captures outlive stale text values; keep only strings still referenced by retained samples.
   auto uses_string = [](FieldType type) { return type == FieldType::TEXT_SENSOR || type == FieldType::SELECT; };
-  auto mark_sample = [&](DebugSample &sample) {
+  auto mark_sample = [&](DebugSample& sample) {
     for (size_t field_index = 0; field_index < this->field_count_; ++field_index) {
       if (!uses_string(this->fields_[field_index].type)) continue;
       const uint32_t value = sample.values[field_index];
@@ -452,7 +454,7 @@ bool OpenQuattDebugRecorder::compact_strings_() {
       std::memmove(this->string_data_.data() + new_data_used, this->string_data_.data() + old_entry.offset,
                    old_entry.length);
     }
-    StringEntry &new_entry = this->string_entries_[new_count];
+    StringEntry& new_entry = this->string_entries_[new_count];
     new_entry.hash = old_entry.hash;
     new_entry.offset = static_cast<uint32_t>(new_data_used);
     new_entry.length = old_entry.length;
@@ -461,7 +463,7 @@ bool OpenQuattDebugRecorder::compact_strings_() {
     new_count++;
   }
 
-  auto remap_sample = [&](DebugSample &sample) {
+  auto remap_sample = [&](DebugSample& sample) {
     for (size_t field_index = 0; field_index < this->field_count_; ++field_index) {
       if (!uses_string(this->fields_[field_index].type)) continue;
       const uint32_t value = sample.values[field_index];
@@ -484,7 +486,7 @@ bool OpenQuattDebugRecorder::compact_strings_() {
   return true;
 }
 
-const OpenQuattDebugRecorder::DebugSample *OpenQuattDebugRecorder::sample_at_(size_t index) const {
+const OpenQuattDebugRecorder::DebugSample* OpenQuattDebugRecorder::sample_at_(size_t index) const {
   if (!this->samples_ || index >= this->count_) {
     return nullptr;
   }
@@ -494,18 +496,18 @@ const OpenQuattDebugRecorder::DebugSample *OpenQuattDebugRecorder::sample_at_(si
   return &this->samples_[(this->write_index_ + index) % SAMPLE_CAPACITY];
 }
 
-const OpenQuattDebugRecorder::StringEntry *OpenQuattDebugRecorder::string_at_(uint32_t index) const {
+const OpenQuattDebugRecorder::StringEntry* OpenQuattDebugRecorder::string_at_(uint32_t index) const {
   return this->string_entries_ && index < this->string_count_ ? &this->string_entries_[index] : nullptr;
 }
 
-uint32_t OpenQuattDebugRecorder::intern_string_(const char *value, size_t length) {
+uint32_t OpenQuattDebugRecorder::intern_string_(const char* value, size_t length) {
   if (string_is_missing(value, length)) {
     return MISSING_VALUE;
   }
   const uint32_t hash = hash_string(value, length);
   auto find_existing = [&]() -> uint32_t {
     for (size_t index = 0; index < this->string_count_; ++index) {
-      const StringEntry &entry = this->string_entries_[index];
+      const StringEntry& entry = this->string_entries_[index];
       if (entry.hash == hash && entry.length == length &&
           std::memcmp(this->string_data_.data() + entry.offset, value, length) == 0) {
         return static_cast<uint32_t>(index);
@@ -532,7 +534,7 @@ uint32_t OpenQuattDebugRecorder::intern_string_(const char *value, size_t length
     this->string_overflow_ = true;
     return MISSING_VALUE;
   }
-  StringEntry &entry = this->string_entries_[this->string_count_];
+  StringEntry& entry = this->string_entries_[this->string_count_];
   entry.hash = hash;
   entry.offset = static_cast<uint32_t>(this->string_data_used_);
   entry.length = static_cast<uint16_t>(length);
@@ -541,7 +543,7 @@ uint32_t OpenQuattDebugRecorder::intern_string_(const char *value, size_t length
   return static_cast<uint32_t>(this->string_count_++);
 }
 
-uint32_t OpenQuattDebugRecorder::capture_value_(const DebugField &field) {
+uint32_t OpenQuattDebugRecorder::capture_value_(const DebugField& field) {
   switch (field.type) {
     case FieldType::SYSTEM_UPTIME_MS:
       return millis();
@@ -553,7 +555,7 @@ uint32_t OpenQuattDebugRecorder::capture_value_(const DebugField &field) {
       return heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL);
 #ifdef USE_SENSOR
     case FieldType::SENSOR: {
-      auto *entity = static_cast<sensor::Sensor *>(field.source);
+      auto* entity = static_cast<sensor::Sensor*>(field.source);
       if (entity == nullptr || !entity->has_state() || !std::isfinite(entity->state)) return MISSING_VALUE;
       uint32_t value;
       std::memcpy(&value, &entity->state, sizeof(value));
@@ -562,7 +564,7 @@ uint32_t OpenQuattDebugRecorder::capture_value_(const DebugField &field) {
 #endif
 #ifdef USE_NUMBER
     case FieldType::NUMBER: {
-      auto *entity = static_cast<number::Number *>(field.source);
+      auto* entity = static_cast<number::Number*>(field.source);
       if (entity == nullptr || !entity->has_state() || !std::isfinite(entity->state)) return MISSING_VALUE;
       uint32_t value;
       std::memcpy(&value, &entity->state, sizeof(value));
@@ -571,26 +573,26 @@ uint32_t OpenQuattDebugRecorder::capture_value_(const DebugField &field) {
 #endif
 #ifdef USE_BINARY_SENSOR
     case FieldType::BINARY_SENSOR: {
-      auto *entity = static_cast<binary_sensor::BinarySensor *>(field.source);
+      auto* entity = static_cast<binary_sensor::BinarySensor*>(field.source);
       return entity != nullptr && entity->has_state() ? static_cast<uint32_t>(entity->state) : MISSING_VALUE;
     }
 #endif
 #ifdef USE_SWITCH
     case FieldType::SWITCH: {
-      auto *entity = static_cast<switch_::Switch *>(field.source);
+      auto* entity = static_cast<switch_::Switch*>(field.source);
       return entity != nullptr ? static_cast<uint32_t>(entity->state) : MISSING_VALUE;
     }
 #endif
 #ifdef USE_TEXT_SENSOR
     case FieldType::TEXT_SENSOR: {
-      auto *entity = static_cast<text_sensor::TextSensor *>(field.source);
+      auto* entity = static_cast<text_sensor::TextSensor*>(field.source);
       if (entity == nullptr || !entity->has_state()) return MISSING_VALUE;
       return this->intern_string_(entity->state.data(), entity->state.size());
     }
 #endif
 #ifdef USE_SELECT
     case FieldType::SELECT: {
-      auto *entity = static_cast<select::Select *>(field.source);
+      auto* entity = static_cast<select::Select*>(field.source);
       if (entity == nullptr || !entity->has_state()) return MISSING_VALUE;
       const StringRef value = entity->current_option();
       return this->intern_string_(value.c_str(), value.size());
@@ -601,7 +603,7 @@ uint32_t OpenQuattDebugRecorder::capture_value_(const DebugField &field) {
   }
 }
 
-bool OpenQuattDebugRecorder::configure(const std::string &entities, bool reset) {
+bool OpenQuattDebugRecorder::configure(const std::string& entities, bool reset) {
   if (!this->available_() || this->active_) {
     return false;
   }
@@ -609,8 +611,8 @@ bool OpenQuattDebugRecorder::configure(const std::string &entities, bool reset) 
   if (reset) {
     this->field_count_ = 0;
     this->missing_field_count_ = 0;
-    auto add_system_field = [&](const char *key, const char *unit, FieldType type) {
-      DebugField &field = this->fields_[this->field_count_++];
+    auto add_system_field = [&](const char* key, const char* unit, FieldType type) {
+      DebugField& field = this->fields_[this->field_count_++];
       field = DebugField{};
       copy_text(field.key, sizeof(field.key), key, std::strlen(key));
       copy_text(field.name, sizeof(field.name), key, std::strlen(key));
@@ -685,12 +687,12 @@ bool OpenQuattDebugRecorder::configure(const std::string &entities, bool reset) 
       this->missing_field_count_++;
     } else if (field.type == FieldType::SENSOR) {
 #ifdef USE_SENSOR
-      const StringRef unit = static_cast<sensor::Sensor *>(field.source)->get_unit_of_measurement_ref();
+      const StringRef unit = static_cast<sensor::Sensor*>(field.source)->get_unit_of_measurement_ref();
       copy_text(field.unit, sizeof(field.unit), unit.c_str(), std::min(unit.size(), sizeof(field.unit) - 1));
 #endif
     } else if (field.type == FieldType::NUMBER) {
 #ifdef USE_NUMBER
-      const StringRef unit = static_cast<number::Number *>(field.source)->get_unit_of_measurement_ref();
+      const StringRef unit = static_cast<number::Number*>(field.source)->get_unit_of_measurement_ref();
       copy_text(field.unit, sizeof(field.unit), unit.c_str(), std::min(unit.size(), sizeof(field.unit) - 1));
 #endif
     }
@@ -711,7 +713,7 @@ void OpenQuattDebugRecorder::capture_sample_() {
     return;
   }
 
-  DebugSample &sample = this->samples_[this->write_index_];
+  DebugSample& sample = this->samples_[this->write_index_];
   this->capture_in_progress_ = true;
   this->capture_index_ = this->write_index_;
   sample.offset_s = (now_ms - this->started_ms_) / 1000U;
@@ -820,16 +822,15 @@ void OpenQuattDebugRecorder::dump_config() {
   ESP_LOGCONFIG(TAG, "  Clock: %s", this->clock_ == nullptr ? "<missing>" : "configured");
   ESP_LOGCONFIG(TAG, "  Fields: %u / %u", static_cast<unsigned>(this->field_count_),
                 static_cast<unsigned>(FIELD_CAPACITY));
-  ESP_LOGCONFIG(TAG, "  Samples: %u / %u", static_cast<unsigned>(this->count_),
-                static_cast<unsigned>(SAMPLE_CAPACITY));
+  ESP_LOGCONFIG(TAG, "  Samples: %u / %u", static_cast<unsigned>(this->count_), static_cast<unsigned>(SAMPLE_CAPACITY));
   ESP_LOGCONFIG(TAG, "  Ring buffer: %s (%u bytes)", this->available_() ? "PSRAM" : "unavailable",
                 static_cast<unsigned>(BUFFER_BYTES));
 }
 
-void OpenQuattDebugRecorder::write_status(httpd_req_t *req) const {
+void OpenQuattDebugRecorder::write_status(httpd_req_t* req) const {
   ChunkedJsonWriter writer(req);
-  const uint32_t estimated_size = 2048U + static_cast<uint32_t>(this->count_) *
-                                             (16U + static_cast<uint32_t>(this->field_count_) * 3U);
+  const uint32_t estimated_size =
+      2048U + static_cast<uint32_t>(this->count_) * (16U + static_cast<uint32_t>(this->field_count_) * 3U);
   if (!writer.write_literal(R"({"ok":true,"available":)") || !writer.write_bool(this->available_()) ||
       !writer.write_literal(R"(,"active":)") || !writer.write_bool(this->active_) ||
       !writer.write_literal(R"(,"mode":")") || !writer.write_literal(this->rolling_ ? "rolling" : "manual") ||
@@ -850,7 +851,8 @@ void OpenQuattDebugRecorder::write_status(httpd_req_t *req) const {
       !writer.write_uint32(static_cast<uint32_t>(this->field_count_ > 4 ? this->field_count_ - 4 : 0)) ||
       !writer.write_literal(R"(,"missing_field_count":)") ||
       !writer.write_uint32(static_cast<uint32_t>(this->missing_field_count_)) ||
-      !writer.write_literal(R"(,"string_count":)") || !writer.write_uint32(static_cast<uint32_t>(this->string_count_)) ||
+      !writer.write_literal(R"(,"string_count":)") ||
+      !writer.write_uint32(static_cast<uint32_t>(this->string_count_)) ||
       !writer.write_literal(R"(,"string_overflow":)") || !writer.write_bool(this->string_overflow_) ||
       !writer.write_literal(R"(,"buffer_size":)") || !writer.write_uint32(static_cast<uint32_t>(BUFFER_BYTES)) ||
       !writer.write_literal(R"(,"estimated_size":)") || !writer.write_uint32(estimated_size) ||
@@ -862,11 +864,11 @@ void OpenQuattDebugRecorder::write_status(httpd_req_t *req) const {
   httpd_resp_send_chunk(req, nullptr, 0);
 }
 
-void OpenQuattDebugRecorder::write_recording(httpd_req_t *req) const {
+void OpenQuattDebugRecorder::write_recording(httpd_req_t* req) const {
   ChunkedJsonWriter writer(req);
-  const DebugSample *initial = this->sample_at_(0);
+  const DebugSample* initial = this->sample_at_(0);
 
-  auto write_value = [&](const DebugField &field, uint32_t value) -> bool {
+  auto write_value = [&](const DebugField& field, uint32_t value) -> bool {
     if (value == MISSING_VALUE) {
       return writer.write_literal("null");
     }
@@ -882,7 +884,7 @@ void OpenQuattDebugRecorder::write_recording(httpd_req_t *req) const {
         return writer.write_bool(value != 0);
       case FieldType::TEXT_SENSOR:
       case FieldType::SELECT: {
-        const StringEntry *entry = this->string_at_(value);
+        const StringEntry* entry = this->string_at_(value);
         return entry != nullptr && writer.write_json_string(this->string_data_.data() + entry->offset, entry->length);
       }
       default:
@@ -928,7 +930,7 @@ void OpenQuattDebugRecorder::write_recording(httpd_req_t *req) const {
   }
   bool first_unit = true;
   for (size_t index = 0; index < this->field_count_; ++index) {
-    const DebugField &field = this->fields_[index];
+    const DebugField& field = this->fields_[index];
     if (field.unit[0] == '\0') continue;
     if ((!first_unit && !writer.write_char(',')) || !writer.write_char('[') ||
         !writer.write_uint32(static_cast<uint32_t>(index)) || !writer.write_char(',') ||
@@ -962,8 +964,8 @@ void OpenQuattDebugRecorder::write_recording(httpd_req_t *req) const {
     return;
   }
   for (size_t sample_index = 0; sample_index < this->count_; ++sample_index) {
-    const DebugSample *sample = this->sample_at_(sample_index);
-    const DebugSample *previous = sample_index > 0 ? this->sample_at_(sample_index - 1) : initial;
+    const DebugSample* sample = this->sample_at_(sample_index);
+    const DebugSample* previous = sample_index > 0 ? this->sample_at_(sample_index - 1) : initial;
     if (sample == nullptr || (sample_index > 0 && !writer.write_char(',')) || !writer.write_char('[') ||
         !writer.write_uint32(sample->offset_s) || !writer.write_literal(",[")) {
       httpd_resp_send_chunk(req, nullptr, 0);

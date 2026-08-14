@@ -21,13 +21,13 @@ namespace esphome::opentherm {
 
 using std::string;
 
-static const char *const TAG = "opentherm";
+static const char* const TAG = "opentherm";
 
 #ifdef ESP8266
-OpenTherm *OpenTherm::instance = nullptr;
+OpenTherm* OpenTherm::instance = nullptr;
 #endif
 
-OpenTherm::OpenTherm(InternalGPIOPin *in_pin, InternalGPIOPin *out_pin, int32_t device_timeout)
+OpenTherm::OpenTherm(InternalGPIOPin* in_pin, InternalGPIOPin* out_pin, int32_t device_timeout)
     : in_pin_(in_pin),
       out_pin_(out_pin),
       mode_(OperationMode::IDLE),
@@ -72,8 +72,7 @@ void OpenTherm::listen() {
   this->bit_pos_ = 0;
 
 #ifdef USE_ESP32
-  this->receive_deadline_us_ =
-      micros() + static_cast<uint32_t>(this->device_timeout_) * 1000U;
+  this->receive_deadline_us_ = micros() + static_cast<uint32_t>(this->device_timeout_) * 1000U;
   if (!this->arm_esp32_rmt_()) {
     this->timer_error_ = ESP_FAIL;
     this->timer_error_type_ = TimerErrorType::TIMER_START_ERROR;
@@ -85,7 +84,7 @@ void OpenTherm::listen() {
 #endif
 }
 
-void OpenTherm::send(OpenthermData &data) {
+void OpenTherm::send(OpenthermData& data) {
   this->stop_timer_();
   this->data_ = data.type;
   this->data_ = (this->data_ << 12) | data.id;
@@ -108,7 +107,7 @@ void OpenTherm::send(OpenthermData &data) {
 #endif
 }
 
-bool OpenTherm::get_message(OpenthermData &data) {
+bool OpenTherm::get_message(OpenthermData& data) {
   if (this->mode_ == OperationMode::RECEIVED) {
     data.type = (this->data_ >> 28) & 0x7;
     data.id = (this->data_ >> 16) & 0xFF;
@@ -119,7 +118,7 @@ bool OpenTherm::get_message(OpenthermData &data) {
   return false;
 }
 
-bool OpenTherm::get_protocol_error(OpenThermError &error) {
+bool OpenTherm::get_protocol_error(OpenThermError& error) {
   if (this->mode_ != OperationMode::ERROR_PROTOCOL) {
     return false;
   }
@@ -168,10 +167,10 @@ void IRAM_ATTR OpenTherm::read_() {
 }
 
 #ifdef USE_ESP32
-bool IRAM_ATTR OpenTherm::timer_isr(gptimer_handle_t timer, const gptimer_alarm_event_data_t *edata, void *user_ctx) {
-  auto *arg = static_cast<OpenTherm *>(user_ctx);
+bool IRAM_ATTR OpenTherm::timer_isr(gptimer_handle_t timer, const gptimer_alarm_event_data_t* edata, void* user_ctx) {
+  auto* arg = static_cast<OpenTherm*>(user_ctx);
 #else
-bool IRAM_ATTR OpenTherm::timer_isr(OpenTherm *arg) {
+bool IRAM_ATTR OpenTherm::timer_isr(OpenTherm* arg) {
 #endif
   if (arg->mode_ == OperationMode::LISTEN) {
 #ifdef USE_ESP32
@@ -364,8 +363,7 @@ bool OpenTherm::init_esp32_rmt_() {
   this->rmt_rx_config_.signal_range_max_ns = 2500000;
   this->rmt_rx_config_.flags.en_partial_rx = false;
 
-  ESP_LOGCONFIG(TAG, "OpenTherm RMT receive capture active on GPIO%u",
-                static_cast<unsigned>(this->in_pin_->get_pin()));
+  ESP_LOGCONFIG(TAG, "OpenTherm RMT receive capture active on GPIO%u", static_cast<unsigned>(this->in_pin_->get_pin()));
   return true;
 }
 
@@ -426,8 +424,7 @@ bool OpenTherm::init_esp32_rmt_tx_() {
     return false;
   }
 
-  ESP_LOGCONFIG(TAG, "OpenTherm RMT transmit active on GPIO%u",
-                static_cast<unsigned>(this->out_pin_->get_pin()));
+  ESP_LOGCONFIG(TAG, "OpenTherm RMT transmit active on GPIO%u", static_cast<unsigned>(this->out_pin_->get_pin()));
   return true;
 }
 
@@ -445,8 +442,8 @@ bool OpenTherm::restore_esp32_rmt_tx_idle_() {
   rmt_transmit_config_t transmit_config{};
   transmit_config.loop_count = 0;
   transmit_config.flags.eot_level = rmt_encoder::IDLE_LEVEL;
-  esp_err_t result = rmt_transmit(this->rmt_tx_channel_, this->rmt_tx_encoder_, &idle_symbol,
-                                  sizeof(idle_symbol), &transmit_config);
+  esp_err_t result =
+      rmt_transmit(this->rmt_tx_channel_, this->rmt_tx_encoder_, &idle_symbol, sizeof(idle_symbol), &transmit_config);
   if (result == ESP_OK) {
     result = rmt_tx_wait_all_done(this->rmt_tx_channel_, 100);
   }
@@ -465,7 +462,7 @@ bool OpenTherm::start_esp32_rmt_tx_() {
 
   for (size_t index = 0; index < RMT_TX_SYMBOLS; index++) {
     const auto encoded = rmt_encoder::encode_frame_symbol(this->data_, index);
-    auto &symbol = this->rmt_tx_symbols_[index];
+    auto& symbol = this->rmt_tx_symbols_[index];
     symbol.level0 = encoded.level0;
     symbol.duration0 = encoded.duration0_us;
     symbol.level1 = encoded.level1;
@@ -476,18 +473,16 @@ bool OpenTherm::start_esp32_rmt_tx_() {
   this->rmt_tx_active_ = true;
   const uint32_t tx_started_us = micros();
   this->rmt_tx_deadline_us_ = tx_started_us + RMT_TX_TIMEOUT_US;
-  this->receive_deadline_us_ =
-      tx_started_us +
-      static_cast<uint32_t>(RMT_TX_SYMBOLS * 2U * rmt_encoder::HALF_BIT_DURATION_US) +
-      static_cast<uint32_t>(this->device_timeout_) * 1000U;
+  this->receive_deadline_us_ = tx_started_us +
+                               static_cast<uint32_t>(RMT_TX_SYMBOLS * 2U * rmt_encoder::HALF_BIT_DURATION_US) +
+                               static_cast<uint32_t>(this->device_timeout_) * 1000U;
   portEXIT_CRITICAL(&this->rmt_mux_);
 
   rmt_transmit_config_t config{};
   config.loop_count = 0;
   config.flags.eot_level = rmt_encoder::IDLE_LEVEL;
-  const esp_err_t result =
-      rmt_transmit(this->rmt_tx_channel_, this->rmt_tx_encoder_, this->rmt_tx_symbols_,
-                   sizeof(this->rmt_tx_symbols_), &config);
+  const esp_err_t result = rmt_transmit(this->rmt_tx_channel_, this->rmt_tx_encoder_, this->rmt_tx_symbols_,
+                                        sizeof(this->rmt_tx_symbols_), &config);
   if (result != ESP_OK) {
     portENTER_CRITICAL(&this->rmt_mux_);
     this->rmt_tx_active_ = false;
@@ -545,8 +540,7 @@ bool OpenTherm::arm_esp32_rmt_() {
   portEXIT_CRITICAL(&this->rmt_mux_);
 
   const esp_err_t result =
-      rmt_receive(this->rmt_rx_channel_, this->rmt_rx_symbols_, sizeof(this->rmt_rx_symbols_),
-                  &this->rmt_rx_config_);
+      rmt_receive(this->rmt_rx_channel_, this->rmt_rx_symbols_, sizeof(this->rmt_rx_symbols_), &this->rmt_rx_config_);
   if (result != ESP_OK) {
     portENTER_CRITICAL(&this->rmt_mux_);
     this->rmt_armed_ = false;
@@ -581,17 +575,16 @@ void OpenTherm::cancel_esp32_rmt_() {
   }
 }
 
-bool IRAM_ATTR OpenTherm::rmt_rx_done_callback_(rmt_channel_handle_t,
-                                                const rmt_rx_done_event_data_t *event, void *user_ctx) {
-  auto *instance = static_cast<OpenTherm *>(user_ctx);
+bool IRAM_ATTR OpenTherm::rmt_rx_done_callback_(rmt_channel_handle_t, const rmt_rx_done_event_data_t* event,
+                                                void* user_ctx) {
+  auto* instance = static_cast<OpenTherm*>(user_ctx);
   if (instance == nullptr || event == nullptr) {
     return false;
   }
 
   portENTER_CRITICAL_ISR(&instance->rmt_mux_);
   if (instance->rmt_armed_ && instance->mode_ == OperationMode::LISTEN) {
-    instance->rmt_symbol_count_ =
-        event->num_symbols < RMT_CAPTURE_SYMBOLS ? event->num_symbols : RMT_CAPTURE_SYMBOLS;
+    instance->rmt_symbol_count_ = event->num_symbols < RMT_CAPTURE_SYMBOLS ? event->num_symbols : RMT_CAPTURE_SYMBOLS;
     instance->rmt_armed_ = false;
     instance->rmt_frame_completed_us_ = micros();
     instance->rmt_frame_ready_ = true;
@@ -603,9 +596,8 @@ bool IRAM_ATTR OpenTherm::rmt_rx_done_callback_(rmt_channel_handle_t,
   return false;
 }
 
-bool IRAM_ATTR OpenTherm::rmt_tx_done_callback_(rmt_channel_handle_t,
-                                                const rmt_tx_done_event_data_t *, void *user_ctx) {
-  auto *instance = static_cast<OpenTherm *>(user_ctx);
+bool IRAM_ATTR OpenTherm::rmt_tx_done_callback_(rmt_channel_handle_t, const rmt_tx_done_event_data_t*, void* user_ctx) {
+  auto* instance = static_cast<OpenTherm*>(user_ctx);
   if (instance == nullptr) {
     return false;
   }
@@ -622,9 +614,8 @@ bool IRAM_ATTR OpenTherm::rmt_tx_done_callback_(rmt_channel_handle_t,
     // ESP-IDF explicitly permits rmt_receive() from ISR context. Keep the
     // component lock until the handover is armed so stop() cannot cancel the
     // channel between our state claim and the driver call.
-    const esp_err_t result =
-        rmt_receive(instance->rmt_rx_channel_, instance->rmt_rx_symbols_,
-                    sizeof(instance->rmt_rx_symbols_), &instance->rmt_rx_config_);
+    const esp_err_t result = rmt_receive(instance->rmt_rx_channel_, instance->rmt_rx_symbols_,
+                                         sizeof(instance->rmt_rx_symbols_), &instance->rmt_rx_config_);
     if (result == ESP_OK) {
       instance->rmt_armed_ = true;
       instance->mode_ = OperationMode::LISTEN;
@@ -659,15 +650,13 @@ void OpenTherm::process_esp32_rmt_() {
     return;
   }
 
-  const bool deadline_expired =
-      static_cast<int32_t>(micros() - this->receive_deadline_us_) >= 0;
+  const bool deadline_expired = static_cast<int32_t>(micros() - this->receive_deadline_us_) >= 0;
   bool frame_ready = false;
   size_t symbol_count = 0;
   portENTER_CRITICAL(&this->rmt_mux_);
   if (this->rmt_frame_ready_) {
     const bool completed_in_time =
-        rmt_decoder::completion_is_within_deadline(
-            this->rmt_frame_completed_us_, this->receive_deadline_us_);
+        rmt_decoder::completion_is_within_deadline(this->rmt_frame_completed_us_, this->receive_deadline_us_);
     if (completed_in_time) {
       frame_ready = true;
       symbol_count = this->rmt_symbol_count_;
@@ -689,7 +678,7 @@ void OpenTherm::process_esp32_rmt_() {
   rmt_decoder::Pulse pulses[RMT_CAPTURE_SYMBOLS * 2]{};
   size_t pulse_count = 0;
   for (size_t symbol_index = 0; symbol_index < symbol_count; symbol_index++) {
-    const rmt_symbol_word_t &symbol = this->rmt_rx_symbols_[symbol_index];
+    const rmt_symbol_word_t& symbol = this->rmt_rx_symbols_[symbol_index];
     if (symbol.duration0 != 0) {
       pulses[pulse_count++] = {symbol.duration0, symbol.level0 != 0};
     }
@@ -701,7 +690,7 @@ void OpenTherm::process_esp32_rmt_() {
   this->stop_timer_();
   const rmt_decoder::DecodeResult result = rmt_decoder::decode(pulses, pulse_count);
   if (result.error != rmt_decoder::DecodeError::NONE) {
-    const char *decode_error = "unknown";
+    const char* decode_error = "unknown";
     switch (result.error) {
       case rmt_decoder::DecodeError::GLITCH:
         decode_error = "glitch";
@@ -725,7 +714,7 @@ void OpenTherm::process_esp32_rmt_() {
         break;
     }
 
-    const char *capture_failure = "none";
+    const char* capture_failure = "none";
     switch (result.capture_failure) {
       case rmt_decoder::CaptureFailure::PULSE_DURATION:
         capture_failure = "pulse_duration";
@@ -745,8 +734,7 @@ void OpenTherm::process_esp32_rmt_() {
              "pulse=%u duration=%uus bit=%u",
              decode_error, capture_failure, static_cast<unsigned>(symbol_count),
              static_cast<unsigned>(result.pulse_count), static_cast<unsigned>(result.half_bit_count),
-             static_cast<unsigned>(result.failure_pulse_index),
-             static_cast<unsigned>(result.failure_pulse_duration_us),
+             static_cast<unsigned>(result.failure_pulse_index), static_cast<unsigned>(result.failure_pulse_duration_us),
              static_cast<unsigned>(result.bit_position));
   }
   this->data_ = result.data;
@@ -877,10 +865,10 @@ bool IRAM_ATTR OpenTherm::check_parity_(uint32_t val) {
 }
 
 #define TO_STRING_MEMBER(name) \
-  case name: \
+  case name:                   \
     return #name;
 
-const char *OpenTherm::operation_mode_to_str(OperationMode mode) {
+const char* OpenTherm::operation_mode_to_str(OperationMode mode) {
   switch (mode) {
     TO_STRING_MEMBER(IDLE)
     TO_STRING_MEMBER(LISTEN)
@@ -896,7 +884,7 @@ const char *OpenTherm::operation_mode_to_str(OperationMode mode) {
       return "<INVALID>";
   }
 }
-const char *OpenTherm::protocol_error_to_str(ProtocolErrorType error_type) {
+const char* OpenTherm::protocol_error_to_str(ProtocolErrorType error_type) {
   switch (error_type) {
     TO_STRING_MEMBER(NO_ERROR)
     TO_STRING_MEMBER(NO_TRANSITION)
@@ -907,7 +895,7 @@ const char *OpenTherm::protocol_error_to_str(ProtocolErrorType error_type) {
       return "<INVALID>";
   }
 }
-const char *OpenTherm::timer_error_to_str(TimerErrorType error_type) {
+const char* OpenTherm::timer_error_to_str(TimerErrorType error_type) {
   switch (error_type) {
     TO_STRING_MEMBER(NO_TIMER_ERROR)
     TO_STRING_MEMBER(SET_ALARM_VALUE_ERROR)
@@ -918,7 +906,7 @@ const char *OpenTherm::timer_error_to_str(TimerErrorType error_type) {
       return "<INVALID>";
   }
 }
-const char *OpenTherm::message_type_to_str(MessageType message_type) {
+const char* OpenTherm::message_type_to_str(MessageType message_type) {
   switch (message_type) {
     TO_STRING_MEMBER(READ_DATA)
     TO_STRING_MEMBER(READ_ACK)
@@ -932,7 +920,7 @@ const char *OpenTherm::message_type_to_str(MessageType message_type) {
   }
 }
 
-const char *OpenTherm::message_id_to_str(MessageId id) {
+const char* OpenTherm::message_id_to_str(MessageId id) {
   switch (id) {
     TO_STRING_MEMBER(STATUS)
     TO_STRING_MEMBER(CH_SETPOINT)
@@ -1032,22 +1020,22 @@ const char *OpenTherm::message_id_to_str(MessageId id) {
   }
 }
 
-void OpenTherm::debug_data(OpenthermData &data) {
+void OpenTherm::debug_data(OpenthermData& data) {
   char type_buf[9], id_buf[9], hb_buf[9], lb_buf[9];
   ESP_LOGD(TAG, "%s %s %s %s", format_bin_to(type_buf, data.type), format_bin_to(id_buf, data.id),
            format_bin_to(hb_buf, data.valueHB), format_bin_to(lb_buf, data.valueLB));
   ESP_LOGD(TAG, "type: %s; id: %u; HB: %u; LB: %u; uint_16: %u; float: %f",
-           this->message_type_to_str((MessageType) data.type), data.id, data.valueHB, data.valueLB, data.u16(),
+           this->message_type_to_str((MessageType)data.type), data.id, data.valueHB, data.valueLB, data.u16(),
            data.f88());
 }
-void OpenTherm::debug_error(OpenThermError &error) const {
+void OpenTherm::debug_error(OpenThermError& error) const {
   ESP_LOGD(TAG, "data: 0x%08" PRIx32 "; clock: %u; capture: 0x%08" PRIx32 "; bit_pos: %u", error.data, this->clock_,
            error.capture, error.bit_pos);
 }
 
-float OpenthermData::f88() { return ((float) this->s16()) / 256.0f; }
+float OpenthermData::f88() { return ((float)this->s16()) / 256.0f; }
 
-void OpenthermData::f88(float value) { this->s16((int16_t) (value * 256)); }
+void OpenthermData::f88(float value) { this->s16((int16_t)(value * 256)); }
 
 uint16_t OpenthermData::u16() {
   uint16_t const value = this->valueHB;

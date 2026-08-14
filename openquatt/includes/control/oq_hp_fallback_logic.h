@@ -64,7 +64,7 @@ struct FallbackDecision {
   FallbackBlockReason block_reason = FallbackBlockReason::NONE;
 };
 
-inline FallbackBlockReason first_cm4_block_reason(const FallbackInputs &inputs) {
+inline FallbackBlockReason first_cm4_block_reason(const FallbackInputs& inputs) {
   // External owners are evaluated first. CM4 may not compete with an
   // override, commissioning, cooling or frost-protection control path.
   if (inputs.override_active) return FallbackBlockReason::OVERRIDE_ACTIVE;
@@ -98,41 +98,50 @@ inline FallbackBlockReason first_cm4_block_reason(const FallbackInputs &inputs) 
   return FallbackBlockReason::NONE;
 }
 
-inline FallbackDecision decide_cm4(const FallbackInputs &inputs) {
+inline FallbackDecision decide_cm4(const FallbackInputs& inputs) {
   FallbackDecision decision;
   decision.block_reason = first_cm4_block_reason(inputs);
   decision.cm4_allowed = decision.block_reason == FallbackBlockReason::NONE;
   if (decision.cm4_allowed) {
-    decision.action = inputs.current_mode == ControlMode::CM4
-        ? FallbackAction::HOLD_CM4
-        : FallbackAction::ENTER_CM4;
+    decision.action = inputs.current_mode == ControlMode::CM4 ? FallbackAction::HOLD_CM4 : FallbackAction::ENTER_CM4;
   } else if (inputs.current_mode == ControlMode::CM4) {
     decision.action = FallbackAction::EXIT_CM4;
   }
   return decision;
 }
 
-inline const char *fallback_block_reason_name(FallbackBlockReason reason) {
+inline const char* fallback_block_reason_name(FallbackBlockReason reason) {
   switch (reason) {
-    case FallbackBlockReason::NONE: return "none";
-    case FallbackBlockReason::OVERRIDE_ACTIVE: return "override active";
-    case FallbackBlockReason::COMMISSIONING_ACTIVE: return "commissioning active";
-    case FallbackBlockReason::COOLING_ACTIVE: return "cooling active";
-    case FallbackBlockReason::FROST_ACTIVE: return "frost protection active";
-    case FallbackBlockReason::NO_HEATING_DEMAND: return "no heating demand";
-    case FallbackBlockReason::FALLBACK_DISABLED: return "boiler fallback disabled";
-    case FallbackBlockReason::HP_AVAILABLE: return "heat pump available";
+    case FallbackBlockReason::NONE:
+      return "none";
+    case FallbackBlockReason::OVERRIDE_ACTIVE:
+      return "override active";
+    case FallbackBlockReason::COMMISSIONING_ACTIVE:
+      return "commissioning active";
+    case FallbackBlockReason::COOLING_ACTIVE:
+      return "cooling active";
+    case FallbackBlockReason::FROST_ACTIVE:
+      return "frost protection active";
+    case FallbackBlockReason::NO_HEATING_DEMAND:
+      return "no heating demand";
+    case FallbackBlockReason::FALLBACK_DISABLED:
+      return "boiler fallback disabled";
+    case FallbackBlockReason::HP_AVAILABLE:
+      return "heat pump available";
     case FallbackBlockReason::HP_AVAILABILITY_UNKNOWN:
       return "heat pump availability unknown";
     case FallbackBlockReason::NO_CONFIRMED_FALLBACK_CAUSE:
       return "no confirmed fallback cause";
     case FallbackBlockReason::HP_OUTPUT_STATE_UNSAFE:
       return "heat pump output state unsafe";
-    case FallbackBlockReason::FLOW_UNAVAILABLE: return "flow unavailable";
-    case FallbackBlockReason::FLOW_INSUFFICIENT: return "flow insufficient";
+    case FallbackBlockReason::FLOW_UNAVAILABLE:
+      return "flow unavailable";
+    case FallbackBlockReason::FLOW_INSUFFICIENT:
+      return "flow insufficient";
     case FallbackBlockReason::SUPPLY_TEMPERATURE_UNAVAILABLE:
       return "supply temperature unavailable";
-    case FallbackBlockReason::BOILER_GUARD_BLOCKED: return "boiler guard blocked";
+    case FallbackBlockReason::BOILER_GUARD_BLOCKED:
+      return "boiler guard blocked";
   }
   return "unknown";
 }

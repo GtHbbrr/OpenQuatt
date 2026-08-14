@@ -40,20 +40,19 @@ struct RuntimeConfig {
 };
 
 inline RuntimeConfig make_runtime_config(int sample_time_s) {
-  return RuntimeConfig{
-      sample_time_s,
-      300,  // total duration
-      60,   // quiet start
-      180,  // pulse window
-      120,  // no-flow failure guard
-      800,  // quiet start iPWM
-      300,  // hard pulse iPWM
-      800,  // rest iPWM between pulses
-      650,  // stabilization iPWM
-      25,
-      15,
-      50,
-      850};
+  return RuntimeConfig{sample_time_s,
+                       300,  // total duration
+                       60,   // quiet start
+                       180,  // pulse window
+                       120,  // no-flow failure guard
+                       800,  // quiet start iPWM
+                       300,  // hard pulse iPWM
+                       800,  // rest iPWM between pulses
+                       650,  // stabilization iPWM
+                       25,
+                       15,
+                       50,
+                       850};
 }
 
 inline int clamp_ipwm(int value, int min_ipwm, int max_ipwm) {
@@ -76,11 +75,11 @@ class AirPurgeRuntime {
     id(oq_air_purge_remaining_s) = 0;
   }
 
-  void start(const RuntimeConfig &cfg, uint32_t now_ms) {
+  void start(const RuntimeConfig& cfg, uint32_t now_ms) {
     const int cm_code = id(oq_control_mode_code);
     const bool cm100_ready = oq_commissioning::is_cm100(cm_code);
-    const bool task_running = oq_commissioning::task_running(
-        id(oq_commissioning_active), id(oq_commissioning_task_code));
+    const bool task_running =
+        oq_commissioning::task_running(id(oq_commissioning_active), id(oq_commissioning_task_code));
 
     if (id(oq_air_purge_active) || task_running || id(oq_commissioning_request_pending)) {
       publish("REFUSED: BUSY");
@@ -104,14 +103,10 @@ class AirPurgeRuntime {
     }
 
     ESP_LOGI("quatt.cm100.purge",
-             "Air purge requested (duration=%ds steady=%d pulse=%d hard_iPWM=%d rest_iPWM=%d stabilize_iPWM=%d return_auto=%d)",
-             cfg.duration_s,
-             cfg.steady_ipwm,
-             cfg.pulse_s,
-             cfg.hard_ipwm,
-             cfg.rest_ipwm,
-             cfg.stabilize_ipwm,
-             (int) id(oq_air_purge_return_to_auto).state);
+             "Air purge requested (duration=%ds steady=%d pulse=%d hard_iPWM=%d rest_iPWM=%d stabilize_iPWM=%d "
+             "return_auto=%d)",
+             cfg.duration_s, cfg.steady_ipwm, cfg.pulse_s, cfg.hard_ipwm, cfg.rest_ipwm, cfg.stabilize_ipwm,
+             (int)id(oq_air_purge_return_to_auto).state);
 
     state_ = PHASE_STEADY;
     id(oq_commissioning_task_code) = TASK_AIR_PURGE;
@@ -136,8 +131,7 @@ class AirPurgeRuntime {
 
   void abort_or_clear() {
     if (id(oq_air_purge_active) ||
-        oq_commissioning::task_selected(id(oq_commissioning_task_code),
-                                        oq_commissioning::TASK_AIR_PURGE)) {
+        oq_commissioning::task_selected(id(oq_commissioning_task_code), oq_commissioning::TASK_AIR_PURGE)) {
       id(oq_air_purge_abort) = true;
       id(oq_commissioning_abort_requested) = true;
       publish("ABORT REQUESTED");
@@ -148,11 +142,10 @@ class AirPurgeRuntime {
     publish("IDLE");
   }
 
-  void tick(const RuntimeConfig &cfg, uint32_t now_ms) {
+  void tick(const RuntimeConfig& cfg, uint32_t now_ms) {
     if (!id(oq_air_purge_active)) return;
 
-    if (!oq_commissioning::air_purge_mode_valid(id(oq_control_mode_code),
-                                                id(oq_commissioning_task_code))) {
+    if (!oq_commissioning::air_purge_mode_valid(id(oq_control_mode_code), id(oq_commissioning_task_code))) {
       finish("ABORT: not CM100", STATE_ABORT, false);
       return;
     }
@@ -175,7 +168,7 @@ class AirPurgeRuntime {
       return;
     }
 
-    const int elapsed_s = (int) ((uint32_t)(now_ms - started_ms) / 1000UL);
+    const int elapsed_s = (int)((uint32_t)(now_ms - started_ms) / 1000UL);
     const int remaining_s = (elapsed_s >= cfg.duration_s) ? 0 : (cfg.duration_s - elapsed_s);
     id(oq_air_purge_remaining_s) = remaining_s;
 
@@ -240,15 +233,12 @@ class AirPurgeRuntime {
   int state_ = STATE_IDLE;
   std::string last_status_;
 
-  void publish(const char *status) {
+  void publish(const char* status) {
     const std::string s(status ? status : "");
     if (s != last_status_) {
       oq_service_status::set_air_purge(s);
-      ESP_LOGI("quatt.cm100.purge", "status=%s phase=%d target_iPWM=%d remaining=%ds flow=%.0fL/h",
-               s.c_str(),
-               id(oq_air_purge_phase),
-               id(oq_air_purge_target_ipwm),
-               id(oq_air_purge_remaining_s),
+      ESP_LOGI("quatt.cm100.purge", "status=%s phase=%d target_iPWM=%d remaining=%ds flow=%.0fL/h", s.c_str(),
+               id(oq_air_purge_phase), id(oq_air_purge_target_ipwm), id(oq_air_purge_remaining_s),
                id(flow_rate_selected).state);
       last_status_ = s;
     }
@@ -261,35 +251,35 @@ class AirPurgeRuntime {
     if (hp1) {
       if (id(hp1_compressor_level).has_state()) {
         auto idx = id(hp1_compressor_level).active_index();
-        level = idx.has_value() ? (int) idx.value() : 0;
+        level = idx.has_value() ? (int)idx.value() : 0;
       }
       last_applied = id(hp1_last_applied_level);
       working_mode = id(hp1_working_mode).state;
     } else {
-      #if OQ_TOPOLOGY_DUO
+#if OQ_TOPOLOGY_DUO
       if (id(hp2_compressor_level).has_state()) {
         auto idx = id(hp2_compressor_level).active_index();
-        level = idx.has_value() ? (int) idx.value() : 0;
+        level = idx.has_value() ? (int)idx.value() : 0;
       }
       last_applied = id(hp2_last_applied_level);
       working_mode = id(hp2_working_mode).state;
-      #endif
+#endif
     }
 
-    const int mode = isnan(working_mode) ? 0 : (int) roundf(working_mode);
+    const int mode = isnan(working_mode) ? 0 : (int)roundf(working_mode);
     const bool thermal_mode = (mode == 1 || mode == 2);
     return level > 0 || last_applied > 0 || thermal_mode;
   }
 
   bool heat_pumps_idle() {
     if (hp_active(true)) return false;
-    #if OQ_TOPOLOGY_DUO
+#if OQ_TOPOLOGY_DUO
     if (hp_active(false)) return false;
-    #endif
+#endif
     return true;
   }
 
-  void finish(const char *status, int next_state, bool return_to_auto) {
+  void finish(const char* status, int next_state, bool return_to_auto) {
     id(oq_air_purge_active) = false;
     id(oq_air_purge_abort) = false;
     id(oq_air_purge_state) = next_state;
@@ -315,7 +305,7 @@ class AirPurgeRuntime {
   }
 };
 
-inline AirPurgeRuntime &runtime() {
+inline AirPurgeRuntime& runtime() {
   static AirPurgeRuntime instance;
   return instance;
 }

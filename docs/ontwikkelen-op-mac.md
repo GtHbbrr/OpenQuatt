@@ -35,7 +35,7 @@ python3 scripts/dev.py preview-pages --no-serve
 npm run check:cpp-format
 ```
 
-Gebruik `npm run fix:cpp-format` om C/C++ formatting lokaal toe te passen voordat je een pull request bijwerkt.
+Gebruik `npm run fix:cpp-format` om C/C++ formatting lokaal toe te passen voordat je een pull request bijwerkt; CI faalt als de formatter-check verschillen vindt.
 Als Homebrew `clang-format` niet automatisch in `PATH` zet, kun je tijdelijk `CLANG_FORMAT_BIN=/opt/homebrew/bin/clang-format` voor het npm-commando zetten.
 
 De bash-wrappers blijven beschikbaar voor de meest gebruikte taken:

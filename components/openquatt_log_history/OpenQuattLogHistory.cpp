@@ -21,7 +21,7 @@
 namespace esphome {
 namespace openquatt_log_history {
 
-static const char *const TAG = "openquatt.log_history";
+static const char* const TAG = "openquatt.log_history";
 
 namespace {
 
@@ -30,7 +30,7 @@ static constexpr uint32_t MAX_VALID_EPOCH_S = 2082758400UL;  // 2036-01-01 00:00
 
 static bool epoch_is_sane(uint32_t epoch_s) { return epoch_s >= MIN_VALID_EPOCH_S && epoch_s < MAX_VALID_EPOCH_S; }
 
-static std::string base64_encode_bytes_(const uint8_t *data, size_t length) {
+static std::string base64_encode_bytes_(const uint8_t* data, size_t length) {
   static constexpr char TABLE[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
   std::string out;
   out.reserve(((length + 2U) / 3U) * 4U);
@@ -50,7 +50,7 @@ static std::string base64_encode_bytes_(const uint8_t *data, size_t length) {
   return out;
 }
 
-static void fill_random_token_(std::array<uint8_t, 32> *token) {
+static void fill_random_token_(std::array<uint8_t, 32>* token) {
   if (token == nullptr) {
     return;
   }
@@ -62,7 +62,7 @@ static void fill_random_token_(std::array<uint8_t, 32> *token) {
   }
 }
 
-static bool header_matches_host_(const std::string &header_value, const std::string &host) {
+static bool header_matches_host_(const std::string& header_value, const std::string& host) {
   if (host.empty() || header_value.empty()) {
     return false;
   }
@@ -96,8 +96,8 @@ struct CrashTimeBreadcrumb {
 
 RTC_NOINIT_ATTR static CrashTimeBreadcrumb crash_time_breadcrumb;
 
-static uint32_t fnv1a32(const void *data, size_t len) {
-  const auto *bytes = static_cast<const uint8_t *>(data);
+static uint32_t fnv1a32(const void* data, size_t len) {
+  const auto* bytes = static_cast<const uint8_t*>(data);
   uint32_t hash = 2166136261UL;
   for (size_t index = 0; index < len; ++index) {
     hash ^= bytes[index];
@@ -106,19 +106,18 @@ static uint32_t fnv1a32(const void *data, size_t len) {
   return hash;
 }
 
-static uint32_t crash_time_breadcrumb_crc(const CrashTimeBreadcrumb &breadcrumb) {
+static uint32_t crash_time_breadcrumb_crc(const CrashTimeBreadcrumb& breadcrumb) {
   CrashTimeBreadcrumb copy = breadcrumb;
   copy.crc = 0;
   return fnv1a32(&copy, sizeof(copy));
 }
 
-static bool crash_time_breadcrumb_is_valid(const CrashTimeBreadcrumb &breadcrumb) {
-  return breadcrumb.magic == CRASH_TIME_BREADCRUMB_MAGIC &&
-         breadcrumb.version == CRASH_TIME_BREADCRUMB_VERSION && epoch_is_sane(breadcrumb.epoch_s) &&
-         breadcrumb.crc == crash_time_breadcrumb_crc(breadcrumb);
+static bool crash_time_breadcrumb_is_valid(const CrashTimeBreadcrumb& breadcrumb) {
+  return breadcrumb.magic == CRASH_TIME_BREADCRUMB_MAGIC && breadcrumb.version == CRASH_TIME_BREADCRUMB_VERSION &&
+         epoch_is_sane(breadcrumb.epoch_s) && breadcrumb.crc == crash_time_breadcrumb_crc(breadcrumb);
 }
 
-static const char *reset_reason_to_string(esp_reset_reason_t reason) {
+static const char* reset_reason_to_string(esp_reset_reason_t reason) {
   switch (reason) {
     case ESP_RST_UNKNOWN:
       return "UNKNOWN";
@@ -148,7 +147,7 @@ static const char *reset_reason_to_string(esp_reset_reason_t reason) {
 }
 #endif
 
-static bool url_path_matches(const char *url, const char *path) {
+static bool url_path_matches(const char* url, const char* path) {
   if (url == nullptr || path == nullptr) {
     return false;
   }
@@ -158,11 +157,11 @@ static bool url_path_matches(const char *url, const char *path) {
 
 class ChunkedJsonWriter {
  public:
-  explicit ChunkedJsonWriter(httpd_req_t *req) : req_(req) { this->buffer_.allocate(BUFFER_SIZE); }
+  explicit ChunkedJsonWriter(httpd_req_t* req) : req_(req) { this->buffer_.allocate(BUFFER_SIZE); }
 
   bool write_char(char c) { return this->write_bytes_(&c, 1); }
 
-  bool write_literal(const char *text) {
+  bool write_literal(const char* text) {
     if (text == nullptr) {
       return true;
     }
@@ -181,7 +180,7 @@ class ChunkedJsonWriter {
     return len >= 0 && this->write_bytes_(buffer, static_cast<size_t>(len));
   }
 
-  bool write_json_string(const char *value, size_t len) {
+  bool write_json_string(const char* value, size_t len) {
     if (!this->write_char('"')) {
       return false;
     }
@@ -256,7 +255,7 @@ class ChunkedJsonWriter {
  private:
   static constexpr size_t BUFFER_SIZE = 512;
 
-  bool write_bytes_(const char *data, size_t len) {
+  bool write_bytes_(const char* data, size_t len) {
     if (!this->buffer_) {
       return false;
     }
@@ -265,7 +264,7 @@ class ChunkedJsonWriter {
     }
 
     size_t remaining = len;
-    const char *cursor = data;
+    const char* cursor = data;
     while (remaining > 0) {
       if (this->used_ == BUFFER_SIZE && !this->flush()) {
         return false;
@@ -282,16 +281,16 @@ class ChunkedJsonWriter {
     return true;
   }
 
-  httpd_req_t *req_;
+  httpd_req_t* req_;
   PsramBuffer<char> buffer_{};
   size_t used_{0};
 };
 
 class OpenQuattLogHistoryRequestHandler : public AsyncWebHandler {
  public:
-  explicit OpenQuattLogHistoryRequestHandler(OpenQuattLogHistory *parent) : parent_(parent) {}
+  explicit OpenQuattLogHistoryRequestHandler(OpenQuattLogHistory* parent) : parent_(parent) {}
 
-  bool passes_same_origin_(AsyncWebServerRequest *request) const {
+  bool passes_same_origin_(AsyncWebServerRequest* request) const {
     const auto host = request->get_header("Host");
     if (!host.has_value() || host->empty()) {
       return false;
@@ -310,12 +309,12 @@ class OpenQuattLogHistoryRequestHandler : public AsyncWebHandler {
     return true;
   }
 
-  bool passes_csrf_(AsyncWebServerRequest *request) const {
+  bool passes_csrf_(AsyncWebServerRequest* request) const {
     const std::string csrf_token = request->arg("csrf_token");
     return !csrf_token.empty() && csrf_token == this->parent_->get_csrf_token();
   }
 
-  bool canHandle(AsyncWebServerRequest *request) const override {
+  bool canHandle(AsyncWebServerRequest* request) const override {
     char url_buf[AsyncWebServerRequest::URL_BUF_SIZE];
     request->url_to(url_buf);
     if (url_path_matches(url_buf, "/openquatt/logs/recent")) {
@@ -324,7 +323,7 @@ class OpenQuattLogHistoryRequestHandler : public AsyncWebHandler {
     return url_path_matches(url_buf, "/openquatt/logs/clear") && request->method() == HTTP_POST;
   }
 
-  void handleRequest(AsyncWebServerRequest *request) override {
+  void handleRequest(AsyncWebServerRequest* request) override {
     char url_buf[AsyncWebServerRequest::URL_BUF_SIZE];
     request->url_to(url_buf);
     if (url_path_matches(url_buf, "/openquatt/logs/clear")) {
@@ -341,7 +340,7 @@ class OpenQuattLogHistoryRequestHandler : public AsyncWebHandler {
       return;
     }
 
-    httpd_req_t *req = *request;
+    httpd_req_t* req = *request;
     httpd_resp_set_status(req, HTTPD_200);
     httpd_resp_set_type(req, "application/json; charset=utf-8");
     httpd_resp_set_hdr(req, "Cache-Control", "no-store");
@@ -349,7 +348,7 @@ class OpenQuattLogHistoryRequestHandler : public AsyncWebHandler {
   }
 
  protected:
-  OpenQuattLogHistory *parent_;
+  OpenQuattLogHistory* parent_;
 };
 
 }  // namespace
@@ -391,7 +390,7 @@ uint8_t OpenQuattLogHistory::normalize_level_(uint8_t level) {
   return level;
 }
 
-const char *OpenQuattLogHistory::level_to_string_(uint8_t level) {
+const char* OpenQuattLogHistory::level_to_string_(uint8_t level) {
   switch (normalize_level_(level)) {
     case 1:
       return "E";
@@ -412,7 +411,8 @@ const char *OpenQuattLogHistory::level_to_string_(uint8_t level) {
   }
 }
 
-void OpenQuattLogHistory::copy_sanitized_log_line_(const char *message, size_t message_len, char *out, size_t out_size) {
+void OpenQuattLogHistory::copy_sanitized_log_line_(const char* message, size_t message_len, char* out,
+                                                   size_t out_size) {
   if (out == nullptr || out_size == 0) {
     return;
   }
@@ -450,8 +450,8 @@ void OpenQuattLogHistory::copy_sanitized_log_line_(const char *message, size_t m
   out[write_pos] = '\0';
 }
 
-void OpenQuattLogHistory::split_log_fields_(const char *raw, const char **tag_start, size_t *tag_len,
-                                            const char **message_start, size_t *message_len) {
+void OpenQuattLogHistory::split_log_fields_(const char* raw, const char** tag_start, size_t* tag_len,
+                                            const char** message_start, size_t* message_len) {
   if (tag_start != nullptr) {
     *tag_start = raw;
   }
@@ -469,29 +469,29 @@ void OpenQuattLogHistory::split_log_fields_(const char *raw, const char **tag_st
     return;
   }
 
-  const char *first_close = std::strchr(raw, ']');
+  const char* first_close = std::strchr(raw, ']');
   if (first_close == nullptr) {
     return;
   }
 
-  const char *tag_open = std::strchr(first_close + 1, '[');
+  const char* tag_open = std::strchr(first_close + 1, '[');
   if (tag_open == nullptr) {
     return;
   }
 
-  const char *tag_close = std::strchr(tag_open + 1, ']');
+  const char* tag_close = std::strchr(tag_open + 1, ']');
   if (tag_close == nullptr) {
     return;
   }
 
-  const char *resolved_message_start = std::strstr(tag_close + 1, ": ");
+  const char* resolved_message_start = std::strstr(tag_close + 1, ": ");
   if (resolved_message_start != nullptr) {
     resolved_message_start += 2;
   } else {
     resolved_message_start = tag_close + 1;
   }
 
-  const char *resolved_tag_end = std::strchr(tag_open + 1, ':');
+  const char* resolved_tag_end = std::strchr(tag_open + 1, ':');
   if (resolved_tag_end == nullptr || resolved_tag_end > tag_close) {
     resolved_tag_end = tag_close;
   }
@@ -510,7 +510,7 @@ void OpenQuattLogHistory::split_log_fields_(const char *raw, const char **tag_st
   }
 }
 
-void OpenQuattLogHistory::push_entry_locked_(const LogEntry &entry) {
+void OpenQuattLogHistory::push_entry_locked_(const LogEntry& entry) {
   if (!this->entries_) {
     return;
   }
@@ -596,7 +596,7 @@ void OpenQuattLogHistory::update_crash_time_breadcrumb_() {
   this->last_crash_breadcrumb_update_ms_ = now_ms;
 }
 
-void OpenQuattLogHistory::format_epoch_(uint32_t epoch_s, char *out, size_t out_size) {
+void OpenQuattLogHistory::format_epoch_(uint32_t epoch_s, char* out, size_t out_size) {
   if (out == nullptr || out_size == 0) {
     return;
   }
@@ -627,8 +627,9 @@ void OpenQuattLogHistory::maybe_log_pending_crash_report_() {
   if (this->pending_crash_breadcrumb_valid_) {
     char timestamp[32];
     format_epoch_(this->pending_crash_epoch_s_, timestamp, sizeof(timestamp));
-    ESP_LOGE(TAG, "Previous boot crashed; last known controller time before reset: %s (uptime %" PRIu32
-                  "s, breadcrumb seq %" PRIu32 ")",
+    ESP_LOGE(TAG,
+             "Previous boot crashed; last known controller time before reset: %s (uptime %" PRIu32
+             "s, breadcrumb seq %" PRIu32 ")",
              timestamp, this->pending_crash_uptime_s_, this->pending_crash_breadcrumb_sequence_);
   } else {
     ESP_LOGE(TAG, "Previous boot crashed; no retained pre-crash timestamp was available");
@@ -648,7 +649,7 @@ void OpenQuattLogHistory::maybe_log_pending_crash_report_() {
 }
 #endif
 
-void OpenQuattLogHistory::on_log_(uint8_t level, const char *tag, const char *message, size_t message_len) {
+void OpenQuattLogHistory::on_log_(uint8_t level, const char* tag, const char* message, size_t message_len) {
   if (!this->capture_enabled_() || message == nullptr || message_len == 0) {
     return;
   }
@@ -665,7 +666,7 @@ void OpenQuattLogHistory::on_log_(uint8_t level, const char *tag, const char *me
     return;
   }
 
-  (void) tag;
+  (void)tag;
   if (!this->lock_history_()) {
     return;
   }
@@ -722,10 +723,10 @@ void OpenQuattLogHistory::setup() {
   }
   this->rotate_csrf_token_();
 
-  logger::global_logger->add_log_callback(this, [](void *self, uint8_t level, const char *tag, const char *message,
-                                                   size_t message_len) {
-    static_cast<OpenQuattLogHistory *>(self)->on_log_(level, tag, message, message_len);
-  });
+  logger::global_logger->add_log_callback(
+      this, [](void* self, uint8_t level, const char* tag, const char* message, size_t message_len) {
+        static_cast<OpenQuattLogHistory*>(self)->on_log_(level, tag, message, message_len);
+      });
 
 #ifdef USE_ESP32_CRASH_HANDLER
   this->load_crash_time_breadcrumb_();
@@ -759,13 +760,14 @@ void OpenQuattLogHistory::dump_config() {
   ESP_LOGCONFIG(TAG, "  Clock: %s", this->clock_ == nullptr ? "<missing>" : "configured");
   ESP_LOGCONFIG(TAG, "  Enabled: %s", YESNO(this->enabled_));
   ESP_LOGCONFIG(TAG, "  Entries: %u / %u", static_cast<unsigned>(entry_count), static_cast<unsigned>(ENTRY_CAPACITY));
-  ESP_LOGCONFIG(TAG, "  History buffer: %s", !this->entries_ ? "missing" : (this->entries_.is_external() ? "PSRAM" : "internal"));
+  ESP_LOGCONFIG(TAG, "  History buffer: %s",
+                !this->entries_ ? "missing" : (this->entries_.is_external() ? "PSRAM" : "internal"));
 #ifdef USE_ESP32_CRASH_HANDLER
   ESP_LOGCONFIG(TAG, "  Pending crash report: %s", YESNO(this->pending_crash_report_));
 #endif
 }
 
-void OpenQuattLogHistory::write_recent_logs(httpd_req_t *req) const {
+void OpenQuattLogHistory::write_recent_logs(httpd_req_t* req) const {
   if (req == nullptr) {
     return;
   }
@@ -813,14 +815,14 @@ void OpenQuattLogHistory::write_recent_logs(httpd_req_t *req) const {
     return;
   }
 
-  auto write_json_entry = [&](const LogEntry &entry) -> bool {
-    const char *tag_start = "";
+  auto write_json_entry = [&](const LogEntry& entry) -> bool {
+    const char* tag_start = "";
     size_t tag_len = 0;
-    const char *message_start = entry.raw;
+    const char* message_start = entry.raw;
     size_t message_len = entry.raw_len;
     split_log_fields_(entry.raw, &tag_start, &tag_len, &message_start, &message_len);
 
-    const char *level = level_to_string_(entry.level);
+    const char* level = level_to_string_(entry.level);
 
     if (!writer.write_char('{')) {
       return false;

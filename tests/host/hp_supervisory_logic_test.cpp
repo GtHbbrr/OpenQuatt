@@ -5,8 +5,7 @@
 
 namespace {
 
-oq_hp_supervisory::FallbackEvaluationInputs
-eligible_fallback_evaluation_inputs() {
+oq_hp_supervisory::FallbackEvaluationInputs eligible_fallback_evaluation_inputs() {
   oq_hp_supervisory::FallbackEvaluationInputs inputs;
   inputs.current_mode = 3;
   inputs.heating_demand = true;
@@ -44,27 +43,23 @@ void test_fallback_evaluation_and_recovering_handover() {
   assert(!evaluation.no_hp_available_confirmed);
   assert(evaluation.fallback_requested);
   assert(!evaluation.decision.cm4_allowed);
-  assert(evaluation.decision.block_reason ==
-         FallbackBlockReason::HP_AVAILABILITY_UNKNOWN);
+  assert(evaluation.decision.block_reason == FallbackBlockReason::HP_AVAILABILITY_UNKNOWN);
   assert(evaluation.cm3_handover_wait);
 
   oq_hp_supervisory::Cm4ResumeTracker recovering_resume;
-  recovering_resume.observe_fallback_request(
-      evaluation.fallback_requested, 3);
+  recovering_resume.observe_fallback_request(evaluation.fallback_requested, 3);
   assert(recovering_resume.resume_mode() == 3);
-  recovering_resume.observe_fallback_request(
-      evaluation.fallback_requested, 1);
+  recovering_resume.observe_fallback_request(evaluation.fallback_requested, 1);
   assert(recovering_resume.resume_mode() == 3);
 
   // The prospective handover check releases only the two coupled stop gates.
   // Every real independent guard still prevents the CM3 hold.
   const auto recovering_inputs = inputs;
-  auto assert_no_handover_hold =
-      [&](const oq_hp_supervisory::FallbackEvaluationInputs &candidate) {
-        const auto blocked = evaluate_fallback(candidate);
-        assert(blocked.fallback_requested);
-        assert(!blocked.cm3_handover_wait);
-      };
+  auto assert_no_handover_hold = [&](const oq_hp_supervisory::FallbackEvaluationInputs& candidate) {
+    const auto blocked = evaluate_fallback(candidate);
+    assert(blocked.fallback_requested);
+    assert(!blocked.cm3_handover_wait);
+  };
 
   inputs = recovering_inputs;
   inputs.fallback_enabled = false;
@@ -105,8 +100,8 @@ void test_fallback_evaluation_and_recovering_handover() {
 }
 
 void test_heating_mode_decisions() {
-  using oq_hp_supervisory::HeatingModeInputs;
   using oq_hp_supervisory::decide_heating_mode;
+  using oq_hp_supervisory::HeatingModeInputs;
 
   HeatingModeInputs inputs;
   inputs.current_mode = 3;
@@ -148,8 +143,8 @@ void test_heating_mode_decisions() {
 }
 
 void test_control_mode_log_classification() {
-  using oq_hp_supervisory::ControlModeLogCodes;
   using oq_hp_supervisory::classify_control_mode_transition;
+  using oq_hp_supervisory::ControlModeLogCodes;
 
   const ControlModeLogCodes codes{
       {10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21},
@@ -157,61 +152,50 @@ void test_control_mode_log_classification() {
       {40, 41, 42, 43},
   };
 
-  auto decision = classify_control_mode_transition(
-      {3, 4, true, false, 10}, codes);
+  auto decision = classify_control_mode_transition({3, 4, true, false, 10}, codes);
   assert(decision.reason == 11);
   assert(decision.severity == 32);
   assert(decision.from_state == 42);
   assert(decision.to_state == 43);
 
-  decision = classify_control_mode_transition(
-      {4, 3, false, false, 10}, codes);
+  decision = classify_control_mode_transition({4, 3, false, false, 10}, codes);
   assert(decision.reason == 12);
   assert(decision.severity == 30);
   assert(decision.from_state == 43);
   assert(decision.to_state == 42);
 
-  decision = classify_control_mode_transition(
-      {4, 1, true, false, 10}, codes);
+  decision = classify_control_mode_transition({4, 1, true, false, 10}, codes);
   assert(decision.reason == 13);
   assert(decision.severity == 31);
 
-  decision = classify_control_mode_transition(
-      {4, 1, false, false, 77}, codes);
+  decision = classify_control_mode_transition({4, 1, false, false, 77}, codes);
   assert(decision.reason == 77);
   assert(decision.severity == 30);
 
-  decision = classify_control_mode_transition(
-      {4, 1, false, false, 10}, codes);
+  decision = classify_control_mode_transition({4, 1, false, false, 10}, codes);
   assert(decision.reason == 21);
   assert(decision.severity == 31);
 
-  decision = classify_control_mode_transition(
-      {4, 0, false, false, 10}, codes);
+  decision = classify_control_mode_transition({4, 0, false, false, 10}, codes);
   assert(decision.reason == 20);
   assert(decision.severity == 30);
 
-  decision = classify_control_mode_transition(
-      {4, 100, false, false, 10}, codes);
+  decision = classify_control_mode_transition({4, 100, false, false, 10}, codes);
   assert(decision.reason == 14);
   assert(decision.severity == 30);
 
-  decision = classify_control_mode_transition(
-      {0, 1, true, false, 10}, codes);
+  decision = classify_control_mode_transition({0, 1, true, false, 10}, codes);
   assert(decision.reason == 13);
   assert(decision.severity == 31);
 
-  decision = classify_control_mode_transition(
-      {2, 98, false, true, 10}, codes);
+  decision = classify_control_mode_transition({2, 98, false, true, 10}, codes);
   // Override classification retains its priority over the target mode.
   assert(decision.reason == 15);
 
-  decision = classify_control_mode_transition(
-      {0, 1, false, false, 77}, codes);
+  decision = classify_control_mode_transition({0, 1, false, false, 77}, codes);
   assert(decision.reason == 77);
 
-  decision = classify_control_mode_transition(
-      {5, 0, false, false, 10}, codes);
+  decision = classify_control_mode_transition({5, 0, false, false, 10}, codes);
   assert(decision.reason == 19);
   assert(decision.to_state == 40);
 }
@@ -219,8 +203,8 @@ void test_control_mode_log_classification() {
 }  // namespace
 
 int main() {
-  using oq_hp_supervisory::fallback_availability_is_confirmed;
   using oq_hp_supervisory::Cm4ResumeTracker;
+  using oq_hp_supervisory::fallback_availability_is_confirmed;
   using oq_hp_supervisory::recovered_heating_mode;
 
   assert(fallback_availability_is_confirmed(true, false, false));

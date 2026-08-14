@@ -22,10 +22,10 @@ namespace openquatt_mqtt_config {
 
 namespace {
 
-static const char *const TAG = "openquatt.mqtt_config";
+static const char* const TAG = "openquatt.mqtt_config";
 static const uint32_t STORAGE_KEY = fnv1_hash("openquatt_mqtt_config_store");
 
-std::string json_escape_(const std::string &input) {
+std::string json_escape_(const std::string& input) {
   std::string out;
   out.reserve(input.size() + 4);
   for (char c : input) {
@@ -65,7 +65,7 @@ std::string json_escape_(const std::string &input) {
   return out;
 }
 
-std::string base64_encode_bytes_(const uint8_t *data, size_t len) {
+std::string base64_encode_bytes_(const uint8_t* data, size_t len) {
   static const char alphabet[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
   std::string out;
   out.reserve(((len + 2) / 3) * 4);
@@ -82,7 +82,7 @@ std::string base64_encode_bytes_(const uint8_t *data, size_t len) {
   return out;
 }
 
-bool header_matches_host_(const std::string &header_value, const std::string &host) {
+bool header_matches_host_(const std::string& header_value, const std::string& host) {
   if (host.empty() || header_value.empty()) {
     return false;
   }
@@ -98,14 +98,14 @@ bool header_matches_host_(const std::string &header_value, const std::string &ho
   return authority == host;
 }
 
-const char *skip_spaces_(const char *cursor) {
+const char* skip_spaces_(const char* cursor) {
   while (cursor != nullptr && *cursor != '\0' && std::isspace(static_cast<unsigned char>(*cursor)) != 0) {
     cursor++;
   }
   return cursor;
 }
 
-bool parse_numeric_scalar_(const char *payload, float *value) {
+bool parse_numeric_scalar_(const char* payload, float* value) {
   if (payload == nullptr || value == nullptr) {
     return false;
   }
@@ -119,14 +119,14 @@ bool parse_numeric_scalar_(const char *payload, float *value) {
     normalized[i] = payload[i] == ',' ? '.' : payload[i];
   }
 
-  const char *begin = skip_spaces_(normalized);
-  char *end = nullptr;
+  const char* begin = skip_spaces_(normalized);
+  char* end = nullptr;
   const float parsed = std::strtof(begin, &end);
   if (begin == end || end == nullptr || !std::isfinite(parsed)) {
     return false;
   }
 
-  const char *tail = skip_spaces_(end);
+  const char* tail = skip_spaces_(end);
   if (static_cast<unsigned char>(tail[0]) == 0xC2U && static_cast<unsigned char>(tail[1]) == 0xB0U) {
     tail += 2;
     tail = skip_spaces_(tail);
@@ -143,19 +143,19 @@ bool parse_numeric_scalar_(const char *payload, float *value) {
   return true;
 }
 
-bool parse_numeric_json_(const char *payload, float *value) {
+bool parse_numeric_json_(const char* payload, float* value) {
   if (payload == nullptr || value == nullptr) {
     return false;
   }
 
   const size_t len = strlen(payload);
-  cJSON *root = cJSON_ParseWithLength(payload, len);
+  cJSON* root = cJSON_ParseWithLength(payload, len);
   if (root == nullptr) {
     return false;
   }
 
   bool ok = false;
-  const cJSON *item = cJSON_IsObject(root) ? cJSON_GetObjectItemCaseSensitive(root, "value") : root;
+  const cJSON* item = cJSON_IsObject(root) ? cJSON_GetObjectItemCaseSensitive(root, "value") : root;
   if (cJSON_IsNumber(item)) {
     *value = static_cast<float>(item->valuedouble);
     ok = std::isfinite(*value);
@@ -167,8 +167,8 @@ bool parse_numeric_json_(const char *payload, float *value) {
   return ok;
 }
 
-bool parse_numeric_payload_(const char *payload, float *value) {
-  const char *trimmed = skip_spaces_(payload);
+bool parse_numeric_payload_(const char* payload, float* value) {
+  const char* trimmed = skip_spaces_(payload);
   if (trimmed == nullptr || *trimmed == '\0') {
     return false;
   }
@@ -178,9 +178,9 @@ bool parse_numeric_payload_(const char *payload, float *value) {
   return parse_numeric_scalar_(trimmed, value);
 }
 
-std::string lowercase_trimmed_(const char *payload) {
+std::string lowercase_trimmed_(const char* payload) {
   std::string out;
-  const char *cursor = skip_spaces_(payload);
+  const char* cursor = skip_spaces_(payload);
   if (cursor == nullptr) {
     return out;
   }
@@ -194,7 +194,7 @@ std::string lowercase_trimmed_(const char *payload) {
   return out;
 }
 
-bool parse_binary_scalar_(const char *payload, bool *value) {
+bool parse_binary_scalar_(const char* payload, bool* value) {
   if (payload == nullptr || value == nullptr) {
     return false;
   }
@@ -213,19 +213,19 @@ bool parse_binary_scalar_(const char *payload, bool *value) {
   return false;
 }
 
-bool parse_binary_json_(const char *payload, bool *value) {
+bool parse_binary_json_(const char* payload, bool* value) {
   if (payload == nullptr || value == nullptr) {
     return false;
   }
 
   const size_t len = strlen(payload);
-  cJSON *root = cJSON_ParseWithLength(payload, len);
+  cJSON* root = cJSON_ParseWithLength(payload, len);
   if (root == nullptr) {
     return false;
   }
 
   bool ok = false;
-  const cJSON *item = cJSON_IsObject(root) ? cJSON_GetObjectItemCaseSensitive(root, "value") : root;
+  const cJSON* item = cJSON_IsObject(root) ? cJSON_GetObjectItemCaseSensitive(root, "value") : root;
   if (cJSON_IsBool(item)) {
     *value = cJSON_IsTrue(item);
     ok = true;
@@ -245,8 +245,8 @@ bool parse_binary_json_(const char *payload, bool *value) {
   return ok;
 }
 
-bool parse_binary_payload_(const char *payload, bool *value) {
-  const char *trimmed = skip_spaces_(payload);
+bool parse_binary_payload_(const char* payload, bool* value) {
+  const char* trimmed = skip_spaces_(payload);
   if (trimmed == nullptr || *trimmed == '\0') {
     return false;
   }
@@ -258,9 +258,9 @@ bool parse_binary_payload_(const char *payload, bool *value) {
 
 class MqttConfigHandler : public AsyncWebHandler {
  public:
-  explicit MqttConfigHandler(OpenQuattMqttConfig *parent) : parent_(parent) {}
+  explicit MqttConfigHandler(OpenQuattMqttConfig* parent) : parent_(parent) {}
 
-  bool canHandle(AsyncWebServerRequest *request) const override {
+  bool canHandle(AsyncWebServerRequest* request) const override {
     char url_buf[AsyncWebServerRequest::URL_BUF_SIZE];
     StringRef url = request->url_to(url_buf);
     if (url == "/mqtt/status" && request->method() == HTTP_GET) {
@@ -278,23 +278,18 @@ class MqttConfigHandler : public AsyncWebHandler {
     return false;
   }
 
-  void handleRequest(AsyncWebServerRequest *request) override {
+  void handleRequest(AsyncWebServerRequest* request) override {
     char url_buf[AsyncWebServerRequest::URL_BUF_SIZE];
     StringRef url = request->url_to(url_buf);
     if (url == "/mqtt/status" && request->method() == HTTP_GET) {
       const auto status = this->parent_->get_status_snapshot();
       const std::string broker = json_escape_(status.broker);
       const std::string username = json_escape_(status.username);
-      const auto outside_index =
-          static_cast<size_t>(OpenQuattMqttConfig::NumericInputKind::OUTSIDE_TEMPERATURE);
-      const auto room_temp_index =
-          static_cast<size_t>(OpenQuattMqttConfig::NumericInputKind::ROOM_TEMPERATURE);
-      const auto room_setpoint_index =
-          static_cast<size_t>(OpenQuattMqttConfig::NumericInputKind::ROOM_SETPOINT);
-      const auto heating_enable_index =
-          static_cast<size_t>(OpenQuattMqttConfig::BinaryInputKind::HEATING_ENABLE);
-      const auto cooling_enable_index =
-          static_cast<size_t>(OpenQuattMqttConfig::BinaryInputKind::COOLING_ENABLE);
+      const auto outside_index = static_cast<size_t>(OpenQuattMqttConfig::NumericInputKind::OUTSIDE_TEMPERATURE);
+      const auto room_temp_index = static_cast<size_t>(OpenQuattMqttConfig::NumericInputKind::ROOM_TEMPERATURE);
+      const auto room_setpoint_index = static_cast<size_t>(OpenQuattMqttConfig::NumericInputKind::ROOM_SETPOINT);
+      const auto heating_enable_index = static_cast<size_t>(OpenQuattMqttConfig::BinaryInputKind::HEATING_ENABLE);
+      const auto cooling_enable_index = static_cast<size_t>(OpenQuattMqttConfig::BinaryInputKind::COOLING_ENABLE);
       const std::string topic = json_escape_(status.dew_point_topic);
       const std::string outside_topic = json_escape_(status.input_topics[outside_index]);
       const std::string room_temp_topic = json_escape_(status.input_topics[room_temp_index]);
@@ -303,33 +298,37 @@ class MqttConfigHandler : public AsyncWebHandler {
       const std::string cooling_enable_topic = json_escape_(status.binary_input_topics[cooling_enable_index]);
       const std::string source = json_escape_(status.config_source);
       const std::string csrf_token = json_escape_(status.csrf_token);
-      auto *stream = request->beginResponseStream("application/json");
+      auto* stream = request->beginResponseStream("application/json");
       stream->printf(
           R"({"enabled":%s,"connected":%s,"broker":"%s","port":%u,"username":"%s","password_set":%s,"dew_point_topic":"%s","input_topics":{"cooling_dew_point":"%s","outside_temperature":"%s","room_temperature":"%s","room_setpoint":"%s","heating_enable":"%s","cooling_enable":"%s"},"input_enabled":{"cooling_dew_point":%s,"outside_temperature":%s,"room_temperature":%s,"room_setpoint":%s,"heating_enable":%s,"cooling_enable":%s},"input_retained":{"cooling_dew_point":%s,"outside_temperature":%s,"room_temperature":%s,"room_setpoint":%s,"heating_enable":%s,"cooling_enable":%s},"input_accept_retained":{"cooling_dew_point":%s,"outside_temperature":%s,"room_temperature":%s,"room_setpoint":%s,"heating_enable":%s,"cooling_enable":%s},"non_retained_stateful_timeout_s":%u,"source":"%s","csrf_token":"%s"})",
           status.enabled ? "true" : "false", status.connected ? "true" : "false", broker.c_str(), status.port,
-          username.c_str(), status.password_set ? "true" : "false", topic.c_str(), topic.c_str(),
-          outside_topic.c_str(), room_temp_topic.c_str(), room_setpoint_topic.c_str(), heating_enable_topic.c_str(),
+          username.c_str(), status.password_set ? "true" : "false", topic.c_str(), topic.c_str(), outside_topic.c_str(),
+          room_temp_topic.c_str(), room_setpoint_topic.c_str(), heating_enable_topic.c_str(),
           cooling_enable_topic.c_str(),
-          status.input_enabled[static_cast<size_t>(OpenQuattMqttConfig::NumericInputKind::COOLING_DEW_POINT)] ? "true" : "false",
+          status.input_enabled[static_cast<size_t>(OpenQuattMqttConfig::NumericInputKind::COOLING_DEW_POINT)] ? "true"
+                                                                                                              : "false",
           status.input_enabled[outside_index] ? "true" : "false",
           status.input_enabled[room_temp_index] ? "true" : "false",
           status.input_enabled[room_setpoint_index] ? "true" : "false",
           status.binary_input_enabled[heating_enable_index] ? "true" : "false",
           status.binary_input_enabled[cooling_enable_index] ? "true" : "false",
-          status.input_retained[static_cast<size_t>(OpenQuattMqttConfig::NumericInputKind::COOLING_DEW_POINT)] ? "true" : "false",
+          status.input_retained[static_cast<size_t>(OpenQuattMqttConfig::NumericInputKind::COOLING_DEW_POINT)]
+              ? "true"
+              : "false",
           status.input_retained[outside_index] ? "true" : "false",
           status.input_retained[room_temp_index] ? "true" : "false",
           status.input_retained[room_setpoint_index] ? "true" : "false",
           status.binary_input_retained[heating_enable_index] ? "true" : "false",
           status.binary_input_retained[cooling_enable_index] ? "true" : "false",
-          status.input_accept_retained[static_cast<size_t>(OpenQuattMqttConfig::NumericInputKind::COOLING_DEW_POINT)] ? "true" : "false",
+          status.input_accept_retained[static_cast<size_t>(OpenQuattMqttConfig::NumericInputKind::COOLING_DEW_POINT)]
+              ? "true"
+              : "false",
           status.input_accept_retained[outside_index] ? "true" : "false",
           status.input_accept_retained[room_temp_index] ? "true" : "false",
           status.input_accept_retained[room_setpoint_index] ? "true" : "false",
           status.binary_input_accept_retained[heating_enable_index] ? "true" : "false",
           status.binary_input_accept_retained[cooling_enable_index] ? "true" : "false",
-          static_cast<unsigned>(30U * 60U),
-          source.c_str(), csrf_token.c_str());
+          static_cast<unsigned>(30U * 60U), source.c_str(), csrf_token.c_str());
       request->send(stream);
       return;
     }
@@ -346,17 +345,17 @@ class MqttConfigHandler : public AsyncWebHandler {
       std::string password = request->arg("password");
       const std::string clear_password_arg = request->arg("clear_password");
       const std::string enabled_arg = request->arg("enabled");
-      bool clear_password =
-          clear_password_arg == "true" || clear_password_arg == "1" || clear_password_arg == "on";
+      bool clear_password = clear_password_arg == "true" || clear_password_arg == "1" || clear_password_arg == "on";
       const bool enabled = enabled_arg == "true" || enabled_arg == "1" || enabled_arg == "on";
       const bool remove_config = !enabled && broker.empty();
 
-      char *end = nullptr;
+      char* end = nullptr;
       unsigned long parsed_port = 1883;
       if (!port_arg.empty()) {
         parsed_port = strtoul(port_arg.c_str(), &end, 10);
       }
-      if ((enabled || !port_arg.empty()) && (end == nullptr || *end != '\0' || parsed_port == 0 || parsed_port > 65535)) {
+      if ((enabled || !port_arg.empty()) &&
+          (end == nullptr || *end != '\0' || parsed_port == 0 || parsed_port > 65535)) {
         request->send(409, "application/json", R"({"ok":false,"error":"invalid_port"})");
         return;
       }
@@ -379,14 +378,13 @@ class MqttConfigHandler : public AsyncWebHandler {
       }
 
       if (!this->parent_->set_runtime_config(broker, static_cast<uint16_t>(parsed_port), username, password,
-                                             clear_password,
-                                             enabled)) {
+                                             clear_password, enabled)) {
         request->send(500, "application/json", R"({"ok":false,"error":"save_failed"})");
         return;
       }
 
       const auto status = this->parent_->get_status_snapshot();
-      auto *stream = request->beginResponseStream("application/json");
+      auto* stream = request->beginResponseStream("application/json");
       stream->printf(R"({"ok":true,"enabled":%s,"connected":%s})", status.enabled ? "true" : "false",
                      status.connected ? "true" : "false");
       request->send(stream);
@@ -408,7 +406,7 @@ class MqttConfigHandler : public AsyncWebHandler {
       }
 
       const auto status = this->parent_->get_status_snapshot();
-      auto *stream = request->beginResponseStream("application/json");
+      auto* stream = request->beginResponseStream("application/json");
       stream->printf(R"({"ok":true,"enabled":%s,"connected":%s})", enabled ? "true" : "false",
                      status.connected ? "true" : "false");
       request->send(stream);
@@ -423,17 +421,17 @@ class MqttConfigHandler : public AsyncWebHandler {
 
       const std::string input = request->arg("input");
       const std::string accept_retained_arg = request->arg("accept_retained");
-      const bool accept_retained = accept_retained_arg == "true" || accept_retained_arg == "1" ||
-                                   accept_retained_arg == "on";
+      const bool accept_retained =
+          accept_retained_arg == "true" || accept_retained_arg == "1" || accept_retained_arg == "on";
       if (!this->parent_->set_input_accept_retained(input, accept_retained)) {
         request->send(409, "application/json", R"({"ok":false,"error":"save_failed"})");
         return;
       }
 
       const auto status = this->parent_->get_status_snapshot();
-      auto *stream = request->beginResponseStream("application/json");
-      stream->printf(R"({"ok":true,"accept_retained":%s,"connected":%s})",
-                     accept_retained ? "true" : "false", status.connected ? "true" : "false");
+      auto* stream = request->beginResponseStream("application/json");
+      stream->printf(R"({"ok":true,"accept_retained":%s,"connected":%s})", accept_retained ? "true" : "false",
+                     status.connected ? "true" : "false");
       request->send(stream);
       return;
     }
@@ -442,7 +440,7 @@ class MqttConfigHandler : public AsyncWebHandler {
   }
 
  protected:
-  bool passes_same_origin_(AsyncWebServerRequest *request) const {
+  bool passes_same_origin_(AsyncWebServerRequest* request) const {
     const auto host = request->get_header("Host");
     if (!host.has_value() || host->empty()) {
       return false;
@@ -461,13 +459,13 @@ class MqttConfigHandler : public AsyncWebHandler {
     return true;
   }
 
-  bool passes_csrf_(AsyncWebServerRequest *request) const {
+  bool passes_csrf_(AsyncWebServerRequest* request) const {
     const std::string csrf_token = request->arg("csrf_token");
     const auto status = this->parent_->get_status_snapshot();
     return !csrf_token.empty() && csrf_token == status.csrf_token;
   }
 
-  OpenQuattMqttConfig *parent_;
+  OpenQuattMqttConfig* parent_;
 };
 
 }  // namespace
@@ -521,8 +519,7 @@ OpenQuattMqttConfig::StatusSnapshot OpenQuattMqttConfig::get_status_snapshot() {
     snapshot.binary_input_retained[i] = this->binary_inputs_[i].last_valid_retained;
     snapshot.binary_input_accept_retained[i] = this->is_binary_input_accept_retained_(i);
   }
-  snapshot.dew_point_topic =
-      this->numeric_input_(NumericInputKind::COOLING_DEW_POINT).topic;
+  snapshot.dew_point_topic = this->numeric_input_(NumericInputKind::COOLING_DEW_POINT).topic;
   snapshot.config_source = this->config_source_;
   snapshot.csrf_token = this->csrf_token_;
   this->unlock_config_();
@@ -574,8 +571,8 @@ void OpenQuattMqttConfig::dump_config() {
 
 float OpenQuattMqttConfig::get_setup_priority() const { return setup_priority::LATE; }
 
-bool OpenQuattMqttConfig::set_runtime_config(const std::string &broker, uint16_t port, const std::string &username,
-                                             const std::string &password, bool clear_password, bool enabled) {
+bool OpenQuattMqttConfig::set_runtime_config(const std::string& broker, uint16_t port, const std::string& username,
+                                             const std::string& password, bool clear_password, bool enabled) {
   this->lock_runtime_();
   Storage storage{};
   if (!this->load_storage_(&storage)) {
@@ -593,8 +590,8 @@ bool OpenQuattMqttConfig::set_runtime_config(const std::string &broker, uint16_t
   this->unlock_config_();
 
   const std::string next_password = clear_password ? "" : (password.empty() ? current_password : password);
-  if (!this->build_storage_(broker, port, username, next_password, enabled, input_disabled_mask,
-                            retained_disabled_mask, &storage)) {
+  if (!this->build_storage_(broker, port, username, next_password, enabled, input_disabled_mask, retained_disabled_mask,
+                            &storage)) {
     this->unlock_runtime_();
     return false;
   }
@@ -609,7 +606,7 @@ bool OpenQuattMqttConfig::set_runtime_config(const std::string &broker, uint16_t
   return true;
 }
 
-bool OpenQuattMqttConfig::set_input_enabled(const std::string &key, bool enabled) {
+bool OpenQuattMqttConfig::set_input_enabled(const std::string& key, bool enabled) {
   uint8_t input_mask = 0;
   if (!this->input_mask_for_key_(key, &input_mask)) {
     return false;
@@ -661,7 +658,7 @@ bool OpenQuattMqttConfig::set_input_enabled(const std::string &key, bool enabled
   return true;
 }
 
-bool OpenQuattMqttConfig::set_input_accept_retained(const std::string &key, bool accept_retained) {
+bool OpenQuattMqttConfig::set_input_accept_retained(const std::string& key, bool accept_retained) {
   uint8_t input_mask = 0;
   if (!this->input_mask_for_key_(key, &input_mask) || (input_mask & STATEFUL_INPUT_MASK) == 0U) {
     return false;
@@ -715,7 +712,7 @@ bool OpenQuattMqttConfig::set_input_accept_retained(const std::string &key, bool
   return true;
 }
 
-bool OpenQuattMqttConfig::load_storage_(Storage *storage) {
+bool OpenQuattMqttConfig::load_storage_(Storage* storage) {
   if (storage == nullptr) {
     return false;
   }
@@ -725,7 +722,7 @@ bool OpenQuattMqttConfig::load_storage_(Storage *storage) {
   return this->is_valid_storage_(*storage);
 }
 
-bool OpenQuattMqttConfig::save_storage_(const Storage &storage, bool sync) {
+bool OpenQuattMqttConfig::save_storage_(const Storage& storage, bool sync) {
   if (!this->pref_.save(&storage)) {
     ESP_LOGE(TAG, "Failed to save MQTT configuration to preferences");
     return false;
@@ -743,7 +740,7 @@ bool OpenQuattMqttConfig::save_storage_(const Storage &storage, bool sync) {
   return true;
 }
 
-bool OpenQuattMqttConfig::apply_storage_(const Storage &storage, const char *source) {
+bool OpenQuattMqttConfig::apply_storage_(const Storage& storage, const char* source) {
   const bool enabled = storage.enabled != 0U;
   bool clear_all_inputs = !enabled;
   this->lock_config_();
@@ -792,9 +789,9 @@ bool OpenQuattMqttConfig::apply_storage_(const Storage &storage, const char *sou
   return true;
 }
 
-bool OpenQuattMqttConfig::build_storage_(const std::string &broker, uint16_t port, const std::string &username,
-                                         const std::string &password, bool enabled, uint8_t input_disabled_mask,
-                                         uint8_t retained_disabled_mask, Storage *storage) {
+bool OpenQuattMqttConfig::build_storage_(const std::string& broker, uint16_t port, const std::string& username,
+                                         const std::string& password, bool enabled, uint8_t input_disabled_mask,
+                                         uint8_t retained_disabled_mask, Storage* storage) {
   if (storage == nullptr) {
     return false;
   }
@@ -818,7 +815,7 @@ bool OpenQuattMqttConfig::build_storage_(const std::string &broker, uint16_t por
   return true;
 }
 
-bool OpenQuattMqttConfig::is_valid_storage_(const Storage &storage) const {
+bool OpenQuattMqttConfig::is_valid_storage_(const Storage& storage) const {
   if (storage.magic != STORAGE_MAGIC || storage.version != STORAGE_VERSION) {
     return false;
   }
@@ -839,7 +836,7 @@ bool OpenQuattMqttConfig::register_http_handlers_() {
   if (this->handlers_registered_) {
     return true;
   }
-  auto *base = web_server_base::global_web_server_base;
+  auto* base = web_server_base::global_web_server_base;
   if (base == nullptr) {
     ESP_LOGW(TAG, "Web server base not available; MQTT config API disabled");
     return false;
@@ -851,7 +848,7 @@ bool OpenQuattMqttConfig::register_http_handlers_() {
 
 void OpenQuattMqttConfig::rotate_csrf_token_() {
   std::array<uint8_t, 16> token_bytes{};
-  for (auto &byte : token_bytes) {
+  for (auto& byte : token_bytes) {
     byte = static_cast<uint8_t>(random_uint32() & 0xFF);
   }
   this->csrf_token_ = base64_encode_bytes_(token_bytes.data(), token_bytes.size());
@@ -911,8 +908,8 @@ bool OpenQuattMqttConfig::start_client_() {
     return false;
   }
 
-  esp_err_t err = esp_mqtt_client_register_event(this->mqtt_client_, MQTT_EVENT_ANY, &OpenQuattMqttConfig::mqtt_event_handler_,
-                                                 this);
+  esp_err_t err = esp_mqtt_client_register_event(this->mqtt_client_, MQTT_EVENT_ANY,
+                                                 &OpenQuattMqttConfig::mqtt_event_handler_, this);
   if (err != ESP_OK) {
     ESP_LOGE(TAG, "Failed to register MQTT ingress event handler: %s", esp_err_to_name(err));
     esp_mqtt_client_destroy(this->mqtt_client_);
@@ -965,9 +962,7 @@ void OpenQuattMqttConfig::stop_client_() {
   this->connected_.store(false);
 }
 
-void OpenQuattMqttConfig::request_client_stop_() {
-  this->client_start_pending_.store(false);
-}
+void OpenQuattMqttConfig::request_client_stop_() { this->client_start_pending_.store(false); }
 
 void OpenQuattMqttConfig::request_client_start_() {
   this->lock_config_();
@@ -1001,8 +996,8 @@ void OpenQuattMqttConfig::request_client_start_() {
   App.wake_loop_threadsafe();
 }
 
-void OpenQuattMqttConfig::start_client_task_(void *arg) {
-  auto *self = static_cast<OpenQuattMqttConfig *>(arg);
+void OpenQuattMqttConfig::start_client_task_(void* arg) {
+  auto* self = static_cast<OpenQuattMqttConfig*>(arg);
   if (self != nullptr) {
     if (!self->start_client_()) {
       ESP_LOGW(TAG, "MQTT ingress client start failed; retrying when the component loop runs again");
@@ -1015,7 +1010,7 @@ void OpenQuattMqttConfig::start_client_task_(void *arg) {
   vTaskDelete(nullptr);
 }
 
-void OpenQuattMqttConfig::set_numeric_input_topic_(NumericInputKind kind, const std::string &topic) {
+void OpenQuattMqttConfig::set_numeric_input_topic_(NumericInputKind kind, const std::string& topic) {
   this->numeric_input_(kind).topic = topic;
 }
 
@@ -1023,28 +1018,28 @@ void OpenQuattMqttConfig::set_numeric_input_stale_ms_(NumericInputKind kind, uin
   this->numeric_input_(kind).stale_ms = stale_ms;
 }
 
-void OpenQuattMqttConfig::set_numeric_input_sensor_(NumericInputKind kind, sensor::Sensor *sensor) {
+void OpenQuattMqttConfig::set_numeric_input_sensor_(NumericInputKind kind, sensor::Sensor* sensor) {
   this->numeric_input_(kind).sensor = sensor;
 }
 
-void OpenQuattMqttConfig::set_numeric_input_age_sensor_(NumericInputKind kind, sensor::Sensor *sensor) {
+void OpenQuattMqttConfig::set_numeric_input_age_sensor_(NumericInputKind kind, sensor::Sensor* sensor) {
   this->numeric_input_(kind).age_sensor = sensor;
 }
 
 void OpenQuattMqttConfig::set_numeric_input_valid_binary_sensor_(NumericInputKind kind,
-                                                                 binary_sensor::BinarySensor *binary_sensor) {
+                                                                 binary_sensor::BinarySensor* binary_sensor) {
   this->numeric_input_(kind).valid_binary_sensor = binary_sensor;
 }
 
-OpenQuattMqttConfig::NumericInput &OpenQuattMqttConfig::numeric_input_(NumericInputKind kind) {
+OpenQuattMqttConfig::NumericInput& OpenQuattMqttConfig::numeric_input_(NumericInputKind kind) {
   return this->numeric_inputs_[static_cast<size_t>(kind)];
 }
 
-const OpenQuattMqttConfig::NumericInput &OpenQuattMqttConfig::numeric_input_(NumericInputKind kind) const {
+const OpenQuattMqttConfig::NumericInput& OpenQuattMqttConfig::numeric_input_(NumericInputKind kind) const {
   return this->numeric_inputs_[static_cast<size_t>(kind)];
 }
 
-void OpenQuattMqttConfig::set_binary_input_topic_(BinaryInputKind kind, const std::string &topic) {
+void OpenQuattMqttConfig::set_binary_input_topic_(BinaryInputKind kind, const std::string& topic) {
   this->binary_input_(kind).topic = topic;
 }
 
@@ -1053,24 +1048,24 @@ void OpenQuattMqttConfig::set_binary_input_stale_ms_(BinaryInputKind kind, uint3
 }
 
 void OpenQuattMqttConfig::set_binary_input_binary_sensor_(BinaryInputKind kind,
-                                                          binary_sensor::BinarySensor *binary_sensor) {
+                                                          binary_sensor::BinarySensor* binary_sensor) {
   this->binary_input_(kind).binary_sensor = binary_sensor;
 }
 
-void OpenQuattMqttConfig::set_binary_input_age_sensor_(BinaryInputKind kind, sensor::Sensor *sensor) {
+void OpenQuattMqttConfig::set_binary_input_age_sensor_(BinaryInputKind kind, sensor::Sensor* sensor) {
   this->binary_input_(kind).age_sensor = sensor;
 }
 
 void OpenQuattMqttConfig::set_binary_input_valid_binary_sensor_(BinaryInputKind kind,
-                                                                binary_sensor::BinarySensor *binary_sensor) {
+                                                                binary_sensor::BinarySensor* binary_sensor) {
   this->binary_input_(kind).valid_binary_sensor = binary_sensor;
 }
 
-OpenQuattMqttConfig::BinaryInput &OpenQuattMqttConfig::binary_input_(BinaryInputKind kind) {
+OpenQuattMqttConfig::BinaryInput& OpenQuattMqttConfig::binary_input_(BinaryInputKind kind) {
   return this->binary_inputs_[static_cast<size_t>(kind)];
 }
 
-const OpenQuattMqttConfig::BinaryInput &OpenQuattMqttConfig::binary_input_(BinaryInputKind kind) const {
+const OpenQuattMqttConfig::BinaryInput& OpenQuattMqttConfig::binary_input_(BinaryInputKind kind) const {
   return this->binary_inputs_[static_cast<size_t>(kind)];
 }
 
@@ -1114,7 +1109,7 @@ bool OpenQuattMqttConfig::is_binary_input_accept_retained_(size_t input_index) c
   return (this->retained_disabled_mask_.load() & mask) == 0U;
 }
 
-bool OpenQuattMqttConfig::input_mask_for_key_(const std::string &key, uint8_t *mask) const {
+bool OpenQuattMqttConfig::input_mask_for_key_(const std::string& key, uint8_t* mask) const {
   if (mask == nullptr) {
     return false;
   }
@@ -1135,7 +1130,7 @@ bool OpenQuattMqttConfig::input_mask_for_key_(const std::string &key, uint8_t *m
 
 void OpenQuattMqttConfig::clear_all_inputs_() {
   portENTER_CRITICAL(&this->pending_lock_);
-  for (auto &input : this->numeric_inputs_) {
+  for (auto& input : this->numeric_inputs_) {
     input.pending_payload_ready = false;
     input.pending_invalid_payload_ready = false;
     input.pending_retained = false;
@@ -1144,7 +1139,7 @@ void OpenQuattMqttConfig::clear_all_inputs_() {
     input.last_valid_ms = 0;
     input.last_valid_retained = false;
   }
-  for (auto &input : this->binary_inputs_) {
+  for (auto& input : this->binary_inputs_) {
     input.pending_payload_ready = false;
     input.pending_invalid_payload_ready = false;
     input.pending_retained = false;
@@ -1163,7 +1158,7 @@ void OpenQuattMqttConfig::clear_disabled_inputs_() {
     if ((disabled_mask & static_cast<uint8_t>(1U << i)) == 0U) {
       continue;
     }
-    auto &input = this->numeric_inputs_[i];
+    auto& input = this->numeric_inputs_[i];
     input.pending_payload_ready = false;
     input.pending_invalid_payload_ready = false;
     input.pending_retained = false;
@@ -1177,7 +1172,7 @@ void OpenQuattMqttConfig::clear_disabled_inputs_() {
     if ((disabled_mask & mask) == 0U) {
       continue;
     }
-    auto &input = this->binary_inputs_[i];
+    auto& input = this->binary_inputs_[i];
     input.pending_payload_ready = false;
     input.pending_invalid_payload_ready = false;
     input.pending_retained = false;
@@ -1195,7 +1190,7 @@ void OpenQuattMqttConfig::clear_input_(uint8_t input_mask) {
     if ((input_mask & static_cast<uint8_t>(1U << i)) == 0U) {
       continue;
     }
-    auto &input = this->numeric_inputs_[i];
+    auto& input = this->numeric_inputs_[i];
     input.pending_payload_ready = false;
     input.pending_invalid_payload_ready = false;
     input.pending_retained = false;
@@ -1209,7 +1204,7 @@ void OpenQuattMqttConfig::clear_input_(uint8_t input_mask) {
     if ((input_mask & mask) == 0U) {
       continue;
     }
-    auto &input = this->binary_inputs_[i];
+    auto& input = this->binary_inputs_[i];
     input.pending_payload_ready = false;
     input.pending_invalid_payload_ready = false;
     input.pending_retained = false;
@@ -1228,7 +1223,7 @@ void OpenQuattMqttConfig::clear_session_scoped_inputs_() {
     if ((session_scoped_mask & static_cast<uint8_t>(1U << i)) == 0U) {
       continue;
     }
-    auto &input = this->numeric_inputs_[i];
+    auto& input = this->numeric_inputs_[i];
     input.last_valid_value = NAN;
     input.last_valid_ms = 0;
     input.last_valid_retained = false;
@@ -1238,7 +1233,7 @@ void OpenQuattMqttConfig::clear_session_scoped_inputs_() {
     if ((session_scoped_mask & mask) == 0U) {
       continue;
     }
-    auto &input = this->binary_inputs_[i];
+    auto& input = this->binary_inputs_[i];
     input.last_valid_value = false;
     input.last_valid_ms = 0;
     input.last_valid_retained = false;
@@ -1268,7 +1263,7 @@ void OpenQuattMqttConfig::subscribe_inputs_(esp_mqtt_client_handle_t client) {
   }
 
   for (size_t i = 0; i < this->numeric_inputs_.size(); i++) {
-    const auto &input = this->numeric_inputs_[i];
+    const auto& input = this->numeric_inputs_[i];
     if (!this->is_numeric_input_enabled_(i)) {
       continue;
     }
@@ -1284,7 +1279,7 @@ void OpenQuattMqttConfig::subscribe_inputs_(esp_mqtt_client_handle_t client) {
   }
 
   for (size_t i = 0; i < this->binary_inputs_.size(); i++) {
-    const auto &input = this->binary_inputs_[i];
+    const auto& input = this->binary_inputs_[i];
     if (!this->is_binary_input_enabled_(i)) {
       continue;
     }
@@ -1300,42 +1295,40 @@ void OpenQuattMqttConfig::subscribe_inputs_(esp_mqtt_client_handle_t client) {
   }
 }
 
-int OpenQuattMqttConfig::find_numeric_input_index_by_topic_(const char *topic, int topic_len) const {
+int OpenQuattMqttConfig::find_numeric_input_index_by_topic_(const char* topic, int topic_len) const {
   if (topic == nullptr || topic_len <= 0) {
     return -1;
   }
 
   for (size_t i = 0; i < this->numeric_inputs_.size(); i++) {
-    const auto &input = this->numeric_inputs_[i];
+    const auto& input = this->numeric_inputs_[i];
     if (this->is_numeric_input_enabled_(i) && !input.topic.empty() &&
-        input.topic.size() == static_cast<size_t>(topic_len) &&
-        memcmp(topic, input.topic.data(), topic_len) == 0) {
+        input.topic.size() == static_cast<size_t>(topic_len) && memcmp(topic, input.topic.data(), topic_len) == 0) {
       return static_cast<int>(i);
     }
   }
   return -1;
 }
 
-int OpenQuattMqttConfig::find_binary_input_index_by_topic_(const char *topic, int topic_len) const {
+int OpenQuattMqttConfig::find_binary_input_index_by_topic_(const char* topic, int topic_len) const {
   if (topic == nullptr || topic_len <= 0) {
     return -1;
   }
 
   for (size_t i = 0; i < this->binary_inputs_.size(); i++) {
-    const auto &input = this->binary_inputs_[i];
+    const auto& input = this->binary_inputs_[i];
     if (this->is_binary_input_enabled_(i) && !input.topic.empty() &&
-        input.topic.size() == static_cast<size_t>(topic_len) &&
-        memcmp(topic, input.topic.data(), topic_len) == 0) {
+        input.topic.size() == static_cast<size_t>(topic_len) && memcmp(topic, input.topic.data(), topic_len) == 0) {
       return static_cast<int>(i);
     }
   }
   return -1;
 }
 
-void OpenQuattMqttConfig::mqtt_event_handler_(void *handler_args, esp_event_base_t base, int32_t event_id,
-                                              void *event_data) {
-  auto *self = static_cast<OpenQuattMqttConfig *>(handler_args);
-  auto *event = static_cast<esp_mqtt_event_handle_t>(event_data);
+void OpenQuattMqttConfig::mqtt_event_handler_(void* handler_args, esp_event_base_t base, int32_t event_id,
+                                              void* event_data) {
+  auto* self = static_cast<OpenQuattMqttConfig*>(handler_args);
+  auto* event = static_cast<esp_mqtt_event_handle_t>(event_data);
   if (self == nullptr || event == nullptr) {
     return;
   }
@@ -1365,9 +1358,8 @@ void OpenQuattMqttConfig::mqtt_event_handler_(void *handler_args, esp_event_base
           event->data_len == event->total_data_len) {
         const int numeric_input_index = self->find_numeric_input_index_by_topic_(event->topic, event->topic_len);
         if (numeric_input_index >= 0) {
-          const auto &input = self->numeric_inputs_[static_cast<size_t>(numeric_input_index)];
-          if (event->retain &&
-              !self->is_numeric_input_accept_retained_(static_cast<size_t>(numeric_input_index))) {
+          const auto& input = self->numeric_inputs_[static_cast<size_t>(numeric_input_index)];
+          if (event->retain && !self->is_numeric_input_accept_retained_(static_cast<size_t>(numeric_input_index))) {
             ESP_LOGI(TAG, "Ignoring retained MQTT %s payload for control freshness", input.log_name);
             break;
           }
@@ -1377,9 +1369,8 @@ void OpenQuattMqttConfig::mqtt_event_handler_(void *handler_args, esp_event_base
         }
         const int binary_input_index = self->find_binary_input_index_by_topic_(event->topic, event->topic_len);
         if (binary_input_index >= 0) {
-          if (event->retain &&
-              !self->is_binary_input_accept_retained_(static_cast<size_t>(binary_input_index))) {
-            const auto &input = self->binary_inputs_[static_cast<size_t>(binary_input_index)];
+          if (event->retain && !self->is_binary_input_accept_retained_(static_cast<size_t>(binary_input_index))) {
+            const auto& input = self->binary_inputs_[static_cast<size_t>(binary_input_index)];
             ESP_LOGI(TAG, "Ignoring retained MQTT %s payload because retained values are disabled", input.log_name);
             break;
           }
@@ -1397,12 +1388,12 @@ void OpenQuattMqttConfig::mqtt_event_handler_(void *handler_args, esp_event_base
   }
 }
 
-void OpenQuattMqttConfig::queue_numeric_payload_(size_t input_index, const char *data, int len, bool retained) {
+void OpenQuattMqttConfig::queue_numeric_payload_(size_t input_index, const char* data, int len, bool retained) {
   if (input_index >= this->numeric_inputs_.size() || data == nullptr || len < 0) {
     return;
   }
 
-  auto &input = this->numeric_inputs_[input_index];
+  auto& input = this->numeric_inputs_[input_index];
   if (static_cast<size_t>(len) >= PAYLOAD_MAX_LEN) {
     ESP_LOGW(TAG, "Invalidating MQTT %s after overlong payload (%d bytes)", input.log_name, len);
     portENTER_CRITICAL(&this->pending_lock_);
@@ -1426,12 +1417,12 @@ void OpenQuattMqttConfig::queue_numeric_payload_(size_t input_index, const char 
   App.wake_loop_threadsafe();
 }
 
-void OpenQuattMqttConfig::queue_binary_payload_(size_t input_index, const char *data, int len, bool retained) {
+void OpenQuattMqttConfig::queue_binary_payload_(size_t input_index, const char* data, int len, bool retained) {
   if (input_index >= this->binary_inputs_.size() || data == nullptr || len < 0) {
     return;
   }
 
-  auto &input = this->binary_inputs_[input_index];
+  auto& input = this->binary_inputs_[input_index];
   if (static_cast<size_t>(len) >= PAYLOAD_MAX_LEN) {
     ESP_LOGW(TAG, "Invalidating MQTT %s after overlong payload (%d bytes)", input.log_name, len);
     portENTER_CRITICAL(&this->pending_lock_);
@@ -1464,7 +1455,7 @@ void OpenQuattMqttConfig::consume_pending_numeric_payloads_() {
     uint32_t session_generation = 0;
 
     portENTER_CRITICAL(&this->pending_lock_);
-    auto &input = this->numeric_inputs_[i];
+    auto& input = this->numeric_inputs_[i];
     if (input.pending_invalid_payload_ready) {
       input.pending_invalid_payload_ready = false;
       input.pending_payload_ready = false;
@@ -1500,7 +1491,7 @@ void OpenQuattMqttConfig::consume_pending_binary_payloads_() {
     uint32_t session_generation = 0;
 
     portENTER_CRITICAL(&this->pending_lock_);
-    auto &input = this->binary_inputs_[i];
+    auto& input = this->binary_inputs_[i];
     if (input.pending_invalid_payload_ready) {
       input.pending_invalid_payload_ready = false;
       input.pending_payload_ready = false;
@@ -1527,7 +1518,7 @@ void OpenQuattMqttConfig::consume_pending_binary_payloads_() {
   }
 }
 
-void OpenQuattMqttConfig::handle_numeric_payload_(size_t input_index, const char *payload, bool retained) {
+void OpenQuattMqttConfig::handle_numeric_payload_(size_t input_index, const char* payload, bool retained) {
   if (input_index >= this->numeric_inputs_.size() || payload == nullptr) {
     return;
   }
@@ -1535,7 +1526,7 @@ void OpenQuattMqttConfig::handle_numeric_payload_(size_t input_index, const char
     return;
   }
 
-  auto &input = this->numeric_inputs_[input_index];
+  auto& input = this->numeric_inputs_[input_index];
   float value = NAN;
   if (!parse_numeric_payload_(payload, &value) || value < input.min_value || value > input.max_value) {
     ESP_LOGW(TAG, "Invalidating MQTT %s after invalid payload: %s", input.log_name, payload);
@@ -1549,7 +1540,7 @@ void OpenQuattMqttConfig::handle_numeric_payload_(size_t input_index, const char
   this->publish_runtime_state_(true);
 }
 
-void OpenQuattMqttConfig::handle_binary_payload_(size_t input_index, const char *payload, bool retained) {
+void OpenQuattMqttConfig::handle_binary_payload_(size_t input_index, const char* payload, bool retained) {
   if (input_index >= this->binary_inputs_.size() || payload == nullptr) {
     return;
   }
@@ -1557,7 +1548,7 @@ void OpenQuattMqttConfig::handle_binary_payload_(size_t input_index, const char 
     return;
   }
 
-  auto &input = this->binary_inputs_[input_index];
+  auto& input = this->binary_inputs_[input_index];
   bool value = false;
   if (!parse_binary_payload_(payload, &value)) {
     ESP_LOGW(TAG, "Invalidating MQTT %s after invalid payload: %s", input.log_name, payload);
@@ -1575,7 +1566,7 @@ void OpenQuattMqttConfig::invalidate_numeric_input_(size_t input_index) {
   if (input_index >= this->numeric_inputs_.size()) {
     return;
   }
-  auto &input = this->numeric_inputs_[input_index];
+  auto& input = this->numeric_inputs_[input_index];
   input.last_valid_value = NAN;
   input.last_valid_ms = 0;
   input.last_valid_retained = false;
@@ -1586,7 +1577,7 @@ void OpenQuattMqttConfig::invalidate_binary_input_(size_t input_index) {
   if (input_index >= this->binary_inputs_.size()) {
     return;
   }
-  auto &input = this->binary_inputs_[input_index];
+  auto& input = this->binary_inputs_[input_index];
   input.last_valid_value = false;
   input.last_valid_ms = 0;
   input.last_valid_retained = false;
@@ -1602,15 +1593,14 @@ void OpenQuattMqttConfig::publish_runtime_state_(bool force) {
 
   const bool mqtt_enabled = this->enabled_.load();
   for (size_t i = 0; i < this->numeric_inputs_.size(); i++) {
-    auto &input = this->numeric_inputs_[i];
+    auto& input = this->numeric_inputs_[i];
     const bool input_enabled = mqtt_enabled && this->is_numeric_input_enabled_(i);
     const bool has_sample = input.last_valid_ms != 0 && std::isfinite(input.last_valid_value);
     const uint32_t age_ms = has_sample ? (uint32_t)(now_ms - input.last_valid_ms) : 0U;
-    const uint32_t stale_ms = this->is_numeric_input_accept_retained_(i)
-                                  ? input.stale_ms
-                                  : i == static_cast<size_t>(NumericInputKind::ROOM_SETPOINT)
-                                        ? NON_RETAINED_STATEFUL_STALE_MS
-                                        : input.stale_ms;
+    const uint32_t stale_ms = this->is_numeric_input_accept_retained_(i) ? input.stale_ms
+                              : i == static_cast<size_t>(NumericInputKind::ROOM_SETPOINT)
+                                  ? NON_RETAINED_STATEFUL_STALE_MS
+                                  : input.stale_ms;
     const bool valid = input_enabled && has_sample && (stale_ms == 0U || age_ms <= stale_ms);
 
     this->publish_binary_if_changed_(input.valid_binary_sensor, valid, force);
@@ -1620,13 +1610,12 @@ void OpenQuattMqttConfig::publish_runtime_state_(bool force) {
   }
 
   for (size_t i = 0; i < this->binary_inputs_.size(); i++) {
-    auto &input = this->binary_inputs_[i];
+    auto& input = this->binary_inputs_[i];
     const bool input_enabled = mqtt_enabled && this->is_binary_input_enabled_(i);
     const bool has_sample = input.last_valid_ms != 0;
     const uint32_t age_ms = has_sample ? (uint32_t)(now_ms - input.last_valid_ms) : 0U;
-    const uint32_t stale_ms = this->is_binary_input_accept_retained_(i)
-                                  ? input.stale_ms
-                                  : NON_RETAINED_STATEFUL_STALE_MS;
+    const uint32_t stale_ms =
+        this->is_binary_input_accept_retained_(i) ? input.stale_ms : NON_RETAINED_STATEFUL_STALE_MS;
     const bool valid = input_enabled && has_sample && (stale_ms == 0U || age_ms <= stale_ms);
 
     this->publish_binary_if_changed_(input.valid_binary_sensor, valid, force);
@@ -1636,7 +1625,7 @@ void OpenQuattMqttConfig::publish_runtime_state_(bool force) {
   }
 }
 
-void OpenQuattMqttConfig::publish_float_if_changed_(sensor::Sensor *sensor, float value, bool force) {
+void OpenQuattMqttConfig::publish_float_if_changed_(sensor::Sensor* sensor, float value, bool force) {
   if (sensor == nullptr) {
     return;
   }
@@ -1648,7 +1637,8 @@ void OpenQuattMqttConfig::publish_float_if_changed_(sensor::Sensor *sensor, floa
   }
 }
 
-void OpenQuattMqttConfig::publish_binary_if_changed_(binary_sensor::BinarySensor *binary_sensor, bool value, bool force) {
+void OpenQuattMqttConfig::publish_binary_if_changed_(binary_sensor::BinarySensor* binary_sensor, bool value,
+                                                     bool force) {
   if (binary_sensor == nullptr) {
     return;
   }
@@ -1681,7 +1671,7 @@ void OpenQuattMqttConfig::unlock_runtime_() {
   }
 }
 
-void OpenQuattMqttConfig::copy_string_field_(char *destination, size_t max_len, const std::string &value) {
+void OpenQuattMqttConfig::copy_string_field_(char* destination, size_t max_len, const std::string& value) {
   if (destination == nullptr || max_len == 0U) {
     return;
   }

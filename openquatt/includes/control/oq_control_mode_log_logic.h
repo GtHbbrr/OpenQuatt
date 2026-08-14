@@ -53,25 +53,20 @@ struct ControlModeLogDecision {
   uint8_t to_state = 0;
 };
 
-inline uint8_t control_mode_log_state(
-    int mode,
-    const ControlModeLogStateCodes &codes) {
+inline uint8_t control_mode_log_state(int mode, const ControlModeLogStateCodes& codes) {
   if (mode == 0) return codes.idle;
   if (mode == 1) return codes.standby;
   if (mode == 4) return codes.fallback;
   return codes.active;
 }
 
-inline ControlModeLogDecision classify_control_mode_transition(
-    const ControlModeLogInputs &inputs,
-    const ControlModeLogCodes &codes) {
+inline ControlModeLogDecision classify_control_mode_transition(const ControlModeLogInputs& inputs,
+                                                               const ControlModeLogCodes& codes) {
   ControlModeLogDecision decision;
   decision.reason = codes.reason.unknown;
   decision.severity = codes.severity.normal;
-  decision.from_state =
-      control_mode_log_state(inputs.previous_mode, codes.state);
-  decision.to_state =
-      control_mode_log_state(inputs.desired_mode, codes.state);
+  decision.from_state = control_mode_log_state(inputs.previous_mode, codes.state);
+  decision.to_state = control_mode_log_state(inputs.desired_mode, codes.state);
 
   if (inputs.desired_mode == 4) {
     decision.reason = codes.reason.boiler_fallback;
@@ -87,16 +82,13 @@ inline ControlModeLogDecision classify_control_mode_transition(
   } else if (inputs.previous_mode == 4) {
     if (inputs.desired_mode == 2 || inputs.desired_mode == 3) {
       decision.reason = codes.reason.hp_recovered;
-    } else if (inputs.desired_mode == 1 &&
-               !inputs.fallback_requested &&
+    } else if (inputs.desired_mode == 1 && !inputs.fallback_requested &&
                inputs.cm1_event_reason != codes.reason.unknown) {
       decision.reason = inputs.cm1_event_reason;
-    } else if (inputs.desired_mode == 1 &&
-               !inputs.fallback_requested) {
+    } else if (inputs.desired_mode == 1 && !inputs.fallback_requested) {
       decision.reason = codes.reason.hp_recovery_wait;
       decision.severity = codes.severity.limited;
-    } else if (inputs.desired_mode == 0 &&
-               !inputs.fallback_requested) {
+    } else if (inputs.desired_mode == 0 && !inputs.fallback_requested) {
       decision.reason = codes.reason.heating_request_cleared;
     } else {
       decision.reason = codes.reason.fallback_blocked;
@@ -110,9 +102,8 @@ inline ControlModeLogDecision classify_control_mode_transition(
   } else if (inputs.cm1_event_reason != codes.reason.unknown) {
     decision.reason = inputs.cm1_event_reason;
   } else if (inputs.desired_mode == 0) {
-    decision.reason = inputs.previous_mode == 5
-        ? codes.reason.cooling_request_cleared
-        : codes.reason.heating_request_cleared;
+    decision.reason =
+        inputs.previous_mode == 5 ? codes.reason.cooling_request_cleared : codes.reason.heating_request_cleared;
   }
   return decision;
 }

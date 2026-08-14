@@ -9,14 +9,13 @@
 namespace oq_manual_hp {
 
 inline bool owns_control() {
-  return id(oq_manual_hp_active) &&
-         id(oq_control_mode_code) == 100 &&
+  return id(oq_manual_hp_active) && id(oq_control_mode_code) == 100 &&
          id(oq_commissioning_task_code) == oq_commissioning::TASK_MANUAL_HP;
 }
 
 class ManualHpRuntime {
  public:
-  void set_mode(int hp_index, const std::string &option, float min_flow_lph) {
+  void set_mode(int hp_index, const std::string& option, float min_flow_lph) {
     const int requested_mode = mode_code(option);
     const int current_mode = selected_mode_code(hp_index);
 
@@ -51,7 +50,8 @@ class ManualHpRuntime {
       return;
     }
     if (last_applied_level(hp_index) > 0) {
-      publish_guard(hp_index == 1 ? "HP1: zet eerst op Standby en wacht op stand 0" : "HP2: zet eerst op Standby en wacht op stand 0");
+      publish_guard(hp_index == 1 ? "HP1: zet eerst op Standby en wacht op stand 0"
+                                  : "HP2: zet eerst op Standby en wacht op stand 0");
       publish_selected_mode(hp_index, oq_request::request_mode_option(current_mode));
       return;
     }
@@ -94,8 +94,7 @@ class ManualHpRuntime {
   void tick(float min_flow_lph) {
     if (!id(oq_manual_hp_active)) return;
 
-    const bool owns_task =
-        id(oq_commissioning_task_code) == oq_commissioning::TASK_MANUAL_HP;
+    const bool owns_task = id(oq_commissioning_task_code) == oq_commissioning::TASK_MANUAL_HP;
     const bool cm100_exited = id(oq_control_mode_code) != 100;
     if (!owns_task || cm100_exited) {
       reset_modes_and_levels();
@@ -114,17 +113,13 @@ class ManualHpRuntime {
       return;
     }
 
-    const bool safety_stop =
-        any_thermal_level() &&
-        (id(oq_water_temp_hard_trip_active) ||
-         id(oq_lowflow_fault_active) ||
-         !flow_ok(min_flow_lph));
+    const bool safety_stop = any_thermal_level() && (id(oq_water_temp_hard_trip_active) ||
+                                                     id(oq_lowflow_fault_active) || !flow_ok(min_flow_lph));
     if (safety_stop) {
       reset_modes_and_levels();
       id(oq_manual_hp_mode_allowed) = false;
-      publish_status((id(oq_lowflow_fault_active) || !flow_ok(min_flow_lph))
-                         ? "SAFETY STOP: LOW FLOW"
-                         : "SAFETY STOP: WATER TEMPERATURE");
+      publish_status((id(oq_lowflow_fault_active) || !flow_ok(min_flow_lph)) ? "SAFETY STOP: LOW FLOW"
+                                                                             : "SAFETY STOP: WATER TEMPERATURE");
     }
 
     if (id(oq_commissioning_abort_requested)) {
@@ -153,7 +148,7 @@ class ManualHpRuntime {
   }
 
  private:
-  int mode_code(const std::string &option) const {
+  int mode_code(const std::string& option) const {
     if (option == "Cooling") return 1;
     if (option == "Heating") return 2;
     return 0;
@@ -161,16 +156,15 @@ class ManualHpRuntime {
 
   bool hp_available(int hp_index) const {
     if (hp_index == 1) return true;
-    #if OQ_TOPOLOGY_DUO
+#if OQ_TOPOLOGY_DUO
     return hp_index == 2;
-    #else
+#else
     return false;
-    #endif
+#endif
   }
 
   bool flow_ok(float min_flow_lph) const {
-    return id(flow_rate_selected).has_state() &&
-           !isnan(id(flow_rate_selected).state) &&
+    return id(flow_rate_selected).has_state() && !isnan(id(flow_rate_selected).state) &&
            id(flow_rate_selected).state >= min_flow_lph;
   }
 
@@ -193,11 +187,11 @@ class ManualHpRuntime {
 
   int last_applied_level(int hp_index) const {
     if (hp_index == 1) return id(hp1_last_applied_level);
-    #if OQ_TOPOLOGY_DUO
+#if OQ_TOPOLOGY_DUO
     return id(hp2_last_applied_level);
-    #else
+#else
     return 0;
-    #endif
+#endif
   }
 
   void set_requested_level(int hp_index, float level) {
@@ -212,7 +206,7 @@ class ManualHpRuntime {
     }
   }
 
-  void publish_selected_mode(int hp_index, const char *mode) {
+  void publish_selected_mode(int hp_index, const char* mode) {
     if (hp_index == 1) {
       id(oq_manual_hp1_mode).publish_state(mode);
     } else {
@@ -230,37 +224,32 @@ class ManualHpRuntime {
   }
 
   bool any_thermal_level() const {
-    if ((int) roundf(id(oq_manual_hp1_level).state) > 0 ||
-        (int) roundf(id(oq_manual_hp2_level).state) > 0 ||
+    if ((int)roundf(id(oq_manual_hp1_level).state) > 0 || (int)roundf(id(oq_manual_hp2_level).state) > 0 ||
         id(hp1_last_applied_level) > 0) {
       return true;
     }
-    #if OQ_TOPOLOGY_DUO
+#if OQ_TOPOLOGY_DUO
     return id(hp2_last_applied_level) > 0;
-    #else
+#else
     return false;
-    #endif
+#endif
   }
 
   bool all_stopped() const {
     if (id(hp1_last_applied_level) > 0) return false;
-    #if OQ_TOPOLOGY_DUO
+#if OQ_TOPOLOGY_DUO
     return id(hp2_last_applied_level) <= 0;
-    #else
+#else
     return true;
-    #endif
+#endif
   }
 
-  void publish_status(const char *status) {
-    oq_service_status::set_manual_hp(status);
-  }
+  void publish_status(const char* status) { oq_service_status::set_manual_hp(status); }
 
-  void publish_guard(const char *status) {
-    oq_service_status::set_manual_hp_guard(status);
-  }
+  void publish_guard(const char* status) { oq_service_status::set_manual_hp_guard(status); }
 };
 
-inline ManualHpRuntime &runtime() {
+inline ManualHpRuntime& runtime() {
   static ManualHpRuntime instance;
   return instance;
 }

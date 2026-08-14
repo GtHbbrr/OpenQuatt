@@ -8,8 +8,7 @@ using namespace oq_incidents;
 
 namespace {
 
-FaultWordsObservation words(uint32_t now_ms, uint16_t r2119 = 0U,
-                            uint16_t r2120 = 0U, uint16_t r2121 = 0U,
+FaultWordsObservation words(uint32_t now_ms, uint16_t r2119 = 0U, uint16_t r2120 = 0U, uint16_t r2121 = 0U,
                             bool fresh = true) {
   FaultWordsObservation observation;
   observation.now_ms = now_ms;
@@ -18,8 +17,7 @@ FaultWordsObservation words(uint32_t now_ms, uint16_t r2119 = 0U,
   return observation;
 }
 
-RunObservation frequency(uint32_t now_ms, float frequency_hz,
-                         bool mode_matches = true, bool fresh = true,
+RunObservation frequency(uint32_t now_ms, float frequency_hz, bool mode_matches = true, bool fresh = true,
                          bool stop_mode_confirmed = true) {
   RunObservation observation;
   observation.now_ms = now_ms;
@@ -31,14 +29,14 @@ RunObservation frequency(uint32_t now_ms, float frequency_hz,
   return observation;
 }
 
-void establish_healthy_link(HpIncidentEngine &engine, uint32_t start_ms) {
+void establish_healthy_link(HpIncidentEngine& engine, uint32_t start_ms) {
   engine.observe_link_round(start_ms, true);
   engine.observe_link_round(start_ms + 30000U, true);
   engine.observe_link_round(start_ms + 60000U, true);
   assert(engine.outputs().link_state == LinkState::HEALTHY);
 }
 
-void confirm_stopped(HpIncidentEngine &engine, uint32_t start_ms) {
+void confirm_stopped(HpIncidentEngine& engine, uint32_t start_ms) {
   engine.observe_run(frequency(start_ms, 0.0F));
   engine.observe_run(frequency(start_ms + 10000U, 0.0F));
   assert(engine.outputs().run_state == RunState::STOPPED);
@@ -53,29 +51,24 @@ void test_catalog_classification() {
   assert(speed_limit.category == IncidentCategory::PROTECTION);
   assert(has_effect(speed_limit.effects, IncidentEffect::LIMIT_CAPACITY));
   assert(!has_effect(speed_limit.effects, IncidentEffect::STOP_COMPRESSOR));
-  assert(speed_limit.recovery_condition ==
-         RecoveryCondition::AFTER_STABLE_READS);
+  assert(speed_limit.recovery_condition == RecoveryCondition::AFTER_STABLE_READS);
 
   const IncidentDefinition preheat = definition_for(2119U, 6U);
   assert(has_effect(preheat.effects, IncidentEffect::BLOCK_START));
   assert(preheat.fallback_policy == FallbackPolicy::NEVER);
-  assert(preheat.user_action ==
-         UserAction::WAIT_FOR_AUTOMATIC_RECOVERY);
-  assert(preheat.recovery_condition ==
-         RecoveryCondition::PREHEAT_COMPLETE);
+  assert(preheat.user_action == UserAction::WAIT_FOR_AUTOMATIC_RECOVERY);
+  assert(preheat.recovery_condition == RecoveryCondition::PREHEAT_COMPLETE);
   assert(preheat.presentation_key[0] != '\0');
 
   const IncidentDefinition lock = definition_for(2120U, 4U);
-  assert(lock.clear_policy ==
-         ClearPolicy::AFTER_CONFIRMED_ODU_POWER_CYCLE);
+  assert(lock.clear_policy == ClearPolicy::AFTER_CONFIRMED_ODU_POWER_CYCLE);
 
   const IncidentDefinition pump = definition_for(2121U, 13U);
   assert(has_effect(pump.effects, IncidentEffect::PUMP_UNAVAILABLE));
   assert(has_effect(pump.effects, IncidentEffect::ALLOW_CM4));
 
   const IncidentDefinition unknown = definition_for(2121U, 12U);
-  assert(unknown.documentation_confidence ==
-         DocumentationConfidence::REVIEW_REQUIRED);
+  assert(unknown.documentation_confidence == DocumentationConfidence::REVIEW_REQUIRED);
   assert(has_effect(unknown.effects, IncidentEffect::BLOCK_START));
   assert(!has_effect(unknown.effects, IncidentEffect::STOP_COMPRESSOR));
   assert(unknown.fallback_policy == FallbackPolicy::NEVER);
@@ -276,8 +269,7 @@ void test_fault_debounce_and_stale_does_not_clear() {
   assert(engine.outputs().fallback_eligible);
   assert(engine.incident(2119U, 0U).occurrence_count == 1U);
 
-  const uint32_t first_seen_ms =
-      engine.incident(2119U, 0U).first_seen_ms;
+  const uint32_t first_seen_ms = engine.incident(2119U, 0U).first_seen_ms;
   engine.observe_fault_words(words(95101U));
   engine.observe_fault_words(words(96101U, kHardFault));
   assert(engine.incident(2119U, 0U).confirmed_active);
@@ -293,8 +285,7 @@ void test_fault_debounce_and_stale_does_not_clear() {
   engine.observe_fault_words(words(130101U));
   assert(!engine.incident(2119U, 0U).confirmed_active);
   assert(engine.incident(2119U, 0U).latched);
-  assert(engine.outputs().protection_state ==
-         ProtectionState::FAULT_RECOVERY);
+  assert(engine.outputs().protection_state == ProtectionState::FAULT_RECOVERY);
   assert(!engine.outputs().available_for_start);
   assert(engine.outputs().fallback_cause_present);
   assert(engine.outputs().fallback_eligible);
@@ -337,8 +328,7 @@ void test_non_fallback_protections() {
   assert(!engine.outputs().fallback_cause_present);
 
   engine.observe_fault_words(words(80100U, 1U << 6U));
-  assert(engine.outputs().protection_state ==
-         ProtectionState::START_BLOCKED);
+  assert(engine.outputs().protection_state == ProtectionState::START_BLOCKED);
   assert(!engine.outputs().available_for_start);
   assert(!engine.outputs().must_stop);
   assert(!engine.outputs().fallback_cause_present);
@@ -349,14 +339,10 @@ void test_preheat_does_not_hide_another_start_block() {
   establish_healthy_link(engine, 100U);
   constexpr uint16_t kPreheat = 1U << 6U;
   constexpr uint16_t kUnknownStartBlock = 1U << 9U;
-  engine.observe_fault_words(
-      words(70100U, kPreheat, kUnknownStartBlock));
-  engine.observe_fault_words(
-      words(80100U, kPreheat, kUnknownStartBlock));
-  assert(engine.outputs().protection_state ==
-         ProtectionState::START_BLOCKED);
-  assert(engine.outputs().primary_incident_id ==
-         incident_id(2120U, 9U));
+  engine.observe_fault_words(words(70100U, kPreheat, kUnknownStartBlock));
+  engine.observe_fault_words(words(80100U, kPreheat, kUnknownStartBlock));
+  assert(engine.outputs().protection_state == ProtectionState::START_BLOCKED);
+  assert(engine.outputs().primary_incident_id == incident_id(2120U, 9U));
 }
 
 void test_run_feedback_and_stale_stop_sample() {
@@ -440,8 +426,7 @@ void test_persistent_wrong_mode_requires_safe_stop_and_retry() {
   engine.observe_run(frequency(130102U, 0.0F));
   assert(engine.outputs().stop_confirmed);
   assert(engine.outputs().fallback_eligible);
-  assert(engine.start_failure_reset_status() ==
-         StartFailureResetResult::READY);
+  assert(engine.start_failure_reset_status() == StartFailureResetResult::READY);
   assert(engine.clear_start_failure(130103U));
   assert(engine.outputs().available_for_start);
 }
@@ -512,8 +497,7 @@ void test_start_timeout_requires_safe_stop_and_explicit_recovery() {
   assert(!engine.outputs().available_for_start);
   assert(engine.outputs().fallback_cause_present);
   assert(!engine.outputs().fallback_eligible);
-  assert(engine.start_failure_reset_status() ==
-         StartFailureResetResult::STOP_NOT_CONFIRMED);
+  assert(engine.start_failure_reset_status() == StartFailureResetResult::STOP_NOT_CONFIRMED);
   assert(engine.outputs().primary_incident_id == kStartFailedIncidentId);
   assert(!engine.clear_start_failure(200103U));
   assert(!engine.acknowledge(kStartFailedIncidentId));
@@ -524,14 +508,12 @@ void test_start_timeout_requires_safe_stop_and_explicit_recovery() {
   engine.observe_run(frequency(220104U, 0.0F));
   assert(engine.outputs().stop_confirmed);
   assert(engine.outputs().fallback_eligible);
-  assert(engine.start_failure_reset_status() ==
-         StartFailureResetResult::READY);
+  assert(engine.start_failure_reset_status() == StartFailureResetResult::READY);
   assert(engine.clear_start_failure(220105U));
   assert(!engine.outputs().start_timed_out);
   assert(!engine.outputs().fallback_cause_present);
   assert(engine.outputs().available_for_start);
-  assert(engine.start_failure_reset_status() ==
-         StartFailureResetResult::NO_START_FAILURE);
+  assert(engine.start_failure_reset_status() == StartFailureResetResult::NO_START_FAILURE);
   assert(!engine.clear_start_failure(220106U));
 }
 
@@ -549,21 +531,18 @@ void test_start_failure_retry_waits_for_fault_recovery() {
   assert(engine.request_stop(210104U));
   engine.observe_run(frequency(220104U, 0.0F));
   engine.observe_run(frequency(230104U, 0.0F));
-  assert(engine.start_failure_reset_status() ==
-         StartFailureResetResult::HARD_FAULT_ACTIVE);
+  assert(engine.start_failure_reset_status() == StartFailureResetResult::HARD_FAULT_ACTIVE);
   assert(!engine.clear_start_failure(230105U));
 
   engine.observe_fault_words(words(240104U));
   engine.observe_fault_words(words(250104U));
   engine.observe_fault_words(words(260104U));
-  assert(engine.start_failure_reset_status() ==
-         StartFailureResetResult::FAULT_RECOVERY_PENDING);
+  assert(engine.start_failure_reset_status() == StartFailureResetResult::FAULT_RECOVERY_PENDING);
   assert(!engine.clear_start_failure(260105U));
 
   engine.observe_fault_words(words(290104U));
   engine.observe_fault_words(words(320104U));
-  assert(engine.start_failure_reset_status() ==
-         StartFailureResetResult::READY);
+  assert(engine.start_failure_reset_status() == StartFailureResetResult::READY);
   assert(engine.clear_start_failure(320105U));
 }
 
@@ -577,8 +556,7 @@ void test_stop_unconfirmed_blocks_fallback() {
   engine.tick(150102U);
   assert(engine.outputs().stop_unconfirmed);
   assert(!engine.outputs().fallback_eligible);
-  assert(engine.outputs().primary_incident_id ==
-         kStopUnconfirmedIncidentId);
+  assert(engine.outputs().primary_incident_id == kStopUnconfirmedIncidentId);
 }
 
 void test_power_cycle_latch_requires_explicit_confirmation() {
@@ -610,8 +588,7 @@ void test_power_cycle_latch_requires_explicit_confirmation() {
   assert(engine.incident(2120U, 4U).acknowledged);
   assert(!engine.has_cleared_power_cycle_latch());
   assert(!engine.confirm_odu_power_cycle(130102U));
-  assert(engine.outputs().protection_state ==
-         ProtectionState::FAULT_RECOVERY);
+  assert(engine.outputs().protection_state == ProtectionState::FAULT_RECOVERY);
 }
 
 }  // namespace

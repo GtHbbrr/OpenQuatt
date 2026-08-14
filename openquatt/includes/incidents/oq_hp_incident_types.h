@@ -18,8 +18,7 @@ static constexpr uint16_t kFirstFaultRegister = 2119U;
 static constexpr uint16_t kLastFaultRegister = 2121U;
 static constexpr size_t kFaultRegisterCount = 3U;
 static constexpr size_t kBitsPerFaultRegister = 16U;
-static constexpr size_t kRawIncidentSlotCount =
-    kFaultRegisterCount * kBitsPerFaultRegister;
+static constexpr size_t kRawIncidentSlotCount = kFaultRegisterCount * kBitsPerFaultRegister;
 
 enum class IncidentCategory : uint8_t {
   STATUS = 0,
@@ -47,21 +46,13 @@ enum class IncidentEffect : EffectMask {
   REQUIRE_CONFIRMED_ODU_POWER_CYCLE = 1U << 8U,
 };
 
-constexpr EffectMask effect_mask(IncidentEffect effect) {
-  return static_cast<EffectMask>(effect);
-}
+constexpr EffectMask effect_mask(IncidentEffect effect) { return static_cast<EffectMask>(effect); }
 
-constexpr EffectMask operator|(IncidentEffect lhs, IncidentEffect rhs) {
-  return effect_mask(lhs) | effect_mask(rhs);
-}
+constexpr EffectMask operator|(IncidentEffect lhs, IncidentEffect rhs) { return effect_mask(lhs) | effect_mask(rhs); }
 
-constexpr EffectMask operator|(EffectMask lhs, IncidentEffect rhs) {
-  return lhs | effect_mask(rhs);
-}
+constexpr EffectMask operator|(EffectMask lhs, IncidentEffect rhs) { return lhs | effect_mask(rhs); }
 
-constexpr bool has_effect(EffectMask effects, IncidentEffect effect) {
-  return (effects & effect_mask(effect)) != 0U;
-}
+constexpr bool has_effect(EffectMask effects, IncidentEffect effect) { return (effects & effect_mask(effect)) != 0U; }
 
 enum class ClearPolicy : uint8_t {
   AFTER_STABLE_READS = 0,
@@ -140,8 +131,8 @@ struct IncidentDefinition {
   IncidentId id = kNoIncident;
   uint16_t register_address = 0U;
   uint8_t bit = 0U;
-  const char *key = "";
-  const char *presentation_key = "";
+  const char* key = "";
+  const char* presentation_key = "";
   IncidentCategory category = IncidentCategory::FAULT;
   IncidentSeverity severity = IncidentSeverity::FAULT;
   EffectMask effects = effect_mask(IncidentEffect::NONE);
@@ -149,8 +140,7 @@ struct IncidentDefinition {
   uint8_t clear_reads = 1U;
   ClearPolicy clear_policy = ClearPolicy::AFTER_STABLE_READS;
   FallbackPolicy fallback_policy = FallbackPolicy::NEVER;
-  DocumentationConfidence documentation_confidence =
-      DocumentationConfidence::REVIEW_REQUIRED;
+  DocumentationConfidence documentation_confidence = DocumentationConfidence::REVIEW_REQUIRED;
   UserAction user_action = UserAction::CONTACT_INSTALLER;
   RecoveryCondition recovery_condition = RecoveryCondition::REVIEW_REQUIRED;
 };
@@ -220,15 +210,12 @@ struct DerivedOutputs {
 };
 
 constexpr bool valid_fault_location(uint16_t register_address, uint8_t bit) {
-  return register_address >= kFirstFaultRegister &&
-         register_address <= kLastFaultRegister &&
+  return register_address >= kFirstFaultRegister && register_address <= kLastFaultRegister &&
          bit < kBitsPerFaultRegister;
 }
 
 constexpr size_t incident_slot(uint16_t register_address, uint8_t bit) {
-  return static_cast<size_t>(register_address - kFirstFaultRegister) *
-             kBitsPerFaultRegister +
-         bit;
+  return static_cast<size_t>(register_address - kFirstFaultRegister) * kBitsPerFaultRegister + bit;
 }
 
 constexpr IncidentId incident_id(uint16_t register_address, uint8_t bit) {
@@ -238,12 +225,9 @@ constexpr IncidentId incident_id(uint16_t register_address, uint8_t bit) {
 }
 
 constexpr uint16_t register_for_slot(size_t slot) {
-  return static_cast<uint16_t>(kFirstFaultRegister +
-                               slot / kBitsPerFaultRegister);
+  return static_cast<uint16_t>(kFirstFaultRegister + slot / kBitsPerFaultRegister);
 }
 
-constexpr uint8_t bit_for_slot(size_t slot) {
-  return static_cast<uint8_t>(slot % kBitsPerFaultRegister);
-}
+constexpr uint8_t bit_for_slot(size_t slot) { return static_cast<uint8_t>(slot % kBitsPerFaultRegister); }
 
 }  // namespace oq_incidents

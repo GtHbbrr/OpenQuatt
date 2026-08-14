@@ -5,57 +5,57 @@
 
 namespace esphome::opentherm {
 
-static const char *const TAG = "opentherm";
+static const char* const TAG = "opentherm";
 namespace message_data {
-bool parse_flag8_lb_0(OpenthermData &data) { return read_bit(data.valueLB, 0); }
-bool parse_flag8_lb_1(OpenthermData &data) { return read_bit(data.valueLB, 1); }
-bool parse_flag8_lb_2(OpenthermData &data) { return read_bit(data.valueLB, 2); }
-bool parse_flag8_lb_3(OpenthermData &data) { return read_bit(data.valueLB, 3); }
-bool parse_flag8_lb_4(OpenthermData &data) { return read_bit(data.valueLB, 4); }
-bool parse_flag8_lb_5(OpenthermData &data) { return read_bit(data.valueLB, 5); }
-bool parse_flag8_lb_6(OpenthermData &data) { return read_bit(data.valueLB, 6); }
-bool parse_flag8_lb_7(OpenthermData &data) { return read_bit(data.valueLB, 7); }
-bool parse_flag8_hb_0(OpenthermData &data) { return read_bit(data.valueHB, 0); }
-bool parse_flag8_hb_1(OpenthermData &data) { return read_bit(data.valueHB, 1); }
-bool parse_flag8_hb_2(OpenthermData &data) { return read_bit(data.valueHB, 2); }
-bool parse_flag8_hb_3(OpenthermData &data) { return read_bit(data.valueHB, 3); }
-bool parse_flag8_hb_4(OpenthermData &data) { return read_bit(data.valueHB, 4); }
-bool parse_flag8_hb_5(OpenthermData &data) { return read_bit(data.valueHB, 5); }
-bool parse_flag8_hb_6(OpenthermData &data) { return read_bit(data.valueHB, 6); }
-bool parse_flag8_hb_7(OpenthermData &data) { return read_bit(data.valueHB, 7); }
-uint8_t parse_u8_lb(OpenthermData &data) { return data.valueLB; }
-uint8_t parse_u8_hb(OpenthermData &data) { return data.valueHB; }
-int8_t parse_s8_lb(OpenthermData &data) { return (int8_t) data.valueLB; }
-int8_t parse_s8_hb(OpenthermData &data) { return (int8_t) data.valueHB; }
-uint16_t parse_u16(OpenthermData &data) { return data.u16(); }
-uint16_t parse_u8_lb_60(OpenthermData &data) { return data.valueLB * 60; }
-uint16_t parse_u8_hb_60(OpenthermData &data) { return data.valueHB * 60; }
-int16_t parse_s16(OpenthermData &data) { return data.s16(); }
-float parse_f88(OpenthermData &data) { return data.f88(); }
+bool parse_flag8_lb_0(OpenthermData& data) { return read_bit(data.valueLB, 0); }
+bool parse_flag8_lb_1(OpenthermData& data) { return read_bit(data.valueLB, 1); }
+bool parse_flag8_lb_2(OpenthermData& data) { return read_bit(data.valueLB, 2); }
+bool parse_flag8_lb_3(OpenthermData& data) { return read_bit(data.valueLB, 3); }
+bool parse_flag8_lb_4(OpenthermData& data) { return read_bit(data.valueLB, 4); }
+bool parse_flag8_lb_5(OpenthermData& data) { return read_bit(data.valueLB, 5); }
+bool parse_flag8_lb_6(OpenthermData& data) { return read_bit(data.valueLB, 6); }
+bool parse_flag8_lb_7(OpenthermData& data) { return read_bit(data.valueLB, 7); }
+bool parse_flag8_hb_0(OpenthermData& data) { return read_bit(data.valueHB, 0); }
+bool parse_flag8_hb_1(OpenthermData& data) { return read_bit(data.valueHB, 1); }
+bool parse_flag8_hb_2(OpenthermData& data) { return read_bit(data.valueHB, 2); }
+bool parse_flag8_hb_3(OpenthermData& data) { return read_bit(data.valueHB, 3); }
+bool parse_flag8_hb_4(OpenthermData& data) { return read_bit(data.valueHB, 4); }
+bool parse_flag8_hb_5(OpenthermData& data) { return read_bit(data.valueHB, 5); }
+bool parse_flag8_hb_6(OpenthermData& data) { return read_bit(data.valueHB, 6); }
+bool parse_flag8_hb_7(OpenthermData& data) { return read_bit(data.valueHB, 7); }
+uint8_t parse_u8_lb(OpenthermData& data) { return data.valueLB; }
+uint8_t parse_u8_hb(OpenthermData& data) { return data.valueHB; }
+int8_t parse_s8_lb(OpenthermData& data) { return (int8_t)data.valueLB; }
+int8_t parse_s8_hb(OpenthermData& data) { return (int8_t)data.valueHB; }
+uint16_t parse_u16(OpenthermData& data) { return data.u16(); }
+uint16_t parse_u8_lb_60(OpenthermData& data) { return data.valueLB * 60; }
+uint16_t parse_u8_hb_60(OpenthermData& data) { return data.valueHB * 60; }
+int16_t parse_s16(OpenthermData& data) { return data.s16(); }
+float parse_f88(OpenthermData& data) { return data.f88(); }
 
-void write_flag8_lb_0(const bool value, OpenthermData &data) { data.valueLB = write_bit(data.valueLB, 0, value); }
-void write_flag8_lb_1(const bool value, OpenthermData &data) { data.valueLB = write_bit(data.valueLB, 1, value); }
-void write_flag8_lb_2(const bool value, OpenthermData &data) { data.valueLB = write_bit(data.valueLB, 2, value); }
-void write_flag8_lb_3(const bool value, OpenthermData &data) { data.valueLB = write_bit(data.valueLB, 3, value); }
-void write_flag8_lb_4(const bool value, OpenthermData &data) { data.valueLB = write_bit(data.valueLB, 4, value); }
-void write_flag8_lb_5(const bool value, OpenthermData &data) { data.valueLB = write_bit(data.valueLB, 5, value); }
-void write_flag8_lb_6(const bool value, OpenthermData &data) { data.valueLB = write_bit(data.valueLB, 6, value); }
-void write_flag8_lb_7(const bool value, OpenthermData &data) { data.valueLB = write_bit(data.valueLB, 7, value); }
-void write_flag8_hb_0(const bool value, OpenthermData &data) { data.valueHB = write_bit(data.valueHB, 0, value); }
-void write_flag8_hb_1(const bool value, OpenthermData &data) { data.valueHB = write_bit(data.valueHB, 1, value); }
-void write_flag8_hb_2(const bool value, OpenthermData &data) { data.valueHB = write_bit(data.valueHB, 2, value); }
-void write_flag8_hb_3(const bool value, OpenthermData &data) { data.valueHB = write_bit(data.valueHB, 3, value); }
-void write_flag8_hb_4(const bool value, OpenthermData &data) { data.valueHB = write_bit(data.valueHB, 4, value); }
-void write_flag8_hb_5(const bool value, OpenthermData &data) { data.valueHB = write_bit(data.valueHB, 5, value); }
-void write_flag8_hb_6(const bool value, OpenthermData &data) { data.valueHB = write_bit(data.valueHB, 6, value); }
-void write_flag8_hb_7(const bool value, OpenthermData &data) { data.valueHB = write_bit(data.valueHB, 7, value); }
-void write_u8_lb(const uint8_t value, OpenthermData &data) { data.valueLB = value; }
-void write_u8_hb(const uint8_t value, OpenthermData &data) { data.valueHB = value; }
-void write_s8_lb(const int8_t value, OpenthermData &data) { data.valueLB = (uint8_t) value; }
-void write_s8_hb(const int8_t value, OpenthermData &data) { data.valueHB = (uint8_t) value; }
-void write_u16(const uint16_t value, OpenthermData &data) { data.u16(value); }
-void write_s16(const int16_t value, OpenthermData &data) { data.s16(value); }
-void write_f88(const float value, OpenthermData &data) { data.f88(value); }
+void write_flag8_lb_0(const bool value, OpenthermData& data) { data.valueLB = write_bit(data.valueLB, 0, value); }
+void write_flag8_lb_1(const bool value, OpenthermData& data) { data.valueLB = write_bit(data.valueLB, 1, value); }
+void write_flag8_lb_2(const bool value, OpenthermData& data) { data.valueLB = write_bit(data.valueLB, 2, value); }
+void write_flag8_lb_3(const bool value, OpenthermData& data) { data.valueLB = write_bit(data.valueLB, 3, value); }
+void write_flag8_lb_4(const bool value, OpenthermData& data) { data.valueLB = write_bit(data.valueLB, 4, value); }
+void write_flag8_lb_5(const bool value, OpenthermData& data) { data.valueLB = write_bit(data.valueLB, 5, value); }
+void write_flag8_lb_6(const bool value, OpenthermData& data) { data.valueLB = write_bit(data.valueLB, 6, value); }
+void write_flag8_lb_7(const bool value, OpenthermData& data) { data.valueLB = write_bit(data.valueLB, 7, value); }
+void write_flag8_hb_0(const bool value, OpenthermData& data) { data.valueHB = write_bit(data.valueHB, 0, value); }
+void write_flag8_hb_1(const bool value, OpenthermData& data) { data.valueHB = write_bit(data.valueHB, 1, value); }
+void write_flag8_hb_2(const bool value, OpenthermData& data) { data.valueHB = write_bit(data.valueHB, 2, value); }
+void write_flag8_hb_3(const bool value, OpenthermData& data) { data.valueHB = write_bit(data.valueHB, 3, value); }
+void write_flag8_hb_4(const bool value, OpenthermData& data) { data.valueHB = write_bit(data.valueHB, 4, value); }
+void write_flag8_hb_5(const bool value, OpenthermData& data) { data.valueHB = write_bit(data.valueHB, 5, value); }
+void write_flag8_hb_6(const bool value, OpenthermData& data) { data.valueHB = write_bit(data.valueHB, 6, value); }
+void write_flag8_hb_7(const bool value, OpenthermData& data) { data.valueHB = write_bit(data.valueHB, 7, value); }
+void write_u8_lb(const uint8_t value, OpenthermData& data) { data.valueLB = value; }
+void write_u8_hb(const uint8_t value, OpenthermData& data) { data.valueHB = value; }
+void write_s8_lb(const int8_t value, OpenthermData& data) { data.valueLB = (uint8_t)value; }
+void write_s8_hb(const int8_t value, OpenthermData& data) { data.valueHB = (uint8_t)value; }
+void write_u16(const uint16_t value, OpenthermData& data) { data.u16(value); }
+void write_s16(const int16_t value, OpenthermData& data) { data.s16(value); }
+void write_f88(const float value, OpenthermData& data) { data.f88(value); }
 
 }  // namespace message_data
 
@@ -128,9 +128,9 @@ OpenthermData OpenthermHub::build_request_(MessageId request_id) const {
 
 OpenthermHub::OpenthermHub() : Component(), in_pin_{}, out_pin_{} {}
 
-void OpenthermHub::process_response(OpenthermData &data) {
+void OpenthermHub::process_response(OpenthermData& data) {
   ESP_LOGD(TAG, "Received OpenTherm response with id %d (%s)", data.id,
-           this->opentherm_->message_id_to_str((MessageId) data.id));
+           this->opentherm_->message_id_to_str((MessageId)data.id));
   this->opentherm_->debug_data(data);
 
   switch (data.id) {
@@ -197,24 +197,24 @@ void OpenthermHub::suspend_polling() {
 }
 
 // Disabling clang-tidy for this particular line since it keeps removing the trailing underscore (bug?)
-void OpenthermHub::write_initial_messages_(std::vector<MessageId> &target) {  // NOLINT
+void OpenthermHub::write_initial_messages_(std::vector<MessageId>& target) {  // NOLINT
   std::vector<std::pair<MessageId, uint8_t>> sorted;
   std::copy_if(this->configured_messages_.begin(), this->configured_messages_.end(), std::back_inserter(sorted),
-               [](const std::pair<MessageId, uint8_t> &pair) { return pair.second < REPEATING_MESSAGE_ORDER; });
+               [](const std::pair<MessageId, uint8_t>& pair) { return pair.second < REPEATING_MESSAGE_ORDER; });
   std::sort(sorted.begin(), sorted.end(),
-            [](const std::pair<MessageId, uint8_t> &a, const std::pair<MessageId, uint8_t> &b) {
+            [](const std::pair<MessageId, uint8_t>& a, const std::pair<MessageId, uint8_t>& b) {
               return a.second < b.second;
             });
 
   target.clear();
   std::transform(sorted.begin(), sorted.end(), std::back_inserter(target),
-                 [](const std::pair<MessageId, uint8_t> &pair) { return pair.first; });
+                 [](const std::pair<MessageId, uint8_t>& pair) { return pair.first; });
 }
 
 // Disabling clang-tidy for this particular line since it keeps removing the trailing underscore (bug?)
-void OpenthermHub::write_repeating_messages_(std::vector<MessageId> &target) {  // NOLINT
+void OpenthermHub::write_repeating_messages_(std::vector<MessageId>& target) {  // NOLINT
   target.clear();
-  for (auto const &pair : this->configured_messages_) {
+  for (auto const& pair : this->configured_messages_) {
     if (pair.second == REPEATING_MESSAGE_ORDER) {
       target.push_back(pair.first);
     }
@@ -362,7 +362,7 @@ void OpenthermHub::check_timings_(uint32_t cur_time) {
     ESP_LOGW(TAG,
              "%d ms elapsed since the start of the last convo, but 1150 ms are allowed at maximum. Look at other "
              "components that might slow the loop down.",
-             (int) (cur_time - this->last_conversation_start_));
+             (int)(cur_time - this->last_conversation_start_));
   }
 }
 
@@ -393,7 +393,7 @@ void OpenthermHub::start_conversation_() {
   this->before_send_callback_.call(request);
 
   ESP_LOGD(TAG, "Sending request with id %d (%s)", request.id,
-           this->opentherm_->message_id_to_str((MessageId) request.id));
+           this->opentherm_->message_id_to_str((MessageId)request.id));
   this->opentherm_->debug_data(request);
   // Send the request
   this->last_conversation_start_ = millis();

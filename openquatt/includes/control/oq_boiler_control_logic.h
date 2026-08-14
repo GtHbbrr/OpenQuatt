@@ -78,24 +78,34 @@ struct BoilerLogDecision {
   uint8_t severity = 0;
 };
 
-inline uint8_t boiler_log_reason_code(
-    BoilerLogReason reason,
-    const BoilerLogReasonCodes &codes) {
+inline uint8_t boiler_log_reason_code(BoilerLogReason reason, const BoilerLogReasonCodes& codes) {
   switch (reason) {
-    case BoilerLogReason::LESS_POWER: return codes.less_power;
-    case BoilerLogReason::FLOW_TOO_LOW: return codes.flow_too_low;
-    case BoilerLogReason::SOFT_GUARD: return codes.soft_guard;
-    case BoilerLogReason::SENSOR_FALLBACK: return codes.sensor_fallback;
-    case BoilerLogReason::NO_CANDIDATE: return codes.no_candidate;
-    case BoilerLogReason::FALLBACK_BLOCKED: return codes.fallback_blocked;
+    case BoilerLogReason::LESS_POWER:
+      return codes.less_power;
+    case BoilerLogReason::FLOW_TOO_LOW:
+      return codes.flow_too_low;
+    case BoilerLogReason::SOFT_GUARD:
+      return codes.soft_guard;
+    case BoilerLogReason::SENSOR_FALLBACK:
+      return codes.sensor_fallback;
+    case BoilerLogReason::NO_CANDIDATE:
+      return codes.no_candidate;
+    case BoilerLogReason::FALLBACK_BLOCKED:
+      return codes.fallback_blocked;
     case BoilerLogReason::HP_STOP_UNCONFIRMED:
       return codes.hp_stop_unconfirmed;
-    case BoilerLogReason::FLOW_PREFLOW: return codes.flow_preflow;
-    case BoilerLogReason::BOILER_FALLBACK: return codes.boiler_fallback;
-    case BoilerLogReason::HP_RECOVERED: return codes.hp_recovered;
-    case BoilerLogReason::COMMISSIONING: return codes.commissioning;
-    case BoilerLogReason::COOLING_REQUEST: return codes.cooling_request;
-    case BoilerLogReason::FROST_PROTECTION: return codes.frost_protection;
+    case BoilerLogReason::FLOW_PREFLOW:
+      return codes.flow_preflow;
+    case BoilerLogReason::BOILER_FALLBACK:
+      return codes.boiler_fallback;
+    case BoilerLogReason::HP_RECOVERED:
+      return codes.hp_recovered;
+    case BoilerLogReason::COMMISSIONING:
+      return codes.commissioning;
+    case BoilerLogReason::COOLING_REQUEST:
+      return codes.cooling_request;
+    case BoilerLogReason::FROST_PROTECTION:
+      return codes.frost_protection;
     case BoilerLogReason::HEATING_REQUEST_CLEARED:
       return codes.heating_request_cleared;
     case BoilerLogReason::MIN_REST_ACTIVE:
@@ -105,27 +115,20 @@ inline uint8_t boiler_log_reason_code(
 }
 
 inline bool boiler_log_reason_is_normal(BoilerLogReason reason) {
-  return reason == BoilerLogReason::BOILER_FALLBACK ||
-         reason == BoilerLogReason::LESS_POWER ||
-         reason == BoilerLogReason::HP_RECOVERED ||
-         reason == BoilerLogReason::HEATING_REQUEST_CLEARED;
+  return reason == BoilerLogReason::BOILER_FALLBACK || reason == BoilerLogReason::LESS_POWER ||
+         reason == BoilerLogReason::HP_RECOVERED || reason == BoilerLogReason::HEATING_REQUEST_CLEARED;
 }
 
-inline BoilerLogDecision make_boiler_log_decision(
-    BoilerLogReason reason,
-    const BoilerLogCodes &codes) {
+inline BoilerLogDecision make_boiler_log_decision(BoilerLogReason reason, const BoilerLogCodes& codes) {
   return BoilerLogDecision{
       reason,
       boiler_log_reason_code(reason, codes.reason),
-      boiler_log_reason_is_normal(reason)
-          ? codes.severity.normal
-          : codes.severity.limited,
+      boiler_log_reason_is_normal(reason) ? codes.severity.normal : codes.severity.limited,
   };
 }
 
-inline BoilerLogDecision classify_boiler_controller_log(
-    const BoilerControllerLogInputs &inputs,
-    const BoilerLogCodes &codes) {
+inline BoilerLogDecision classify_boiler_controller_log(const BoilerControllerLogInputs& inputs,
+                                                        const BoilerLogCodes& codes) {
   BoilerLogReason reason = BoilerLogReason::LESS_POWER;
   switch (inputs.controller_block_reason) {
     case BLOCK_WATER_TEMP_INHIBIT:
@@ -163,9 +166,8 @@ inline BoilerLogDecision classify_boiler_controller_log(
       break;
     default:
       if (inputs.role == BoilerRole::FALLBACK_CM4) {
-        reason = inputs.controller_block_reason == BLOCK_NONE
-            ? BoilerLogReason::BOILER_FALLBACK
-            : BoilerLogReason::FALLBACK_BLOCKED;
+        reason = inputs.controller_block_reason == BLOCK_NONE ? BoilerLogReason::BOILER_FALLBACK
+                                                              : BoilerLogReason::FALLBACK_BLOCKED;
       }
       break;
   }
@@ -182,18 +184,12 @@ struct BoilerStopLogInputs {
   BoilerLogReason guard_reason = BoilerLogReason::LESS_POWER;
 };
 
-inline BoilerLogDecision classify_boiler_stop_log(
-    const BoilerStopLogInputs &inputs,
-    const BoilerLogCodes &codes) {
+inline BoilerLogDecision classify_boiler_stop_log(const BoilerStopLogInputs& inputs, const BoilerLogCodes& codes) {
   BoilerLogReason reason = inputs.guard_reason;
-  if (inputs.continuous_handover &&
-      inputs.stopped_role == BoilerRole::ASSIST_CM3 &&
-      inputs.current_mode == 4) {
+  if (inputs.continuous_handover && inputs.stopped_role == BoilerRole::ASSIST_CM3 && inputs.current_mode == 4) {
     reason = BoilerLogReason::BOILER_FALLBACK;
   } else if (inputs.stopped_role == BoilerRole::FALLBACK_CM4) {
-    if (inputs.continuous_handover ||
-        inputs.current_mode == 2 ||
-        inputs.current_mode == 3) {
+    if (inputs.continuous_handover || inputs.current_mode == 2 || inputs.current_mode == 3) {
       reason = BoilerLogReason::HP_RECOVERED;
     } else if (inputs.current_mode == 100) {
       reason = BoilerLogReason::COMMISSIONING;

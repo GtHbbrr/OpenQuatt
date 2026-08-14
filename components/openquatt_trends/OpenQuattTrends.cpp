@@ -12,13 +12,13 @@
 namespace esphome {
 namespace openquatt_trends {
 
-static const char *const TAG = "openquatt.trends";
+static const char* const TAG = "openquatt.trends";
 
 namespace {
 
 constexpr uint32_t kDefaultWindowHours = 24;
 
-static bool url_path_matches(const char *url, const char *path) {
+static bool url_path_matches(const char* url, const char* path) {
   if (url == nullptr || path == nullptr) {
     return false;
   }
@@ -26,7 +26,7 @@ static bool url_path_matches(const char *url, const char *path) {
   return std::strncmp(url, path, path_len) == 0 && (url[path_len] == '\0' || url[path_len] == '?');
 }
 
-uint32_t parse_window_hours_value(const char *value) {
+uint32_t parse_window_hours_value(const char* value) {
   if (value == nullptr || value[0] == '\0') {
     return kDefaultWindowHours;
   }
@@ -37,19 +37,19 @@ uint32_t parse_window_hours_value(const char *value) {
   return kDefaultWindowHours;
 }
 
-uint32_t parse_window_hours_from_url(const char *url) {
+uint32_t parse_window_hours_from_url(const char* url) {
   if (url == nullptr) {
     return kDefaultWindowHours;
   }
 
-  const char *query = std::strchr(url, '?');
+  const char* query = std::strchr(url, '?');
   if (query == nullptr || *(query + 1) == '\0') {
     return kDefaultWindowHours;
   }
   query++;
 
   while (*query != '\0') {
-    const char *separator = std::strchr(query, '&');
+    const char* separator = std::strchr(query, '&');
     const size_t length = separator == nullptr ? std::strlen(query) : static_cast<size_t>(separator - query);
     if (length > 6 && std::strncmp(query, "hours=", 6) == 0) {
       char buffer[12];
@@ -68,7 +68,7 @@ uint32_t parse_window_hours_from_url(const char *url) {
   return kDefaultWindowHours;
 }
 
-void format_temperature_x10(int16_t value, char *buffer, size_t buffer_size) {
+void format_temperature_x10(int16_t value, char* buffer, size_t buffer_size) {
   if (value == INT16_MIN) {
     std::snprintf(buffer, buffer_size, "nan");
     return;
@@ -77,11 +77,11 @@ void format_temperature_x10(int16_t value, char *buffer, size_t buffer_size) {
   const int32_t hundredths = static_cast<int32_t>(value) * 10;
   const bool negative = hundredths < 0;
   const uint32_t magnitude = static_cast<uint32_t>(negative ? -hundredths : hundredths);
-  std::snprintf(buffer, buffer_size, "%s%lu.%02lu", negative ? "-" : "",
-                static_cast<unsigned long>(magnitude / 100), static_cast<unsigned long>(magnitude % 100));
+  std::snprintf(buffer, buffer_size, "%s%lu.%02lu", negative ? "-" : "", static_cast<unsigned long>(magnitude / 100),
+                static_cast<unsigned long>(magnitude % 100));
 }
 
-void format_unsigned_metric(uint16_t value, char *buffer, size_t buffer_size) {
+void format_unsigned_metric(uint16_t value, char* buffer, size_t buffer_size) {
   if (value == UINT16_MAX) {
     std::snprintf(buffer, buffer_size, "nan");
     return;
@@ -93,12 +93,12 @@ void format_unsigned_metric(uint16_t value, char *buffer, size_t buffer_size) {
 
 class ChunkedTextWriter {
  public:
-  explicit ChunkedTextWriter(httpd_req_t *req) : req_(req) {
+  explicit ChunkedTextWriter(httpd_req_t* req) : req_(req) {
     this->buffer_.allocate(BUFFER_SIZE);
     this->scratch_.allocate(SCRATCH_SIZE);
   }
 
-  bool printf(const char *format, ...) {
+  bool printf(const char* format, ...) {
     if (!this->buffer_ || !this->scratch_) {
       return false;
     }
@@ -134,12 +134,12 @@ class ChunkedTextWriter {
   static constexpr size_t BUFFER_SIZE = 512;
   static constexpr size_t SCRATCH_SIZE = 160;
 
-  bool write_bytes_(const char *data, size_t len) {
+  bool write_bytes_(const char* data, size_t len) {
     if (!this->buffer_) {
       return false;
     }
     size_t remaining = len;
-    const char *cursor = data;
+    const char* cursor = data;
     while (remaining > 0) {
       if (this->used_ == BUFFER_SIZE && !this->flush()) {
         return false;
@@ -154,7 +154,7 @@ class ChunkedTextWriter {
     return true;
   }
 
-  httpd_req_t *req_;
+  httpd_req_t* req_;
   PsramBuffer<char> buffer_{};
   PsramBuffer<char> scratch_{};
   size_t used_{0};
@@ -162,22 +162,22 @@ class ChunkedTextWriter {
 
 class OpenQuattTrendsRequestHandler : public AsyncWebHandler {
  public:
-  explicit OpenQuattTrendsRequestHandler(OpenQuattTrends *parent) : parent_(parent) {}
+  explicit OpenQuattTrendsRequestHandler(OpenQuattTrends* parent) : parent_(parent) {}
 
-  bool canHandle(AsyncWebServerRequest *request) const override {
+  bool canHandle(AsyncWebServerRequest* request) const override {
     char url_buf[AsyncWebServerRequest::URL_BUF_SIZE];
     request->url_to(url_buf);
     return url_path_matches(url_buf, "/trends/history") && request->method() == HTTP_GET;
   }
 
-  void handleRequest(AsyncWebServerRequest *request) override {
+  void handleRequest(AsyncWebServerRequest* request) override {
     char url_buf[AsyncWebServerRequest::URL_BUF_SIZE];
     request->url_to(url_buf);
     const std::string hours_arg = request->arg("hours");
-    const uint32_t window_hours = hours_arg.empty() ? parse_window_hours_from_url(url_buf)
-                                                    : parse_window_hours_value(hours_arg.c_str());
+    const uint32_t window_hours =
+        hours_arg.empty() ? parse_window_hours_from_url(url_buf) : parse_window_hours_value(hours_arg.c_str());
     const std::string meta_arg = request->arg("meta");
-    httpd_req_t *req = *request;
+    httpd_req_t* req = *request;
     httpd_resp_set_status(req, HTTPD_200);
     httpd_resp_set_type(req, "text/plain; charset=utf-8");
     httpd_resp_set_hdr(req, "Cache-Control", "no-store");
@@ -189,7 +189,7 @@ class OpenQuattTrendsRequestHandler : public AsyncWebHandler {
   }
 
  protected:
-  OpenQuattTrends *parent_;
+  OpenQuattTrends* parent_;
 };
 
 void OpenQuattTrends::setup() {
@@ -205,7 +205,8 @@ void OpenQuattTrends::setup() {
     ESP_LOGW(TAG, "Failed to allocate trend flash index");
   }
 
-  this->flash_partition_ = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_ANY, "openquatt_data");
+  this->flash_partition_ =
+      esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_ANY, "openquatt_data");
   if (this->flash_partition_ == nullptr) {
     ESP_LOGW(TAG, "Trend flash partition 'openquatt_data' not found");
   }
@@ -215,7 +216,7 @@ void OpenQuattTrends::setup() {
   }
 
   if (this->capture_switch_ != nullptr && this->capture_switch_->state) {
-    this->last_capture_ms_ = (uint32_t) millis();
+    this->last_capture_ms_ = (uint32_t)millis();
   }
 
   this->scan_flash_archive_();
@@ -231,16 +232,14 @@ void OpenQuattTrends::loop() {
   }
 
   if (this->flash_builder_.active && this->flash_builder_.sample_count > 0) {
-    const uint32_t now_ms = (uint32_t) millis();
-    if ((uint32_t) (now_ms - this->last_flash_flush_ms_) >= SAMPLE_INTERVAL_MS * 12UL) {
+    const uint32_t now_ms = (uint32_t)millis();
+    if ((uint32_t)(now_ms - this->last_flash_flush_ms_) >= SAMPLE_INTERVAL_MS * 12UL) {
       this->flush_flash_builder_(true);
     }
   }
 }
 
-void OpenQuattTrends::on_shutdown() {
-  this->force_flush();
-}
+void OpenQuattTrends::on_shutdown() { this->force_flush(); }
 
 void OpenQuattTrends::dump_config() {
   ESP_LOGCONFIG(TAG, "OpenQuatt Trends");
@@ -248,7 +247,8 @@ void OpenQuattTrends::dump_config() {
   ESP_LOGCONFIG(TAG, "  Flash switch: %s", this->flash_switch_ == nullptr ? "<missing>" : "configured");
   ESP_LOGCONFIG(TAG, "  Clock: %s", this->clock_ == nullptr ? "<missing>" : "configured");
   ESP_LOGCONFIG(TAG, "  Flash partition: %s", this->flash_partition_ == nullptr ? "<missing>" : "configured");
-  ESP_LOGCONFIG(TAG, "  RAM samples: %u / %u", static_cast<unsigned>(this->ram_count_), static_cast<unsigned>(RAM_CAPACITY));
+  ESP_LOGCONFIG(TAG, "  RAM samples: %u / %u", static_cast<unsigned>(this->ram_count_),
+                static_cast<unsigned>(RAM_CAPACITY));
   ESP_LOGCONFIG(TAG, "  RAM history buffer: %s",
                 !this->ram_history_ ? "missing" : (this->ram_history_.is_external() ? "PSRAM" : "internal"));
   ESP_LOGCONFIG(TAG, "  Flash index: %s",
@@ -277,13 +277,9 @@ TrendStorageCapabilities OpenQuattTrends::storage_capabilities_() const {
                                     this->flash_partition_ != nullptr);
 }
 
-bool OpenQuattTrends::flash_archive_available_() const {
-  return this->storage_capabilities_().flash_archive_available;
-}
+bool OpenQuattTrends::flash_archive_available_() const { return this->storage_capabilities_().flash_archive_available; }
 
-bool OpenQuattTrends::time_is_valid_() const {
-  return this->clock_ != nullptr && this->clock_->now().is_valid();
-}
+bool OpenQuattTrends::time_is_valid_() const { return this->clock_ != nullptr && this->clock_->now().is_valid(); }
 
 uint64_t OpenQuattTrends::current_time_ms_() const {
   if (this->time_is_valid_()) {
@@ -332,7 +328,7 @@ float OpenQuattTrends::decode_unsigned_(uint16_t value) {
   return value == UINT16_MAX ? NAN : static_cast<float>(value);
 }
 
-uint32_t OpenQuattTrends::fnv1a_hash_(const uint8_t *data, size_t len) {
+uint32_t OpenQuattTrends::fnv1a_hash_(const uint8_t* data, size_t len) {
   uint32_t hash = 2166136261u;
   for (size_t i = 0; i < len; ++i) {
     hash ^= data[i];
@@ -341,18 +337,16 @@ uint32_t OpenQuattTrends::fnv1a_hash_(const uint8_t *data, size_t len) {
   return hash;
 }
 
-bool OpenQuattTrends::valid_unsigned_metric_(float value) {
-  return std::isfinite(value) && value >= 0.0f;
-}
+bool OpenQuattTrends::valid_unsigned_metric_(float value) { return std::isfinite(value) && value >= 0.0f; }
 
-void OpenQuattTrends::reset_interval_metric_samples_(IntervalMetricState &state) {
+void OpenQuattTrends::reset_interval_metric_samples_(IntervalMetricState& state) {
   state.sum = 0.0f;
   state.count = 0;
   state.min = 0.0f;
   state.max = 0.0f;
 }
 
-void OpenQuattTrends::update_interval_metric_(IntervalMetricState &state, float value) {
+void OpenQuattTrends::update_interval_metric_(IntervalMetricState& state, float value) {
   if (!valid_unsigned_metric_(value)) {
     return;
   }
@@ -367,7 +361,7 @@ void OpenQuattTrends::update_interval_metric_(IntervalMetricState &state, float 
   state.count++;
 }
 
-float OpenQuattTrends::select_interval_metric_value_(const IntervalMetricState &state, float fallback) {
+float OpenQuattTrends::select_interval_metric_value_(const IntervalMetricState& state, float fallback) {
   if (state.count == 0) {
     return fallback;
   }
@@ -386,27 +380,22 @@ float OpenQuattTrends::select_interval_metric_value_(const IntervalMetricState &
   return furthest_deviation > (INTERVAL_DEVIATION_RATIO * average) ? furthest_value : average;
 }
 
-void OpenQuattTrends::update_last_saved_metric_(IntervalMetricState &state, float value) {
+void OpenQuattTrends::update_last_saved_metric_(IntervalMetricState& state, float value) {
   if (valid_unsigned_metric_(value)) {
     state.last_saved = value;
   }
 }
 
 OpenQuattTrends::TrendValues OpenQuattTrends::pack_values_(float outside_c, float supply_c, float room_c,
-                                                            float room_setpoint_c, float flow_lph, float input_w,
-                                                            float output_w) const {
+                                                           float room_setpoint_c, float flow_lph, float input_w,
+                                                           float output_w) const {
   return TrendValues{
-    encode_temp_(outside_c),
-    encode_temp_(supply_c),
-    encode_temp_(room_c),
-    encode_temp_(room_setpoint_c),
-    encode_unsigned_(flow_lph),
-    encode_unsigned_(input_w),
-    encode_unsigned_(output_w),
+      encode_temp_(outside_c),    encode_temp_(supply_c),    encode_temp_(room_c),       encode_temp_(room_setpoint_c),
+      encode_unsigned_(flow_lph), encode_unsigned_(input_w), encode_unsigned_(output_w),
   };
 }
 
-OpenQuattTrends::TrendSample OpenQuattTrends::make_sample_(uint64_t timestamp_ms, const TrendValues &values) const {
+OpenQuattTrends::TrendSample OpenQuattTrends::make_sample_(uint64_t timestamp_ms, const TrendValues& values) const {
   return TrendSample{timestamp_ms, values};
 }
 
@@ -465,7 +454,7 @@ void OpenQuattTrends::load_archive_if_needed_() {
   }
 }
 
-void OpenQuattTrends::push_ram_sample_(const TrendSample &sample) {
+void OpenQuattTrends::push_ram_sample_(const TrendSample& sample) {
   if (!this->ram_history_) {
     return;
   }
@@ -482,7 +471,7 @@ void OpenQuattTrends::push_ram_sample_(const TrendSample &sample) {
   }
 }
 
-bool OpenQuattTrends::get_ram_sample_at_(size_t ordered_index, TrendSample *sample) const {
+bool OpenQuattTrends::get_ram_sample_at_(size_t ordered_index, TrendSample* sample) const {
   if (sample == nullptr || !this->ram_history_ || ordered_index >= this->ram_count_) {
     return false;
   }
@@ -528,7 +517,8 @@ bool OpenQuattTrends::scan_flash_archive_() {
     }
     if (this->flash_valid_block_count_ == 1 || info.end_timestamp_ms >= this->flash_latest_timestamp_ms_) {
       this->flash_latest_timestamp_ms_ = info.end_timestamp_ms;
-      this->flash_last_flush_timestamp_ms_ = info.flush_timestamp_ms > 0 ? info.flush_timestamp_ms : info.end_timestamp_ms;
+      this->flash_last_flush_timestamp_ms_ =
+          info.flush_timestamp_ms > 0 ? info.flush_timestamp_ms : info.end_timestamp_ms;
     }
     if (this->flash_valid_block_count_ == 1 || info.sequence >= highest_sequence) {
       highest_sequence = info.sequence;
@@ -537,7 +527,7 @@ bool OpenQuattTrends::scan_flash_archive_() {
 
   if (this->flash_index_ && this->flash_index_count_ > 1) {
     std::sort(this->flash_index_.data(), this->flash_index_.data() + this->flash_index_count_,
-              [](const FlashBlockInfo &a, const FlashBlockInfo &b) {
+              [](const FlashBlockInfo& a, const FlashBlockInfo& b) {
                 if (a.start_timestamp_ms == b.start_timestamp_ms) {
                   return a.sequence < b.sequence;
                 }
@@ -560,22 +550,21 @@ bool OpenQuattTrends::merge_flash_history_into_ram_() {
     }
   }
 
-  const uint64_t cutoff_ms = this->flash_latest_timestamp_ms_ > RAM_WINDOW_MS
-    ? this->flash_latest_timestamp_ms_ - RAM_WINDOW_MS
-    : 0;
+  const uint64_t cutoff_ms =
+      this->flash_latest_timestamp_ms_ > RAM_WINDOW_MS ? this->flash_latest_timestamp_ms_ - RAM_WINDOW_MS : 0;
 
   this->ram_head_ = 0;
   this->ram_count_ = 0;
 
   for (size_t block_index = 0; block_index < this->flash_index_count_; ++block_index) {
-    const FlashBlockInfo &indexed = this->flash_index_[block_index];
+    const FlashBlockInfo& indexed = this->flash_index_[block_index];
     std::array<TrendSample, FLASH_SAMPLES_PER_BLOCK> block_samples{};
     FlashBlockInfo info{};
     if (!this->read_flash_block_(indexed.slot_index, indexed.sequence, &info, &block_samples)) {
       continue;
     }
     for (size_t index = 0; index < info.sample_count; ++index) {
-      const TrendSample &sample = block_samples[index];
+      const TrendSample& sample = block_samples[index];
       if (sample.timestamp_ms >= cutoff_ms) {
         this->push_ram_sample_(sample);
       }
@@ -607,11 +596,9 @@ bool OpenQuattTrends::clear_flash_archive_() {
   return true;
 }
 
-void OpenQuattTrends::reset_flash_builder_() {
-  this->flash_builder_ = {};
-}
+void OpenQuattTrends::reset_flash_builder_() { this->flash_builder_ = {}; }
 
-bool OpenQuattTrends::append_sample_to_flash_(const TrendSample &sample) {
+bool OpenQuattTrends::append_sample_to_flash_(const TrendSample& sample) {
   if (!this->flash_switch_enabled_() || !this->flash_archive_available_() || !this->time_is_valid_()) {
     return false;
   }
@@ -642,7 +629,7 @@ bool OpenQuattTrends::append_sample_to_flash_(const TrendSample &sample) {
   return true;
 }
 
-bool OpenQuattTrends::write_flash_block_(const FlashBlockBuilder &builder) {
+bool OpenQuattTrends::write_flash_block_(const FlashBlockBuilder& builder) {
   if (!this->flash_archive_available_() || builder.sample_count == 0) {
     return false;
   }
@@ -653,8 +640,8 @@ bool OpenQuattTrends::write_flash_block_(const FlashBlockBuilder &builder) {
   if (erased_sector) {
     const esp_err_t erase_result = esp_partition_erase_range(this->flash_partition_, slot_offset, FLASH_SECTOR_SIZE);
     if (erase_result != ESP_OK) {
-      ESP_LOGW(TAG, "Could not erase trend flash sector %u: %s", static_cast<unsigned>(slot_index / FLASH_SLOTS_PER_SECTOR),
-               esp_err_to_name(erase_result));
+      ESP_LOGW(TAG, "Could not erase trend flash sector %u: %s",
+               static_cast<unsigned>(slot_index / FLASH_SLOTS_PER_SECTOR), esp_err_to_name(erase_result));
       return false;
     }
   }
@@ -667,14 +654,16 @@ bool OpenQuattTrends::write_flash_block_(const FlashBlockBuilder &builder) {
   header.sequence = builder.sequence;
   header.start_timestamp_ms = builder.start_timestamp_ms;
   header.payload_bytes = static_cast<uint32_t>(builder.sample_count * sizeof(TrendSample));
-  header.crc32 = fnv1a_hash_(reinterpret_cast<const uint8_t *>(builder.samples.data()), header.payload_bytes);
+  header.crc32 = fnv1a_hash_(reinterpret_cast<const uint8_t*>(builder.samples.data()), header.payload_bytes);
   header.reserved = static_cast<uint32_t>(this->current_time_ms_() / 1000ULL);
   std::memcpy(slot_buffer.data(), &header, sizeof(header));
   std::memcpy(slot_buffer.data() + sizeof(header), builder.samples.data(), header.payload_bytes);
 
-  const esp_err_t write_result = esp_partition_write(this->flash_partition_, slot_offset, slot_buffer.data(), slot_buffer.size());
+  const esp_err_t write_result =
+      esp_partition_write(this->flash_partition_, slot_offset, slot_buffer.data(), slot_buffer.size());
   if (write_result != ESP_OK) {
-    ESP_LOGW(TAG, "Could not write trend flash slot %u: %s", static_cast<unsigned>(slot_index), esp_err_to_name(write_result));
+    ESP_LOGW(TAG, "Could not write trend flash slot %u: %s", static_cast<unsigned>(slot_index),
+             esp_err_to_name(write_result));
     return false;
   }
 
@@ -736,7 +725,7 @@ void OpenQuattTrends::invalidate_flash_index_() {
   this->flash_index_count_ = 0;
 }
 
-bool OpenQuattTrends::update_flash_index_after_write_(const FlashBlockInfo &info, bool erased_sector) {
+bool OpenQuattTrends::update_flash_index_after_write_(const FlashBlockInfo& info, bool erased_sector) {
   if (!this->flash_archive_scanned_ || !this->flash_index_) {
     return false;
   }
@@ -745,10 +734,10 @@ bool OpenQuattTrends::update_flash_index_after_write_(const FlashBlockInfo &info
   const uint32_t erased_sector_end = erased_sector_start + FLASH_SLOTS_PER_SECTOR;
   size_t write_index = 0;
   for (size_t read_index = 0; read_index < this->flash_index_count_; ++read_index) {
-    const FlashBlockInfo &existing = this->flash_index_[read_index];
+    const FlashBlockInfo& existing = this->flash_index_[read_index];
     const bool same_slot = existing.slot_index == info.slot_index;
-    const bool erased_slot = erased_sector && existing.slot_index >= erased_sector_start &&
-                             existing.slot_index < erased_sector_end;
+    const bool erased_slot =
+        erased_sector && existing.slot_index >= erased_sector_start && existing.slot_index < erased_sector_end;
     if (!same_slot && !erased_slot) {
       this->flash_index_[write_index++] = existing;
     }
@@ -762,7 +751,7 @@ bool OpenQuattTrends::update_flash_index_after_write_(const FlashBlockInfo &info
   this->flash_index_[this->flash_index_count_++] = info;
   if (this->flash_index_count_ > 1) {
     std::sort(this->flash_index_.data(), this->flash_index_.data() + this->flash_index_count_,
-              [](const FlashBlockInfo &a, const FlashBlockInfo &b) {
+              [](const FlashBlockInfo& a, const FlashBlockInfo& b) {
                 if (a.start_timestamp_ms == b.start_timestamp_ms) {
                   return a.sequence < b.sequence;
                 }
@@ -786,19 +775,20 @@ void OpenQuattTrends::rebuild_flash_metadata_from_index_() {
 
   this->flash_valid_block_count_ = static_cast<uint16_t>(std::min(this->flash_index_count_, FLASH_SLOT_COUNT));
   for (size_t index = 0; index < this->flash_index_count_; ++index) {
-    const FlashBlockInfo &info = this->flash_index_[index];
+    const FlashBlockInfo& info = this->flash_index_[index];
     if (index == 0 || info.start_timestamp_ms < this->flash_oldest_timestamp_ms_) {
       this->flash_oldest_timestamp_ms_ = info.start_timestamp_ms;
     }
     if (index == 0 || info.end_timestamp_ms >= this->flash_latest_timestamp_ms_) {
       this->flash_latest_timestamp_ms_ = info.end_timestamp_ms;
-      this->flash_last_flush_timestamp_ms_ = info.flush_timestamp_ms > 0 ? info.flush_timestamp_ms : info.end_timestamp_ms;
+      this->flash_last_flush_timestamp_ms_ =
+          info.flush_timestamp_ms > 0 ? info.flush_timestamp_ms : info.end_timestamp_ms;
     }
   }
 }
 
-bool OpenQuattTrends::read_flash_block_(uint32_t slot_index, uint32_t expected_sequence, FlashBlockInfo *info,
-                                        std::array<TrendSample, FLASH_SAMPLES_PER_BLOCK> *samples) const {
+bool OpenQuattTrends::read_flash_block_(uint32_t slot_index, uint32_t expected_sequence, FlashBlockInfo* info,
+                                        std::array<TrendSample, FLASH_SAMPLES_PER_BLOCK>* samples) const {
   if (info == nullptr || samples == nullptr || this->flash_partition_ == nullptr || slot_index >= FLASH_SLOT_COUNT) {
     return false;
   }
@@ -806,8 +796,8 @@ bool OpenQuattTrends::read_flash_block_(uint32_t slot_index, uint32_t expected_s
   TrendBlockHeader header{};
   const uint32_t slot_offset = slot_index * FLASH_SLOT_SIZE;
   const esp_err_t read_result = esp_partition_read(this->flash_partition_, slot_offset, &header, sizeof(header));
-  if (read_result != ESP_OK || header.magic != TAG_MAGIC || header.version != TAG_VERSION ||
-      header.sample_count == 0 || header.sample_count > FLASH_SAMPLES_PER_BLOCK ||
+  if (read_result != ESP_OK || header.magic != TAG_MAGIC || header.version != TAG_VERSION || header.sample_count == 0 ||
+      header.sample_count > FLASH_SAMPLES_PER_BLOCK ||
       header.payload_bytes != static_cast<uint32_t>(header.sample_count * sizeof(TrendSample))) {
     return false;
   }
@@ -816,17 +806,13 @@ bool OpenQuattTrends::read_flash_block_(uint32_t slot_index, uint32_t expected_s
   }
 
   samples->fill(TrendSample{});
-  const esp_err_t payload_result = esp_partition_read(
-    this->flash_partition_,
-    slot_offset + sizeof(header),
-    samples->data(),
-    header.payload_bytes
-  );
+  const esp_err_t payload_result =
+      esp_partition_read(this->flash_partition_, slot_offset + sizeof(header), samples->data(), header.payload_bytes);
   if (payload_result != ESP_OK) {
     return false;
   }
 
-  if (fnv1a_hash_(reinterpret_cast<const uint8_t *>(samples->data()), header.payload_bytes) != header.crc32) {
+  if (fnv1a_hash_(reinterpret_cast<const uint8_t*>(samples->data()), header.payload_bytes) != header.crc32) {
     return false;
   }
 
@@ -853,8 +839,8 @@ void OpenQuattTrends::reset_interval_filters_() {
   this->output_w_interval_.last_saved = 0.0f;
 }
 
-void OpenQuattTrends::capture_sample(float outside_c, float supply_c, float room_c, float room_setpoint_c, float flow_lph,
-                                     float input_w, float output_w, bool force) {
+void OpenQuattTrends::capture_sample(float outside_c, float supply_c, float room_c, float room_setpoint_c,
+                                     float flow_lph, float input_w, float output_w, bool force) {
   if (!this->capture_enabled_()) {
     return;
   }
@@ -874,8 +860,8 @@ void OpenQuattTrends::capture_sample(float outside_c, float supply_c, float room
   const float output_w_to_save = select_interval_metric_value_(this->output_w_interval_, output_w);
 
   const uint64_t now_ms = this->current_time_ms_();
-  const TrendValues values = this->pack_values_(outside_c, supply_c, room_c, room_setpoint_c, flow_to_save,
-                                                input_w_to_save, output_w_to_save);
+  const TrendValues values =
+      this->pack_values_(outside_c, supply_c, room_c, room_setpoint_c, flow_to_save, input_w_to_save, output_w_to_save);
   const bool any_valid = values.outside_c_x10 != INT16_MIN || values.supply_c_x10 != INT16_MIN ||
                          values.room_c_x10 != INT16_MIN || values.room_setpoint_c_x10 != INT16_MIN ||
                          values.flow_lph != UINT16_MAX || values.input_w != UINT16_MAX || values.output_w != UINT16_MAX;
@@ -974,17 +960,11 @@ void OpenQuattTrends::reset_flash_metadata_() {
   this->flash_index_count_ = 0;
 }
 
-uint64_t OpenQuattTrends::get_flash_oldest_timestamp_ms_() const {
-  return this->flash_oldest_timestamp_ms_;
-}
+uint64_t OpenQuattTrends::get_flash_oldest_timestamp_ms_() const { return this->flash_oldest_timestamp_ms_; }
 
-uint64_t OpenQuattTrends::get_flash_newest_timestamp_ms_() const {
-  return this->flash_latest_timestamp_ms_;
-}
+uint64_t OpenQuattTrends::get_flash_newest_timestamp_ms_() const { return this->flash_latest_timestamp_ms_; }
 
-uint64_t OpenQuattTrends::get_flash_last_flush_timestamp_ms_() const {
-  return this->flash_last_flush_timestamp_ms_;
-}
+uint64_t OpenQuattTrends::get_flash_last_flush_timestamp_ms_() const { return this->flash_last_flush_timestamp_ms_; }
 
 std::string OpenQuattTrends::format_flash_absolute_time_(uint64_t timestamp_ms) const {
   if (timestamp_ms == 0) {
@@ -1032,12 +1012,14 @@ std::string OpenQuattTrends::format_flash_relative_age_(uint64_t timestamp_ms) c
   return buffer;
 }
 
-std::string OpenQuattTrends::format_flash_available_span_(uint64_t oldest_timestamp_ms, uint64_t newest_timestamp_ms) const {
+std::string OpenQuattTrends::format_flash_available_span_(uint64_t oldest_timestamp_ms,
+                                                          uint64_t newest_timestamp_ms) const {
   if (oldest_timestamp_ms == 0 || newest_timestamp_ms == 0 || newest_timestamp_ms <= oldest_timestamp_ms) {
     return "Opgeslagen in flash: leeg";
   }
 
-  const float span_days = static_cast<float>(newest_timestamp_ms - oldest_timestamp_ms) / static_cast<float>(24ULL * 60ULL * 60ULL * 1000ULL);
+  const float span_days = static_cast<float>(newest_timestamp_ms - oldest_timestamp_ms) /
+                          static_cast<float>(24ULL * 60ULL * 60ULL * 1000ULL);
   if (span_days >= 1.0f) {
     char buffer[48];
     std::snprintf(buffer, sizeof(buffer), "Opgeslagen in flash: %.1f dagen", span_days);
@@ -1059,7 +1041,7 @@ std::string OpenQuattTrends::format_flash_available_span_(uint64_t oldest_timest
   return buffer;
 }
 
-bool OpenQuattTrends::write_sample_line_(ChunkedTextWriter *writer, const TrendSample &sample) const {
+bool OpenQuattTrends::write_sample_line_(ChunkedTextWriter* writer, const TrendSample& sample) const {
   if (writer == nullptr) {
     return false;
   }
@@ -1077,20 +1059,11 @@ bool OpenQuattTrends::write_sample_line_(ChunkedTextWriter *writer, const TrendS
   format_unsigned_metric(sample.values.flow_lph, flow, sizeof(flow));
   format_unsigned_metric(sample.values.input_w, input, sizeof(input));
   format_unsigned_metric(sample.values.output_w, output, sizeof(output));
-  return writer->printf(
-    "%llu|%s|%s|%s|%s|%s|%s|%s\n",
-    static_cast<unsigned long long>(sample.timestamp_ms),
-    outside,
-    supply,
-    room,
-    setpoint,
-    flow,
-    input,
-    output
-  );
+  return writer->printf("%llu|%s|%s|%s|%s|%s|%s|%s\n", static_cast<unsigned long long>(sample.timestamp_ms), outside,
+                        supply, room, setpoint, flow, input, output);
 }
 
-void OpenQuattTrends::write_samples_for_history_(ChunkedTextWriter *writer, uint32_t window_hours) {
+void OpenQuattTrends::write_samples_for_history_(ChunkedTextWriter* writer, uint32_t window_hours) {
   const uint64_t cutoff_ms = this->get_window_cutoff_ms_(window_hours);
   const uint32_t stride = this->get_window_stride_(window_hours);
   if (this->flash_archive_available_() && !this->flash_archive_scanned_) {
@@ -1104,7 +1077,7 @@ void OpenQuattTrends::write_samples_for_history_(ChunkedTextWriter *writer, uint
   bool last_sample_emitted = false;
   TrendSample last_sample{};
 
-  auto emit_sample = [&](const TrendSample &sample, bool count_only) {
+  auto emit_sample = [&](const TrendSample& sample, bool count_only) {
     if (sample.timestamp_ms < cutoff_ms) {
       return false;
     }
@@ -1125,7 +1098,7 @@ void OpenQuattTrends::write_samples_for_history_(ChunkedTextWriter *writer, uint
       this->flash_archive_scanned_ && this->flash_index_count_ > 0 && !ram_covers_window;
   if (should_read_flash_archive) {
     for (size_t block_index = 0; block_index < this->flash_index_count_; ++block_index) {
-      const FlashBlockInfo &indexed = this->flash_index_[block_index];
+      const FlashBlockInfo& indexed = this->flash_index_[block_index];
       if (indexed.end_timestamp_ms < cutoff_ms) {
         continue;
       }
@@ -1135,7 +1108,7 @@ void OpenQuattTrends::write_samples_for_history_(ChunkedTextWriter *writer, uint
         continue;
       }
       for (size_t index = 0; index < info.sample_count; ++index) {
-        const TrendSample &sample = block_samples[index];
+        const TrendSample& sample = block_samples[index];
         emit_sample(sample, false);
         if (sample.timestamp_ms >= cutoff_ms && sample.timestamp_ms > emitted_flash_latest) {
           emitted_flash_latest = sample.timestamp_ms;
@@ -1161,7 +1134,7 @@ void OpenQuattTrends::write_samples_for_history_(ChunkedTextWriter *writer, uint
   }
 }
 
-void OpenQuattTrends::write_history(httpd_req_t *req, uint32_t window_hours) {
+void OpenQuattTrends::write_history(httpd_req_t* req, uint32_t window_hours) {
   if (req == nullptr) {
     return;
   }
@@ -1178,7 +1151,7 @@ void OpenQuattTrends::write_history(httpd_req_t *req, uint32_t window_hours) {
   }
 }
 
-void OpenQuattTrends::write_metadata(httpd_req_t *req) {
+void OpenQuattTrends::write_metadata(httpd_req_t* req) {
   if (req == nullptr) {
     return;
   }
@@ -1193,8 +1166,7 @@ void OpenQuattTrends::write_metadata(httpd_req_t *req) {
   if (!writer.printf("@now|%llu\n", static_cast<unsigned long long>(now_ms)) ||
       !writer.printf("@flash|%s|%s|%s|%s|%u.%u|%u\n", available.c_str(), oldest.c_str(), newest.c_str(),
                      last_flush.c_str(), static_cast<unsigned>(size_kib_x10 / 10U),
-                     static_cast<unsigned>(size_kib_x10 % 10U),
-                     static_cast<unsigned>(this->get_flash_write_count())) ||
+                     static_cast<unsigned>(size_kib_x10 % 10U), static_cast<unsigned>(this->get_flash_write_count())) ||
       !writer.flush() || httpd_resp_send_chunk(req, nullptr, 0) != ESP_OK) {
     ESP_LOGW(TAG, "Failed to write trend history metadata response");
   }

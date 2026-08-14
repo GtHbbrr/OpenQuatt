@@ -80,8 +80,8 @@ class OpenthermHub final : public Component {
   // Very likely to happen while using Dallas temperature sensors.
   bool sync_mode_ = false;
 
-  CallbackManager<void(OpenthermData &)> before_send_callback_;
-  CallbackManager<void(OpenthermData &)> before_process_response_callback_;
+  CallbackManager<void(OpenthermData&)> before_send_callback_;
+  CallbackManager<void(OpenthermData&)> before_process_response_callback_;
 
   // Create OpenTherm messages based on the message id
   OpenthermData build_request_(MessageId request_id) const;
@@ -96,10 +96,11 @@ class OpenthermHub final : public Component {
   bool should_skip_loop_(uint32_t cur_time) const;
   void sync_loop_();
 
-  void write_initial_messages_(std::vector<MessageId> &target);
-  void write_repeating_messages_(std::vector<MessageId> &target);
+  void write_initial_messages_(std::vector<MessageId>& target);
+  void write_repeating_messages_(std::vector<MessageId>& target);
 
-  template<typename F> bool spin_wait_(uint32_t timeout, F func) {
+  template <typename F>
+  bool spin_wait_(uint32_t timeout, F func) {
     auto start_time = millis();
     while (func()) {
       yield();
@@ -116,11 +117,11 @@ class OpenthermHub final : public Component {
   OpenthermHub();
 
   // Handle responses from the OpenTherm interface
-  void process_response(OpenthermData &data);
+  void process_response(OpenthermData& data);
 
   // Setters for the input and output OpenTherm interface pins
-  void set_in_pin(InternalGPIOPin *in_pin) { this->in_pin_ = in_pin; }
-  void set_out_pin(InternalGPIOPin *out_pin) { this->out_pin_ = out_pin; }
+  void set_in_pin(InternalGPIOPin* in_pin) { this->in_pin_ = in_pin; }
+  void set_out_pin(InternalGPIOPin* out_pin) { this->out_pin_ = out_pin; }
 
   OPENTHERM_SENSOR_LIST(OPENTHERM_SET_SENSOR, )
 
@@ -168,10 +169,12 @@ class OpenthermHub final : public Component {
   void suspend_polling();
   bool is_polling_enabled() const { return this->polling_enabled_; }
 
-  template<typename F> void add_on_before_send_callback(F &&callback) {
+  template <typename F>
+  void add_on_before_send_callback(F&& callback) {
     this->before_send_callback_.add(std::forward<F>(callback));
   }
-  template<typename F> void add_on_before_process_response_callback(F &&callback) {
+  template <typename F>
+  void add_on_before_process_response_callback(F&& callback) {
     this->before_process_response_callback_.add(std::forward<F>(callback));
   }
 

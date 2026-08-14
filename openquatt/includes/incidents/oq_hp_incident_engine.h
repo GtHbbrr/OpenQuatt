@@ -12,31 +12,25 @@ namespace oq_incidents {
 
 class HpIncidentEngine {
  public:
-  explicit HpIncidentEngine(const EngineTuning &tuning = EngineTuning{})
-      : tuning_(tuning) {
-    refresh_derived();
-  }
+  explicit HpIncidentEngine(const EngineTuning& tuning = EngineTuning{}) : tuning_(tuning) { refresh_derived(); }
 
-  const DerivedOutputs &outputs() const { return outputs_; }
+  const DerivedOutputs& outputs() const { return outputs_; }
 
-  const IncidentRuntime &incident(uint16_t register_address,
-                                  uint8_t bit) const {
+  const IncidentRuntime& incident(uint16_t register_address, uint8_t bit) const {
     if (!valid_fault_location(register_address, bit)) {
       return empty_incident_;
     }
     return incidents_[incident_slot(register_address, bit)];
   }
 
-  const IncidentRuntime &incident(IncidentId id) const {
-    if (id == kNoIncident ||
-        id > static_cast<IncidentId>(kRawIncidentSlotCount)) {
+  const IncidentRuntime& incident(IncidentId id) const {
+    if (id == kNoIncident || id > static_cast<IncidentId>(kRawIncidentSlotCount)) {
       return empty_incident_;
     }
     return incidents_[static_cast<size_t>(id - 1U)];
   }
 
-  void observe_link_round(uint32_t now_ms,
-                          bool critical_snapshot_complete) {
+  void observe_link_round(uint32_t now_ms, bool critical_snapshot_complete) {
     advance_time(now_ms);
 
     if (critical_snapshot_complete) {
@@ -47,7 +41,7 @@ class HpIncidentEngine {
     refresh_derived();
   }
 
-  void observe_fault_words(const FaultWordsObservation &observation) {
+  void observe_fault_words(const FaultWordsObservation& observation) {
     advance_time(observation.now_ms);
     const bool hard_fault_before = hard_fault_effective();
 
@@ -55,19 +49,14 @@ class HpIncidentEngine {
       if (!observation.fresh[bank]) {
         continue;
       }
-      const uint16_t register_address =
-          static_cast<uint16_t>(kFirstFaultRegister + bank);
+      const uint16_t register_address = static_cast<uint16_t>(kFirstFaultRegister + bank);
       for (uint8_t bit = 0U; bit < kBitsPerFaultRegister; ++bit) {
-        const bool raw_active =
-            (observation.words[bank] & (1U << bit)) != 0U;
-        update_incident(definition_for(register_address, bit), raw_active,
-                        observation.now_ms);
+        const bool raw_active = (observation.words[bank] & (1U << bit)) != 0U;
+        update_incident(definition_for(register_address, bit), raw_active, observation.now_ms);
       }
     }
 
-    const bool complete_snapshot =
-        observation.fresh[0U] && observation.fresh[1U] &&
-        observation.fresh[2U];
+    const bool complete_snapshot = observation.fresh[0U] && observation.fresh[1U] && observation.fresh[2U];
     update_fault_recovery(observation.now_ms, complete_snapshot);
     const bool hard_fault_after = hard_fault_effective();
     if (!hard_fault_before && hard_fault_after) {
@@ -121,15 +110,13 @@ class HpIncidentEngine {
       stop_requested_at_ms_ = now_ms;
       stop_request_initialized_ = true;
       stopped_read_streak_ = 0U;
-      run_state_ = run_state_ == RunState::STOP_UNCONFIRMED
-                       ? RunState::STOP_UNCONFIRMED
-                       : RunState::STOPPING;
+      run_state_ = run_state_ == RunState::STOP_UNCONFIRMED ? RunState::STOP_UNCONFIRMED : RunState::STOPPING;
     }
     refresh_derived();
     return newly_initialized;
   }
 
-  void observe_run(const RunObservation &observation) {
+  void observe_run(const RunObservation& observation) {
     advance_time(observation.now_ms);
     if (!observation.fresh || !observation.compressor_frequency_valid) {
       refresh_derived();
@@ -140,15 +127,12 @@ class HpIncidentEngine {
       start_mode_seen_ = true;
     }
 
-    const bool compressor_active =
-        observation.compressor_frequency_hz >
-        tuning_.compressor_running_threshold_hz;
+    const bool compressor_active = observation.compressor_frequency_hz > tuning_.compressor_running_threshold_hz;
     if (compressor_active) {
       stopped_read_streak_ = 0U;
       if (stop_requested_) {
         run_state_ = RunState::STOPPING;
-      } else if ((run_state_ == RunState::START_REQUESTED ||
-                  run_state_ == RunState::WAIT_MODE ||
+      } else if ((run_state_ == RunState::START_REQUESTED || run_state_ == RunState::WAIT_MODE ||
                   run_state_ == RunState::WAIT_COMPRESSOR) &&
                  !observation.mode_matches_request) {
         // Frequency proves physical compressor activity, but not a successful
@@ -168,13 +152,10 @@ class HpIncidentEngine {
       return;
     }
 
-    if (run_state_ == RunState::START_REQUESTED ||
-        run_state_ == RunState::WAIT_MODE ||
+    if (run_state_ == RunState::START_REQUESTED || run_state_ == RunState::WAIT_MODE ||
         run_state_ == RunState::WAIT_COMPRESSOR) {
       wrong_mode_compressor_active_ = false;
-      run_state_ = observation.mode_matches_request
-                       ? RunState::WAIT_COMPRESSOR
-                       : RunState::WAIT_MODE;
+      run_state_ = observation.mode_matches_request ? RunState::WAIT_COMPRESSOR : RunState::WAIT_MODE;
       refresh_derived();
       return;
     }
@@ -197,8 +178,7 @@ class HpIncidentEngine {
     }
 
     stopped_read_streak_ = saturating_increment(stopped_read_streak_);
-    if (stopped_read_streak_ >=
-        std::max<uint8_t>(1U, tuning_.stop_confirm_reads)) {
+    if (stopped_read_streak_ >= std::max<uint8_t>(1U, tuning_.stop_confirm_reads)) {
       run_state_ = RunState::STOPPED;
       compressor_running_confirmed_ = false;
       stop_requested_ = false;
@@ -252,11 +232,10 @@ class HpIncidentEngine {
   }
 
   bool acknowledge(IncidentId id) {
-    if (id == kNoIncident ||
-        id > static_cast<IncidentId>(kRawIncidentSlotCount)) {
+    if (id == kNoIncident || id > static_cast<IncidentId>(kRawIncidentSlotCount)) {
       return false;
     }
-    IncidentRuntime &runtime = incidents_[static_cast<size_t>(id - 1U)];
+    IncidentRuntime& runtime = incidents_[static_cast<size_t>(id - 1U)];
     if (!runtime.confirmed_active && !runtime.latched) {
       return false;
     }
@@ -264,13 +243,11 @@ class HpIncidentEngine {
     // A power-cycle latch is a safety gate, not an acknowledgeable history
     // item. Keeping acknowledged=false prevents a still-controlling latch
     // from disappearing from presentation before explicit confirmation.
-    if (definition.clear_policy ==
-        ClearPolicy::AFTER_CONFIRMED_ODU_POWER_CYCLE) {
+    if (definition.clear_policy == ClearPolicy::AFTER_CONFIRMED_ODU_POWER_CYCLE) {
       return false;
     }
     runtime.acknowledged = true;
-    if (!runtime.confirmed_active &&
-        definition.clear_policy == ClearPolicy::AFTER_STABLE_READS) {
+    if (!runtime.confirmed_active && definition.clear_policy == ClearPolicy::AFTER_STABLE_READS) {
       runtime.latched = false;
     }
     refresh_derived();
@@ -279,13 +256,10 @@ class HpIncidentEngine {
 
   bool has_cleared_power_cycle_latch() const {
     for (size_t slot = 0U; slot < incidents_.size(); ++slot) {
-      const IncidentDefinition definition =
-          definition_for(register_for_slot(slot), bit_for_slot(slot));
-      const IncidentRuntime &runtime = incidents_[slot];
-      if (definition.clear_policy ==
-              ClearPolicy::AFTER_CONFIRMED_ODU_POWER_CYCLE &&
-          !runtime.confirmed_active && !runtime.raw_active &&
-          runtime.latched) {
+      const IncidentDefinition definition = definition_for(register_for_slot(slot), bit_for_slot(slot));
+      const IncidentRuntime& runtime = incidents_[slot];
+      if (definition.clear_policy == ClearPolicy::AFTER_CONFIRMED_ODU_POWER_CYCLE && !runtime.confirmed_active &&
+          !runtime.raw_active && runtime.latched) {
         return true;
       }
     }
@@ -294,11 +268,8 @@ class HpIncidentEngine {
 
   bool has_power_cycle_latch() const {
     for (size_t slot = 0U; slot < incidents_.size(); ++slot) {
-      const IncidentDefinition definition =
-          definition_for(register_for_slot(slot), bit_for_slot(slot));
-      if (definition.clear_policy ==
-              ClearPolicy::AFTER_CONFIRMED_ODU_POWER_CYCLE &&
-          incidents_[slot].latched) {
+      const IncidentDefinition definition = definition_for(register_for_slot(slot), bit_for_slot(slot));
+      if (definition.clear_policy == ClearPolicy::AFTER_CONFIRMED_ODU_POWER_CYCLE && incidents_[slot].latched) {
         return true;
       }
     }
@@ -306,16 +277,14 @@ class HpIncidentEngine {
   }
 
   bool restore_power_cycle_latch(IncidentId id) {
-    if (id == kNoIncident ||
-        id > static_cast<IncidentId>(kRawIncidentSlotCount)) {
+    if (id == kNoIncident || id > static_cast<IncidentId>(kRawIncidentSlotCount)) {
       return false;
     }
     const IncidentDefinition definition = definition_for_id(id);
-    if (definition.clear_policy !=
-        ClearPolicy::AFTER_CONFIRMED_ODU_POWER_CYCLE) {
+    if (definition.clear_policy != ClearPolicy::AFTER_CONFIRMED_ODU_POWER_CYCLE) {
       return false;
     }
-    IncidentRuntime &runtime = incidents_[static_cast<size_t>(id - 1U)];
+    IncidentRuntime& runtime = incidents_[static_cast<size_t>(id - 1U)];
     runtime.latched = true;
     runtime.acknowledged = false;
     refresh_derived();
@@ -330,12 +299,10 @@ class HpIncidentEngine {
     bool released_latch = false;
     bool released_hard_latch = false;
     for (size_t slot = 0U; slot < incidents_.size(); ++slot) {
-      const IncidentDefinition definition =
-          definition_for(register_for_slot(slot), bit_for_slot(slot));
-      IncidentRuntime &runtime = incidents_[slot];
-      if (definition.clear_policy !=
-              ClearPolicy::AFTER_CONFIRMED_ODU_POWER_CYCLE ||
-          runtime.confirmed_active || runtime.raw_active || !runtime.latched) {
+      const IncidentDefinition definition = definition_for(register_for_slot(slot), bit_for_slot(slot));
+      IncidentRuntime& runtime = incidents_[slot];
+      if (definition.clear_policy != ClearPolicy::AFTER_CONFIRMED_ODU_POWER_CYCLE || runtime.confirmed_active ||
+          runtime.raw_active || !runtime.latched) {
         continue;
       }
       runtime.latched = false;
@@ -344,9 +311,7 @@ class HpIncidentEngine {
       // with FLAG_MANUAL_RESET_REQUIRED.
       runtime.acknowledged = true;
       released_latch = true;
-      released_hard_latch =
-          released_hard_latch ||
-          has_effect(definition.effects, IncidentEffect::STOP_COMPRESSOR);
+      released_hard_latch = released_hard_latch || has_effect(definition.effects, IncidentEffect::STOP_COMPRESSOR);
     }
     if (released_hard_latch) {
       hard_fault_seen_ = true;
@@ -359,35 +324,24 @@ class HpIncidentEngine {
   }
 
  private:
-  static uint32_t elapsed_ms(uint32_t now_ms, uint32_t since_ms) {
-    return static_cast<uint32_t>(now_ms - since_ms);
-  }
+  static uint32_t elapsed_ms(uint32_t now_ms, uint32_t since_ms) { return static_cast<uint32_t>(now_ms - since_ms); }
 
-  static bool elapsed_at_least(uint32_t now_ms, uint32_t since_ms,
-                               uint32_t duration_ms) {
+  static bool elapsed_at_least(uint32_t now_ms, uint32_t since_ms, uint32_t duration_ms) {
     return elapsed_ms(now_ms, since_ms) >= duration_ms;
   }
 
   static uint8_t saturating_increment(uint8_t value) {
-    return value == std::numeric_limits<uint8_t>::max()
-               ? value
-               : static_cast<uint8_t>(value + 1U);
+    return value == std::numeric_limits<uint8_t>::max() ? value : static_cast<uint8_t>(value + 1U);
   }
 
   static uint32_t saturating_add(uint32_t lhs, uint32_t rhs) {
-    return rhs > std::numeric_limits<uint32_t>::max() - lhs
-               ? std::numeric_limits<uint32_t>::max()
-               : lhs + rhs;
+    return rhs > std::numeric_limits<uint32_t>::max() - lhs ? std::numeric_limits<uint32_t>::max() : lhs + rhs;
   }
 
-  bool incident_effective(size_t slot,
-                          const IncidentDefinition &definition) const {
-    const IncidentRuntime &runtime = incidents_[slot];
+  bool incident_effective(size_t slot, const IncidentDefinition& definition) const {
+    const IncidentRuntime& runtime = incidents_[slot];
     return runtime.confirmed_active ||
-           (runtime.latched &&
-            has_effect(
-                definition.effects,
-                IncidentEffect::REQUIRE_CONFIRMED_ODU_POWER_CYCLE));
+           (runtime.latched && has_effect(definition.effects, IncidentEffect::REQUIRE_CONFIRMED_ODU_POWER_CYCLE));
   }
 
   bool preheat_active() const {
@@ -397,10 +351,8 @@ class HpIncidentEngine {
 
   bool hard_fault_effective() const {
     for (size_t slot = 0U; slot < incidents_.size(); ++slot) {
-      const IncidentDefinition definition =
-          definition_for(register_for_slot(slot), bit_for_slot(slot));
-      if (incident_effective(slot, definition) &&
-          has_effect(definition.effects, IncidentEffect::STOP_COMPRESSOR)) {
+      const IncidentDefinition definition = definition_for(register_for_slot(slot), bit_for_slot(slot));
+      if (incident_effective(slot, definition) && has_effect(definition.effects, IncidentEffect::STOP_COMPRESSOR)) {
         return true;
       }
     }
@@ -411,15 +363,11 @@ class HpIncidentEngine {
     if (start_watchdog_initialized_) {
       const uint32_t delta_ms = elapsed_ms(now_ms, start_watchdog_last_ms_);
       start_watchdog_last_ms_ = now_ms;
-      const bool waiting_for_start =
-          run_state_ == RunState::START_REQUESTED ||
-          run_state_ == RunState::WAIT_MODE ||
-          run_state_ == RunState::WAIT_COMPRESSOR;
+      const bool waiting_for_start = run_state_ == RunState::START_REQUESTED || run_state_ == RunState::WAIT_MODE ||
+                                     run_state_ == RunState::WAIT_COMPRESSOR;
       if (waiting_for_start && !preheat_active()) {
-        start_watchdog_elapsed_ms_ =
-            saturating_add(start_watchdog_elapsed_ms_, delta_ms);
-        if (!start_mode_seen_ &&
-            start_watchdog_elapsed_ms_ >= tuning_.mode_ack_timeout_ms) {
+        start_watchdog_elapsed_ms_ = saturating_add(start_watchdog_elapsed_ms_, delta_ms);
+        if (!start_mode_seen_ && start_watchdog_elapsed_ms_ >= tuning_.mode_ack_timeout_ms) {
           start_mode_ack_timed_out_ = true;
           if (wrong_mode_compressor_active_) {
             start_timed_out_ = true;
@@ -431,10 +379,8 @@ class HpIncidentEngine {
       }
     }
 
-    if (stop_request_initialized_ &&
-        run_state_ != RunState::STOPPED &&
-        elapsed_at_least(now_ms, stop_requested_at_ms_,
-                         tuning_.stop_confirm_timeout_ms)) {
+    if (stop_request_initialized_ && run_state_ != RunState::STOPPED &&
+        elapsed_at_least(now_ms, stop_requested_at_ms_, tuning_.stop_confirm_timeout_ms)) {
       run_state_ = RunState::STOP_UNCONFIRMED;
       compressor_running_confirmed_ = false;
     }
@@ -457,8 +403,7 @@ class HpIncidentEngine {
       link_recovery_started_ms_ = now_ms;
       link_recovery_rounds_ = 1U;
     }
-    if (link_state_ == LinkState::BOOTSTRAP ||
-        link_state_ == LinkState::LOST) {
+    if (link_state_ == LinkState::BOOTSTRAP || link_state_ == LinkState::LOST) {
       recovering_from_loss_ = link_state_ == LinkState::LOST;
       link_state_ = LinkState::RECOVERING;
       link_recovery_started_ms_ = now_ms;
@@ -467,10 +412,8 @@ class HpIncidentEngine {
       link_recovery_rounds_ = saturating_increment(link_recovery_rounds_);
     }
 
-    if (link_recovery_rounds_ >=
-            std::max<uint8_t>(1U, tuning_.link_recovery_rounds) &&
-        elapsed_at_least(now_ms, link_recovery_started_ms_,
-                         tuning_.link_recovery_ms)) {
+    if (link_recovery_rounds_ >= std::max<uint8_t>(1U, tuning_.link_recovery_rounds) &&
+        elapsed_at_least(now_ms, link_recovery_started_ms_, tuning_.link_recovery_ms)) {
       link_state_ = LinkState::HEALTHY;
       link_recovery_rounds_ = 0U;
       recovering_from_loss_ = false;
@@ -496,11 +439,8 @@ class HpIncidentEngine {
       missed_link_rounds_ = saturating_increment(missed_link_rounds_);
     }
 
-    if (link_suspect_started_ &&
-        missed_link_rounds_ >=
-            std::max<uint8_t>(1U, tuning_.link_lost_rounds) &&
-        elapsed_at_least(now_ms, link_suspect_since_ms_,
-                         tuning_.link_lost_ms)) {
+    if (link_suspect_started_ && missed_link_rounds_ >= std::max<uint8_t>(1U, tuning_.link_lost_rounds) &&
+        elapsed_at_least(now_ms, link_suspect_since_ms_, tuning_.link_lost_ms)) {
       mark_link_lost();
     }
   }
@@ -522,13 +462,11 @@ class HpIncidentEngine {
     stopped_read_streak_ = 0U;
   }
 
-  void update_incident(const IncidentDefinition &definition, bool raw_active,
-                       uint32_t now_ms) {
+  void update_incident(const IncidentDefinition& definition, bool raw_active, uint32_t now_ms) {
     if (!valid_fault_location(definition.register_address, definition.bit)) {
       return;
     }
-    IncidentRuntime &runtime =
-        incidents_[incident_slot(definition.register_address, definition.bit)];
+    IncidentRuntime& runtime = incidents_[incident_slot(definition.register_address, definition.bit)];
 
     if (raw_active) {
       if (!runtime.raw_active && !runtime.confirmed_active) {
@@ -541,20 +479,15 @@ class HpIncidentEngine {
       runtime.clear_streak = 0U;
       runtime.trip_streak = saturating_increment(runtime.trip_streak);
 
-      if (!runtime.confirmed_active &&
-          runtime.trip_streak >=
-              std::max<uint8_t>(1U, definition.trip_reads)) {
+      if (!runtime.confirmed_active && runtime.trip_streak >= std::max<uint8_t>(1U, definition.trip_reads)) {
         runtime.confirmed_active = true;
         // Informational operating states are useful while present, but must
         // not turn normal ODU behaviour into acknowledgeable alarm history.
-        runtime.latched =
-            definition.category != IncidentCategory::STATUS;
+        runtime.latched = definition.category != IncidentCategory::STATUS;
         runtime.acknowledged = false;
-        runtime.occurrence_count =
-            runtime.occurrence_count ==
-                    std::numeric_limits<uint32_t>::max()
-                ? runtime.occurrence_count
-                : runtime.occurrence_count + 1U;
+        runtime.occurrence_count = runtime.occurrence_count == std::numeric_limits<uint32_t>::max()
+                                       ? runtime.occurrence_count
+                                       : runtime.occurrence_count + 1U;
       }
       return;
     }
@@ -567,8 +500,7 @@ class HpIncidentEngine {
     }
 
     runtime.clear_streak = saturating_increment(runtime.clear_streak);
-    if (runtime.clear_streak <
-        std::max<uint8_t>(1U, definition.clear_reads)) {
+    if (runtime.clear_streak < std::max<uint8_t>(1U, definition.clear_reads)) {
       return;
     }
 
@@ -579,9 +511,7 @@ class HpIncidentEngine {
       // Automatic incidents keep a non-controlling history latch until the
       // user acknowledges them. Acknowledgement while active only prevents
       // that latch from remaining after the physical condition clears.
-      runtime.latched =
-          definition.category != IncidentCategory::STATUS &&
-          !runtime.acknowledged;
+      runtime.latched = definition.category != IncidentCategory::STATUS && !runtime.acknowledged;
     }
   }
 
@@ -601,22 +531,18 @@ class HpIncidentEngine {
       fault_recovery_started_ms_ = now_ms;
       fault_recovery_rounds_ = complete_snapshot ? 1U : 0U;
     } else if (complete_snapshot) {
-      fault_recovery_rounds_ =
-          saturating_increment(fault_recovery_rounds_);
+      fault_recovery_rounds_ = saturating_increment(fault_recovery_rounds_);
     }
 
-    if (complete_snapshot &&
-        fault_recovery_rounds_ >=
-            std::max<uint8_t>(1U, tuning_.fault_recovery_rounds) &&
-        elapsed_at_least(now_ms, fault_recovery_started_ms_,
-                         tuning_.fault_recovery_ms)) {
+    if (complete_snapshot && fault_recovery_rounds_ >= std::max<uint8_t>(1U, tuning_.fault_recovery_rounds) &&
+        elapsed_at_least(now_ms, fault_recovery_started_ms_, tuning_.fault_recovery_ms)) {
       fault_recovery_active_ = false;
       fault_recovery_rounds_ = 0U;
       hard_fault_seen_ = false;
     }
   }
 
-  static int primary_priority(const IncidentDefinition &definition) {
+  static int primary_priority(const IncidentDefinition& definition) {
     if (has_effect(definition.effects, IncidentEffect::STOP_COMPRESSOR)) {
       return 5;
     }
@@ -649,41 +575,25 @@ class HpIncidentEngine {
     int selected_priority = 0;
 
     for (size_t slot = 0U; slot < incidents_.size(); ++slot) {
-      const IncidentDefinition definition =
-          definition_for(register_for_slot(slot), bit_for_slot(slot));
+      const IncidentDefinition definition = definition_for(register_for_slot(slot), bit_for_slot(slot));
       if (!incident_effective(slot, definition)) {
         continue;
       }
 
       outputs_.active_effects |= definition.effects;
-      outputs_.active_incident_count =
-          saturating_increment(outputs_.active_incident_count);
-      outputs_.fault_active =
-          outputs_.fault_active ||
-          definition.category == IncidentCategory::FAULT;
-      outputs_.protection_active =
-          outputs_.protection_active ||
-          definition.category == IncidentCategory::PROTECTION;
-      hard_fault =
-          hard_fault ||
-          has_effect(definition.effects, IncidentEffect::STOP_COMPRESSOR);
-      block_start =
-          block_start ||
-          has_effect(definition.effects, IncidentEffect::BLOCK_START);
-      limited =
-          limited ||
-          has_effect(definition.effects, IncidentEffect::LIMIT_CAPACITY);
-      fallback_fault =
-          fallback_fault ||
-          (definition.fallback_policy ==
-               FallbackPolicy::AFTER_SYSTEM_GUARDS &&
-           has_effect(definition.effects, IncidentEffect::ALLOW_CM4));
+      outputs_.active_incident_count = saturating_increment(outputs_.active_incident_count);
+      outputs_.fault_active = outputs_.fault_active || definition.category == IncidentCategory::FAULT;
+      outputs_.protection_active = outputs_.protection_active || definition.category == IncidentCategory::PROTECTION;
+      hard_fault = hard_fault || has_effect(definition.effects, IncidentEffect::STOP_COMPRESSOR);
+      block_start = block_start || has_effect(definition.effects, IncidentEffect::BLOCK_START);
+      limited = limited || has_effect(definition.effects, IncidentEffect::LIMIT_CAPACITY);
+      fallback_fault = fallback_fault || (definition.fallback_policy == FallbackPolicy::AFTER_SYSTEM_GUARDS &&
+                                          has_effect(definition.effects, IncidentEffect::ALLOW_CM4));
 
       const int priority = primary_priority(definition);
       if (priority > selected_priority ||
           (priority == selected_priority &&
-           (outputs_.primary_incident_id == kNoIncident ||
-            definition.id < outputs_.primary_incident_id))) {
+           (outputs_.primary_incident_id == kNoIncident || definition.id < outputs_.primary_incident_id))) {
         selected_priority = priority;
         outputs_.primary_incident_id = definition.id;
       }
@@ -701,37 +611,28 @@ class HpIncidentEngine {
       outputs_.protection_state = ProtectionState::CLEAR;
     }
 
-    const bool link_recovery_after_loss =
-        link_state_ == LinkState::RECOVERING && recovering_from_loss_;
-    outputs_.must_stop = hard_fault || start_timed_out_ ||
-                         link_state_ == LinkState::LOST ||
-                         link_recovery_after_loss;
-    outputs_.available_for_start =
-        link_state_ == LinkState::HEALTHY &&
-        (outputs_.protection_state == ProtectionState::CLEAR ||
-         outputs_.protection_state == ProtectionState::LIMITED) &&
-        run_state_ != RunState::STOP_UNCONFIRMED && !start_timed_out_;
-    outputs_.fallback_cause_present =
-        fallback_fault || fault_recovery_active_ || start_timed_out_ ||
-        link_state_ == LinkState::LOST || link_recovery_after_loss;
-    outputs_.fallback_eligible =
-        outputs_.fallback_cause_present && !outputs_.available_for_start &&
-        outputs_.stop_confirmed && !outputs_.stop_unconfirmed;
+    const bool link_recovery_after_loss = link_state_ == LinkState::RECOVERING && recovering_from_loss_;
+    outputs_.must_stop = hard_fault || start_timed_out_ || link_state_ == LinkState::LOST || link_recovery_after_loss;
+    outputs_.available_for_start = link_state_ == LinkState::HEALTHY &&
+                                   (outputs_.protection_state == ProtectionState::CLEAR ||
+                                    outputs_.protection_state == ProtectionState::LIMITED) &&
+                                   run_state_ != RunState::STOP_UNCONFIRMED && !start_timed_out_;
+    outputs_.fallback_cause_present = fallback_fault || fault_recovery_active_ || start_timed_out_ ||
+                                      link_state_ == LinkState::LOST || link_recovery_after_loss;
+    outputs_.fallback_eligible = outputs_.fallback_cause_present && !outputs_.available_for_start &&
+                                 outputs_.stop_confirmed && !outputs_.stop_unconfirmed;
 
     if (start_timed_out_) {
       outputs_.fault_active = true;
-      outputs_.active_incident_count =
-          saturating_increment(outputs_.active_incident_count);
+      outputs_.active_incident_count = saturating_increment(outputs_.active_incident_count);
       if (outputs_.primary_incident_id == kNoIncident) {
         outputs_.primary_incident_id = kStartFailedIncidentId;
       }
     }
-    if ((link_state_ == LinkState::LOST || link_recovery_after_loss) &&
-        outputs_.primary_incident_id == kNoIncident) {
+    if ((link_state_ == LinkState::LOST || link_recovery_after_loss) && outputs_.primary_incident_id == kNoIncident) {
       outputs_.primary_incident_id = kLinkLossIncidentId;
     }
-    if (outputs_.stop_unconfirmed &&
-        outputs_.primary_incident_id == kNoIncident) {
+    if (outputs_.stop_unconfirmed && outputs_.primary_incident_id == kNoIncident) {
       outputs_.primary_incident_id = kStopUnconfirmedIncidentId;
     }
   }

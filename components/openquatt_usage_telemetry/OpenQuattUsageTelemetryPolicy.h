@@ -19,8 +19,7 @@ enum class MqttCleanupDecision : uint8_t {
 
 class FixedBufferWriter {
  public:
-  FixedBufferWriter(char *data, size_t capacity)
-      : data_(data), capacity_(capacity) {
+  FixedBufferWriter(char* data, size_t capacity) : data_(data), capacity_(capacity) {
     if (this->data_ == nullptr || this->capacity_ == 0U) {
       this->ok_ = false;
     } else {
@@ -28,27 +27,26 @@ class FixedBufferWriter {
     }
   }
 
-  FixedBufferWriter &operator+=(const char *value) {
+  FixedBufferWriter& operator+=(const char* value) {
     if (value != nullptr) {
       this->append_(value, std::strlen(value));
     }
     return *this;
   }
 
-  FixedBufferWriter &operator+=(const std::string &value) {
+  FixedBufferWriter& operator+=(const std::string& value) {
     this->append_(value.data(), value.size());
     return *this;
   }
 
-  FixedBufferWriter &operator+=(char value) {
+  FixedBufferWriter& operator+=(char value) {
     this->append_(&value, 1U);
     return *this;
   }
 
   void append_uint(uint64_t value) {
     char buffer[24];
-    const int length = std::snprintf(
-        buffer, sizeof(buffer), "%" PRIu64, value);
+    const int length = std::snprintf(buffer, sizeof(buffer), "%" PRIu64, value);
     if (length <= 0) {
       this->ok_ = false;
       return;
@@ -60,9 +58,8 @@ class FixedBufferWriter {
   size_t size() const { return this->size_; }
 
  private:
-  void append_(const char *value, size_t length) {
-    if (!this->ok_ || value == nullptr ||
-        length >= this->capacity_ - this->size_) {
+  void append_(const char* value, size_t length) {
+    if (!this->ok_ || value == nullptr || length >= this->capacity_ - this->size_) {
       this->ok_ = false;
       return;
     }
@@ -71,14 +68,13 @@ class FixedBufferWriter {
     this->data_[this->size_] = '\0';
   }
 
-  char *data_{nullptr};
+  char* data_{nullptr};
   size_t capacity_{0U};
   size_t size_{0U};
   bool ok_{true};
 };
 
-inline void append_json_escaped(FixedBufferWriter &output,
-                                const std::string &input) {
+inline void append_json_escaped(FixedBufferWriter& output, const std::string& input) {
   for (char c : input) {
     switch (c) {
       case '"':
@@ -105,9 +101,7 @@ inline void append_json_escaped(FixedBufferWriter &output,
       default:
         if (static_cast<unsigned char>(c) < 0x20U) {
           char buffer[7];
-          std::snprintf(
-              buffer, sizeof(buffer), "\\u%04x",
-              static_cast<unsigned char>(c));
+          std::snprintf(buffer, sizeof(buffer), "\\u%04x", static_cast<unsigned char>(c));
           output += buffer;
         } else {
           output += c;
@@ -117,9 +111,8 @@ inline void append_json_escaped(FixedBufferWriter &output,
   }
 }
 
-inline MqttCleanupDecision mqtt_cleanup_decision(
-    bool stop_succeeded, bool connected_seen, bool disconnected_seen,
-    uint8_t consecutive_stop_failures) {
+inline MqttCleanupDecision mqtt_cleanup_decision(bool stop_succeeded, bool connected_seen, bool disconnected_seen,
+                                                 uint8_t consecutive_stop_failures) {
   if (stop_succeeded) {
     return MqttCleanupDecision::DESTROY;
   }

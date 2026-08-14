@@ -8,8 +8,7 @@ struct TrendStorageCapabilities {
   bool flash_archive_available;
 };
 
-constexpr TrendStorageCapabilities trend_storage_capabilities(bool ram_history_allocated,
-                                                              bool flash_index_allocated,
+constexpr TrendStorageCapabilities trend_storage_capabilities(bool ram_history_allocated, bool flash_index_allocated,
                                                               bool flash_partition_available) {
   return TrendStorageCapabilities{
       ram_history_allocated,

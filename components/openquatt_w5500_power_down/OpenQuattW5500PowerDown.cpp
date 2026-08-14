@@ -6,7 +6,7 @@
 namespace esphome {
 namespace openquatt_w5500_power_down {
 
-static const char *const TAG = "openquatt.w5500_power";
+static const char* const TAG = "openquatt.w5500_power";
 
 void OpenQuattW5500PowerDown::setup() {
   this->spi_setup();
@@ -28,8 +28,7 @@ void OpenQuattW5500PowerDown::setup() {
   this->write_register_(PHYCFGR_REGISTER, PHYCFGR_POWER_DOWN);
 
   const uint8_t final_phycfgr = this->read_register_(PHYCFGR_REGISTER);
-  this->power_down_active_ =
-      (final_phycfgr & PHYCFGR_CONFIGURATION_MASK) == PHYCFGR_POWER_DOWN;
+  this->power_down_active_ = (final_phycfgr & PHYCFGR_CONFIGURATION_MASK) == PHYCFGR_POWER_DOWN;
   if (!this->power_down_active_) {
     ESP_LOGE(TAG, "W5500 Power Down verification failed: PHYCFGR=0x%02X", final_phycfgr);
     this->mark_failed();

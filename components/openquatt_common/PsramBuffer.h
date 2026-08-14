@@ -10,23 +10,20 @@ namespace esphome::openquatt_common {
 
 /// Large OpenQuatt history buffer that prefers PSRAM but falls back to internal RAM
 /// when PSRAM is not available on the target hardware.
-template<typename T> class PsramBuffer {
+template <typename T>
+class PsramBuffer {
  public:
   PsramBuffer() = default;
   ~PsramBuffer() { this->release(); }
 
-  PsramBuffer(const PsramBuffer &) = delete;
-  PsramBuffer &operator=(const PsramBuffer &) = delete;
+  PsramBuffer(const PsramBuffer&) = delete;
+  PsramBuffer& operator=(const PsramBuffer&) = delete;
 
-  bool allocate(size_t count) {
-    return this->allocate_(count, true);
-  }
+  bool allocate(size_t count) { return this->allocate_(count, true); }
 
   /// Allocate strictly from PSRAM. This intentionally does not fall back to
   /// internal RAM when preserving internal heap is part of the safety budget.
-  bool allocate_external(size_t count) {
-    return this->allocate_(count, false);
-  }
+  bool allocate_external(size_t count) { return this->allocate_(count, false); }
 
   void release() {
     if (this->data_ != nullptr) {
@@ -37,14 +34,14 @@ template<typename T> class PsramBuffer {
     this->external_ = false;
   }
 
-  T *data() { return this->data_; }
-  const T *data() const { return this->data_; }
+  T* data() { return this->data_; }
+  const T* data() const { return this->data_; }
   size_t size() const { return this->size_; }
   bool is_external() const { return this->external_; }
   explicit operator bool() const { return this->data_ != nullptr; }
 
-  T &operator[](size_t index) { return this->data_[index]; }
-  const T &operator[](size_t index) const { return this->data_[index]; }
+  T& operator[](size_t index) { return this->data_[index]; }
+  const T& operator[](size_t index) const { return this->data_[index]; }
 
  private:
   bool allocate_(size_t count, bool allow_internal_fallback) {
@@ -73,7 +70,7 @@ template<typename T> class PsramBuffer {
     return true;
   }
 
-  T *data_{nullptr};
+  T* data_{nullptr};
   size_t size_{0};
   bool external_{false};
 };
@@ -83,13 +80,14 @@ template<typename T> class PsramBuffer {
 /// Unlike PsramBuffer, this helper never falls back to internal RAM and manages
 /// the lifetime of non-trivial objects. Allocate it from setup(), after PSRAM
 /// initialization, and keep all accesses in normal task context.
-template<typename T, size_t Count> class PsramObjectArray {
+template <typename T, size_t Count>
+class PsramObjectArray {
  public:
   PsramObjectArray() = default;
   ~PsramObjectArray() { this->release(); }
 
-  PsramObjectArray(const PsramObjectArray &) = delete;
-  PsramObjectArray &operator=(const PsramObjectArray &) = delete;
+  PsramObjectArray(const PsramObjectArray&) = delete;
+  PsramObjectArray& operator=(const PsramObjectArray&) = delete;
 
   bool allocate() {
     this->release();
@@ -119,16 +117,16 @@ template<typename T, size_t Count> class PsramObjectArray {
     this->data_ = nullptr;
   }
 
-  T *data() { return this->data_; }
-  const T *data() const { return this->data_; }
+  T* data() { return this->data_; }
+  const T* data() const { return this->data_; }
   static constexpr size_t size() { return Count; }
   explicit operator bool() const { return this->data_ != nullptr; }
 
-  T &operator[](size_t index) { return this->data_[index]; }
-  const T &operator[](size_t index) const { return this->data_[index]; }
+  T& operator[](size_t index) { return this->data_[index]; }
+  const T& operator[](size_t index) const { return this->data_[index]; }
 
  private:
-  T *data_{nullptr};
+  T* data_{nullptr};
 };
 
 }  // namespace esphome::openquatt_common

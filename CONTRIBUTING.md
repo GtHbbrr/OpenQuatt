@@ -119,7 +119,7 @@ For C/C++ source files, install `clang-format` locally and use the repository fo
 - `npm run check:cpp-format`
 - `npm run fix:cpp-format`
 
-If `clang-format` is installed but not in `PATH`, set `CLANG_FORMAT_BIN` to the executable path before running the npm command. The CI formatting job currently reports formatting differences as warnings, but contributors should run the local fix command before opening or updating a pull request.
+If `clang-format` is installed but not in `PATH`, set `CLANG_FORMAT_BIN` to the executable path before running the npm command. CI enforces C/C++ formatting and fails when formatting differences are detected, so run the local fix command before opening or updating a pull request.
 
 For quick iterations, the standalone checks remain useful:
 

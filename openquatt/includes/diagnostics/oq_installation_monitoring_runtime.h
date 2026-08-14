@@ -18,49 +18,42 @@ inline size_t compressor_starts_warning_limit_72h() {
 }
 
 inline bool compressor_cycling_warning_2h(uint32_t now_ms, size_t warning_limit) {
-  auto &monitor = installation_monitor();
+  auto& monitor = installation_monitor();
   return monitor.compressor_cycling_warning_2h(now_ms, warning_limit);
 }
 
 inline bool compressor_cycling_warning_72h(uint32_t now_ms, size_t warning_limit) {
-  auto &monitor = installation_monitor();
+  auto& monitor = installation_monitor();
   return monitor.compressor_cycling_warning_72h(now_ms, warning_limit);
 }
 
 inline bool compressor_cycling_warning(uint32_t now_ms, size_t short_warning_limit, size_t long_warning_limit) {
-  auto &monitor = installation_monitor();
+  auto& monitor = installation_monitor();
   return monitor.compressor_cycling_warning(now_ms, short_warning_limit, long_warning_limit) ||
          monitor.alternating_cycling_warning(now_ms, short_warning_limit);
 }
 
 inline void publish_compressor_cycling_alert_metadata() {
-  id(oq_compressor_cycling_alert_latched_sensor)
-      .publish_state(id(oq_compressor_cycling_alert_latched));
-  id(oq_compressor_cycling_alert_alternating_sensor)
-      .publish_state(id(oq_compressor_cycling_alert_alternating));
+  id(oq_compressor_cycling_alert_latched_sensor).publish_state(id(oq_compressor_cycling_alert_latched));
+  id(oq_compressor_cycling_alert_alternating_sensor).publish_state(id(oq_compressor_cycling_alert_alternating));
   id(oq_compressor_cycling_alert_first_seen)
       .publish_state(id(oq_compressor_cycling_alert_first_seen_epoch) > 0U
                          ? id(oq_compressor_cycling_alert_first_seen_epoch)
                          : NAN);
   id(oq_compressor_cycling_alert_last_seen)
-      .publish_state(id(oq_compressor_cycling_alert_last_seen_epoch) > 0U
-                         ? id(oq_compressor_cycling_alert_last_seen_epoch)
-                         : NAN);
-  id(oq_compressor_cycling_alert_hp1_peak_2h)
-      .publish_state(id(oq_compressor_cycling_alert_hp1_peak_2h_value));
-  id(oq_compressor_cycling_alert_hp1_peak_72h)
-      .publish_state(id(oq_compressor_cycling_alert_hp1_peak_72h_value));
-  id(oq_compressor_cycling_alert_hp2_peak_2h)
-      .publish_state(id(oq_compressor_cycling_alert_hp2_peak_2h_value));
-  id(oq_compressor_cycling_alert_hp2_peak_72h)
-      .publish_state(id(oq_compressor_cycling_alert_hp2_peak_72h_value));
+      .publish_state(
+          id(oq_compressor_cycling_alert_last_seen_epoch) > 0U ? id(oq_compressor_cycling_alert_last_seen_epoch) : NAN);
+  id(oq_compressor_cycling_alert_hp1_peak_2h).publish_state(id(oq_compressor_cycling_alert_hp1_peak_2h_value));
+  id(oq_compressor_cycling_alert_hp1_peak_72h).publish_state(id(oq_compressor_cycling_alert_hp1_peak_72h_value));
+  id(oq_compressor_cycling_alert_hp2_peak_2h).publish_state(id(oq_compressor_cycling_alert_hp2_peak_2h_value));
+  id(oq_compressor_cycling_alert_hp2_peak_72h).publish_state(id(oq_compressor_cycling_alert_hp2_peak_72h_value));
 }
 
 inline void capture_compressor_cycling_alert() {
   const uint32_t now_ms = millis();
   const size_t short_warning_limit = compressor_starts_warning_limit_2h();
   const size_t long_warning_limit = compressor_starts_warning_limit_72h();
-  auto &monitor = installation_monitor();
+  auto& monitor = installation_monitor();
   const int hp1_short_starts = monitor.start_count(1, now_ms, InstallationMonitor::kTwoHoursMs);
   const int hp2_short_starts = monitor.start_count(2, now_ms, InstallationMonitor::kTwoHoursMs);
   const int hp1_long_starts = monitor.start_count(1, now_ms, InstallationMonitor::kSeventyTwoHoursMs);
@@ -85,19 +78,12 @@ inline void capture_compressor_cycling_alert() {
     const uint8_t subject =
         alternating || hp1_triggered == hp2_triggered
             ? openquatt_decision_log::SUBJECT_BOTH
-            : (hp1_triggered ? openquatt_decision_log::SUBJECT_HP1
-                             : openquatt_decision_log::SUBJECT_HP2);
-    id(oq_decision_log).emit(
-        openquatt_decision_log::EVENT_ATTENTION_PATTERN,
-        subject,
-        openquatt_decision_log::REASON_START_STOP_RATE_HIGH,
-        openquatt_decision_log::SEVERITY_ATTENTION,
-        (uint8_t) id(oq_control_mode_code),
-        openquatt_decision_log::STATE_ACTIVE,
-        openquatt_decision_log::STATE_ACTIVE,
-        (int16_t) hp1_value,
-        (int16_t) hp2_value,
-        (int16_t) threshold);
+            : (hp1_triggered ? openquatt_decision_log::SUBJECT_HP1 : openquatt_decision_log::SUBJECT_HP2);
+    id(oq_decision_log)
+        .emit(openquatt_decision_log::EVENT_ATTENTION_PATTERN, subject,
+              openquatt_decision_log::REASON_START_STOP_RATE_HIGH, openquatt_decision_log::SEVERITY_ATTENTION,
+              (uint8_t)id(oq_control_mode_code), openquatt_decision_log::STATE_ACTIVE,
+              openquatt_decision_log::STATE_ACTIVE, (int16_t)hp1_value, (int16_t)hp2_value, (int16_t)threshold);
   }
   id(oq_compressor_cycling_alert_latched) = true;
   if (first_occurrence) {
@@ -121,16 +107,10 @@ inline void capture_compressor_cycling_alert() {
       std::max(id(oq_compressor_cycling_alert_hp2_peak_2h_value), hp2_short_starts);
   id(oq_compressor_cycling_alert_hp2_peak_72h_value) =
       std::max(id(oq_compressor_cycling_alert_hp2_peak_72h_value), hp2_long_starts);
-  id(oq_compressor_cycling_alert_alternating) =
-      id(oq_compressor_cycling_alert_alternating) || alternating;
+  id(oq_compressor_cycling_alert_alternating) = id(oq_compressor_cycling_alert_alternating) || alternating;
   publish_compressor_cycling_alert_metadata();
-  ESP_LOGW(
-      "oq_diag",
-      "Compressor cycling incident recorded: HP1=%d/2h %d/72h, HP2=%d/2h %d/72h.",
-      hp1_short_starts,
-      hp1_long_starts,
-      hp2_short_starts,
-      hp2_long_starts);
+  ESP_LOGW("oq_diag", "Compressor cycling incident recorded: HP1=%d/2h %d/72h, HP2=%d/2h %d/72h.", hp1_short_starts,
+           hp1_long_starts, hp2_short_starts, hp2_long_starts);
 }
 
 inline void acknowledge_compressor_cycling_alert() {
@@ -155,8 +135,8 @@ inline void acknowledge_compressor_cycling_alert() {
 }
 
 inline bool logged_compressor_cycling_warning_2h(uint32_t now_ms) {
-  const bool active = installation_monitor().compressor_cycling_warning_2h(
-      now_ms, compressor_starts_warning_limit_2h());
+  const bool active =
+      installation_monitor().compressor_cycling_warning_2h(now_ms, compressor_starts_warning_limit_2h());
   static bool previous = false;
   if (active != previous) {
     ESP_LOGW("oq_diag", "Compressor cycling warning 2h %s.", active ? "active" : "cleared");
@@ -166,8 +146,8 @@ inline bool logged_compressor_cycling_warning_2h(uint32_t now_ms) {
 }
 
 inline bool logged_compressor_cycling_warning_72h(uint32_t now_ms) {
-  const bool active = installation_monitor().compressor_cycling_warning_72h(
-      now_ms, compressor_starts_warning_limit_72h());
+  const bool active =
+      installation_monitor().compressor_cycling_warning_72h(now_ms, compressor_starts_warning_limit_72h());
   static bool previous = false;
   if (active != previous) {
     ESP_LOGW("oq_diag", "Compressor cycling warning 72h %s.", active ? "active" : "cleared");
@@ -177,8 +157,7 @@ inline bool logged_compressor_cycling_warning_72h(uint32_t now_ms) {
 }
 
 inline bool logged_alternating_cycling_warning(uint32_t now_ms) {
-  const bool active = installation_monitor().alternating_cycling_warning(
-      now_ms, compressor_starts_warning_limit_2h());
+  const bool active = installation_monitor().alternating_cycling_warning(now_ms, compressor_starts_warning_limit_2h());
   static bool previous = false;
   if (active != previous) {
     ESP_LOGW("oq_diag", "Alternating compressor starts warning %s.", active ? "active" : "cleared");

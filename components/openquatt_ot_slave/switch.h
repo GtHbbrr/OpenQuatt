@@ -16,17 +16,17 @@ namespace OpenQuattOTSlave {
 };*/
 
 class OpenQuattOTSlaveSwitch : public switch_::Switch, public Component {
-protected:
-    std::function<void(bool)> write_callback_{};
+ protected:
+  std::function<void(bool)> write_callback_{};
 
-    void write_state(bool state) override;
+  void write_state(bool state) override;
 
-public:
-//    void set_mode(OpenthermSwitchMode mode) { this->mode = mode; }
-    void set_write_callback(std::function<void(bool)> callback) { this->write_callback_ = std::move(callback); }
+ public:
+  //    void set_mode(OpenthermSwitchMode mode) { this->mode = mode; }
+  void set_write_callback(std::function<void(bool)> callback) { this->write_callback_ = std::move(callback); }
 
-    void setup() override;
+  void setup() override;
 };
 
-} // namespace opentherm
-} // namespace esphome
+}  // namespace OpenQuattOTSlave
+}  // namespace esphome

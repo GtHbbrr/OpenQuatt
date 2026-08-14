@@ -44,7 +44,7 @@ struct DispatchCandidate {
   int balance_gap = 0;
 };
 
-inline ControlProfileTuning control_profile(const std::string &profile_option) {
+inline ControlProfileTuning control_profile(const std::string& profile_option) {
   ControlProfileTuning tuning;
   if (profile_option == "Comfort") {
     tuning.start_delta_c = 0.30f;
@@ -96,14 +96,9 @@ inline ControlProfileTuning control_profile(const std::string &profile_option) {
   return tuning;
 }
 
-inline void reset_control_state(float &demand_continuous,
-                                int &demand_curve,
-                                int &demand_pre_guardrail,
-                                bool &heat_request_active,
-                                uint32_t &stop_arm_ms,
-                                uint32_t &off_since_ms,
-                                bool &restart_inhibit_active,
-                                int &regime_code) {
+inline void reset_control_state(float& demand_continuous, int& demand_curve, int& demand_pre_guardrail,
+                                bool& heat_request_active, uint32_t& stop_arm_ms, uint32_t& off_since_ms,
+                                bool& restart_inhibit_active, int& regime_code) {
   demand_continuous = NAN;
   demand_curve = 0;
   demand_pre_guardrail = 0;
@@ -114,20 +109,15 @@ inline void reset_control_state(float &demand_continuous,
   regime_code = 0;
 }
 
-inline void reset_outside_ema_state(float &outside_ema_c,
-                                    bool &outside_ema_initialized,
-                                    uint32_t &outside_ema_last_ms) {
+inline void reset_outside_ema_state(float& outside_ema_c, bool& outside_ema_initialized,
+                                    uint32_t& outside_ema_last_ms) {
   outside_ema_c = 0.0f;
   outside_ema_initialized = false;
   outside_ema_last_ms = 0;
 }
 
-inline void reset_request_state(uint32_t &request_last_loop_ms,
-                                int &request_total_level,
-                                int &request_owner_hp,
-                                int &dispatch_hp1_level,
-                                int &dispatch_hp2_level,
-                                int &capacity_mode_code) {
+inline void reset_request_state(uint32_t& request_last_loop_ms, int& request_total_level, int& request_owner_hp,
+                                int& dispatch_hp1_level, int& dispatch_hp2_level, int& capacity_mode_code) {
   request_last_loop_ms = 0;
   request_total_level = 0;
   request_owner_hp = 0;
@@ -136,21 +126,16 @@ inline void reset_request_state(uint32_t &request_last_loop_ms,
   capacity_mode_code = 0;
 }
 
-inline DispatchCandidate invalid_dispatch_candidate() {
-  return DispatchCandidate{};
-}
+inline DispatchCandidate invalid_dispatch_candidate() { return DispatchCandidate{}; }
 
 inline float normalized_demand_u(float demand_continuous, int demand_max_f) {
   if (demand_max_f <= 0) return 0.0f;
   if (isnan(demand_continuous)) return 0.0f;
-  const float clamped = std::max(0.0f, std::min((float) demand_max_f, demand_continuous));
-  return clamped / (float) demand_max_f;
+  const float clamped = std::max(0.0f, std::min((float)demand_max_f, demand_continuous));
+  return clamped / (float)demand_max_f;
 }
 
-inline float phase_target_power_w(bool heat_phase,
-                                  float demand_u,
-                                  float dispatch_u,
-                                  float single_cap_w,
+inline float phase_target_power_w(bool heat_phase, float demand_u, float dispatch_u, float single_cap_w,
                                   float duo_cap_w) {
   const float effective_u = heat_phase ? demand_u : std::min(demand_u, dispatch_u);
   if (effective_u <= 0.0f) return 0.0f;
@@ -159,10 +144,7 @@ inline float phase_target_power_w(bool heat_phase,
   return heat_phase ? single_target_w : duo_target_w;
 }
 
-inline int pick_single_owner(bool demand_active,
-                             int stored_owner_hp,
-                             bool prev_hp1_on,
-                             bool prev_hp2_on,
+inline int pick_single_owner(bool demand_active, int stored_owner_hp, bool prev_hp1_on, bool prev_hp2_on,
                              bool lead_is_hp1) {
   if (!demand_active) return 0;
   if (prev_hp1_on != prev_hp2_on) return prev_hp1_on ? 1 : 2;
@@ -170,26 +152,20 @@ inline int pick_single_owner(bool demand_active,
   return lead_is_hp1 ? 1 : 2;
 }
 
-inline bool better_dispatch_candidate(const DispatchCandidate &candidate,
-                                      const DispatchCandidate &best,
-                                      int prev_hp1_level,
-                                      int prev_hp2_level) {
+inline bool better_dispatch_candidate(const DispatchCandidate& candidate, const DispatchCandidate& best,
+                                      int prev_hp1_level, int prev_hp2_level) {
   if (!candidate.valid) return false;
   if (!best.valid) return true;
   if (fabsf(candidate.error_w - best.error_w) > 50.0f) return candidate.error_w < best.error_w;
 
-  const int candidate_starts =
-      ((prev_hp1_level == 0) && (candidate.hp1_level > 0) ? 1 : 0) +
-      ((prev_hp2_level == 0) && (candidate.hp2_level > 0) ? 1 : 0);
+  const int candidate_starts = ((prev_hp1_level == 0) && (candidate.hp1_level > 0) ? 1 : 0) +
+                               ((prev_hp2_level == 0) && (candidate.hp2_level > 0) ? 1 : 0);
   const int best_starts =
-      ((prev_hp1_level == 0) && (best.hp1_level > 0) ? 1 : 0) +
-      ((prev_hp2_level == 0) && (best.hp2_level > 0) ? 1 : 0);
+      ((prev_hp1_level == 0) && (best.hp1_level > 0) ? 1 : 0) + ((prev_hp2_level == 0) && (best.hp2_level > 0) ? 1 : 0);
   if (candidate_starts != best_starts) return candidate_starts < best_starts;
 
-  const int candidate_moves =
-      abs(candidate.hp1_level - prev_hp1_level) + abs(candidate.hp2_level - prev_hp2_level);
-  const int best_moves =
-      abs(best.hp1_level - prev_hp1_level) + abs(best.hp2_level - prev_hp2_level);
+  const int candidate_moves = abs(candidate.hp1_level - prev_hp1_level) + abs(candidate.hp2_level - prev_hp2_level);
+  const int best_moves = abs(best.hp1_level - prev_hp1_level) + abs(best.hp2_level - prev_hp2_level);
   if (candidate_moves != best_moves) return candidate_moves < best_moves;
 
   if (candidate.active_hp_count != best.active_hp_count) {
@@ -199,19 +175,25 @@ inline bool better_dispatch_candidate(const DispatchCandidate &candidate,
   return candidate.power_w < best.power_w;
 }
 
-inline const char *regime_name(int regime_code) {
+inline const char* regime_name(int regime_code) {
   switch (regime_code) {
-    case 1: return "recovery";
-    case 2: return "maintain";
-    default: return "off";
+    case 1:
+      return "recovery";
+    case 2:
+      return "maintain";
+    default:
+      return "off";
   }
 }
 
-inline const char *capacity_mode_name(int capacity_mode_code) {
+inline const char* capacity_mode_name(int capacity_mode_code) {
   switch (capacity_mode_code) {
-    case 1: return "single";
-    case 2: return "duo";
-    default: return "off";
+    case 1:
+      return "single";
+    case 2:
+      return "duo";
+    default:
+      return "off";
   }
 }
 

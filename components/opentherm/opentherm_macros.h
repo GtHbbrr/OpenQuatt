@@ -33,32 +33,32 @@ namespace esphome::opentherm {
 #endif
 
 // Use macros to create fields for every entity specified in the ESPHome configuration
-#define OPENTHERM_DECLARE_SENSOR(entity) sensor::Sensor *entity;
-#define OPENTHERM_DECLARE_BINARY_SENSOR(entity) binary_sensor::BinarySensor *entity;
-#define OPENTHERM_DECLARE_SWITCH(entity) OpenthermSwitch *entity;
-#define OPENTHERM_DECLARE_NUMBER(entity) OpenthermNumber *entity;
-#define OPENTHERM_DECLARE_OUTPUT(entity) OpenthermOutput *entity;
-#define OPENTHERM_DECLARE_INPUT_SENSOR(entity) sensor::Sensor *entity;
+#define OPENTHERM_DECLARE_SENSOR(entity) sensor::Sensor* entity;
+#define OPENTHERM_DECLARE_BINARY_SENSOR(entity) binary_sensor::BinarySensor* entity;
+#define OPENTHERM_DECLARE_SWITCH(entity) OpenthermSwitch* entity;
+#define OPENTHERM_DECLARE_NUMBER(entity) OpenthermNumber* entity;
+#define OPENTHERM_DECLARE_OUTPUT(entity) OpenthermOutput* entity;
+#define OPENTHERM_DECLARE_INPUT_SENSOR(entity) sensor::Sensor* entity;
 #define OPENTHERM_DECLARE_SETTING(type, entity, def) type entity = def;
 
 // Setter macros
 #define OPENTHERM_SET_SENSOR(entity) \
-  void set_##entity(sensor::Sensor *sensor) { this->entity = sensor; }
+  void set_##entity(sensor::Sensor* sensor) { this->entity = sensor; }
 
 #define OPENTHERM_SET_BINARY_SENSOR(entity) \
-  void set_##entity(binary_sensor::BinarySensor *binary_sensor) { this->entity = binary_sensor; }
+  void set_##entity(binary_sensor::BinarySensor* binary_sensor) { this->entity = binary_sensor; }
 
 #define OPENTHERM_SET_SWITCH(entity) \
-  void set_##entity(OpenthermSwitch *sw) { this->entity = sw; }
+  void set_##entity(OpenthermSwitch* sw) { this->entity = sw; }
 
 #define OPENTHERM_SET_NUMBER(entity) \
-  void set_##entity(OpenthermNumber *number) { this->entity = number; }
+  void set_##entity(OpenthermNumber* number) { this->entity = number; }
 
 #define OPENTHERM_SET_OUTPUT(entity) \
-  void set_##entity(OpenthermOutput *output) { this->entity = output; }
+  void set_##entity(OpenthermOutput* output) { this->entity = output; }
 
 #define OPENTHERM_SET_INPUT_SENSOR(entity) \
-  void set_##entity(sensor::Sensor *sensor) { this->entity = sensor; }
+  void set_##entity(sensor::Sensor* sensor) { this->entity = sensor; }
 
 #define OPENTHERM_SET_SETTING(type, entity, def) \
   void set_##entity(type value) { this->entity = value; }
@@ -98,20 +98,20 @@ namespace esphome::opentherm {
 
 // Write data request builders
 #define OPENTHERM_MESSAGE_WRITE_MESSAGE(msg) \
-  case MessageId::msg: { \
-    data.type = MessageType::WRITE_DATA; \
+  case MessageId::msg: {                     \
+    data.type = MessageType::WRITE_DATA;     \
     data.id = request_id;
 #define OPENTHERM_MESSAGE_WRITE_ENTITY(key, msg_data) message_data::write_##msg_data(this->key->state, data);
 #define OPENTHERM_MESSAGE_WRITE_SETTING(key, msg_data) message_data::write_##msg_data(this->key, data);
 #define OPENTHERM_MESSAGE_WRITE_POSTSCRIPT \
-  return data; \
+  return data;                             \
   }
 
 // Read data request builder
 #define OPENTHERM_MESSAGE_READ_MESSAGE(msg) \
-  case MessageId::msg: \
-    data.type = MessageType::READ_DATA; \
-    data.id = request_id; \
+  case MessageId::msg:                      \
+    data.type = MessageType::READ_DATA;     \
+    data.id = request_id;                   \
     return data;
 
 // Data processing builders
