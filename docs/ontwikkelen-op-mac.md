@@ -7,7 +7,14 @@ De GitHub Actions blijven op Linux draaien; lokaal gebruik je dezelfde Python- e
 
 1. Clone de repo in je normale home-directory.
 2. Zorg dat Python 3.12 of nieuwer als `python3` beschikbaar is.
-3. Maak de lokale ESPHome-omgeving aan:
+3. Installeer `clang-format` voor lokale C/C++ formattingchecks:
+
+```bash
+brew install clang-format
+clang-format --version
+```
+
+4. Maak de lokale ESPHome-omgeving aan:
 
 ```bash
 python3 scripts/dev.py bootstrap
@@ -25,7 +32,11 @@ Gebruik deze commando's als primaire lokale workflow:
 python3 scripts/dev.py validate
 python3 scripts/dev.py validate --config-only
 python3 scripts/dev.py preview-pages --no-serve
+npm run check:cpp-format
 ```
+
+Gebruik `npm run fix:cpp-format` om C/C++ formatting lokaal toe te passen voordat je een pull request bijwerkt.
+Als Homebrew `clang-format` niet automatisch in `PATH` zet, kun je tijdelijk `CLANG_FORMAT_BIN=/opt/homebrew/bin/clang-format` voor het npm-commando zetten.
 
 De bash-wrappers blijven beschikbaar voor de meest gebruikte taken:
 
