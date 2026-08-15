@@ -39,6 +39,15 @@ openquatt_usage_telemetry:
   hardware_profile: "${oq_hardware_profile}"
   topology: "${oq_topology}"
   connection: "${oq_connection}"
+  quatt_hybrid_generation_select: hp_generation
+  flow_source_select: flow_source
+  heating_strategy_select: oq_heat_control_mode
+  room_temperature_source_select: room_temp_source
+  room_setpoint_source_select: room_setpoint_source
+  outside_temperature_source_select: outside_temp_source
+  heating_enable_source_select: heating_enable_source
+  cooling_enable_source_select: cooling_enable_source
+  cooling_dew_point_source_select: cooling_dew_point_source
   loop_time_sensor: oq_loop_time
   internal_temperature_sensor: oq_esp_internal_temperature
   cic_polling_switch: cic_enable

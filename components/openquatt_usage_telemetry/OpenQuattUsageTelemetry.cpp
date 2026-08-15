@@ -91,6 +91,40 @@ void append_json_optional_bool_(FixedBufferWriter& payload, const char* key, boo
   payload += value ? "true" : "false";
 }
 
+void append_json_wire_value_(FixedBufferWriter& payload, const char* key, const char* value) {
+  append_json_key_(payload, key);
+  if (value == nullptr) {
+    payload += "null";
+    return;
+  }
+  payload += '"';
+  payload += value;
+  payload += '"';
+}
+
+void append_json_optional_select_(FixedBufferWriter& payload, const char* key, const select::Select* source,
+                                  const char* (*wire_value)(const std::string&)) {
+  if (source == nullptr || !source->has_state()) {
+    append_json_wire_value_(payload, key, nullptr);
+    return;
+  }
+  append_json_wire_value_(payload, key, wire_value(source->current_option()));
+}
+
+void append_json_flow_source_(FixedBufferWriter& payload, const select::Select* flow_source,
+                              const select::Select* q_flow_source) {
+  const std::string empty_option;
+  const std::string& flow_option =
+      flow_source != nullptr && flow_source->has_state() ? flow_source->current_option() : empty_option;
+  const bool q_source_available = q_flow_source != nullptr;
+  const std::string& q_flow_option =
+      q_source_available && q_flow_source->has_state() ? q_flow_source->current_option() : empty_option;
+  append_json_wire_value_(payload, "flow_source_config",
+                          flow_source_config_wire_value(flow_option, q_source_available, q_flow_option));
+  append_json_wire_value_(payload, "flow_source_mode",
+                          flow_source_mode_wire_value(flow_option, q_source_available, q_flow_option));
+}
+
 void append_json_boiler_connection_(FixedBufferWriter& payload, const select::Select* source) {
   append_json_key_(payload, "boiler_connection");
   if (source == nullptr) {
@@ -797,6 +831,23 @@ bool OpenQuattUsageTelemetry::build_payload_() {
   payload += R"(","connection":")";
   append_json_escaped(payload, this->connection_);
   payload += '"';
+  append_json_optional_select_(payload, "quatt_hybrid_generation_config", this->quatt_hybrid_generation_select_,
+                               quatt_hybrid_generation_wire_value);
+  append_json_flow_source_(payload, this->flow_source_select_, this->q_flow_source_select_);
+  append_json_optional_select_(payload, "heating_strategy", this->heating_strategy_select_,
+                               heating_strategy_wire_value);
+  append_json_optional_select_(payload, "room_temperature_source", this->room_temperature_source_select_,
+                               configured_source_wire_value);
+  append_json_optional_select_(payload, "room_setpoint_source", this->room_setpoint_source_select_,
+                               configured_source_wire_value);
+  append_json_optional_select_(payload, "outside_temperature_source", this->outside_temperature_source_select_,
+                               configured_source_wire_value);
+  append_json_optional_select_(payload, "heating_enable_source", this->heating_enable_source_select_,
+                               configured_source_wire_value);
+  append_json_optional_select_(payload, "cooling_enable_source", this->cooling_enable_source_select_,
+                               configured_source_wire_value);
+  append_json_optional_select_(payload, "cooling_dew_point_source", this->cooling_dew_point_source_select_,
+                               configured_source_wire_value);
   append_json_uint_(payload, "heap_free_b", heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
   append_json_uint_(payload, "heap_min_free_b", heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL));
   append_json_uint_(payload, "heap_largest_block_b", heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL));

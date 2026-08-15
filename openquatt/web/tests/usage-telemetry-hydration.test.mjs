@@ -173,6 +173,7 @@ test("usage telemetry disclosure matches the hourly payload scope", async () => 
   const settingsSource = await readFile(new URL("../js/src/settings/privacy.js", import.meta.url), "utf8");
   const disclosureSource = await readFile(new URL("../js/src/features/usage-telemetry.js", import.meta.url), "utf8");
   const telemetryYaml = await readFile(new URL("../../oq_usage_telemetry.yaml", import.meta.url), "utf8");
+  const telemetryCpp = await readFile(new URL("../../../components/openquatt_usage_telemetry/OpenQuattUsageTelemetry.cpp", import.meta.url), "utf8");
 
   assert.match(quickStartSource, /renderUsageTelemetryDisclosure\(\)/);
   assert.match(quickStartSource, /data-oq-action="confirm-no-usage-telemetry"/);
@@ -194,13 +195,30 @@ test("usage telemetry disclosure matches the hourly payload scope", async () => 
   assert.match(disclosureSource, /vrijwel direct en daarna ongeveer elk uur/);
   assert.match(disclosureSource, /OpenQuatt-loggingserver/);
   assert.match(disclosureSource, /wifi-signaal/);
+  assert.match(disclosureSource, /Quatt Hybrid-versie, verwarmingsstrategie, flowbron en regelbronnen/);
   assert.match(disclosureSource, /Aan\/uit-status van CiC, OpenTherm-thermostaat, ketelondersteuning, MQTT-inputs en lokale historie/);
   assert.match(disclosureSource, /ketelaansluiting \(aan\/uit of OpenTherm\)/);
-  assert.match(disclosureSource, /Geen ingestelde temperaturen, grenzen, MQTT-topics of logs/);
+  assert.match(disclosureSource, /Geen gemeten of ingestelde temperaturen, grenzen, MQTT-topics of logs/);
   assert.match(disclosureSource, /Nooit een wifi-netwerknaam, wifi-wachtwoord, gebruikersnaam, ander wachtwoord of inloggegevens/);
   assert.match(disclosureSource, /Voorbeeld van het verzonden bericht \(JSON\)/);
   assert.match(disclosureSource, /schema_version/);
   assert.match(disclosureSource, /timestamp_s/);
+  const configFields = [
+    "quatt_hybrid_generation_config",
+    "flow_source_config",
+    "flow_source_mode",
+    "heating_strategy",
+    "room_temperature_source",
+    "room_setpoint_source",
+    "outside_temperature_source",
+    "heating_enable_source",
+    "cooling_enable_source",
+    "cooling_dew_point_source",
+  ];
+  for (const field of configFields) {
+    assert.match(disclosureSource, new RegExp(field));
+    assert.match(telemetryCpp, new RegExp(`"${field}"`));
+  }
   assert.match(disclosureSource, /oq-usage-disclosure--collapsible/);
   assert.match(disclosureSource, /data-oq-action="toggle-usage-telemetry-details"/);
   assert.match(disclosureSource, /technisch wel het bron-IP-adres zien/);
