@@ -40,6 +40,13 @@ Docs-impact motivatie:
 
 <!-- Verplicht invullen als "Geen documentatiewijziging nodig" is aangevinkt. -->
 
+## Home Assistant-compatibiliteit
+
+- [ ] Geen wijziging aan het Home Assistant entity/API-contract
+- [ ] Contractwijziging; companion-PR geopend of bijgewerkt
+
+Companion-PR of motivatie waarom die niet nodig is:
+
 ## Validatie
 
 <!-- Wat is lokaal getest? Noem commando's/configs waar relevant. -->
