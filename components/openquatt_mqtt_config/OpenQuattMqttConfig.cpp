@@ -309,6 +309,9 @@ bool send_mutation_error_(AsyncWebServerRequest* request, OpenQuattMqttConfig::M
     case OpenQuattMqttConfig::MutationResult::RECOVERY_PENDING:
       request->send(503, "application/json", R"({"ok":false,"error":"storage_recovery_pending"})");
       break;
+    case OpenQuattMqttConfig::MutationResult::PERSISTENCE_PENDING:
+      request->send(503, "application/json", R"({"ok":false,"error":"preference_commit_pending"})");
+      break;
   }
   return true;
 }
@@ -611,6 +614,9 @@ OpenQuattMqttConfig::StatusSnapshot OpenQuattMqttConfig::get_status_snapshot() {
 }
 
 void OpenQuattMqttConfig::loop() {
+  if (this->process_permanent_failure_cleanup_()) {
+    return;
+  }
   this->process_storage_transaction_();
   if (this->client_reconcile_pending_.load() && !this->client_worker_active_.load() &&
       (this->mqtt_client_present_.load() || network::is_connected()) &&
@@ -828,13 +834,6 @@ void OpenQuattMqttConfig::process_storage_transaction_() {
              "(attempt %u/%u)",
              static_cast<unsigned>(attempt + 1U), static_cast<unsigned>(STORAGE_MAX_ATTEMPTS));
     failure_result = MutationResult::SYNC_FAILED;
-    // ESPHome clears its pending-save queue even when NVS reports failure.
-    // A main-loop readback distinguishes a false-negative sync from an
-    // uncertain/old durable value before another complete attempt.
-    if (this->storage_matches_persisted_(storage)) {
-      durable = true;
-      break;
-    }
   }
 
   this->lock_persistence_();
@@ -843,15 +842,12 @@ void OpenQuattMqttConfig::process_storage_transaction_() {
   const bool cancelled =
       this->storage_transaction_phase_.load() == StorageTransactionPhase::CANCELLED || !generation_is_current;
   if (!storage_generation_may_commit(durable, generation_is_current, cancelled)) {
-    bool recovered = true;
-    if (any_save_succeeded && !this->storage_matches_persisted_(committed_storage)) {
-      recovered = this->restore_committed_storage_(committed_storage);
-    }
+    const bool recovered = !any_save_succeeded || this->restore_committed_storage_(committed_storage);
     if (!recovered) {
       ESP_LOGE(TAG,
                "MQTT configuration rollback could not be proven; keeping "
                "runtime fail-closed");
-      this->mark_failed();
+      this->start_permanent_failure_cleanup_();
     }
     this->finish_storage_transaction_(
         generation,
@@ -869,7 +865,7 @@ void OpenQuattMqttConfig::process_storage_transaction_() {
   if (!this->storage_transaction_phase_.compare_exchange_strong(commit_expected, StorageTransactionPhase::COMMITTING)) {
     const bool recovered = this->restore_committed_storage_(committed_storage);
     if (!recovered) {
-      this->mark_failed();
+      this->start_permanent_failure_cleanup_();
     }
     this->finish_storage_transaction_(generation, recovered ? MutationResult::TIMEOUT : MutationResult::RECOVERY_FAILED,
                                       committed_storage, false);
@@ -879,10 +875,10 @@ void OpenQuattMqttConfig::process_storage_transaction_() {
   const StorageApplyResult apply_result = this->apply_storage_(storage, apply_as_bootstrap ? "bootstrap" : "runtime");
   if (apply_result == StorageApplyResult::FAILED) {
     const bool recovered = this->restore_committed_storage_(committed_storage);
-    if (recovered) {
+    if (recovered && !this->is_failed() && !this->permanent_failure_cleanup_pending_.load()) {
       this->apply_storage_(committed_storage, "rollback");
-    } else {
-      this->mark_failed();
+    } else if (!recovered) {
+      this->start_permanent_failure_cleanup_();
     }
     this->finish_storage_transaction_(generation,
                                       recovered ? MutationResult::APPLY_FAILED : MutationResult::RECOVERY_FAILED,
@@ -895,19 +891,11 @@ void OpenQuattMqttConfig::process_storage_transaction_() {
       storage, true);
 }
 
-bool OpenQuattMqttConfig::storage_matches_persisted_(const Storage& storage) {
-  Storage persisted{};
-  return this->load_storage_(&persisted) && memcmp(&persisted, &storage, sizeof(Storage)) == 0;
-}
-
 bool OpenQuattMqttConfig::restore_committed_storage_(const Storage& storage) {
-  if (this->storage_matches_persisted_(storage)) {
-    return true;
-  }
   for (uint8_t attempt = 0U; attempt < STORAGE_MAX_ATTEMPTS; attempt++) {
     const bool saved = this->pref_.save(&storage);
     const bool synced = saved && global_preferences->sync();
-    if (synced || this->storage_matches_persisted_(storage)) {
+    if (synced) {
       return true;
     }
     ESP_LOGE(TAG,
@@ -959,8 +947,9 @@ void OpenQuattMqttConfig::finish_storage_transaction_(uint32_t generation, Mutat
 }
 
 OpenQuattMqttConfig::MutationResult OpenQuattMqttConfig::begin_storage_mutation_(Storage* storage) {
-  if (this->is_failed() || storage == nullptr || this->storage_mutation_lock_ == nullptr ||
-      this->storage_mutation_complete_ == nullptr || this->persistence_lock_ == nullptr) {
+  if (this->is_failed() || this->permanent_failure_cleanup_pending_.load() || storage == nullptr ||
+      this->storage_mutation_lock_ == nullptr || this->storage_mutation_complete_ == nullptr ||
+      this->persistence_lock_ == nullptr) {
     return MutationResult::UNAVAILABLE;
   }
   if (xSemaphoreTake(this->storage_mutation_lock_, 0) != pdTRUE) {
@@ -1072,10 +1061,11 @@ OpenQuattMqttConfig::MutationResult OpenQuattMqttConfig::submit_storage_mutation
   const StorageTimeoutAction final_timeout_action = storage_timeout_action(
       exact_generation_completed,
       commit_won_cancellation_race || this->storage_transaction_phase_.load() == StorageTransactionPhase::COMMITTING);
-  if (final_timeout_action == StorageTimeoutAction::REPORT_RUNTIME_PENDING) {
-    // Persistence is proven and commit already won the cancellation race.
-    // Report the durable-but-pending state instead of a misleading timeout.
-    result = MutationResult::RUNTIME_PENDING;
+  if (final_timeout_action == StorageTimeoutAction::REPORT_PERSISTENCE_PENDING) {
+    // The commit won the cancellation race but has not completed. Fail this
+    // request closed so sequential restore clients cannot mistake the 2xx
+    // lifecycle-pending response for durable mutation completion.
+    result = MutationResult::PERSISTENCE_PENDING;
   } else if (!exact_generation_completed && this->storage_write_started_.load()) {
     // Cancellation won, so runtime apply is prohibited. A slow NVS rollback
     // may still be finishing; expose that reboot-sensitive state explicitly.
@@ -1171,7 +1161,7 @@ OpenQuattMqttConfig::StorageApplyResult OpenQuattMqttConfig::apply_storage_(cons
     this->next_reconcile_attempt_ms_.store(0U);
     if (client_present || network::is_connected()) {
       if (!this->request_client_reconcile_()) {
-        const bool permanently_failed = this->is_failed();
+        const bool permanently_failed = this->is_failed() || this->permanent_failure_cleanup_pending_.load();
         ESP_LOGE(TAG, "MQTT ingress client generation %" PRIu32 " is fail-closed and reconciliation is %s",
                  requested_generation, permanently_failed ? "unavailable" : "pending retry");
         this->force_publish_.store(true);
@@ -1307,7 +1297,7 @@ bool OpenQuattMqttConfig::ensure_client_worker_() {
     this->client_worker_task_state_.deallocate();
     this->client_worker_active_.store(false);
     xSemaphoreGive(this->worker_lock_);
-    this->mark_failed();
+    this->start_permanent_failure_cleanup_();
     return false;
   }
   this->client_worker_region_valid_ = true;
@@ -1317,11 +1307,51 @@ bool OpenQuattMqttConfig::ensure_client_worker_() {
   return true;
 }
 
+void OpenQuattMqttConfig::start_permanent_failure_cleanup_() {
+  if (!this->permanent_failure_cleanup_pending_.exchange(true)) {
+    this->close_client_event_gate_();
+    this->mqtt_session_generation_.fetch_add(1U);
+    const uint32_t failed_generation = this->client_requested_generation_.fetch_add(1U) + 1U;
+    this->client_applied_generation_.store(failed_generation);
+    this->clear_session_scoped_inputs_pending_.store(false);
+    this->clear_all_inputs_();
+    this->client_reconcile_pending_.store(false);
+    this->next_reconcile_attempt_ms_.store(0U);
+    this->force_publish_.store(true);
+  }
+  this->process_permanent_failure_cleanup_();
+}
+
+bool OpenQuattMqttConfig::process_permanent_failure_cleanup_() {
+  if (!this->permanent_failure_cleanup_pending_.load()) {
+    return false;
+  }
+  this->close_client_event_gate_();
+  if (!time_reached_(millis(), this->next_reconcile_attempt_ms_.load())) {
+    return true;
+  }
+  if (this->client_worker_active_.load()) {
+    return true;
+  }
+  if (!this->stop_client_()) {
+    this->next_reconcile_attempt_ms_.store(millis() + MQTT_RECONCILE_RETRY_MS);
+    this->force_publish_.store(true);
+    return true;
+  }
+  this->maybe_release_classic_worker_();
+  this->permanent_failure_cleanup_pending_.store(false);
+  this->mark_failed();
+  return true;
+}
+
 bool OpenQuattMqttConfig::request_client_reconcile_() {
   if (!this->ensure_client_worker_()) {
-    this->client_reconcile_pending_.store(true);
+    const bool permanently_unavailable = this->is_failed() || this->permanent_failure_cleanup_pending_.load();
+    this->client_reconcile_pending_.store(!permanently_unavailable);
     this->client_worker_active_.store(false);
-    this->next_reconcile_attempt_ms_.store(millis() + MQTT_RECONCILE_RETRY_MS);
+    if (!permanently_unavailable) {
+      this->next_reconcile_attempt_ms_.store(millis() + MQTT_RECONCILE_RETRY_MS);
+    }
     return false;
   }
   if (xSemaphoreTake(this->worker_lock_, portMAX_DELAY) != pdTRUE) {
@@ -1583,6 +1613,10 @@ void OpenQuattMqttConfig::client_worker_task_(void* arg) {
     log_heap_state_("MQTT ingress reconcile begin");
 
     while (true) {
+      if (self->permanent_failure_cleanup_pending_.load()) {
+        self->client_reconcile_pending_.store(false);
+        break;
+      }
       const uint32_t requested_generation = self->client_requested_generation_.load();
       const ClientReconcileResult result = self->reconcile_client_(requested_generation);
       if (self->client_requested_generation_.load() != requested_generation) {

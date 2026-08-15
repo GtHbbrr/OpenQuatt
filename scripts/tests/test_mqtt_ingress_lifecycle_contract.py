@@ -33,9 +33,34 @@ class MqttIngressLifecycleContractTest(unittest.TestCase):
         wrong_region = CPP.index("stack_is_external != MQTT_WORKER_STACK_IN_PSRAM")
         suspend = CPP.index("vTaskSuspend(handle)", wrong_region)
         release = CPP.index("client_worker_task_state_.deallocate()", wrong_region)
-        failed = CPP.index("this->mark_failed();", wrong_region)
+        cleanup = CPP.index("this->start_permanent_failure_cleanup_();", wrong_region)
         self.assertLess(suspend, release)
-        self.assertLess(release, failed)
+        self.assertLess(release, cleanup)
+        failure_start = CPP[
+            CPP.index("void OpenQuattMqttConfig::start_permanent_failure_cleanup_()") :
+            CPP.index("bool OpenQuattMqttConfig::process_permanent_failure_cleanup_()")
+        ]
+        self.assertLess(
+            failure_start.index("this->close_client_event_gate_();"),
+            failure_start.index("this->process_permanent_failure_cleanup_();"),
+        )
+        self.assertIn("this->client_requested_generation_.fetch_add(1U) + 1U", failure_start)
+        self.assertIn("this->client_applied_generation_.store(failed_generation);", failure_start)
+        failure_cleanup = CPP[
+            CPP.index("bool OpenQuattMqttConfig::process_permanent_failure_cleanup_()") :
+            CPP.index("bool OpenQuattMqttConfig::request_client_reconcile_()")
+        ]
+        self.assertIn("this->stop_client_()", failure_cleanup)
+        self.assertLess(
+            failure_cleanup.index("this->stop_client_()"),
+            failure_cleanup.index("this->mark_failed();"),
+        )
+        self.assertLess(
+            failure_cleanup.index("this->client_worker_active_.load()"),
+            failure_cleanup.index("this->stop_client_()"),
+        )
+        self.assertIn("this->maybe_release_classic_worker_();", failure_cleanup)
+        self.assertIn("this->permanent_failure_cleanup_pending_.load()", CPP)
 
     def test_worker_config_copies_do_not_allocate_internal_heap(self) -> None:
         config_start = HEADER.index("struct ClientConfig")
@@ -152,13 +177,34 @@ class MqttIngressLifecycleContractTest(unittest.TestCase):
         )
         self.assertIn("STORAGE_MAX_ATTEMPTS = 2U", HEADER)
         self.assertIn("storage_should_retry(", CPP)
-        self.assertIn("this->storage_matches_persisted_(storage)", CPP)
+        self.assertNotIn("storage_matches_persisted_", CPP)
         self.assertIn("this->restore_committed_storage_(committed_storage)", CPP)
         self.assertNotIn("STORAGE_RETRY_MS", HEADER)
         self.assertNotIn("next_storage_attempt_ms_", HEADER)
         self.assertNotIn("preference_sync_pending_", HEADER)
         self.assertNotIn("save_storage_", HEADER)
         self.assertNotIn("save_storage_", CPP)
+
+    def test_only_successful_sync_proves_commit_or_rollback(self) -> None:
+        process_start = CPP.index(
+            "void OpenQuattMqttConfig::process_storage_transaction_()"
+        )
+        restore_start = CPP.index(
+            "bool OpenQuattMqttConfig::restore_committed_storage_(",
+            process_start,
+        )
+        process = CPP[process_start:restore_start]
+        restore_end = CPP.index(
+            "bool OpenQuattMqttConfig::preflight_storage_apply_", restore_start
+        )
+        restore = CPP[restore_start:restore_end]
+        self.assertEqual(process.count("durable = true;"), 1)
+        self.assertIn("if (global_preferences->sync())", process)
+        self.assertIn("if (synced)", restore)
+        self.assertNotIn("storage_matches_persisted_", process + restore)
+        self.assertGreaterEqual(
+            process.count("this->start_permanent_failure_cleanup_();"), 3
+        )
 
     def test_bootstrap_and_http_share_the_main_loop_persistence_path(self) -> None:
         setup_start = CPP.index("void OpenQuattMqttConfig::setup()")
@@ -198,6 +244,12 @@ class MqttIngressLifecycleContractTest(unittest.TestCase):
         self.assertIn("MutationResult::TIMEOUT", CPP)
         self.assertIn("MutationResult::RUNTIME_PENDING", CPP)
         self.assertIn("MutationResult::RECOVERY_PENDING", CPP)
+        self.assertIn("MutationResult::PERSISTENCE_PENDING", CPP)
+        self.assertIn('"preference_commit_pending"', CPP)
+        self.assertIn(
+            'request->send(503, "application/json", R"({"ok":false,"error":"preference_commit_pending"})")',
+            CPP,
+        )
         self.assertIn('"pending":true', CPP)
         self.assertIn('"runtime_pending":%s', CPP)
 

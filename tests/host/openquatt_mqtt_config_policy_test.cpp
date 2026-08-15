@@ -67,9 +67,10 @@ int main() {
   assert(!storage_generation_may_commit(true, false, false));
   assert(!storage_generation_may_commit(true, true, true));
 
-  // An in-flight durable commit is reported as pending, never as a timeout.
+  // An in-flight commit has its own persistence-pending result, distinct from
+  // a completed mutation whose client reconciliation remains pending.
   assert(storage_timeout_action(true, false) == StorageTimeoutAction::RETURN_COMPLETED);
-  assert(storage_timeout_action(false, true) == StorageTimeoutAction::REPORT_RUNTIME_PENDING);
+  assert(storage_timeout_action(false, true) == StorageTimeoutAction::REPORT_PERSISTENCE_PENDING);
   assert(storage_timeout_action(false, false) == StorageTimeoutAction::CANCEL);
 
   // A classic-ESP32 preflight worker that never received work must release

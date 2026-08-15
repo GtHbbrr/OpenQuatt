@@ -176,6 +176,7 @@ class OpenQuattMqttConfig : public Component {
     RUNTIME_PENDING = 8U,
     RECOVERY_FAILED = 9U,
     RECOVERY_PENDING = 10U,
+    PERSISTENCE_PENDING = 11U,
   };
 
   StatusSnapshot get_status_snapshot();
@@ -232,7 +233,6 @@ class OpenQuattMqttConfig : public Component {
   void initialize_storage_transaction_(const Storage& storage, const Storage& committed_storage,
                                        bool persistence_pending);
   void process_storage_transaction_();
-  bool storage_matches_persisted_(const Storage& storage);
   bool restore_committed_storage_(const Storage& storage);
   bool preflight_storage_apply_(const Storage& storage);
   void finish_storage_transaction_(uint32_t generation, MutationResult result, const Storage& desired_storage,
@@ -259,6 +259,8 @@ class OpenQuattMqttConfig : public Component {
   ClientConfig get_desired_client_config_();
   bool active_client_matches_(uint32_t requested_generation);
   bool ensure_client_worker_();
+  void start_permanent_failure_cleanup_();
+  bool process_permanent_failure_cleanup_();
   bool request_client_reconcile_();
   enum class ClientReconcileResult : uint8_t {
     APPLIED = 0U,
@@ -397,6 +399,7 @@ class OpenQuattMqttConfig : public Component {
   std::atomic<bool> clear_session_scoped_inputs_pending_{false};
   std::atomic<bool> client_reconcile_pending_{false};
   std::atomic<bool> client_worker_active_{false};
+  std::atomic<bool> permanent_failure_cleanup_pending_{false};
   std::atomic<bool> mqtt_client_present_{false};
   std::atomic<bool> client_events_enabled_{false};
   std::atomic<bool> mqtt_connected_seen_{false};

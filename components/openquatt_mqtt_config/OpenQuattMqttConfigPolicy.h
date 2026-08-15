@@ -22,7 +22,7 @@ enum class MqttStopDecision : uint8_t {
 enum class StorageTimeoutAction : uint8_t {
   CANCEL = 0U,
   RETURN_COMPLETED = 1U,
-  REPORT_RUNTIME_PENDING = 2U,
+  REPORT_PERSISTENCE_PENDING = 2U,
 };
 
 enum class ClassicWorkerAction : uint8_t {
@@ -74,7 +74,7 @@ inline StorageTimeoutAction storage_timeout_action(bool exact_generation_complet
   if (exact_generation_completed) {
     return StorageTimeoutAction::RETURN_COMPLETED;
   }
-  return commit_in_progress ? StorageTimeoutAction::REPORT_RUNTIME_PENDING : StorageTimeoutAction::CANCEL;
+  return commit_in_progress ? StorageTimeoutAction::REPORT_PERSISTENCE_PENDING : StorageTimeoutAction::CANCEL;
 }
 
 inline ClassicWorkerAction classic_worker_action(bool waiting_or_suspended, bool worker_active, bool work_pending,
