@@ -204,6 +204,18 @@ select:
 # SENSORS
 # ----------------------------
 sensor:
+  - platform: template
+    id: oq_flow_output_ipwm
+    name: "Flow Output iPWM"
+    internal: true
+    icon: mdi:fan-speed-3
+    unit_of_measurement: "iPWM"
+    entity_category: diagnostic
+    accuracy_decimals: 0
+    update_interval: 1s
+    lambda: |-
+      return (float) id(oq_flow_last_pwm);
+
   # Average flow HP1/HP2
   - platform: template
     id: flow_rate_hp_avg
