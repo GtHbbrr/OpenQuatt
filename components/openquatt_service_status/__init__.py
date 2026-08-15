@@ -46,6 +46,9 @@ CONF_GLOBAL_KEYS = [
     "hp_water_calibration_result_hp1_out_raw_avg",
     "hp_water_calibration_result_hp2_in_raw_avg",
     "hp_water_calibration_result_hp2_out_raw_avg",
+    "hp_water_calibration_result_supply_raw_avg",
+    "hp_water_calibration_result_supply_offset",
+    "hp_water_calibration_result_supply_source",
 ]
 
 CONFIG_SCHEMA = cv.Schema(

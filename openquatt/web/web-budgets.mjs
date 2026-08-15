@@ -4,8 +4,9 @@ export const WEB_BUNDLE_GZIP_GROWTH_LIMIT = { bytes: 4_608, ratio: 0.03 };
 export const WEB_BUNDLE_BUDGETS = [
   {
     file: "js/openquatt-app.js",
-    // Includes the HCQ R2 auxiliary-relay settings and bounded usage-telemetry confirmation polling.
-    raw: 877_500,
+    // Includes HCQ R2 settings, bounded usage-telemetry confirmation polling,
+    // and source-bound supply-temperature calibration status and results.
+    raw: 880_000,
     // One-time migration ceiling for structured incident monitoring, replay,
     // the CSRF-protected deferred recovery actions, and their compact editor.
     // Once this bundle is the base, the normal gzip growth limit applies again.

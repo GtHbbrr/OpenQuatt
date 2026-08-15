@@ -125,3 +125,20 @@ test("ongeldige PT1000 toont geen misleidende nulwaarde", () => {
   assert.match(markup, /<span>DS18B20<\/span>\s*<strong>0 °C<\/strong>/);
   assert.match(markup, /<span>Bron<\/span>\s*<strong>HP2 uitgaand water \(fallback\)<\/strong>/);
 });
+
+test("bronwissel toont dat de aanvoerkalibratie opnieuw moet", () => {
+  setSourceSelectionState(false);
+  Object.assign(state.entities, {
+    waterSupplySource: { value: "CIC", option: ["Local", "CIC", "HA input"] },
+    supplyTemp: { value: 31.2, uom: "°C" },
+    waterSupplyTempEffectiveSource: { value: "CIC", state: "CIC" },
+    waterSupplyCalibrationStatus: { value: "Recalibration required: Local - PT1000", state: "Recalibration required: Local - PT1000" },
+    waterSupplyCalibrationRequired: { value: true, state: "ON" },
+  });
+
+  const markup = renderSettingsSensorSelectionSection();
+
+  assert.match(markup, /Kalibratie<\/span>\s*<strong>Recalibration required: Local - PT1000<\/strong>/);
+  assert.match(markup, /De aanvoerbron of bronconfiguratie is gewijzigd\./);
+  assert.match(markup, /voer de temperatuurkalibratie opnieuw uit/);
+});

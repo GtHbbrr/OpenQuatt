@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <string>
 
+#include "../../control/oq_supply_calibration_logic.h"
 #include "../oq_service_runtime.h"
 
 namespace oq_hp_water_calibration {
@@ -46,6 +47,7 @@ struct SampleSet {
   float hp1_out;
   float hp2_in;
   float hp2_out;
+  float supply;
 };
 
 struct WindowStats {
@@ -55,6 +57,7 @@ struct WindowStats {
   float hp1_out_avg;
   float hp2_in_avg;
   float hp2_out_avg;
+  float supply_avg;
   float reference;
   float spread;
   float drift;
@@ -75,6 +78,8 @@ class HpWaterCalibrationRuntime {
  public:
   void reset() {
     phase_ = PHASE_IDLE;
+    supply_source_code_ = oq_supply_calibration::SOURCE_NONE;
+    supply_source_fingerprint_ = 0;
     last_status_.clear();
     clear_samples();
     reset_result_globals();
@@ -115,6 +120,13 @@ class HpWaterCalibrationRuntime {
       return;
     }
 
+    const auto supply_source = current_supply_source();
+    float supply_c = NAN;
+    if (!supply_source.ready || !read_supply_temperature(supply_source, supply_c)) {
+      publish("REFUSED: supply source unavailable");
+      return;
+    }
+
     ESP_LOGI("quatt.cm100.hpcal",
              "HP water sensor calibration requested (min_mix=%ds stable_window=%ds max=%ds flow_setpoint=normal "
              "spread<=%.2fC drift<=%.2fC/min max_offset=%.2fC)",
@@ -123,6 +135,8 @@ class HpWaterCalibrationRuntime {
 
     clear_samples();
     reset_result_globals();
+    supply_source_code_ = supply_source.code;
+    supply_source_fingerprint_ = supply_source.fingerprint;
 
     id(oq_commissioning_task_code) = TASK_HP_WATER_CALIBRATION;
     id(oq_commissioning_request_pending) = false;
@@ -166,6 +180,7 @@ class HpWaterCalibrationRuntime {
     const float hp1_out = id(oq_hp_calibration_hp1_water_out_offset_suggested).state;
     const float hp2_in = id(oq_hp_calibration_hp2_water_in_offset_suggested).state;
     const float hp2_out = id(oq_hp_calibration_hp2_water_out_offset_suggested).state;
+    const float supply_offset = id(oq_hp_calibration_supply_offset_suggested).state;
 
     if (!result_ready()) {
       publish("APPLY_FAILED: NO_RESULT");
@@ -175,12 +190,31 @@ class HpWaterCalibrationRuntime {
       publish("APPLY_FAILED");
       return;
     }
+    if (!valid_offset(supply_offset, cfg.max_offset_c)) {
+      publish("APPLY_FAILED: SUPPLY_OFFSET");
+      return;
+    }
 #if OQ_TOPOLOGY_DUO
     if (!valid_offset(hp2_in, cfg.max_offset_c) || !valid_offset(hp2_out, cfg.max_offset_c)) {
       publish("APPLY_FAILED");
       return;
     }
 #endif
+
+    if (!oq_commissioning::is_cm100(id(oq_control_mode_code)) || id(oq_water_temp_hard_trip_active) ||
+        id(boiler_active).state || !heat_pumps_idle()) {
+      publish("APPLY_FAILED: SAFETY_STATE");
+      return;
+    }
+    const auto supply_source = current_supply_source();
+    const int32_t result_source = id(oq_hp_water_calibration_result_supply_source_code);
+    float supply_c = NAN;
+    if (!supply_source.ready || result_source <= 0 || result_source != static_cast<int32_t>(supply_source.code) ||
+        id(oq_hp_water_calibration_result_supply_source_fingerprint) != supply_source.fingerprint ||
+        !read_supply_temperature(supply_source, supply_c)) {
+      publish("APPLY_FAILED: SUPPLY_SOURCE_CHANGED");
+      return;
+    }
 
     set_number_value(id(hp1_water_in_temp_offset), hp1_in);
     set_number_value(id(hp1_water_out_temp_offset), hp1_out);
@@ -189,6 +223,18 @@ class HpWaterCalibrationRuntime {
     set_number_value(id(hp2_water_in_temp_offset), hp2_in);
     set_number_value(id(hp2_water_out_temp_offset), hp2_out);
 #endif
+
+    // Persist the source-bound record fail-closed. The source code and checksum
+    // are committed last so an interrupted preference write cannot activate a
+    // partially updated offset on the next boot.
+    id(oq_water_supply_temp_calibration_source_code) = 0;
+    id(oq_water_supply_temp_calibration_checksum) = 0;
+    set_number_value(id(water_supply_temp_calibration_offset), supply_offset);
+    id(oq_water_supply_temp_calibration_source_fingerprint) = supply_source.fingerprint;
+    id(oq_water_supply_temp_calibration_source_code) = result_source;
+    id(oq_water_supply_temp_calibration_checksum) =
+        oq_supply_calibration::record_checksum(result_source, supply_source.fingerprint, supply_offset);
+    id(water_supply_temp_selected).update();
 
     publish("APPLIED");
   }
@@ -214,6 +260,12 @@ class HpWaterCalibrationRuntime {
     }
     if (!heat_pumps_idle()) {
       finish("FAILED: heat pump active", STATE_FAILED);
+      return;
+    }
+    const auto supply_source = current_supply_source();
+    if (!supply_source.ready || supply_source.code != supply_source_code_ ||
+        supply_source.fingerprint != supply_source_fingerprint_) {
+      finish("FAILED: supply source changed", STATE_FAILED);
       return;
     }
 
@@ -274,6 +326,8 @@ class HpWaterCalibrationRuntime {
 
  private:
   int phase_ = PHASE_IDLE;
+  oq_supply_calibration::SourceCode supply_source_code_ = oq_supply_calibration::SOURCE_NONE;
+  uint32_t supply_source_fingerprint_ = 0;
   std::string last_status_;
   int sample_count_ = 0;
   int sample_next_ = 0;
@@ -290,7 +344,7 @@ class HpWaterCalibrationRuntime {
     sample_count_ = 0;
     sample_next_ = 0;
     for (int i = 0; i < MAX_WINDOW_SAMPLES; i++) {
-      samples_[i] = SampleSet{NAN, NAN, NAN, NAN};
+      samples_[i] = SampleSet{NAN, NAN, NAN, NAN, NAN};
     }
   }
 
@@ -302,6 +356,11 @@ class HpWaterCalibrationRuntime {
     id(oq_hp_water_calibration_result_hp1_out_raw_avg_c) = NAN;
     id(oq_hp_water_calibration_result_hp2_in_raw_avg_c) = NAN;
     id(oq_hp_water_calibration_result_hp2_out_raw_avg_c) = NAN;
+    id(oq_hp_water_calibration_result_supply_raw_avg_c) = NAN;
+    id(oq_hp_water_calibration_result_supply_offset_c) = NAN;
+    id(oq_hp_water_calibration_result_supply_source_code) = 0;
+    id(oq_hp_water_calibration_result_supply_source_fingerprint) = 0;
+    id(oq_hp_water_calibration_result_supply_source).clear();
   }
 
   bool valid_offset(float value, float max_offset_c) const { return !isnan(value) && fabsf(value) <= max_offset_c; }
@@ -310,7 +369,10 @@ class HpWaterCalibrationRuntime {
     return !id(oq_hp_water_calibration_active) && id(oq_hp_water_calibration_phase) == PHASE_DONE &&
            id(oq_commissioning_state_code) == STATE_DONE && !isnan(id(oq_hp_water_calibration_result_reference_c)) &&
            !isnan(id(oq_hp_water_calibration_result_spread_before_c)) &&
-           !isnan(id(oq_hp_water_calibration_result_expected_spread_c));
+           !isnan(id(oq_hp_water_calibration_result_expected_spread_c)) &&
+           !isnan(id(oq_hp_water_calibration_result_supply_raw_avg_c)) &&
+           !isnan(id(oq_hp_water_calibration_result_supply_offset_c)) &&
+           id(oq_hp_water_calibration_result_supply_source_code) > 0;
   }
 
   void set_phase(int phase, int state_code, uint32_t now_ms) {
@@ -334,7 +396,50 @@ class HpWaterCalibrationRuntime {
     sample.hp2_out = id(hp2_water_out_temp_raw).state;
     if (isnan(sample.hp2_in) || isnan(sample.hp2_out)) return false;
 #endif
-    return true;
+    const auto supply_source = current_supply_source();
+    if (!supply_source.ready || supply_source.code != supply_source_code_ ||
+        supply_source.fingerprint != supply_source_fingerprint_) {
+      return false;
+    }
+    return read_supply_temperature(supply_source, sample.supply);
+  }
+
+  oq_supply_calibration::SourceIdentity current_supply_source() const {
+    return {static_cast<oq_supply_calibration::SourceCode>(id(oq_water_supply_temp_current_source_code)),
+            id(oq_water_supply_temp_current_source_fingerprint), id(oq_water_supply_temp_current_source_ready)};
+  }
+
+  bool read_supply_temperature(const oq_supply_calibration::SourceIdentity& source, float& value) const {
+    value = NAN;
+    if (!source.ready || id(oq_water_supply_temp_fallback_runtime_active) ||
+        id(oq_water_supply_temp_selected_hold_active)) {
+      return false;
+    }
+    switch (source.code) {
+      case oq_supply_calibration::SOURCE_LOCAL_PT1000:
+#if OQ_HARDWARE_HEATPUMP_CONTROLLER_Q
+        if (id(water_supply_temp_pt1000).has_state()) value = id(water_supply_temp_pt1000).state;
+#endif
+        break;
+      case oq_supply_calibration::SOURCE_LOCAL_DS18B20:
+        if (id(water_supply_temp_ds18b20).has_state()) value = id(water_supply_temp_ds18b20).state;
+        break;
+      case oq_supply_calibration::SOURCE_CIC:
+        if (id(feed_ok).has_state() && id(feed_ok).state && id(cic_data_stale).has_state() &&
+            !id(cic_data_stale).state && id(water_supply_temp_cic).has_state()) {
+          value = id(water_supply_temp_cic).state;
+        }
+        break;
+      case oq_supply_calibration::SOURCE_HA_INPUT:
+        if (id(water_supply_temp_valid_ha).has_state() && id(water_supply_temp_valid_ha).state &&
+            id(water_supply_temp_ha).has_state()) {
+          value = id(water_supply_temp_ha).state;
+        }
+        break;
+      default:
+        break;
+    }
+    return isfinite(value);
   }
 
   void push_sample(const SampleSet& sample) {
@@ -370,11 +475,13 @@ class HpWaterCalibrationRuntime {
     float hp1_out_sum = 0.0f;
     float hp2_in_sum = 0.0f;
     float hp2_out_sum = 0.0f;
+    float supply_sum = 0.0f;
 
     for (int offset = start_offset; offset < sample_count_; offset++) {
       const SampleSet sample = samples_[sample_index_from_oldest(offset)];
       hp1_in_sum += sample.hp1_in;
       hp1_out_sum += sample.hp1_out;
+      supply_sum += sample.supply;
 #if OQ_TOPOLOGY_DUO
       hp2_in_sum += sample.hp2_in;
       hp2_out_sum += sample.hp2_out;
@@ -385,10 +492,12 @@ class HpWaterCalibrationRuntime {
     stats.span_s = required * cfg.sample_time_s;
     stats.hp1_in_avg = hp1_in_sum / required;
     stats.hp1_out_avg = hp1_out_sum / required;
+    stats.supply_avg = supply_sum / required;
     stats.reference = (stats.hp1_in_avg + stats.hp1_out_avg) * 0.5f;
     float min_avg = fminf(stats.hp1_in_avg, stats.hp1_out_avg);
     float max_avg = fmaxf(stats.hp1_in_avg, stats.hp1_out_avg);
     stats.drift = fmaxf(fabsf(last.hp1_in - first.hp1_in), fabsf(last.hp1_out - first.hp1_out));
+    stats.drift = fmaxf(stats.drift, fabsf(last.supply - first.supply));
 
     stats.hp2_in_avg = NAN;
     stats.hp2_out_avg = NAN;
@@ -403,8 +512,7 @@ class HpWaterCalibrationRuntime {
 
     stats.spread = max_avg - min_avg;
     id(oq_hp_water_calibration_spread_c) = stats.spread;
-    const float supply_c = id(water_supply_temp_selected).state;
-    id(oq_hp_water_calibration_supply_delta_c) = isnan(supply_c) ? NAN : (stats.reference - supply_c);
+    id(oq_hp_water_calibration_supply_delta_c) = stats.reference - stats.supply_avg;
     return true;
   }
 
@@ -418,22 +526,26 @@ class HpWaterCalibrationRuntime {
     return stats.spread <= cfg.stable_spread_c && stats.drift <= allowed_drift;
   }
 
-  float rounded_offset(float value) const { return roundf(value * 100.0f) * 0.01f; }
-
   void compute_result(const RuntimeConfig& cfg, const WindowStats& stats) {
-    const float hp1_in_offset = rounded_offset(stats.reference - stats.hp1_in_avg);
-    const float hp1_out_offset = rounded_offset(stats.reference - stats.hp1_out_avg);
+    const float hp1_in_offset = oq_supply_calibration::rounded_offset(stats.reference - stats.hp1_in_avg);
+    const float hp1_out_offset = oq_supply_calibration::rounded_offset(stats.reference - stats.hp1_out_avg);
+    const float supply_offset = oq_supply_calibration::rounded_offset(stats.reference - stats.supply_avg);
     if (fabsf(hp1_in_offset) > cfg.max_offset_c || fabsf(hp1_out_offset) > cfg.max_offset_c) {
       finish("FAILED: offset too large", STATE_FAILED);
+      return;
+    }
+    if (fabsf(supply_offset) > cfg.max_offset_c) {
+      finish("FAILED: supply offset too large", STATE_FAILED);
       return;
     }
 
     set_number_value(id(oq_hp_calibration_hp1_water_in_offset_suggested), hp1_in_offset);
     set_number_value(id(oq_hp_calibration_hp1_water_out_offset_suggested), hp1_out_offset);
+    set_number_value(id(oq_hp_calibration_supply_offset_suggested), supply_offset);
 
 #if OQ_TOPOLOGY_DUO
-    const float hp2_in_offset = rounded_offset(stats.reference - stats.hp2_in_avg);
-    const float hp2_out_offset = rounded_offset(stats.reference - stats.hp2_out_avg);
+    const float hp2_in_offset = oq_supply_calibration::rounded_offset(stats.reference - stats.hp2_in_avg);
+    const float hp2_out_offset = oq_supply_calibration::rounded_offset(stats.reference - stats.hp2_out_avg);
     if (fabsf(hp2_in_offset) > cfg.max_offset_c || fabsf(hp2_out_offset) > cfg.max_offset_c) {
       finish("FAILED: offset too large", STATE_FAILED);
       return;
@@ -449,6 +561,11 @@ class HpWaterCalibrationRuntime {
     id(oq_hp_water_calibration_result_hp1_out_raw_avg_c) = stats.hp1_out_avg;
     id(oq_hp_water_calibration_result_hp2_in_raw_avg_c) = stats.hp2_in_avg;
     id(oq_hp_water_calibration_result_hp2_out_raw_avg_c) = stats.hp2_out_avg;
+    id(oq_hp_water_calibration_result_supply_raw_avg_c) = stats.supply_avg;
+    id(oq_hp_water_calibration_result_supply_offset_c) = supply_offset;
+    id(oq_hp_water_calibration_result_supply_source_code) = static_cast<int32_t>(supply_source_code_);
+    id(oq_hp_water_calibration_result_supply_source_fingerprint) = supply_source_fingerprint_;
+    id(oq_hp_water_calibration_result_supply_source) = oq_supply_calibration::source_label(supply_source_code_);
 
     char status[96];
     snprintf(status, sizeof(status), "DONE: stable spread %.2fC", stats.spread);

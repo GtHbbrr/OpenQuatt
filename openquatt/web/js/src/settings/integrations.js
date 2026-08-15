@@ -691,7 +691,11 @@ import { escapeHtml } from "../core/html.js";
         activeRows: [
           renderSourceRow({ label: "Waarde", key: "supplyTemp" }),
           renderSourceRow({ label: "Bron", value: getWaterSupplyUsedSource() }),
+          renderSourceRow({ label: "Kalibratie", value: getSettingsTextStatValue("waterSupplyCalibrationStatus", "Niet gekalibreerd") }),
         ],
+        warning: isInstallationMonitoringBinaryActive("waterSupplyCalibrationRequired")
+          ? "De aanvoerbron of bronconfiguratie is gewijzigd. De oude correctie is uitgeschakeld; voer de temperatuurkalibratie opnieuw uit."
+          : "",
         measurementRows: [
           renderSourceRow({ label: "Lokale selectie", key: "waterSupplyTempEsp" }),
           renderSourceRow({ label: "PT1000", key: "waterSupplyTempPt1000" }),

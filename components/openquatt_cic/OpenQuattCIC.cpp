@@ -373,6 +373,10 @@ bool OpenQuattCIC::parse_payload_(const uint8_t* data, size_t len, ParsedPayload
 void OpenQuattCIC::apply_payload_(const ParsedPayload& payload) {
   if (payload.water_supply_temp.present) {
     this->publish_float_if_changed_(this->water_supply_temp_, payload.water_supply_temp.value);
+  } else {
+    // A successful payload without this optional field must not keep exposing
+    // the previous value as a fresh CIC supply-temperature sample.
+    this->publish_float_if_changed_(this->water_supply_temp_, NAN);
   }
   if (payload.flow_rate.present) {
     this->publish_float_if_changed_(this->flow_rate_, payload.flow_rate.value);
