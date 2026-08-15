@@ -17,8 +17,11 @@ jobs:
 
       - name: Install clang-format
         run: |
-          sudo apt-get update
-          sudo apt-get install -y clang-format
+          clang_format_version="$(tr -d '[:space:]' < .clang-format-version)"
+          clang_format_venv="${RUNNER_TEMP}/clang-format"
+          python3 -m venv "${clang_format_venv}"
+          "${clang_format_venv}/bin/python" -m pip install --disable-pip-version-check "clang-format==${clang_format_version}"
+          echo "${clang_format_venv}/bin" >> "${GITHUB_PATH}"
 
       - name: Check C/C++ formatting
         run: python3 scripts/cpp_format.py check

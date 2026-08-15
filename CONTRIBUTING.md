@@ -111,15 +111,14 @@ Use the project helper for normal local checks:
 - `python3 scripts/dev.py validate --config-only`
 - `python3 scripts/dev.py validate --jobs 2`
 
-For C/C++ source files, install `clang-format` locally and use the repository formatting commands:
+For C/C++ source files, install the exact version from `.clang-format-version` and use the repository formatting commands. The cross-platform `uv` tool installer provides the pinned binary:
 
-- Windows: `winget install LLVM.LLVM`
-- macOS: `brew install clang-format`
-- Linux: install `clang-format` with your distribution package manager
+- `uv tool install --force clang-format==22.1.8`
+- `clang-format --version`
 - `npm run check:cpp-format`
 - `npm run fix:cpp-format`
 
-If `clang-format` is installed but not in `PATH`, set `CLANG_FORMAT_BIN` to the executable path before running the npm command. CI enforces C/C++ formatting and fails when formatting differences are detected, so run the local fix command before opening or updating a pull request.
+The formatting commands reject any version other than the one pinned in `.clang-format-version` and include both tracked and new, non-ignored C/C++ files. If `clang-format` is installed but not in `PATH`, set `CLANG_FORMAT_BIN` to the executable path before running the npm command. CI enforces the same version and formatting, so run the local fix command before opening or updating a pull request.
 
 For quick iterations, the standalone checks remain useful:
 
