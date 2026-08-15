@@ -10,6 +10,7 @@ const { getPrimeBaseKeys } = await import("../js/src/core/entity-sync.js");
 const {
   isUsageTelemetryChoiceConfirmed,
   shouldInitializeQuickStartUsageTelemetryChoice,
+  waitForUsageTelemetryChoiceConfirmation,
 } = await import("../js/src/core/usage-telemetry-domain.js");
 
 test("usage telemetry is hydrated before Quick Start filters optional steps", () => {
@@ -57,6 +58,104 @@ test("telemetry choice confirmation requires persisted state and the expected va
   }), false);
 });
 
+test("telemetry choice confirmation waits for a deferred controller write", async () => {
+  let telemetryValue = "OFF";
+  let choiceValue = "OFF";
+  let refreshCount = 0;
+  let waitCount = 0;
+
+  const confirmed = await waitForUsageTelemetryChoiceConfirmation({
+    refresh: async () => {
+      refreshCount += 1;
+      if (refreshCount === 3) {
+        telemetryValue = "ON";
+        choiceValue = "ON";
+      }
+    },
+    getTelemetryValue: () => telemetryValue,
+    getChoiceValue: () => choiceValue,
+    expectedEnabled: true,
+    attempts: 5,
+    pollIntervalMs: 25,
+    wait: async (delayMs) => {
+      assert.equal(delayMs, 25);
+      waitCount += 1;
+    },
+  });
+
+  assert.equal(confirmed, true);
+  assert.equal(refreshCount, 3);
+  assert.equal(waitCount, 3);
+});
+
+test("telemetry choice confirmation retries a transient refresh failure", async () => {
+  let telemetryValue = "OFF";
+  let choiceValue = "OFF";
+  let refreshCount = 0;
+
+  const confirmed = await waitForUsageTelemetryChoiceConfirmation({
+    refresh: async () => {
+      refreshCount += 1;
+      if (refreshCount === 1) {
+        throw new Error("temporary read failure");
+      }
+      telemetryValue = "ON";
+      choiceValue = "ON";
+    },
+    getTelemetryValue: () => telemetryValue,
+    getChoiceValue: () => choiceValue,
+    expectedEnabled: true,
+    attempts: 3,
+    pollIntervalMs: 0,
+    wait: async () => {},
+  });
+
+  assert.equal(confirmed, true);
+  assert.equal(refreshCount, 2);
+});
+
+test("telemetry choice confirmation stops after its bounded retry window", async () => {
+  let refreshCount = 0;
+
+  const confirmed = await waitForUsageTelemetryChoiceConfirmation({
+    refresh: async () => {
+      refreshCount += 1;
+    },
+    getTelemetryValue: () => "OFF",
+    getChoiceValue: () => "ON",
+    expectedEnabled: true,
+    attempts: 3,
+    pollIntervalMs: 0,
+    wait: async () => {},
+  });
+
+  assert.equal(confirmed, false);
+  assert.equal(refreshCount, 3);
+});
+
+test("telemetry choice confirmation does not start more reads after its deadline", async () => {
+  let nowMs = 0;
+  let refreshCount = 0;
+
+  const confirmed = await waitForUsageTelemetryChoiceConfirmation({
+    refresh: async () => {
+      refreshCount += 1;
+      nowMs = 3000;
+    },
+    getTelemetryValue: () => "OFF",
+    getChoiceValue: () => "ON",
+    expectedEnabled: true,
+    attempts: 10,
+    pollIntervalMs: 200,
+    timeoutMs: 2000,
+    wait: async () => {},
+    now: () => nowMs,
+  });
+
+  assert.equal(confirmed, false);
+  assert.equal(refreshCount, 1);
+});
+
 test("Quick Start applies default-on only while no telemetry choice is recorded", () => {
   const base = {
     stepId: "usage-telemetry",
@@ -82,6 +181,7 @@ test("Quick Start locks telemetry consent before hydration starts", async () => 
 
 test("usage telemetry disclosure matches the hourly payload scope", async () => {
   const quickStartSource = await readFile(new URL("../js/src/features/quickstart.js", import.meta.url), "utf8");
+  const quickStartActionsSource = await readFile(new URL("../js/src/features/quickstart-actions.js", import.meta.url), "utf8");
   const entityWriteSource = await readFile(new URL("../js/src/core/entity-write-actions.js", import.meta.url), "utf8");
   const settingsSource = await readFile(new URL("../js/src/settings/privacy.js", import.meta.url), "utf8");
   const disclosureSource = await readFile(new URL("../js/src/features/usage-telemetry.js", import.meta.url), "utf8");
@@ -90,8 +190,8 @@ test("usage telemetry disclosure matches the hourly payload scope", async () => 
   assert.match(quickStartSource, /renderUsageTelemetryDisclosure\(\)/);
   assert.match(quickStartSource, /data-oq-action="confirm-no-usage-telemetry"/);
   assert.match(entityWriteSource, /commitUsageTelemetrySwitch/);
-  assert.match(entityWriteSource, /refreshEntities\(\[key, "usageTelemetryChoiceConfigured", "usageTelemetryInstallationId"\]/);
-  assert.match(entityWriteSource, /isUsageTelemetryChoiceConfirmed/);
+  assert.match(entityWriteSource, /waitForUsageTelemetryChoiceConfirmation/);
+  assert.match(quickStartActionsSource, /waitForUsageTelemetryChoiceConfirmation/);
   assert.match(entityWriteSource, /"turn_off"/);
   assert.match(settingsSource, /renderUsageTelemetryDisclosure\(\{ collapsible: true/);
   assert.match(settingsSource, /usageTelemetryDetailsOpen/);

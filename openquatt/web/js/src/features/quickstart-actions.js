@@ -5,7 +5,7 @@ import { setEntityBackupValue } from "../core/entity-backup.js";
 import { getEntityValue } from "../core/entity-store.js";
 import { refreshEntities } from "../core/entity-sync.js";
 import { state } from "../core/state.js";
-import { isUsageTelemetryChoiceConfirmed, shouldInitializeQuickStartUsageTelemetryChoice } from "../core/usage-telemetry-domain.js";
+import { shouldInitializeQuickStartUsageTelemetryChoice, waitForUsageTelemetryChoiceConfirmation } from "../core/usage-telemetry-domain.js";
 import { getQuickStartFlowSourceModel, getQuickStartThermostatSourceModel } from "./quickstart.js";
 import { render } from "../core/render-scheduler.js";
 
@@ -100,30 +100,29 @@ import { render } from "../core/render-scheduler.js";
     state.controlError = "";
     render();
 
+    const confirmChoice = (expectedEnabled) => waitForUsageTelemetryChoiceConfirmation({
+      refresh: () => refreshEntities(["usageTelemetryEnabled", "usageTelemetryChoiceConfigured"], "all"),
+      getTelemetryValue: () => getEntityValue("usageTelemetryEnabled"),
+      getChoiceValue: () => getEntityValue("usageTelemetryChoiceConfigured"),
+      expectedEnabled,
+    });
+
     try {
       await setQuickStartSwitch("usageTelemetryEnabled", true);
-      await refreshEntities(["usageTelemetryEnabled", "usageTelemetryChoiceConfigured"], "all");
-      if (!isUsageTelemetryChoiceConfirmed({
-        telemetryValue: getEntityValue("usageTelemetryEnabled"),
-        choiceValue: getEntityValue("usageTelemetryChoiceConfigured"),
-        expectedEnabled: true,
-      })) {
+      if (!await confirmChoice(true)) {
         throw new Error("De controller heeft de keuze niet bevestigd.");
       }
+      state.controlError = "";
     } catch (error) {
       let disabledConfirmed = false;
       try {
         await setQuickStartSwitch("usageTelemetryEnabled", false);
-        await refreshEntities(["usageTelemetryEnabled", "usageTelemetryChoiceConfigured"], "all");
-        disabledConfirmed = isUsageTelemetryChoiceConfirmed({
-          telemetryValue: getEntityValue("usageTelemetryEnabled"),
-          choiceValue: getEntityValue("usageTelemetryChoiceConfigured"),
-          expectedEnabled: false,
-        });
+        disabledConfirmed = await confirmChoice(false);
       } catch (_disableError) {
         // Keep navigation blocked when the privacy-safe fallback cannot be confirmed.
       }
       if (disabledConfirmed) {
+        state.controlError = "";
         state.controlNotice = "De standaardkeuze kon niet worden ingeschakeld. Delen is bevestigd uitgeschakeld; je kunt doorgaan of het opnieuw inschakelen.";
       } else {
         state.controlError = `De keuze kon niet veilig worden bevestigd. Controleer de verbinding en probeer opnieuw. ${error.message}`;
