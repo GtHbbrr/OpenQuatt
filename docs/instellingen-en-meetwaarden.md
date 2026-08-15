@@ -202,6 +202,20 @@ Alleen als het probleem daar lijkt te zitten:
 - power cap;
 - gedrag rond stille uren of begrenzing.
 
+### Voor compressorpendelen
+
+Home Assistant toont `Compressor cycling warning` zodra minimaal één actuele
+pendelwaarschuwing actief is. Gebruik dit samengestelde signaal als eenvoudige
+trigger voor een automation. De oorzaak blijft afzonderlijk zichtbaar via:
+
+- `Compressor cycling warning 2h`;
+- `Compressor cycling warning 72h`;
+- `Alternating compressor starts warning` bij een duo-installatie.
+
+De signalen kunnen gelijktijdig actief zijn en worden weer inactief zodra de
+bijbehorende actuele conditie is hersteld. Een eerder gedetecteerde maar alleen
+nog gelatchte melding houdt `Compressor cycling warning` niet actief.
+
 ## Wanneer zit je waarschijnlijk in de verkeerde laag?
 
 Gebruik deze vuistregels:
