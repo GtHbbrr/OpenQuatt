@@ -1,4 +1,4 @@
-import { getEntityStateText, hasEntity, isEntityActive } from "../core/app-shared.js";
+import { getEntityNumericValue, getEntityStateText, hasEntity, isEntityActive } from "../core/app-shared.js";
 import { formatValue } from "../core/entity-store.js";
 import { formatSettingsOptionLabel, renderSettingsAdvancedDisclosure, renderSettingsFieldCard, renderSettingsNumberField, renderSettingsOptionCardsField, renderSettingsSection, renderSettingsSliderField, renderSettingsSwitchField } from "./controls.js";
 import { escapeHtml } from "../core/html.js";
@@ -40,6 +40,20 @@ import { escapeHtml } from "../core/html.js";
     return labels[value] || value;
   }
 
+  function renderCoolingSilentLimitWarning() {
+    const coolingDemandMax = getEntityNumericValue("coolingDemandMax");
+    const silentMax = getEntityNumericValue("silentMax");
+    const silentModeOverride = getEntityStateText("silentModeOverride", "").trim().toLowerCase();
+    if (!hasEntity("silentMax") || !Number.isFinite(coolingDemandMax) || !Number.isFinite(silentMax) || coolingDemandMax <= silentMax || silentModeOverride === "off") {
+      return "";
+    }
+
+    const prefix = isEntityActive("silentActive")
+      ? "Stille modus is nu actief. Koelen wordt"
+      : "Tijdens stille modus wordt koelen";
+    return `<p class="oq-settings-cooling-limit-warning"><span class="oq-settings-cooling-limit-warning-icon" aria-hidden="true">!</span><span>${prefix} begrensd op niveau ${escapeHtml(formatValue("silentMax"))}. Deze maximale koelsterkte wordt dan niet volledig gebruikt.</span></p>`;
+  }
+
   export function renderSettingsCoolingSection() {
     const roomRequestRequired = !hasEntity("coolingRoomRequestRequired") || isEntityActive("coolingRoomRequestRequired");
     const tuningFields = [
@@ -48,6 +62,7 @@ import { escapeHtml } from "../core/html.js";
         minLabel: "Rustig",
         maxLabel: "Krachtig",
         valueLabel: `${formatValue("coolingDemandMax")} max`,
+        footerMarkup: renderCoolingSilentLimitWarning(),
       }),
       renderSettingsNumberField("coolingRestartDelta", "Herstartmarge watertemperatuur", "Na het bereiken van het koel-aanvoerdoel start de watercyclus pas opnieuw zodra de aanvoer deze marge boven het doel ligt."),
       renderSettingsNumberField("coolingSafetyMargin", "Dauwpunt veiligheidsmarge", "Extra marge boven het geselecteerde dauwpunt voor de minimale veilige watertemperatuur."),

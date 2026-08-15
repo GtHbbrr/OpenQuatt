@@ -249,6 +249,9 @@ import { fetchWithTimeout } from "./browser-utils.js";
       "coolingMinimumSafeSupplyTemp",
       "coolingSupplyTarget",
       "coolingSupplyError",
+      "silentModeOverride",
+      "silentActive",
+      "silentMax",
       ...COOLING_SETTING_KEYS,
     ],
     integrations: [

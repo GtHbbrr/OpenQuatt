@@ -1641,6 +1641,7 @@
     "usageTelemetryEnabled",
     "usageTelemetryInstallationId",
     "silentModeOverride",
+    "silentActive",
     "trendHistoryEnabled",
     "trendHistoryFlashEnabled",
     "trendHistoryFlush",
