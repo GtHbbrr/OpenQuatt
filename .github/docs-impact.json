@@ -95,7 +95,7 @@
       ],
       "docs_any_of": [
         "docs/instellingen-en-meetwaarden.md",
-        "docs/dashboardoverzicht.md",
+        "docs/dashboard/README.md",
         "docs/web-app.md"
       ]
     },

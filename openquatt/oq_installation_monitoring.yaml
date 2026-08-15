@@ -323,7 +323,6 @@ binary_sensor:
   - platform: template
     id: oq_compressor_cycling_warning_2h
     name: "Compressor cycling warning 2h"
-    internal: true
     icon: mdi:alert-decagram-outline
     device_class: problem
     entity_category: diagnostic
@@ -333,7 +332,6 @@ binary_sensor:
   - platform: template
     id: oq_compressor_cycling_warning_72h
     name: "Compressor cycling warning 72h"
-    internal: true
     icon: mdi:calendar-alert-outline
     device_class: problem
     entity_category: diagnostic
@@ -344,8 +342,19 @@ binary_sensor:
     id: oq_compressor_alternating_warning
     name: "Alternating compressor starts warning"
     icon: mdi:swap-horizontal-bold
-    internal: true
+    internal: ${monitoring_hp2_internal}
     device_class: problem
     entity_category: diagnostic
     lambda: |-
       return oq_diagnostics::logged_alternating_cycling_warning(millis());
+
+  - platform: template
+    id: oq_compressor_cycling_warning
+    name: "Compressor cycling warning"
+    icon: mdi:alert-decagram
+    device_class: problem
+    entity_category: diagnostic
+    lambda: |-
+      return id(oq_compressor_cycling_warning_2h).state ||
+             id(oq_compressor_cycling_warning_72h).state ||
+             id(oq_compressor_alternating_warning).state;
