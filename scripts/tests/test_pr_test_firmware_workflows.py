@@ -35,6 +35,35 @@ class PrTestFirmwareWorkflowTests(unittest.TestCase):
             ),
         )
 
+    def test_release_channel_follows_supported_pr_base_branch(self) -> None:
+        self.assertIn("types: [opened, reopened, labeled, synchronize, edited]", BUILD_WORKFLOW)
+        self.assertIn("github.event.changes.base != null", BUILD_WORKFLOW)
+        self.assertIn("BASE_REF: ${{ github.event.pull_request.base.ref }}", BUILD_WORKFLOW)
+        self.assertIn('case "${BASE_REF}" in\n            main|dev)', BUILD_WORKFLOW)
+        self.assertIn(
+            "release_channel: ${{ steps.pr_meta.outputs.release_channel }}",
+            BUILD_WORKFLOW,
+        )
+        self.assertIn(
+            'echo "release_channel=${RELEASE_CHANNEL}" >> "${GITHUB_OUTPUT}"',
+            BUILD_WORKFLOW,
+        )
+        self.assertIn(
+            "release_channel: ${{ needs.compute-meta.outputs.release_channel }}",
+            BUILD_WORKFLOW,
+        )
+        self.assertIn('--arg base_ref "${BASE_REF}"', BUILD_WORKFLOW)
+        self.assertIn('--arg release_channel "${RELEASE_CHANNEL}"', BUILD_WORKFLOW)
+
+    def test_release_channel_is_revalidated_before_publishing(self) -> None:
+        self.assertIn('BASE_REF="$(jq -er \'.base_ref', PUBLISH_WORKFLOW)
+        self.assertIn('RELEASE_CHANNEL="$(jq -er \'.release_channel', PUBLISH_WORKFLOW)
+        self.assertIn('[[ "${RELEASE_CHANNEL}" != "${BASE_REF}" ]]', PUBLISH_WORKFLOW)
+        self.assertIn("base branch changed since this firmware was built", PUBLISH_WORKFLOW)
+        self.assertIn("base_ref: ${{ steps.gate.outputs.base_ref }}", PUBLISH_WORKFLOW)
+        self.assertIn("BASE_REF: ${{ needs.validate-pr-test-build.outputs.base_ref }}", PUBLISH_WORKFLOW)
+        self.assertGreaterEqual(PUBLISH_WORKFLOW.count(".base.ref"), 2)
+
     def test_privileged_workflow_revalidates_before_publishing(self) -> None:
         self.assertIn("workflow_run:", PUBLISH_WORKFLOW)
         self.assertIn("pull_request_target:", PUBLISH_WORKFLOW)

@@ -46,6 +46,18 @@ class OpenQuattUsageTelemetry : public switch_::Switch, public Component {
   void set_hardware_profile(const std::string& profile) { this->hardware_profile_ = profile; }
   void set_topology(const std::string& topology) { this->topology_ = topology; }
   void set_connection(const std::string& connection) { this->connection_ = connection; }
+  void set_quatt_hybrid_generation_select(select::Select* source) { this->quatt_hybrid_generation_select_ = source; }
+  void set_flow_source_select(select::Select* source) { this->flow_source_select_ = source; }
+  void set_q_flow_source_select(select::Select* source) { this->q_flow_source_select_ = source; }
+  void set_heating_strategy_select(select::Select* source) { this->heating_strategy_select_ = source; }
+  void set_room_temperature_source_select(select::Select* source) { this->room_temperature_source_select_ = source; }
+  void set_room_setpoint_source_select(select::Select* source) { this->room_setpoint_source_select_ = source; }
+  void set_outside_temperature_source_select(select::Select* source) {
+    this->outside_temperature_source_select_ = source;
+  }
+  void set_heating_enable_source_select(select::Select* source) { this->heating_enable_source_select_ = source; }
+  void set_cooling_enable_source_select(select::Select* source) { this->cooling_enable_source_select_ = source; }
+  void set_cooling_dew_point_source_select(select::Select* source) { this->cooling_dew_point_source_select_ = source; }
   void set_loop_time_sensor(sensor::Sensor* sensor) { this->loop_time_sensor_ = sensor; }
   void set_internal_temperature_sensor(sensor::Sensor* sensor) { this->internal_temperature_sensor_ = sensor; }
   void set_wifi_signal_sensor(sensor::Sensor* sensor) { this->wifi_signal_sensor_ = sensor; }
@@ -167,6 +179,16 @@ class OpenQuattUsageTelemetry : public switch_::Switch, public Component {
   std::string hardware_profile_;
   std::string topology_;
   std::string connection_;
+  select::Select* quatt_hybrid_generation_select_{nullptr};
+  select::Select* flow_source_select_{nullptr};
+  select::Select* q_flow_source_select_{nullptr};
+  select::Select* heating_strategy_select_{nullptr};
+  select::Select* room_temperature_source_select_{nullptr};
+  select::Select* room_setpoint_source_select_{nullptr};
+  select::Select* outside_temperature_source_select_{nullptr};
+  select::Select* heating_enable_source_select_{nullptr};
+  select::Select* cooling_enable_source_select_{nullptr};
+  select::Select* cooling_dew_point_source_select_{nullptr};
   sensor::Sensor* loop_time_sensor_{nullptr};
   sensor::Sensor* internal_temperature_sensor_{nullptr};
   sensor::Sensor* wifi_signal_sensor_{nullptr};
