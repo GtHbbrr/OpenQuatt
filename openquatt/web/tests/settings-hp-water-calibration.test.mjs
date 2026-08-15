@@ -45,3 +45,28 @@ test("kalibratieresultaat bevat de brongebonden aanvoer-offset", () => {
   assert.match(markup, /0\.45 °C/);
   assert.match(markup, /25\.15 °C/);
 });
+
+test("lege resultaatbron valt tijdens de meting terug op de actieve bron", () => {
+  state.loadingEntities = false;
+  state.entities = {
+    hp1WaterIn: { value: 25.1, uom: "°C" },
+    hp1WaterInRaw: { value: 25.0, uom: "°C" },
+    hpWaterCalibrationResultSupplySource: { value: "", state: "" },
+    waterSupplyTempEffectiveSource: { value: "CIC", state: "CIC" },
+    supplyTemp: { value: 24.7, uom: "°C" },
+  };
+
+  const markup = renderHpWaterCalibrationWizard({
+    status: "MEASURING",
+    running: true,
+    resultReady: false,
+    startDisabled: true,
+    abortDisabled: false,
+    applyDisabled: true,
+    busy: true,
+    controlsAvailable: true,
+  });
+
+  assert.match(markup, /Aanvoer \(CIC\)/);
+  assert.doesNotMatch(markup, /Aanvoer \(IDLE\)/);
+});

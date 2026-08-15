@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <string>
 
+#include "PsramBuffer.h"
 #include "../../control/oq_supply_calibration_logic.h"
 #include "../oq_service_runtime.h"
 
@@ -81,7 +82,7 @@ class HpWaterCalibrationRuntime {
     supply_source_code_ = oq_supply_calibration::SOURCE_NONE;
     supply_source_fingerprint_ = 0;
     last_status_.clear();
-    clear_samples();
+    release_samples();
     reset_result_globals();
     id(oq_hp_water_calibration_active) = false;
     id(oq_hp_water_calibration_abort) = false;
@@ -126,6 +127,11 @@ class HpWaterCalibrationRuntime {
       publish("REFUSED: supply source unavailable");
       return;
     }
+    if (!allocate_samples()) {
+      ESP_LOGE("quatt.cm100.hpcal", "Strict PSRAM allocation failed for calibration samples");
+      publish("REFUSED: calibration memory unavailable");
+      return;
+    }
 
     ESP_LOGI("quatt.cm100.hpcal",
              "HP water sensor calibration requested (min_mix=%ds stable_window=%ds max=%ds flow_setpoint=normal "
@@ -133,7 +139,6 @@ class HpWaterCalibrationRuntime {
              cfg.min_mixing_s, cfg.stable_window_s, cfg.max_duration_s, cfg.stable_spread_c, cfg.stable_drift_c_per_min,
              cfg.max_offset_c);
 
-    clear_samples();
     reset_result_globals();
     supply_source_code_ = supply_source.code;
     supply_source_fingerprint_ = supply_source.fingerprint;
@@ -291,7 +296,10 @@ class HpWaterCalibrationRuntime {
         finish("FAILED: invalid temperature sample", STATE_FAILED);
         return;
       }
-      push_sample(sample);
+      if (!push_sample(sample)) {
+        finish("FAILED: calibration memory unavailable", STATE_FAILED);
+        return;
+      }
     }
 
     if (elapsed_s < cfg.min_mixing_s) {
@@ -331,7 +339,7 @@ class HpWaterCalibrationRuntime {
   std::string last_status_;
   int sample_count_ = 0;
   int sample_next_ = 0;
-  SampleSet samples_[MAX_WINDOW_SAMPLES];
+  esphome::openquatt_common::PsramBuffer<SampleSet> samples_{};
 
   template <typename NumberEntity>
   void set_number_value(NumberEntity& number_entity, float value) {
@@ -340,9 +348,22 @@ class HpWaterCalibrationRuntime {
     call.perform();
   }
 
+  bool allocate_samples() {
+    if (!samples_.allocate_external(MAX_WINDOW_SAMPLES)) return false;
+    clear_samples();
+    return true;
+  }
+
+  void release_samples() {
+    samples_.release();
+    sample_count_ = 0;
+    sample_next_ = 0;
+  }
+
   void clear_samples() {
     sample_count_ = 0;
     sample_next_ = 0;
+    if (!samples_) return;
     for (int i = 0; i < MAX_WINDOW_SAMPLES; i++) {
       samples_[i] = SampleSet{NAN, NAN, NAN, NAN, NAN};
     }
@@ -442,10 +463,12 @@ class HpWaterCalibrationRuntime {
     return isfinite(value);
   }
 
-  void push_sample(const SampleSet& sample) {
+  bool push_sample(const SampleSet& sample) {
+    if (!samples_ || samples_.size() != static_cast<size_t>(MAX_WINDOW_SAMPLES)) return false;
     samples_[sample_next_] = sample;
     sample_next_ = (sample_next_ + 1) % MAX_WINDOW_SAMPLES;
     if (sample_count_ < MAX_WINDOW_SAMPLES) sample_count_++;
+    return true;
   }
 
   int required_window_samples(const RuntimeConfig& cfg) const {
@@ -461,6 +484,7 @@ class HpWaterCalibrationRuntime {
   }
 
   bool compute_window_stats(const RuntimeConfig& cfg, WindowStats& stats) {
+    if (!samples_ || samples_.size() != static_cast<size_t>(MAX_WINDOW_SAMPLES)) return false;
     const int required = required_window_samples(cfg);
     id(oq_hp_water_calibration_stable_required_s) = cfg.stable_window_s;
     id(oq_hp_water_calibration_stable_progress_s) =
@@ -630,6 +654,7 @@ class HpWaterCalibrationRuntime {
 
     publish(status);
     phase_ = PHASE_IDLE;
+    release_samples();
   }
 
   void publish(const char* status) {

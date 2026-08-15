@@ -466,8 +466,9 @@ sensor:
       local_source_ready = id(${oq_local_supply_temp_selector_id}).has_state();
       if (local_source_ready) local_source = id(${oq_local_supply_temp_selector_id}).current_option();
       #endif
-      const bool cic_url_ready = id(cic_feed_url).has_state();
-      const std::string cic_url = cic_url_ready ? id(cic_feed_url).state : std::string();
+      const bool cic_url_configured = id(cic_feed_url).has_state();
+      const std::string cic_url = cic_url_configured ? id(cic_feed_url).state : std::string();
+      const bool cic_url_ready = cic_url_configured && id(cic_component).is_url_ready(cic_url);
       const auto source_identity = oq_supply_calibration::source_identity(
           source.c_str(), OQ_HARDWARE_HEATPUMP_CONTROLLER_Q, local_source.c_str(), local_source_ready,
           cic_url.c_str(), cic_url_ready, "${ha_water_supply_temp_entity_id}");

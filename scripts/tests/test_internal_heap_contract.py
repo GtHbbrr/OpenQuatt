@@ -60,6 +60,14 @@ LOG_HISTORY_HEADER = (
     / "openquatt_log_history"
     / "OpenQuattLogHistory.h"
 ).read_text()
+HP_WATER_CALIBRATION_HEADER = (
+    ROOT
+    / "openquatt"
+    / "includes"
+    / "service"
+    / "tasks"
+    / "oq_hp_water_calibration_logic.h"
+).read_text()
 
 
 class InternalHeapPlacementContractTest(unittest.TestCase):
@@ -194,6 +202,25 @@ class InternalHeapPlacementContractTest(unittest.TestCase):
         self.assertLess(
             merge_archive.index("!this->flash_archive_available_()"),
             merge_archive.index("this->ram_head_ = 0"),
+        )
+
+    def test_hp_water_calibration_samples_are_task_scoped_psram(self) -> None:
+        self.assertIn(
+            "PsramBuffer<SampleSet> samples_",
+            HP_WATER_CALIBRATION_HEADER,
+        )
+        self.assertIn(
+            "samples_.allocate_external(MAX_WINDOW_SAMPLES)",
+            HP_WATER_CALIBRATION_HEADER,
+        )
+        self.assertIn(
+            'publish("REFUSED: calibration memory unavailable")',
+            HP_WATER_CALIBRATION_HEADER,
+        )
+        self.assertIn("release_samples();", HP_WATER_CALIBRATION_HEADER)
+        self.assertNotIn(
+            "SampleSet samples_[MAX_WINDOW_SAMPLES]",
+            HP_WATER_CALIBRATION_HEADER,
         )
 
 
