@@ -10,6 +10,8 @@
 namespace esphome {
 namespace openquatt_usage_telemetry {
 
+inline constexpr int MQTT_PUBLISH_RETAIN = 0;
+
 enum class MqttCleanupDecision : uint8_t {
   DESTROY = 0U,
   FORCE_DISCONNECT = 1U,

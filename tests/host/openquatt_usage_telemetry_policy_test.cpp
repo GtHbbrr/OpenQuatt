@@ -12,10 +12,13 @@ using esphome::openquatt_usage_telemetry::flow_source_config_wire_value;
 using esphome::openquatt_usage_telemetry::flow_source_mode_wire_value;
 using esphome::openquatt_usage_telemetry::heating_strategy_wire_value;
 using esphome::openquatt_usage_telemetry::mqtt_cleanup_decision;
+using esphome::openquatt_usage_telemetry::MQTT_PUBLISH_RETAIN;
 using esphome::openquatt_usage_telemetry::MqttCleanupDecision;
 using esphome::openquatt_usage_telemetry::quatt_hybrid_generation_wire_value;
 
 int main() {
+  assert(MQTT_PUBLISH_RETAIN == 0);
+
   assert(mqtt_cleanup_decision(true, false, false, 0U) == MqttCleanupDecision::DESTROY);
   assert(mqtt_cleanup_decision(false, true, false, 1U) == MqttCleanupDecision::FORCE_DISCONNECT);
   assert(mqtt_cleanup_decision(false, false, false, 1U) == MqttCleanupDecision::RETRY_STOP);

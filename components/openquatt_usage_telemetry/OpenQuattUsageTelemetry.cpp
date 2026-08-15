@@ -999,7 +999,7 @@ void OpenQuattUsageTelemetry::mqtt_event_handler_(void* handler_args, esp_event_
       if (self->enabled_.load() && self->session_active_.load() && !self->finishing_session_.load() &&
           !self->consent_publish_blocked_.load()) {
         message_id = esp_mqtt_client_enqueue(event->client, self->publish_topic_.data(), self->payload_.data(),
-                                             static_cast<int>(self->payload_size_), 1, 1, true);
+                                             static_cast<int>(self->payload_size_), 1, MQTT_PUBLISH_RETAIN, true);
       }
       xSemaphoreGive(self->consent_mutex_);
       ESP_LOGD(TAG, "esp-mqtt task stack free after enqueue: %u bytes",
