@@ -277,6 +277,20 @@ binary_sensor:
         return false;
       }
 
+      const oq_flow::PumpRelayState hp1_pump{
+        id(hp1_is_online) && id(hp1_pump_relay).has_state(), id(hp1_pump_relay).state
+      };
+      const oq_flow::PumpRelayState hp2_pump{
+        id(${secondary_hp_id}_is_online) && id(${secondary_hp_id}_pump_relay).has_state(),
+        id(${secondary_hp_id}_pump_relay).state
+      };
+      if (oq_flow::all_relevant_pumps_stopped(secondary_enabled, hp1_pump, hp2_pump)) {
+        state = false;
+        mismatch_timer_running = false;
+        mismatch_start_ms = 0;
+        return false;
+      }
+
       float f1 = id(hp1_flow).state;
       float f2 = id(${secondary_flow_id}).state;
 

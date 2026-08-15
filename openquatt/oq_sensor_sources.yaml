@@ -470,11 +470,31 @@ sensor:
       if (source == "Outdoor unit") {
         #if OQ_HARDWARE_HEATPUMP_CONTROLLER_Q
         const auto q_flow_source = id(${oq_q_flow_source_selector_id}).current_option();
-        if (q_flow_source == "Local") {
+        bool q_uses_exclusively_local_flow = q_flow_source == "Local";
+        #if !OQ_TOPOLOGY_DUO
+        // Q V1 Auto resolves to the local controller meter in a single topology.
+        q_uses_exclusively_local_flow =
+          q_uses_exclusively_local_flow ||
+          (q_flow_source == "Auto" &&
+           id(hp_generation).has_state() &&
+           id(hp_generation).current_option() == "V1");
+        #endif
+        if (q_uses_exclusively_local_flow) {
           if (id(${oq_controller_flow_sensor_id}).has_state()) return id(${oq_controller_flow_sensor_id}).state;
           return NAN;
         }
         #endif
+        const oq_flow::PumpRelayState hp1_pump{
+          id(hp1_is_online) && id(hp1_pump_relay).has_state(), id(hp1_pump_relay).state
+        };
+        const oq_flow::PumpRelayState hp2_pump{
+          id(${secondary_hp_id}_is_online) && id(${secondary_hp_id}_pump_relay).has_state(),
+          id(${secondary_hp_id}_pump_relay).state
+        };
+        if (oq_flow::all_relevant_pumps_stopped(
+              (${flow_secondary_enabled} != 0), hp1_pump, hp2_pump)) {
+          return 0.0f;
+        }
         #if OQ_TOPOLOGY_DUO
         // Duo-only outdoor-unit flow selector:
         // - HP1/HP2 = direct individual outdoor-unit flowmeter
