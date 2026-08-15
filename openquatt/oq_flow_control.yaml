@@ -212,9 +212,7 @@ sensor:
     unit_of_measurement: "iPWM"
     entity_category: diagnostic
     accuracy_decimals: 0
-    update_interval: 1s
-    lambda: |-
-      return (float) id(oq_flow_last_pwm);
+    update_interval: never
 
   # Average flow HP1/HP2
   - platform: template
@@ -377,12 +375,21 @@ interval:
               c.perform();
             }
           };
+          auto set_flow_output_pwm = [](int value) {
+            const bool changed =
+                !id(oq_flow_output_ipwm).has_state() ||
+                id(oq_flow_last_pwm) != value;
+            id(oq_flow_last_pwm) = value;
+            if (changed) {
+              id(oq_flow_output_ipwm).publish_state((float) value);
+            }
+          };
 
           const int service_pwm = clamp_iPWM(
               air_purge_output
                   ? (int) id(oq_air_purge_target_ipwm)
                   : (int) id(oq_quick_flow_test_target_ipwm));
-          id(oq_flow_last_pwm) = service_pwm;
+          set_flow_output_pwm(service_pwm);
           write_pump_pwm_if_changed(id(hp1_pump_speed), service_pwm);
           if (${flow_secondary_enabled} != 0) {
             write_pump_pwm_if_changed(id(${secondary_pump_speed_id}), service_pwm);
@@ -461,6 +468,15 @@ interval:
               c.perform();
             }
           };
+          auto set_flow_output_pwm = [](int value) {
+            const bool changed =
+                !id(oq_flow_output_ipwm).has_state() ||
+                id(oq_flow_last_pwm) != value;
+            id(oq_flow_last_pwm) = value;
+            if (changed) {
+              id(oq_flow_output_ipwm).publish_state((float) value);
+            }
+          };
           if (!id(oq_flow_cooling_settings_migrated) && !isnan(id(oq_flow_setpoint_lph).state)) {
             const float current_flow_setpoint = id(oq_flow_setpoint_lph).state;
             if (!isnan(current_flow_setpoint)) {
@@ -495,7 +511,7 @@ interval:
                      tag, start_pwm, last_good_pwm, cooling_target ? "cooling" : "normal",
                      fallback, commissioning_start ? "yes" : "no", STARTUP_HOLD_S);
 
-            id(oq_flow_last_pwm) = start_pwm;
+            set_flow_output_pwm(start_pwm);
             id(oq_flow_i) = 0.0f;
             startup_hold = STARTUP_HOLD_TICKS;
             sp_f = NAN;
@@ -702,7 +718,7 @@ interval:
           // Autotune temporarily overrides PWM (flow_control remains output owner).
           if (id(oq_flow_autotune_active) && (cm_code == 100) && (id(oq_commissioning_task_code) == oq_commissioning::TASK_FLOW_AUTOTUNE) && !is_frost) {
             int at_pwm = clamp_iPWM((int) id(oq_flow_autotune_pwm));
-            id(oq_flow_last_pwm) = at_pwm;
+            set_flow_output_pwm(at_pwm);
             stable_cnt = 0;
             pi_failsafe = false;
             write_pump_pwm_if_changed(id(hp1_pump_speed), at_pwm);
@@ -722,7 +738,7 @@ interval:
               (id(oq_commissioning_task_code) == oq_commissioning::TASK_AIR_PURGE) &&
               !is_frost) {
             int purge_pwm = clamp_iPWM((int) id(oq_air_purge_target_ipwm));
-            id(oq_flow_last_pwm) = purge_pwm;
+            set_flow_output_pwm(purge_pwm);
             stable_cnt = 0;
             pi_failsafe = false;
             // The dedicated 5s service-output loop applies this target.
@@ -739,7 +755,7 @@ interval:
               (id(oq_commissioning_task_code) == oq_commissioning::TASK_MANUAL_FLOW) &&
               !is_frost) {
             int test_pwm = clamp_iPWM((int) id(oq_quick_flow_test_target_ipwm));
-            id(oq_flow_last_pwm) = test_pwm;
+            set_flow_output_pwm(test_pwm);
             stable_cnt = 0;
             pi_failsafe = false;
             // The dedicated 5s service-output loop applies this target.
@@ -792,7 +808,7 @@ interval:
           }
 
           pwm = clamp_iPWM(pwm);
-          id(oq_flow_last_pwm) = pwm;
+          set_flow_output_pwm(pwm);
 
           write_pump_pwm_if_changed(id(hp1_pump_speed), pwm);
           if (${flow_secondary_enabled} != 0) {

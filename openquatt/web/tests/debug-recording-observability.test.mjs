@@ -70,9 +70,21 @@ test("elk nieuw debugveld verwijst naar een echte firmware-entity", async () => 
 
 test("flowOutputIpwm publiceert de bestaande actuatoruitgang zonder tweede regelstate", async () => {
   const flowPackage = await readFile(new URL("../../oq_flow_control.yaml", import.meta.url), "utf8");
+  const flowOutputSensor = flowPackage.match(
+    /  - platform: template\n    id: oq_flow_output_ipwm\n[\s\S]*?(?=\n  - platform: template\n)/,
+  )?.[0];
 
-  assert.match(flowPackage, /id: oq_flow_output_ipwm[\s\S]*name: "Flow Output iPWM"[\s\S]*internal: true/);
-  assert.match(flowPackage, /id: oq_flow_output_ipwm[\s\S]*return \(float\) id\(oq_flow_last_pwm\);/);
+  assert.ok(flowOutputSensor, "flowOutputIpwm-sensorblok ontbreekt");
+  assert.match(flowOutputSensor, /name: "Flow Output iPWM"/);
+  assert.match(flowOutputSensor, /internal: true/);
+  assert.match(flowOutputSensor, /update_interval: never/);
+  assert.doesNotMatch(flowOutputSensor, /update_interval: 1s/);
+  assert.equal((flowPackage.match(/id\(oq_flow_last_pwm\) = value;/g) || []).length, 2);
+  assert.equal((flowPackage.match(/id\(oq_flow_output_ipwm\)\.publish_state\(\(float\) value\);/g) || []).length, 2);
+  for (const value of ["service_pwm", "start_pwm", "at_pwm", "purge_pwm", "test_pwm", "pwm"]) {
+    assert.ok(flowPackage.includes(`set_flow_output_pwm(${value});`), `eventpublicatie ontbreekt voor ${value}`);
+    assert.ok(!flowPackage.includes(`id(oq_flow_last_pwm) = ${value};`), `directe niet-gepubliceerde write voor ${value}`);
+  }
   assert.equal(ENTITY_DEFS.flowOutputIpwm.domain, "sensor");
   assert.equal(ENTITY_DEFS.flowOutputIpwm.name, "Flow Output iPWM");
 });
