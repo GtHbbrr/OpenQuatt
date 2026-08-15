@@ -2,7 +2,7 @@ name: PR Test Firmware Build
 
 on:
   pull_request:
-    types: [opened, reopened, labeled, synchronize]
+    types: [opened, reopened, labeled, synchronize, edited]
 
 permissions:
   contents: read
@@ -14,8 +14,13 @@ concurrency:
 jobs:
   compute-meta:
     runs-on: ubuntu-latest
-    if: ${{ contains(github.event.pull_request.labels.*.name, 'test-firmware') }}
+    if: >-
+      ${{
+        contains(github.event.pull_request.labels.*.name, 'test-firmware') &&
+        (github.event.action != 'edited' || github.event.changes.base != null)
+      }}
     outputs:
+      release_channel: ${{ steps.pr_meta.outputs.release_channel }}
       version: ${{ steps.pr_meta.outputs.version }}
     steps:
       - name: Checkout PR head
@@ -28,10 +33,21 @@ jobs:
       - name: Compute PR test metadata
         id: pr_meta
         env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
           HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
+          case "${BASE_REF}" in
+            main|dev)
+              RELEASE_CHANNEL="${BASE_REF}"
+              ;;
+            *)
+              echo "Unsupported PR base branch: ${BASE_REF}" >&2
+              exit 1
+              ;;
+          esac
+
           BASE_VERSION="$(awk -F'"' '/^project_version: / { print $2 }' openquatt/oq_substitutions_common.yaml)"
           if [[ ! "${BASE_VERSION}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z]+)*$ ]]; then
             echo "Unexpected project_version: ${BASE_VERSION}" >&2
@@ -40,20 +56,25 @@ jobs:
 
           SHORT_SHA="${HEAD_SHA::7}"
           PR_VERSION="${BASE_VERSION}-pr.${PR_NUMBER}.${GITHUB_RUN_NUMBER}+${SHORT_SHA}"
+          echo "release_channel=${RELEASE_CHANNEL}" >> "${GITHUB_OUTPUT}"
           echo "version=${PR_VERSION}" >> "${GITHUB_OUTPUT}"
 
           jq -n \
+            --arg base_ref "${BASE_REF}" \
             --arg base_version "${BASE_VERSION}" \
             --arg head_repository "${HEAD_REPOSITORY}" \
             --arg head_sha "${HEAD_SHA}" \
             --argjson pr_number "${PR_NUMBER}" \
+            --arg release_channel "${RELEASE_CHANNEL}" \
             --argjson run_number "${GITHUB_RUN_NUMBER}" \
             --arg version "${PR_VERSION}" \
             '{
+              base_ref: $base_ref,
               base_version: $base_version,
               head_repository: $head_repository,
               head_sha: $head_sha,
               pr_number: $pr_number,
+              release_channel: $release_channel,
               run_number: $run_number,
               version: $version
             }' > "${RUNNER_TEMP}/pr-test-firmware-meta.json"
@@ -77,4 +98,5 @@ jobs:
       checkout_ref: ${{ github.event.pull_request.head.sha }}
       checkout_repository: ${{ github.event.pull_request.head.repo.full_name }}
       project_version: ${{ needs.compute-meta.outputs.version }}
+      release_channel: ${{ needs.compute-meta.outputs.release_channel }}
       include_factory_bin: false

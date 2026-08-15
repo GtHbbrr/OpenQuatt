@@ -2,7 +2,9 @@
 
 #include "components/openquatt_trends/OpenQuattTrendsStoragePolicy.h"
 
+using esphome::openquatt_trends::trend_archive_load_action;
 using esphome::openquatt_trends::trend_storage_capabilities;
+using esphome::openquatt_trends::TrendArchiveLoadAction;
 
 int main() {
   const auto full = trend_storage_capabilities(true, true, true);
@@ -24,6 +26,14 @@ int main() {
   const auto flash_only = trend_storage_capabilities(false, true, true);
   assert(!flash_only.ram_history_available);
   assert(flash_only.flash_archive_available);
+
+  // Enabling flash persistence on a fresh controller completes archive seeding
+  // without merging an empty archive over newly captured RAM history.
+  assert(trend_archive_load_action(true, 0U, false) == TrendArchiveLoadAction::MARK_EMPTY_AS_SEEDED);
+
+  assert(trend_archive_load_action(true, 1U, false) == TrendArchiveLoadAction::MERGE_FLASH_INTO_RAM);
+  assert(trend_archive_load_action(false, 0U, false) == TrendArchiveLoadAction::WAIT);
+  assert(trend_archive_load_action(true, 1U, true) == TrendArchiveLoadAction::WAIT);
 
   return 0;
 }

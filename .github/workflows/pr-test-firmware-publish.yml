@@ -22,6 +22,7 @@ jobs:
       actions: read
       pull-requests: read
     outputs:
+      base_ref: ${{ steps.gate.outputs.base_ref }}
       base_sha: ${{ steps.gate.outputs.base_sha }}
       head_sha: ${{ steps.gate.outputs.head_sha }}
       pr_number: ${{ steps.gate.outputs.pr_number }}
@@ -77,7 +78,9 @@ jobs:
           PR_NUMBER="$(jq -er '.pr_number | select(type == "number" and . > 0 and floor == .)' "${META_FILE}")"
           HEAD_SHA="$(jq -er '.head_sha | select(type == "string")' "${META_FILE}")"
           HEAD_REPOSITORY="$(jq -er '.head_repository | select(type == "string")' "${META_FILE}")"
+          BASE_REF="$(jq -er '.base_ref | select(type == "string")' "${META_FILE}")"
           BASE_VERSION="$(jq -er '.base_version | select(type == "string")' "${META_FILE}")"
+          RELEASE_CHANNEL="$(jq -er '.release_channel | select(type == "string")' "${META_FILE}")"
           BUILD_RUN_NUMBER="$(jq -er '.run_number | select(type == "number" and . > 0 and floor == .)' "${META_FILE}")"
           VERSION="$(jq -er '.version | select(type == "string")' "${META_FILE}")"
 
@@ -97,6 +100,11 @@ jobs:
           fi
           if [[ ! "${BASE_VERSION}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z]+)*$ ]]; then
             echo "Metadata contains an invalid base version." >&2
+            exit 1
+          fi
+          if [[ "${BASE_REF}" != "main" && "${BASE_REF}" != "dev" ]] ||
+             [[ "${RELEASE_CHANNEL}" != "${BASE_REF}" ]]; then
+            echo "Metadata contains an invalid PR base branch or release channel." >&2
             exit 1
           fi
           if [[ "${BUILD_RUN_NUMBER}" != "${SOURCE_RUN_NUMBER}" ]]; then
@@ -137,7 +145,12 @@ jobs:
             echo "PR #${PR_NUMBER} does not target this repository." >&2
             exit 1
           fi
+          if [[ "$(jq -r '.base.ref' <<< "${PR_JSON}")" != "${BASE_REF}" ]]; then
+            echo "PR #${PR_NUMBER} base branch changed since this firmware was built." >&2
+            exit 1
+          fi
 
+          echo "base_ref=${BASE_REF}" >> "${GITHUB_OUTPUT}"
           echo "base_sha=${BASE_SHA}" >> "${GITHUB_OUTPUT}"
           echo "head_sha=${HEAD_SHA}" >> "${GITHUB_OUTPUT}"
           echo "pr_number=${PR_NUMBER}" >> "${GITHUB_OUTPUT}"
@@ -186,6 +199,7 @@ jobs:
 
       - name: Publish current PR test release
         env:
+          BASE_REF: ${{ needs.validate-pr-test-build.outputs.base_ref }}
           GH_TOKEN: ${{ github.token }}
           HEAD_SHA: ${{ needs.validate-pr-test-build.outputs.head_sha }}
           PR_NUMBER: ${{ needs.validate-pr-test-build.outputs.pr_number }}
@@ -195,7 +209,8 @@ jobs:
           PR_JSON="$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}")"
           if [[ "$(jq -r '.state' <<< "${PR_JSON}")" != "open" ]] || \
              ! jq -e '.labels | any(.name == "test-firmware")' <<< "${PR_JSON}" >/dev/null || \
-             [[ "$(jq -r '.head.sha' <<< "${PR_JSON}")" != "${HEAD_SHA}" ]]; then
+             [[ "$(jq -r '.head.sha' <<< "${PR_JSON}")" != "${HEAD_SHA}" ]] || \
+             [[ "$(jq -r '.base.ref' <<< "${PR_JSON}")" != "${BASE_REF}" ]]; then
             echo "PR publication gate changed while assets were prepared." >&2
             exit 1
           fi
