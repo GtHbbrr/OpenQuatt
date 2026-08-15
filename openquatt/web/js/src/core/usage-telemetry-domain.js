@@ -33,53 +33,25 @@ export function isUsageTelemetryChoiceConfirmed({
     && telemetryEnabled === expectedEnabled;
 }
 
-export const USAGE_TELEMETRY_CONFIRMATION_ATTEMPTS = 10;
-export const USAGE_TELEMETRY_CONFIRMATION_POLL_INTERVAL_MS = 200;
-export const USAGE_TELEMETRY_CONFIRMATION_TIMEOUT_MS = 2000;
-
-function waitForUsageTelemetryPoll(delayMs) {
-  return new Promise((resolve) => globalThis.setTimeout(resolve, delayMs));
-}
-
 export async function waitForUsageTelemetryChoiceConfirmation({
   refresh,
-  getTelemetryValue,
-  getChoiceValue,
   expectedEnabled,
-  attempts = USAGE_TELEMETRY_CONFIRMATION_ATTEMPTS,
-  pollIntervalMs = USAGE_TELEMETRY_CONFIRMATION_POLL_INTERVAL_MS,
-  timeoutMs = USAGE_TELEMETRY_CONFIRMATION_TIMEOUT_MS,
-  wait = waitForUsageTelemetryPoll,
+  wait = (ms) => new Promise((done) => setTimeout(done, ms)),
   now = Date.now,
 }) {
-  const requestedAttempts = Number(attempts);
-  const boundedAttempts = Number.isFinite(requestedAttempts) && requestedAttempts > 0
-    ? Math.floor(requestedAttempts)
-    : USAGE_TELEMETRY_CONFIRMATION_ATTEMPTS;
-  const requestedIntervalMs = Number(pollIntervalMs);
-  const delayMs = Number.isFinite(requestedIntervalMs) && requestedIntervalMs >= 0
-    ? requestedIntervalMs
-    : USAGE_TELEMETRY_CONFIRMATION_POLL_INTERVAL_MS;
-  const requestedTimeoutMs = Number(timeoutMs);
-  const boundedTimeoutMs = Number.isFinite(requestedTimeoutMs) && requestedTimeoutMs > 0
-    ? requestedTimeoutMs
-    : USAGE_TELEMETRY_CONFIRMATION_TIMEOUT_MS;
-  const deadlineMs = now() + boundedTimeoutMs;
+  const deadline = now() + 2000;
 
-  for (let attempt = 0; attempt < boundedAttempts; attempt += 1) {
-    const remainingMs = deadlineMs - now();
-    if (remainingMs <= 0) {
-      return false;
-    }
-    await wait(Math.min(delayMs, remainingMs));
+  for (let attempt = 0; attempt < 10 && now() < deadline; attempt += 1) {
+    await wait(Math.min(200, deadline - now()));
+    let values;
     try {
-      await refresh();
-    } catch (_error) {
+      values = await refresh();
+    } catch {
       continue;
     }
     if (isUsageTelemetryChoiceConfirmed({
-      telemetryValue: getTelemetryValue(),
-      choiceValue: getChoiceValue(),
+      telemetryValue: values[0],
+      choiceValue: values[1],
       expectedEnabled,
     })) {
       return true;

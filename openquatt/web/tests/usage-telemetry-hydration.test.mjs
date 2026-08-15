@@ -71,14 +71,11 @@ test("telemetry choice confirmation waits for a deferred controller write", asyn
         telemetryValue = "ON";
         choiceValue = "ON";
       }
+      return [telemetryValue, choiceValue];
     },
-    getTelemetryValue: () => telemetryValue,
-    getChoiceValue: () => choiceValue,
     expectedEnabled: true,
-    attempts: 5,
-    pollIntervalMs: 25,
     wait: async (delayMs) => {
-      assert.equal(delayMs, 25);
+      assert.equal(delayMs, 200);
       waitCount += 1;
     },
   });
@@ -101,12 +98,9 @@ test("telemetry choice confirmation retries a transient refresh failure", async 
       }
       telemetryValue = "ON";
       choiceValue = "ON";
+      return [telemetryValue, choiceValue];
     },
-    getTelemetryValue: () => telemetryValue,
-    getChoiceValue: () => choiceValue,
     expectedEnabled: true,
-    attempts: 3,
-    pollIntervalMs: 0,
     wait: async () => {},
   });
 
@@ -120,17 +114,14 @@ test("telemetry choice confirmation stops after its bounded retry window", async
   const confirmed = await waitForUsageTelemetryChoiceConfirmation({
     refresh: async () => {
       refreshCount += 1;
+      return ["OFF", "ON"];
     },
-    getTelemetryValue: () => "OFF",
-    getChoiceValue: () => "ON",
     expectedEnabled: true,
-    attempts: 3,
-    pollIntervalMs: 0,
     wait: async () => {},
   });
 
   assert.equal(confirmed, false);
-  assert.equal(refreshCount, 3);
+  assert.equal(refreshCount, 10);
 });
 
 test("telemetry choice confirmation does not start more reads after its deadline", async () => {
@@ -141,13 +132,9 @@ test("telemetry choice confirmation does not start more reads after its deadline
     refresh: async () => {
       refreshCount += 1;
       nowMs = 3000;
+      return ["OFF", "ON"];
     },
-    getTelemetryValue: () => "OFF",
-    getChoiceValue: () => "ON",
     expectedEnabled: true,
-    attempts: 10,
-    pollIntervalMs: 200,
-    timeoutMs: 2000,
     wait: async () => {},
     now: () => nowMs,
   });

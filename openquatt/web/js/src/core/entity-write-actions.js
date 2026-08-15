@@ -21,9 +21,10 @@ import { waitForUsageTelemetryChoiceConfirmation } from "./usage-telemetry-domai
 async function commitUsageTelemetrySwitch(entity, enabled) {
   const key = "usageTelemetryEnabled";
   const confirmChoice = (expectedEnabled) => waitForUsageTelemetryChoiceConfirmation({
-    refresh: () => refreshEntities([key, "usageTelemetryChoiceConfigured", "usageTelemetryInstallationId"], "all"),
-    getTelemetryValue: () => getEntityValue(key),
-    getChoiceValue: () => getEntityValue("usageTelemetryChoiceConfigured"),
+    refresh: async () => {
+      await refreshEntities([key, "usageTelemetryChoiceConfigured", "usageTelemetryInstallationId"], "all");
+      return [getEntityValue(key), getEntityValue("usageTelemetryChoiceConfigured")];
+    },
     expectedEnabled,
   });
   const previousEntity = state.entities[key] ? { ...state.entities[key] } : null;

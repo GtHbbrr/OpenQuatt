@@ -101,9 +101,10 @@ import { render } from "../core/render-scheduler.js";
     render();
 
     const confirmChoice = (expectedEnabled) => waitForUsageTelemetryChoiceConfirmation({
-      refresh: () => refreshEntities(["usageTelemetryEnabled", "usageTelemetryChoiceConfigured"], "all"),
-      getTelemetryValue: () => getEntityValue("usageTelemetryEnabled"),
-      getChoiceValue: () => getEntityValue("usageTelemetryChoiceConfigured"),
+      refresh: async () => {
+        await refreshEntities(["usageTelemetryEnabled", "usageTelemetryChoiceConfigured"], "all");
+        return [getEntityValue("usageTelemetryEnabled"), getEntityValue("usageTelemetryChoiceConfigured")];
+      },
       expectedEnabled,
     });
 
