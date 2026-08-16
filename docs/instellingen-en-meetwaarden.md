@@ -153,9 +153,9 @@ Kies je expliciet `MQTT`, houd er dan rekening mee dat de MQTT-buitentemperatuur
 
 Voor `Cooling Dew Point Source` is `Auto` meestal ook de veiligste keuze. OpenQuatt gebruikt dan de hoogste geldige dauwpuntwaarde van Home Assistant en MQTT. Kies `Home Assistant` of `MQTT` alleen als je die bron expliciet wilt vereisen.
 
-De temperatuurkalibratie neemt ook de actieve aanvoertemperatuurbron mee. OpenQuatt bewaart daarvoor één offset, gekoppeld aan de concrete bron: lokale PT1000, lokale DS18B20, CIC-feed of Home Assistant-invoer. Bij een wissel van bron, lokale sensor of CIC-feed-URL wordt de oude aanvoercorrectie direct uitgeschakeld en verschijnt een melding om opnieuw te kalibreren. Een tijdelijke automatische fallback naar de water-uitmeting van de warmtepomp gebruikt geen aanvoercorrectie, maar maakt een nog passende kalibratie niet ongeldig.
+De temperatuurkalibratie neemt ook de actieve aanvoertemperatuurbron mee. OpenQuatt bewaart daarvoor vier afzonderlijke offsets: voor de lokale PT1000, lokale DS18B20, CIC-feed en Home Assistant-invoer. Bij een bronwissel activeert OpenQuatt automatisch de eerder opgeslagen correctie voor die bron. Voor CIC en Home Assistant moet ook de concrete bronconfiguratie nog overeenkomen; na een gewijzigde CIC-feed-URL of Home Assistant-entiteit blijft de correctie uitgeschakeld totdat je die bron opnieuw kalibreert. Een tijdelijke automatische fallback naar de water-uitmeting van de warmtepomp gebruikt geen aanvoercorrectie en wist geen opgeslagen kalibratie.
 
-De brongebonden aanvoerkalibratie wordt bewust niet meegenomen in een instellingenbackup: alleen de offset herstellen zonder de bijbehorende bronidentiteit zou onveilig zijn. Kalibreer de aanvoer daarom opnieuw na het terugzetten van een backup of na een relevante wijziging van de Home Assistant-bron in een nieuwe firmwarebuild.
+De brongebonden aanvoerkalibraties worden bewust niet meegenomen in een instellingenbackup: alleen offsets herstellen zonder de bijbehorende bronidentiteiten zou onveilig zijn. Kalibreer de gebruikte aanvoerbronnen daarom opnieuw na het terugzetten van een backup of na een relevante wijziging van de Home Assistant-bron in een nieuwe firmwarebuild.
 
 ### 6. Hulprelais R2 (alleen Heatpump Controller Q-edition)
 

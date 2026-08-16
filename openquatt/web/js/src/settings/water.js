@@ -177,7 +177,7 @@ import { escapeHtml } from "../core/html.js";
         ${hasSupplyCorrection ? `
           <aside class="oq-settings-hp-offset-supply-note">
             <strong>Waarom is de aanvoercorrectie niet handmatig aanpasbaar?</strong>
-            <p>De correctie hoort bij de actieve aanvoerbron en de bijbehorende bronconfiguratie. Een los ingestelde offset kan na een bronwissel op de verkeerde sensor worden toegepast. Daarom is deze waarde hier alleen-lezen en wijzig je haar via de taak Temperatuursensoren kalibreren onder Service; die slaat de correctie en bron samen op.</p>
+            <p>OpenQuatt bewaart een aparte correctie voor lokale PT1000, lokale DS18B20, CIC en Home Assistant. Alleen de correctie die exact bij de actieve bronconfiguratie hoort wordt gebruikt; een gewijzigde CIC-URL of Home Assistant-invoer blijft ongekalibreerd. Daarom is deze waarde hier alleen-lezen en wijzig je haar via de taak Temperatuursensoren kalibreren onder Service.</p>
           </aside>
         ` : ""}
       </div>

@@ -126,13 +126,13 @@ test("ongeldige PT1000 toont geen misleidende nulwaarde", () => {
   assert.match(markup, /<span>Bron<\/span>\s*<strong>HP2 uitgaand water \(fallback\)<\/strong>/);
 });
 
-test("bronwissel toont dat de aanvoerkalibratie opnieuw moet", () => {
+test("gewijzigde bronconfiguratie toont dat de aanvoerkalibratie opnieuw moet", () => {
   setSourceSelectionState(false);
   Object.assign(state.entities, {
     waterSupplySource: { value: "CIC", option: ["Local", "CIC", "HA input"] },
     supplyTemp: { value: 31.2, uom: "°C" },
     waterSupplyTempEffectiveSource: { value: "CIC", state: "CIC" },
-    waterSupplyCalibrationStatus: { value: "Recalibration required: Local - PT1000", state: "Recalibration required: Local - PT1000" },
+    waterSupplyCalibrationStatus: { value: "Recalibration required: CIC", state: "Recalibration required: CIC" },
     waterSupplyCalibrationRequired: { value: true, state: "ON" },
   });
 
