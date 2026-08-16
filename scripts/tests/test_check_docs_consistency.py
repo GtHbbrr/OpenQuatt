@@ -86,7 +86,7 @@ Docs-impact motivatie:
             text = read_text(path)
             if path == check_docs_consistency.REPO_ROOT / "docs/dashboard/README.md":
                 return text.replace(
-                    "https://github.com/OpenQuatt/openquatt-home-assistant",
+                    "https://github.com/OpenQuatt/home-assistant-openquatt",
                     "",
                 )
             return text

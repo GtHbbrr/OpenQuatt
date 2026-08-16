@@ -243,7 +243,7 @@ def main() -> int:
         docs_impact_rules = []
         add(findings, ".github/docs-impact.json", 1, str(exc))
 
-    companion_repo_url = "https://github.com/OpenQuatt/openquatt-home-assistant"
+    companion_repo_url = "https://github.com/OpenQuatt/home-assistant-openquatt"
     docs_settings = REPO_ROOT / "docs/instellingen-en-meetwaarden.md"
     docs_tuning = REPO_ROOT / "docs/diagnose-en-afstelling.md"
 

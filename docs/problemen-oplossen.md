@@ -144,7 +144,7 @@ Controleer:
 Koeling is bewust terughoudend. Zonder goede dauwpuntinformatie kan blokkeren precies het veilige gedrag zijn.
 
 Gebruik je dauwpuntbronnen uit Home Assistant, volg dan de actuele
-[handleiding voor dynamische koelbronnen](https://github.com/OpenQuatt/openquatt-home-assistant/blob/main/docs/cooling.md).
+[handleiding voor dynamische koelbronnen](https://github.com/OpenQuatt/home-assistant-openquatt/blob/main/docs/cooling.md).
 
 Gebruik je MQTT voor het dauwpunt, controleer dan ook:
 

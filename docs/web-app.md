@@ -194,7 +194,7 @@ Bij `Dauwpuntsbenadering` gebruikt OpenQuatt een echte dauwpuntmeting zodra die 
 Bij `Expliciet toestaan` gebruikt OpenQuatt geen dauwpuntgrens: ook een beschikbare dauwpuntmeting wordt dan genegeerd. Alleen de ingestelde minimale koel-aanvoer blijft gelden. Gebruik dit alleen als je de installatie zelf bewaakt en het condensrisico bewust accepteert.
 
 Wil je dauwpuntbronnen uit Home Assistant gebruiken, volg dan de
-[companion-handleiding voor dynamische koelbronnen](https://github.com/OpenQuatt/openquatt-home-assistant/blob/main/docs/cooling.md).
+[companion-handleiding voor dynamische koelbronnen](https://github.com/OpenQuatt/home-assistant-openquatt/blob/main/docs/cooling.md).
 De web-app kiest daarna welke koelingsdauwpuntbron OpenQuatt gebruikt: `Auto`,
 `Home Assistant` of `MQTT`. In `Auto` gebruikt OpenQuatt de hoogste geldige
 dauwpuntwaarde.
