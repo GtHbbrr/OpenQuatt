@@ -1003,9 +1003,14 @@ interval:
             }
             const bool restart_after_water_stop = stop_reason_code != 0;
             const bool projected_floor_pause = stop_reason_code == 4;
-            const float restart_threshold_c = id(oq_cooling_stop_buffer_gap_c) + restart_delta_c;
+            const oq_cooling::WaterCycleState stopped_cycle{
+                false,
+                id(oq_cooling_stop_buffer_gap_c),
+                stop_reason_code,
+            };
+            const float restart_threshold_c = stopped_cycle.stop_buffer_gap_c + restart_delta_c;
             const bool restart_gap_recovered =
-                !restart_after_water_stop || projected_floor_pause || filtered_gap_c >= restart_threshold_c;
+                oq_cooling::water_restart_gap_recovered(stopped_cycle, filtered_gap_c, restart_delta_c);
             const bool dew_recovered = !dew_mode || isnan(dew_gap_c) || dew_gap_c > hard_dew_restart_gap_c;
             const bool fallback_recovered =
                 !fallback_mode || !restart_after_water_stop || projected_floor_pause ||
@@ -1140,12 +1145,28 @@ interval:
           if (demand > allowed_max) demand = allowed_max;
           if (demand < 0) demand = 0;
           if (demand != prev_limited) id(oq_cooling_last_demand_change_ms) = now_ms;
+
+          oq_cooling::WaterCycleState water_cycle_state{
+              water_cycle_active,
+              id(oq_cooling_stop_buffer_gap_c),
+              id(oq_cooling_stop_reason_code),
+          };
+          const bool pi_zero_stop =
+              oq_cooling::record_pi_zero_stop(prev_limited, demand, filtered_gap_c, water_cycle_state);
+          if (pi_zero_stop) {
+            id(oq_cooling_water_cycle_active) = water_cycle_state.active;
+            id(oq_cooling_stop_buffer_gap_c) = water_cycle_state.stop_buffer_gap_c;
+            id(oq_cooling_stop_reason_code) = water_cycle_state.stop_reason_code;
+            reason_code = oq_cooling::REASON_BUFFER_STOP;
+            integral = fminf(integral, 0.0f);
+          }
+
           id(oq_cooling_limited_demand) = demand;
           id(oq_cooling_limiter_reason_code) = reason_code;
           id(oq_cooling_pid_integral) = integral;
           id(oq_cooling_pid_last_error_c) = buffer_gap_c;
           id(oq_cooling_demand_raw) = demand;
-          publish_cooling_limiter_event(reason_code != 1, reason_code, demand, base_demand, dew_gap_c);
+          publish_cooling_limiter_event(reason_code != 1, reason_code, demand, base_demand, dew_gap_c, pi_zero_stop);
 
           static int last_reason = -1;
           if (reason_code != last_reason) {
