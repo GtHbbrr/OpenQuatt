@@ -68,7 +68,7 @@ test("MQTT verdwijnt uit alle bronselecties en metingen wanneer de integratie ui
   MQTT_SOURCE_SELECT_KEYS.forEach((key) => {
     assert.match(getSelectMarkup(enabledMarkup, key), /<option value="MQTT"/);
   });
-  assert.match(enabledMarkup, /<div class="oq-settings-source-row has-status">\s*<span>MQTT/);
+  assert.match(enabledMarkup, /<div class="oq-settings-source-row has-status">\s*<div class="oq-settings-source-row-label">MQTT/);
 
   setSourceSelectionState(false);
   const disabledMarkup = renderSettingsSensorSelectionSection();
@@ -105,6 +105,18 @@ test("MQTT als buitentemperatuurbron waarschuwt voor ontbrekende opstartwaarde e
   assert.doesNotMatch(outdoorUnitMarkup, /kan OpenQuatt naar CM98 \(antivriescirculatie\) gaan/);
 });
 
+test("bronstatusbadges openen hun uitleg op aanraken", () => {
+  setSourceSelectionState(true);
+  const markup = renderSettingsSensorSelectionSection();
+  assert.match(markup, /data-info-id="mqttRoomTemperature-info"[^>]*aria-expanded="false"[^>]*>Geldig<\/button>/s);
+
+  state.settingsInfoOpen = "mqttRoomTemperature-info";
+  const openMarkup = renderSettingsSensorSelectionSection();
+  assert.match(openMarkup, /data-info-id="mqttRoomTemperature-info"[^>]*aria-expanded="true"[^>]*>Geldig<\/button>/s);
+  assert.match(openMarkup, /MQTT heeft een geldige, recente waarde ontvangen\./);
+  state.settingsInfoOpen = "";
+});
+
 test("ongeldige PT1000 toont geen misleidende nulwaarde", () => {
   setSourceSelectionState(false);
   Object.assign(state.entities, {
@@ -120,10 +132,10 @@ test("ongeldige PT1000 toont geen misleidende nulwaarde", () => {
 
   const markup = renderSettingsSensorSelectionSection();
 
-  assert.match(markup, /<span>PT1000<\/span>\s*<strong>—<\/strong>/);
-  assert.doesNotMatch(markup, /<span>PT1000<\/span>\s*<strong>0 °C<\/strong>/);
-  assert.match(markup, /<span>DS18B20<\/span>\s*<strong>0 °C<\/strong>/);
-  assert.match(markup, /<span>Bron<\/span>\s*<strong>HP2 uitgaand water \(fallback\)<\/strong>/);
+  assert.match(markup, /<div class="oq-settings-source-row-label">PT1000<\/div>\s*<strong>—<\/strong>/);
+  assert.doesNotMatch(markup, /<div class="oq-settings-source-row-label">PT1000<\/div>\s*<strong>0 °C<\/strong>/);
+  assert.match(markup, /<div class="oq-settings-source-row-label">DS18B20<\/div>\s*<strong>0 °C<\/strong>/);
+  assert.match(markup, /<div class="oq-settings-source-row-label">Bron<\/div>\s*<strong>HP2 uitgaand water \(fallback\)<\/strong>/);
 });
 
 test("gewijzigde bronconfiguratie toont dat de aanvoerkalibratie opnieuw moet", () => {
@@ -138,7 +150,10 @@ test("gewijzigde bronconfiguratie toont dat de aanvoerkalibratie opnieuw moet", 
 
   const markup = renderSettingsSensorSelectionSection();
 
-  assert.match(markup, /Waarde<em class="oq-settings-source-status oq-settings-source-status--error" title="Opnieuw kalibreren"[^>]*>i<\/em>/);
+  assert.match(markup, /Gebruikte waarde\s*<div class="oq-settings-info oq-settings-source-info oq-settings-source-info--error oq-settings-source-info--circle"/);
+  assert.match(markup, /<button[^>]*data-oq-action="toggle-settings-info"[^>]*data-info-id="supplyTemp-info"[^>]*aria-expanded="false"[^>]*>i<\/button>/s);
+  assert.match(markup, /Ruwe waarde; kalibreer via Service\./);
+  assert.match(markup, /Ruwe metingen/);
   assert.doesNotMatch(markup, /<span>Kalibratie<\/span>/);
   assert.match(markup, /De aanvoerbron of bronconfiguratie is gewijzigd\./);
   assert.match(markup, /voer de temperatuurkalibratie opnieuw uit/);
@@ -148,6 +163,14 @@ test("gewijzigde bronconfiguratie toont dat de aanvoerkalibratie opnieuw moet", 
   state.entities.waterSupplyCalibrationOffset = { value: -0.6, uom: "°C" };
   const calibratedMarkup = renderSettingsSensorSelectionSection();
 
-  assert.match(calibratedMarkup, /Waarde<em class="oq-settings-source-status oq-settings-source-status--valid" title="Aanvoertemperatuur gekalibreerd voor de actieve bron"[^>]*>i<\/em>/);
+  assert.match(calibratedMarkup, /Gebruikte waarde\s*<div class="oq-settings-info oq-settings-source-info oq-settings-source-info--valid oq-settings-source-info--circle"/);
+  assert.match(calibratedMarkup, /aria-label="Uitleg bij Gebruikte waarde"/);
+  assert.match(calibratedMarkup, /Gekalibreerd; ruwe metingen hieronder\./);
   assert.doesNotMatch(calibratedMarkup, /<span>Kalibratie<\/span>|voer de temperatuurkalibratie opnieuw uit/);
+
+  state.settingsInfoOpen = "supplyTemp-info";
+  const openInfoMarkup = renderSettingsSensorSelectionSection();
+  assert.match(openInfoMarkup, /data-info-id="supplyTemp-info"[^>]*aria-expanded="true"/s);
+  assert.match(openInfoMarkup, /class="oq-settings-info-popover"\s*>/);
+  state.settingsInfoOpen = "";
 });
