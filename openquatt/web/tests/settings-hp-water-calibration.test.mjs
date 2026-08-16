@@ -10,7 +10,8 @@ globalThis.window = {
 
 const { state } = await import("../js/src/core/state.js");
 const { renderHpWaterCalibrationWizard } = await import("../js/src/settings/service.js");
-const { getWaterSupplyCorrectionView, renderHpWaterSensorOffsetSettings } = await import("../js/src/settings/water.js");
+const { handleSystemAction } = await import("../js/src/features/system-actions.js");
+const { getWaterSupplyCorrectionView, renderHpWaterSensorOffsetSettings, renderHpWaterSensorOffsetsModal, renderWaterSettingsFields } = await import("../js/src/settings/water.js");
 
 test("kalibratieresultaat bevat de brongebonden aanvoer-offset", () => {
   state.loadingEntities = false;
@@ -118,6 +119,24 @@ test("sensorcorrecties tonen een stale aanvoer-offset niet als actief", () => {
   assert.doesNotMatch(markup, /-0\.60 °C/);
 });
 
+test("herkalibratiesignaal schakelt een nog niet ververste status fail-closed uit", () => {
+  state.loadingEntities = false;
+  state.entities = {
+    supplyTemp: { value: 22.54, uom: "°C" },
+    waterSupplyCalibrationOffset: { value: -0.6, uom: "°C" },
+    waterSupplyCalibrationStatus: { value: "Calibrated: CIC", state: "Calibrated: CIC" },
+    waterSupplyCalibrationRequired: { value: true, state: "ON" },
+    waterSupplyTempEffectiveSource: { value: "CIC", state: "CIC" },
+    waterSupplyTempFallbackActive: { value: false, state: "OFF" },
+  };
+
+  const view = getWaterSupplyCorrectionView();
+
+  assert.equal(view.rawValue, 22.54);
+  assert.equal(view.offsetValue, 0);
+  assert.equal(view.statusLabel, "Opnieuw kalibreren");
+});
+
 test("sensorcorrecties passen de bronoffset niet toe op een runtime-fallback", () => {
   state.loadingEntities = false;
   state.entities = {
@@ -136,4 +155,31 @@ test("sensorcorrecties passen de bronoffset niet toe op een runtime-fallback", (
   assert.equal(view.offsetValue, 0);
   assert.match(markup, /Fallback actief; correctie tijdelijk uit/);
   assert.doesNotMatch(markup, /-0\.60 °C/);
+});
+
+test("waterinstellingen openen sensorcorrecties in een modal", () => {
+  state.loadingEntities = false;
+  state.entities = {
+    hp1WaterIn: { value: 21.46, uom: "°C" },
+    hp1WaterInOffset: { value: -0.16, uom: "°C" },
+    supplyTemp: { value: 22.54, uom: "°C" },
+    waterSupplyCalibrationOffset: { value: -0.6, uom: "°C" },
+    waterSupplyCalibrationStatus: { value: "Calibrated: CIC", state: "Calibrated: CIC" },
+    waterSupplyTempEffectiveSource: { value: "CIC", state: "CIC" },
+  };
+
+  const settingsMarkup = renderWaterSettingsFields();
+  const modalMarkup = renderHpWaterSensorOffsetsModal();
+
+  assert.match(settingsMarkup, /data-oq-action="open-water-sensor-corrections-modal"/);
+  assert.doesNotMatch(settingsMarkup, /data-oq-hp-offset-raw-key/);
+  assert.match(modalMarkup, /role="dialog"/);
+  assert.match(modalMarkup, /Watertemperatuurcorrecties/);
+  assert.match(modalMarkup, /Waarom is de aanvoercorrectie niet handmatig aanpasbaar\?/);
+  assert.match(modalMarkup, /bronwissel op de verkeerde sensor/);
+
+  state.root = null;
+  assert.equal(handleSystemAction("open-water-sensor-corrections-modal", {}), true);
+  assert.equal(state.systemModal, "water-sensor-corrections");
+  state.systemModal = "";
 });

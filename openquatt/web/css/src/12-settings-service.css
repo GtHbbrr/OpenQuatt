@@ -1313,6 +1313,14 @@
   margin-top: 14px;
 }
 
+.oq-settings-hp-offset-launcher {
+  margin-top: 14px;
+}
+
+.oq-settings-hp-offset-modal .oq-settings-hp-offset-panel {
+  margin-top: 12px;
+}
+
 .oq-settings-hp-offset-list {
   display: grid;
   gap: 10px;
@@ -1420,6 +1428,33 @@
 .oq-settings-hp-offset-input .oq-helper-input:focus {
   border-color: rgba(234, 88, 12, 0.7);
   background: rgba(255, 247, 237, 0.92);
+}
+
+.oq-settings-hp-offset-supply-note {
+  display: grid;
+  gap: 5px;
+  margin-top: 12px;
+  padding: 14px 16px;
+  border-left: 3px solid rgba(234, 88, 12, 0.58);
+  border-radius: 0 var(--oq-helper-radius) var(--oq-helper-radius) 0;
+  background: rgba(255, 247, 237, 0.64);
+}
+
+.oq-settings-hp-offset-supply-note strong {
+  color: var(--oq-helper-ink);
+  font-size: 0.9rem;
+  line-height: 1.35;
+}
+
+.oq-settings-hp-offset-supply-note p {
+  margin: 0;
+  color: var(--oq-helper-soft);
+  font-size: 0.86rem;
+  line-height: 1.5;
+}
+
+.oq-settings-hp-offset-modal > .oq-helper-modal-actions {
+  justify-content: flex-end;
 }
 
 .oq-helper-modal--service-task {

@@ -1311,7 +1311,7 @@ import { fetchWithTimeout } from "./browser-utils.js";
       } else {
         patchHeaderDom();
       }
-      if (state.appView === "settings" && String(state.systemModal || "").startsWith("service-task-")) {
+      if (state.appView === "settings" && (String(state.systemModal || "").startsWith("service-task-") || state.systemModal === "water-sensor-corrections")) {
         const nextSettingsSignature = getSettingsRenderSignature();
         if (nextSettingsSignature !== state.settingsRenderSignature) {
           render();

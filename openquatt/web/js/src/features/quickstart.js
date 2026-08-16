@@ -692,7 +692,7 @@ import { renderUsageTelemetryConsent, renderUsageTelemetryDisclosure } from "./u
         <p class="oq-helper-label">${escapeHtml(getQuickStepKicker("water"))}</p>
         <h2 class="oq-helper-section-title">Watertemperatuur beveiligen</h2>
         <p class="oq-helper-section-copy">Hier stel je de veilige bovengrens voor de watertemperatuur in. OpenQuatt regelt richting deze grens terug en grijpt 5°C erboven hard in.</p>
-        ${renderWaterSettingsFields("oq-settings-grid oq-settings-grid--quickstart")}
+        ${renderWaterSettingsFields("oq-settings-grid oq-settings-grid--quickstart", { includeSensorCorrections: false })}
         ${renderQuickStartStepNav()}
       </section>
     `;

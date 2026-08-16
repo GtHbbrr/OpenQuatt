@@ -2,14 +2,14 @@ import { getEntityStateText, hasEntity, isEntityActive } from "../core/app-share
 import { renderOqIcon, SETTINGS_GROUP_IDS, SETTINGS_GROUPS } from "../core/config.js";
 import { isCurveMode } from "../core/domain-helpers.js";
 import { getInputDraftValue } from "../core/control-drafts.js";
-import { formatValue, getEntityValue, getNumberMeta, normalizeNumber, parseLooseNumber } from "../core/entity-store.js";
+import { formatValue, getEntityValue, normalizeNumber } from "../core/entity-store.js";
 import { state } from "../core/state.js";
 import { setSettingsRenderControls } from "../core/settings-render-controls.js";
 import { formatDiagnosticsDateTime, formatUptimeFromMeta, getDeviceIpAddress, getInstallationLabel } from "../features/device-context.js";
 import { getUpdateStatus } from "../features/firmware-update.js";
 import { getEspTemperatureLabel } from "../features/header-status.js";
 import { getWebAuthStatusDetail, getWebAuthStatusLabel } from "../features/security-access.js";
-import { formatSettingsNumberValue, getCommissioningStatusValue, getSelectEntityOptions, getSettingsTemperatureValue, renderSettingsSection } from "./controls.js";
+import { getCommissioningStatusValue, getSelectEntityOptions, renderSettingsSection } from "./controls.js";
 import { renderSettingsCoolingSection } from "./cooling.js";
 import { renderSettingsFlowSection, renderSettingsHeatingSection } from "./heating.js";
 import { renderSettingsAuxRelaySection, renderSettingsBoilerCvSection, renderSettingsCompressorSection, renderSettingsDiagnosticsSection, renderSettingsGenerationSection, renderSettingsInstallationMonitoringSection, renderSettingsOduRuntimeFrequencySection, renderSettingsQuickStartSection } from "./installation.js";
@@ -19,7 +19,7 @@ import { getApiSecurityStatusDetail, getApiSecurityStatusLabel, renderSettingsAc
 import { renderSettingsCounterServiceSection, renderSettingsServiceSection } from "./service.js";
 import { renderSettingsSilentSection } from "./silent.js";
 import { renderSettingsBackupSection, renderSettingsTrendSection } from "./storage.js";
-import { getHpWaterRawValue, getWaterSupplyCorrectionView, renderSettingsWaterSection } from "./water.js";
+import { renderSettingsWaterSection } from "./water.js";
 import { escapeHtml } from "../core/html.js";
 
 
@@ -383,66 +383,6 @@ import { escapeHtml } from "../core/html.js";
         restartButton.disabled = busyRestart;
         restartButton.textContent = busyRestart ? "Herstarten..." : "Herstarten";
       }
-    }
-
-    stack.querySelectorAll(".oq-settings-hp-offset-row").forEach((row) => {
-      const offsetKey = String(row.dataset.oqSettingsField || "");
-      const rawKey = String(row.dataset.oqHpOffsetRawKey || "");
-      const finalKey = String(row.dataset.oqHpOffsetFinalKey || "");
-      if (!offsetKey || !rawKey || !finalKey) {
-        return;
-      }
-      const meta = getNumberMeta(offsetKey);
-      const raw = getHpWaterRawValue(rawKey, finalKey, offsetKey);
-      const offsetDraft = parseLooseNumber(getInputDraftValue(offsetKey));
-      const finalFromDraft = Number.isFinite(raw) && Number.isFinite(offsetDraft)
-        ? formatSettingsNumberValue(raw + offsetDraft, meta.uom || "°C", 2)
-        : getSettingsTemperatureValue(finalKey, 2);
-      const activeNode = row.querySelector("[data-oq-hp-offset-active]");
-      if (activeNode) {
-        const activeText = `${getSettingsTemperatureValue(finalKey, 2)} actief`;
-        if (activeNode.textContent !== activeText) {
-          activeNode.textContent = activeText;
-        }
-      }
-      const rawNode = row.querySelector("[data-oq-hp-offset-raw]");
-      if (rawNode) {
-        const rawText = Number.isFinite(raw)
-          ? formatSettingsNumberValue(raw, meta.uom || "°C", 2)
-          : getSettingsTemperatureValue(rawKey, 2);
-        if (rawNode.textContent !== rawText) {
-          rawNode.textContent = rawText;
-        }
-      }
-      const finalNode = row.querySelector("[data-oq-hp-offset-final]");
-      if (finalNode && finalNode.textContent !== finalFromDraft) {
-        finalNode.textContent = finalFromDraft;
-      }
-    });
-
-    const supplyOffsetRow = stack.querySelector("[data-oq-supply-offset-row]");
-    const supplyOffsetExpected = hasEntity("supplyTemp") && hasEntity("waterSupplyCalibrationOffset");
-    if (Boolean(supplyOffsetRow) !== supplyOffsetExpected) {
-      return false;
-    }
-    if (supplyOffsetRow) {
-      const view = getWaterSupplyCorrectionView();
-      const formatSupplyValue = (value) => Number.isFinite(value)
-        ? formatSettingsNumberValue(value, view.uom, 2)
-        : "—";
-      const values = {
-        "[data-oq-supply-offset-label]": `Aanvoer (${view.source})`,
-        "[data-oq-supply-offset-summary]": `${formatSupplyValue(view.activeValue)} actief · ${view.statusLabel}`,
-        "[data-oq-supply-offset-raw]": formatSupplyValue(view.rawValue),
-        "[data-oq-supply-offset-value]": formatSupplyValue(view.offsetValue),
-        "[data-oq-supply-offset-active]": formatSupplyValue(view.activeValue),
-      };
-      Object.entries(values).forEach(([selector, value]) => {
-        const node = supplyOffsetRow.querySelector(selector);
-        if (node && node.textContent !== value) {
-          node.textContent = value;
-        }
-      });
     }
 
     const curveShell = stack.querySelector(".oq-settings-curve-shell");
