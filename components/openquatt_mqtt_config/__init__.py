@@ -1,8 +1,14 @@
 import esphome.codegen as cg
 import esphome.config_validation as cv
 from esphome.core import CORE
-from esphome.components import binary_sensor, sensor, socket
-from esphome.components.esp32 import add_idf_component, idf_version, include_builtin_idf_component
+from esphome.components import binary_sensor, psram, sensor, socket
+from esphome.components.esp32 import (
+    add_idf_component,
+    get_esp32_variant,
+    idf_version,
+    include_builtin_idf_component,
+)
+from esphome.components.esp32.const import VARIANT_ESP32S3
 from esphome.const import CONF_ID
 
 CONF_BOOTSTRAP_BROKER = "bootstrap_broker"
@@ -45,6 +51,7 @@ openquatt_mqtt_config_ns = cg.esphome_ns.namespace("openquatt_mqtt_config")
 OpenQuattMqttConfig = openquatt_mqtt_config_ns.class_("OpenQuattMqttConfig", cg.Component)
 
 AUTO_LOAD = ["web_server_base"]
+DEPENDENCIES = ["psram"]
 
 CONFIG_SCHEMA = cv.Schema(
     {
@@ -96,6 +103,8 @@ CONFIG_SCHEMA = cv.All(
 
 async def to_code(config):
     if CORE.is_esp32:
+        if get_esp32_variant() == VARIANT_ESP32S3:
+            psram.request_external_task_stack()
         if idf_version() >= cv.Version(6, 0, 0):
             add_idf_component(name="espressif/mqtt", ref="1.0.0")
         else:

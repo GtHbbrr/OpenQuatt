@@ -11,7 +11,9 @@
 #include "esphome/components/web_server_base/web_server_base.h"
 #include "esphome/core/component.h"
 #include "esphome/core/preferences.h"
+#include "esphome/core/static_task.h"
 #include "mqtt_client.h"
+#include "OpenQuattMqttConfigPolicy.h"
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
 #include <freertos/task.h>
@@ -139,11 +141,12 @@ class OpenQuattMqttConfig : public Component {
   float get_setup_priority() const override;
 
   bool is_enabled() const { return this->enabled_.load(); }
-  bool is_connected() const { return this->connected_.load(); }
+  bool is_connected() const { return this->connected_.load() && this->client_events_enabled_.load(); }
 
   struct StatusSnapshot {
     bool enabled{false};
     bool connected{false};
+    bool runtime_pending{false};
     std::string broker;
     uint16_t port{1883};
     std::string username;
@@ -161,11 +164,26 @@ class OpenQuattMqttConfig : public Component {
     std::string csrf_token;
   };
 
+  enum class MutationResult : uint8_t {
+    OK = 0U,
+    INVALID = 1U,
+    BUSY = 2U,
+    UNAVAILABLE = 3U,
+    TIMEOUT = 4U,
+    SAVE_FAILED = 5U,
+    SYNC_FAILED = 6U,
+    APPLY_FAILED = 7U,
+    RUNTIME_PENDING = 8U,
+    RECOVERY_FAILED = 9U,
+    RECOVERY_PENDING = 10U,
+    PERSISTENCE_PENDING = 11U,
+  };
+
   StatusSnapshot get_status_snapshot();
-  bool set_runtime_config(const std::string& broker, uint16_t port, const std::string& username,
-                          const std::string& password, bool clear_password, bool enabled);
-  bool set_input_enabled(const std::string& key, bool enabled);
-  bool set_input_accept_retained(const std::string& key, bool accept_retained);
+  MutationResult set_runtime_config(const std::string& broker, uint16_t port, const std::string& username,
+                                    const std::string& password, bool clear_password, bool enabled);
+  MutationResult set_input_enabled(const std::string& key, bool enabled);
+  MutationResult set_input_accept_retained(const std::string& key, bool accept_retained);
 
  protected:
   static constexpr uint32_t STORAGE_MAGIC = 0x4F514D49;
@@ -196,20 +214,66 @@ class OpenQuattMqttConfig : public Component {
   static_assert(offsetof(Storage, retained_disabled_mask) == 269,
                 "Retained policy must use the existing version 1 padding byte");
 
+  enum class StorageTransactionPhase : uint8_t {
+    IDLE = 0U,
+    QUEUED = 1U,
+    PROCESSING = 2U,
+    WRITING = 3U,
+    COMMITTING = 4U,
+    CANCELLED = 5U,
+    COMPLETED = 6U,
+  };
+  enum class StorageApplyResult : uint8_t {
+    APPLIED = 0U,
+    RUNTIME_PENDING = 1U,
+    FAILED = 2U,
+  };
+
   bool load_storage_(Storage* storage);
-  bool save_storage_(const Storage& storage, bool sync = true);
-  bool apply_storage_(const Storage& storage, const char* source);
+  void initialize_storage_transaction_(const Storage& storage, const Storage& committed_storage,
+                                       bool persistence_pending);
+  void process_storage_transaction_();
+  bool restore_committed_storage_(const Storage& storage);
+  bool preflight_storage_apply_(const Storage& storage);
+  void finish_storage_transaction_(uint32_t generation, MutationResult result, const Storage& desired_storage,
+                                   bool commit_storage);
+  MutationResult begin_storage_mutation_(Storage* storage);
+  MutationResult submit_storage_mutation_(const Storage& storage);
+  void cancel_storage_mutation_();
+  void lock_persistence_();
+  void unlock_persistence_();
+  StorageApplyResult apply_storage_(const Storage& storage, const char* source);
   bool build_storage_(const std::string& broker, uint16_t port, const std::string& username,
                       const std::string& password, bool enabled, uint8_t input_disabled_mask,
                       uint8_t retained_disabled_mask, Storage* storage);
   bool is_valid_storage_(const Storage& storage) const;
   bool register_http_handlers_();
   void rotate_csrf_token_();
-  bool start_client_();
-  void stop_client_();
-  void request_client_stop_();
-  void request_client_start_();
-  static void start_client_task_(void* arg);
+  struct ClientConfig {
+    bool enabled{false};
+    std::array<char, BROKER_MAX_LEN + 1> broker{};
+    uint16_t port{1883};
+    std::array<char, USERNAME_MAX_LEN + 1> username{};
+    std::array<char, PASSWORD_MAX_LEN + 1> password{};
+  };
+  ClientConfig get_desired_client_config_();
+  bool active_client_matches_(uint32_t requested_generation);
+  bool ensure_client_worker_();
+  void start_permanent_failure_cleanup_();
+  bool process_permanent_failure_cleanup_();
+  bool request_client_reconcile_();
+  enum class ClientReconcileResult : uint8_t {
+    APPLIED = 0U,
+    WAIT_FOR_NETWORK = 1U,
+    RETRY = 2U,
+  };
+  ClientReconcileResult reconcile_client_(uint32_t requested_generation);
+  bool start_client_(const ClientConfig& config, uint32_t requested_generation, uint32_t session_generation);
+  bool stop_client_();
+  void clear_active_client_state_();
+  void close_client_event_gate_();
+  void maybe_release_classic_worker_();
+  static void client_worker_task_(void* arg);
   struct NumericInput {
     NumericInput(const char* key, const char* log_name, float min_value, float max_value)
         : key(key), log_name(log_name), min_value(min_value), max_value(max_value) {}
@@ -280,8 +344,9 @@ class OpenQuattMqttConfig : public Component {
   int find_numeric_input_index_by_topic_(const char* topic, int topic_len) const;
   int find_binary_input_index_by_topic_(const char* topic, int topic_len) const;
   static void mqtt_event_handler_(void* handler_args, esp_event_base_t base, int32_t event_id, void* event_data);
-  void queue_numeric_payload_(size_t input_index, const char* data, int len, bool retained);
-  void queue_binary_payload_(size_t input_index, const char* data, int len, bool retained);
+  void queue_numeric_payload_(size_t input_index, const char* data, int len, bool retained,
+                              uint32_t session_generation);
+  void queue_binary_payload_(size_t input_index, const char* data, int len, bool retained, uint32_t session_generation);
   void consume_pending_numeric_payloads_();
   void consume_pending_binary_payloads_();
   void handle_numeric_payload_(size_t input_index, const char* payload, bool retained);
@@ -300,18 +365,50 @@ class OpenQuattMqttConfig : public Component {
   static constexpr uint32_t SENSOR_PUBLISH_INTERVAL_MS = 10000;
   static constexpr uint32_t NON_RETAINED_STATEFUL_STALE_MS = 30UL * 60UL * 1000UL;
   static constexpr int MQTT_TASK_STACK_SIZE = 12288;
-  static constexpr uint32_t MQTT_START_TASK_STACK_SIZE = 24576;
+#if defined(CONFIG_IDF_TARGET_ESP32S3)
+  static constexpr bool MQTT_WORKER_STACK_IN_PSRAM = true;
+#else
+  static constexpr bool MQTT_WORKER_STACK_IN_PSRAM = false;
+#endif
+  static constexpr uint32_t MQTT_WORKER_TASK_STACK_SIZE = 24576;
+  static constexpr uint32_t MQTT_RECONCILE_RETRY_MS = 5000;
+  static constexpr size_t MQTT_CLIENT_ID_MAX_LEN = 96;
+  static constexpr uint8_t STORAGE_MAX_ATTEMPTS = 2U;
+  static constexpr uint32_t STORAGE_MUTATION_WAIT_MS = 2000U;
+  static constexpr uint32_t STORAGE_CANCELLATION_GRACE_MS = 750U;
+  static_assert(sizeof(StackType_t) == 1U, "ESP-IDF StaticTask stack sizes are configured in bytes");
 
   esp_mqtt_client_handle_t mqtt_client_{nullptr};
   SemaphoreHandle_t config_lock_{nullptr};
   SemaphoreHandle_t runtime_lock_{nullptr};
+  StaticSemaphore_t persistence_lock_storage_{};
+  SemaphoreHandle_t persistence_lock_{nullptr};
+  StaticSemaphore_t storage_mutation_lock_storage_{};
+  SemaphoreHandle_t storage_mutation_lock_{nullptr};
+  StaticSemaphore_t storage_mutation_complete_storage_{};
+  SemaphoreHandle_t storage_mutation_complete_{nullptr};
+  StaticSemaphore_t worker_lock_storage_{};
+  SemaphoreHandle_t worker_lock_{nullptr};
+  StaticTask client_worker_task_state_{};
+  bool client_worker_region_valid_{false};
+  bool mqtt_client_started_{false};
+  bool disconnect_requested_{false};
   std::atomic<bool> connected_{false};
   std::atomic<bool> force_publish_{true};
   std::atomic<bool> resubscribe_inputs_{false};
   std::atomic<bool> clear_session_scoped_inputs_pending_{false};
-  std::atomic<bool> client_start_task_running_{false};
-  std::atomic<bool> client_start_pending_{false};
-  std::atomic<bool> preference_sync_pending_{false};
+  std::atomic<bool> client_reconcile_pending_{false};
+  std::atomic<bool> client_worker_active_{false};
+  std::atomic<bool> permanent_failure_cleanup_pending_{false};
+  std::atomic<bool> mqtt_client_present_{false};
+  std::atomic<bool> client_events_enabled_{false};
+  std::atomic<bool> mqtt_connected_seen_{false};
+  std::atomic<bool> mqtt_disconnected_seen_{false};
+  std::atomic<bool> mqtt_transport_connected_{false};
+  std::atomic<esp_mqtt_client_handle_t> callback_client_{nullptr};
+  std::atomic<uint32_t> callback_session_generation_{0U};
+  std::atomic<uint32_t> client_requested_generation_{0U};
+  std::atomic<uint32_t> client_applied_generation_{0U};
   std::atomic<uint8_t> clear_input_mask_pending_{0};
   std::atomic<uint32_t> mqtt_session_generation_{0};
   std::atomic<uint8_t> input_disabled_mask_{0};
@@ -339,17 +436,27 @@ class OpenQuattMqttConfig : public Component {
   uint16_t port_{1883};
   std::string username_;
   std::string password_;
-  std::string active_broker_;
-  std::string active_username_;
-  std::string active_password_;
-  std::string active_client_id_;
-  uint16_t active_port_{0};
+  std::atomic<uint32_t> active_client_generation_{0U};
   std::atomic<bool> enabled_{false};
   std::string config_source_;
   std::string csrf_token_;
   ESPPreferenceObject pref_;
+  // Protected by persistence_lock_. Only process_storage_transaction_ writes
+  // preferences or applies an HTTP-originated desired generation.
+  Storage desired_storage_{};
+  Storage committed_storage_{};
+  uint32_t desired_storage_generation_{0U};
+  uint32_t waiting_storage_generation_{0U};
+  uint32_t completed_storage_generation_{0U};
+  MutationResult completed_storage_result_{MutationResult::UNAVAILABLE};
+  std::atomic<StorageTransactionPhase> storage_transaction_phase_{StorageTransactionPhase::IDLE};
+  std::atomic<bool> storage_write_started_{false};
+  bool desired_storage_initialized_{false};
+  bool storage_persistence_pending_{false};
+  bool storage_mutation_waiting_{false};
   bool handlers_registered_{false};
   uint32_t last_sensor_publish_ms_{0};
+  std::atomic<uint32_t> next_reconcile_attempt_ms_{0U};
 };
 
 }  // namespace openquatt_mqtt_config
