@@ -218,7 +218,7 @@ import { renderModalShell } from "../core/modal-shell.js";
     const mixing = running && (phaseCode === 1 || normalizedStatus.includes("MIXING"));
     const measuring = running && !mixing;
     const maxDurationS = 300;
-    const minMixingS = 60;
+    const minMixingS = 180;
     const elapsed = Number.isFinite(remaining) ? Math.max(0, maxDurationS - remaining) : NaN;
     const mixingRemaining = Number.isFinite(elapsed) ? Math.max(0, minMixingS - elapsed) : NaN;
     const progressValue = mixing && Number.isFinite(elapsed)
@@ -253,7 +253,7 @@ import { renderModalShell } from "../core/modal-shell.js";
           ? "Meting niet voltooid"
           : "Voorbereiding";
     const statusCopy = applied
-      ? "De voorgestelde offsets zijn opgeslagen."
+      ? "De voorgestelde offsets zijn opgeslagen. De aanvoercorrectie blijft alleen actief voor deze bron."
       : resultReady
       ? "Controleer de voorgestelde offsets en pas ze toe."
       : running
@@ -263,13 +263,18 @@ import { renderModalShell } from "../core/modal-shell.js";
         : failed
           ? getSettingsTextStatValue("hpWaterCalibrationStatus", "Controleer de voorwaarden en start opnieuw.")
           : (hasHp2
-            ? "Start alleen wanneer compressor en boiler uit zijn. HP1 en HP2 water in/out worden samen naar een relatieve referentie gebracht."
-            : "Start alleen wanneer compressor en boiler uit zijn. Bij single setup wordt HP1 water in/out onderling gelijkgetrokken; supply blijft diagnose.");
+            ? "Start alleen wanneer compressor en boiler uit zijn. HP1, HP2 en de actieve aanvoerbron worden samen naar een relatieve referentie gebracht."
+            : "Start alleen wanneer compressor en boiler uit zijn. HP1 water in/out en de actieve aanvoerbron worden samen gekalibreerd.");
+    const supplySource = getSettingsTextStatValue(
+      "hpWaterCalibrationResultSupplySource",
+      getSettingsTextStatValue("waterSupplyTempEffectiveSource", "Actieve bron"),
+    );
     const sensorRows = [
       { label: "HP1 water in", rawKey: "hp1WaterInRaw", liveKey: "hp1WaterIn", resultRawKey: "hpWaterCalibrationResultHp1InRawAvg", offsetKey: "hp1WaterInOffset", suggestedKey: "hp1WaterInOffsetSuggested" },
       { label: "HP1 water uit", rawKey: "hp1WaterOutRaw", liveKey: "hp1WaterOut", resultRawKey: "hpWaterCalibrationResultHp1OutRawAvg", offsetKey: "hp1WaterOutOffset", suggestedKey: "hp1WaterOutOffsetSuggested" },
       { label: "HP2 water in", rawKey: "hp2WaterInRaw", liveKey: "hp2WaterIn", resultRawKey: "hpWaterCalibrationResultHp2InRawAvg", offsetKey: "hp2WaterInOffset", suggestedKey: "hp2WaterInOffsetSuggested" },
       { label: "HP2 water uit", rawKey: "hp2WaterOutRaw", liveKey: "hp2WaterOut", resultRawKey: "hpWaterCalibrationResultHp2OutRawAvg", offsetKey: "hp2WaterOutOffset", suggestedKey: "hp2WaterOutOffsetSuggested" },
+      { label: `Aanvoer (${supplySource})`, rawKey: "supplyTemp", liveKey: "supplyTemp", resultRawKey: "hpWaterCalibrationResultSupplyRawAvg", offsetKey: "waterSupplyCalibrationOffset", suggestedKey: "waterSupplyCalibrationOffsetSuggested" },
     ].filter((row) => hasEntity(row.liveKey) || hasEntity(row.rawKey) || hasEntity(row.offsetKey));
 
     const renderStep = (index, label) => {
@@ -337,19 +342,15 @@ import { renderModalShell } from "../core/modal-shell.js";
               <span>Spreiding</span>
               <strong>${escapeHtml(getSettingsTemperatureValue("hpWaterCalibrationSpread", 2))}</strong>
             </article>
-            <article class="oq-settings-hp-calibration-live-card">
-              <span>Supply verschil</span>
-              <strong>${escapeHtml(getSettingsTemperatureValue("hpWaterCalibrationSupplyDelta", 2))}</strong>
-            </article>
           </div>
-          <p class="oq-settings-hp-calibration-note">Supply wordt alleen als diagnose getoond en niet automatisch gecorrigeerd.</p>
+          <p class="oq-settings-hp-calibration-note">De actieve aanvoerbron wordt raw gemeten. Een bestaande aanvoercorrectie telt niet mee in het nieuwe voorstel.</p>
         ` : ""}
 
         ${resultReady ? `
           <div class="oq-settings-hp-calibration-results">
             <div class="oq-settings-hp-calibration-result-summary">
               <span>Referentie ${escapeHtml(getSettingsTemperatureValue("hpWaterCalibrationResultReference", 2))}</span>
-              <span>Supply verschil ${escapeHtml(getSettingsTemperatureValue("hpWaterCalibrationSupplyDelta", 2))}</span>
+              <span>Aanvoerbron ${escapeHtml(supplySource)}</span>
             </div>
             <div class="oq-settings-hp-calibration-table-wrap">
               <table class="oq-settings-hp-calibration-table">
@@ -588,15 +589,15 @@ import { renderModalShell } from "../core/modal-shell.js";
         key: "hp-water-calibration",
         title: "Temperatuursensoren kalibreren",
         label: "Sensor kalibratie",
-        summary: "Laat de waterpomp draaien zonder compressor en bepaal offsets voor HP1/HP2 water in/out.",
+        summary: "Laat de waterpomp draaien zonder compressor en bepaal offsets voor HP1/HP2 water in/out en de actieve aanvoerbron.",
         status: hpWaterCalibrationStatusDisplay,
         available: Boolean(hpWaterCalibrationControls || state.entities.hpWaterCalibrationStatus),
         openDisabled: !cm100Ready,
         cardMarkup: renderCommissioningTaskCard({
           taskKey: "hp-water-calibration",
           title: "Temperatuursensoren kalibreren",
-          copy: "Doorloop voorbereiding, meting en toepassen in vaste volgorde. De meting stopt eerder zodra de sensoren stabiel genoeg zijn.",
-          subcopy: "De voorgestelde waarden worden pas actief wanneer je ze toepast; supply blijft een diagnosewaarde.",
+          copy: "Reken op ongeveer 3 tot 5 minuten. Eerst mengt het water 3 minuten; daarna stopt de meting zodra de sensoren stabiel genoeg zijn.",
+          subcopy: "De voorgestelde waarden worden pas actief wanneer je ze toepast. De aanvoer-offset is brongebonden en wordt bij een bronwissel uitgeschakeld.",
           status: hpWaterCalibrationStatusDisplay,
           statusCopy: hpWaterCalibrationTaskRunning
             ? "De pomp draait en de firmware wacht op een stabiel temperatuurbeeld."

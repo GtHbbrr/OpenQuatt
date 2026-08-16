@@ -646,6 +646,11 @@
   color: var(--oq-helper-accent-deep);
 }
 
+.oq-settings-source-status--error {
+  background: rgba(220, 38, 38, 0.11);
+  color: #dc2626;
+}
+
 .oq-settings-source-row.is-warning strong {
   color: var(--oq-helper-accent-deep);
 }

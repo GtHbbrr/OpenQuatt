@@ -223,6 +223,12 @@ void OpenQuattServiceStatus::write_status(httpd_req_t* req) const {
                            float_value(this->hp_water_calibration_result_hp2_in_raw_avg_), "°C", 2) ||
       !write_number_entity(req, &first, "hpWaterCalibrationResultHp2OutRawAvg",
                            float_value(this->hp_water_calibration_result_hp2_out_raw_avg_), "°C", 2) ||
+      !write_number_entity(req, &first, "hpWaterCalibrationResultSupplyRawAvg",
+                           float_value(this->hp_water_calibration_result_supply_raw_avg_), "°C", 2) ||
+      !write_number_entity(req, &first, "hpWaterCalibrationResultSupplyOffset",
+                           float_value(this->hp_water_calibration_result_supply_offset_), "°C", 2) ||
+      !write_text_entity(req, &first, "hpWaterCalibrationResultSupplySource",
+                         text_value(this->hp_water_calibration_result_supply_source_, "")) ||
       !write_raw(req, R"(}})")) {
     httpd_resp_send_chunk(req, nullptr, 0);
     return;

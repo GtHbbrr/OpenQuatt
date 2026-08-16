@@ -48,6 +48,25 @@ text:
     optimistic: true
     restore_value: true
     initial_value: "http://192.168.2.117:8080/beta/feed/data.json"
+    on_value:
+      - lambda: |-
+          // The feed URL is part of the CIC calibration identity.
+          id(cic_component).notify_url_changed(x);
+          const uint32_t fingerprint = oq_supply_calibration::fingerprint(
+              oq_supply_calibration::SOURCE_CIC, x.c_str());
+          const int32_t calibrated_source = id(oq_water_supply_temp_calibration_source_code);
+          if (calibrated_source == oq_supply_calibration::SOURCE_CIC &&
+              fingerprint != id(oq_water_supply_temp_calibration_source_fingerprint)) {
+            id(oq_water_supply_temp_calibration_checksum) = 0;
+            id(oq_water_supply_temp_calibration_source_code) =
+                oq_supply_calibration::stale_source_code(calibrated_source);
+          }
+          if (id(water_supply_source).has_state() &&
+              id(water_supply_source).current_option() == "CIC") {
+            id(oq_water_supply_temp_current_source_ready) = false;
+            if (id(oq_hp_water_calibration_active)) id(oq_hp_water_calibration_abort) = true;
+            id(water_supply_temp_selected).update();
+          }
 
 # ----------------------------
 # TELEMETRY

@@ -15,6 +15,7 @@ import { getWebServerLogStatusLabel, renderWebServerLogsModal } from "./webserve
 import { getControlModeOverrideLabel, renderSettingsServiceTaskModal } from "../settings/service.js";
 import { renderSilentSettingsFields } from "../settings/silent.js";
 import { renderSettingsBackupImportModal, renderSettingsBackupRestoreModal, renderSettingsHistoryStorageModal } from "../settings/storage.js";
+import { renderHpWaterSensorOffsetsModal } from "../settings/water.js";
 import { formatNumericState } from "../core/formatting.js";
 import { escapeHtml } from "../core/html.js";
 import { render } from "../core/render-scheduler.js";
@@ -467,6 +468,10 @@ import { render } from "../core/render-scheduler.js";
 
     if (state.systemModal === "history-storage") {
       return renderSettingsHistoryStorageModal();
+    }
+
+    if (state.systemModal === "water-sensor-corrections") {
+      return renderHpWaterSensorOffsetsModal();
     }
 
     if (String(state.systemModal || "").startsWith("service-task-")) {

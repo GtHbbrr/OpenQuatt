@@ -106,6 +106,28 @@ select:
       - PT1000
       - DS18B20
     initial_option: PT1000
+    on_value:
+      - lambda: |-
+          // PT1000 and DS18B20 are separate calibration identities.
+          if (!id(oq_water_supply_temp_current_source_ready) ||
+              !id(water_supply_source).has_state() ||
+              id(water_supply_source).current_option() != "Local") {
+            return;
+          }
+          const int32_t selected = x == "PT1000"
+              ? oq_supply_calibration::SOURCE_LOCAL_PT1000
+              : oq_supply_calibration::SOURCE_LOCAL_DS18B20;
+          if (id(oq_water_supply_temp_current_source_code) == selected) return;
+
+          const int32_t calibrated_source = id(oq_water_supply_temp_calibration_source_code);
+          if (calibrated_source > 0) {
+            id(oq_water_supply_temp_calibration_checksum) = 0;
+            id(oq_water_supply_temp_calibration_source_code) =
+                oq_supply_calibration::stale_source_code(calibrated_source);
+          }
+          id(oq_water_supply_temp_current_source_ready) = false;
+          if (id(oq_hp_water_calibration_active)) id(oq_hp_water_calibration_abort) = true;
+          id(water_supply_temp_selected).update();
 
   - platform: template
     id: oq_q_flow_source

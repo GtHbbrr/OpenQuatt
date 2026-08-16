@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <cstdint>
 #include <string>
 
@@ -15,6 +16,8 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
 #include <freertos/task.h>
+
+#include "OpenQuattCICUrlState.h"
 
 namespace esphome {
 namespace openquatt_cic {
@@ -64,6 +67,9 @@ class OpenQuattCIC : public PollingComponent {
   void loop() override;
   void dump_config() override;
 
+  void notify_url_changed(const std::string& url) { this->notify_url_changed(url.data(), url.size()); }
+  bool is_url_ready(const std::string& url) const { return this->url_state_.ready(url.data(), url.size()); }
+
  protected:
   struct MaybeFloat {
     bool present{false};
@@ -88,6 +94,7 @@ class OpenQuattCIC : public PollingComponent {
   struct FetchResult {
     bool ready{false};
     bool ok{false};
+    uint32_t url_generation{0};
     uint32_t completed_at_ms{0};
     uint32_t duration_ms{0};
     int status_code{0};
@@ -106,6 +113,7 @@ class OpenQuattCIC : public PollingComponent {
   void mark_success_(uint32_t now_ms);
   void mark_failure_(uint32_t now_ms);
   void update_runtime_state_(uint32_t now_ms);
+  void notify_url_changed(const char* url, size_t length);
   void handle_disabled_();
   void invalidate_feed_signals_();
   void publish_diagnostics_if_due_(uint32_t now_ms, bool force);
@@ -162,7 +170,10 @@ class OpenQuattCIC : public PollingComponent {
   TaskHandle_t fetch_task_handle_{nullptr};
   bool fetch_in_progress_{false};
   std::string fetch_url_{};
+  uint32_t fetch_url_generation_{0};
   FetchResult fetch_result_{};
+  std::atomic<bool> fetch_result_ready_{false};
+  OpenQuattCICUrlState url_state_{};
   PsramBuffer<uint8_t> response_buffer_{};
 };
 

@@ -75,6 +75,15 @@ class OpenQuattServiceStatus : public Component {
   void set_hp_water_calibration_result_hp2_out_raw_avg(FloatGlobal* value) {
     this->hp_water_calibration_result_hp2_out_raw_avg_ = value;
   }
+  void set_hp_water_calibration_result_supply_raw_avg(FloatGlobal* value) {
+    this->hp_water_calibration_result_supply_raw_avg_ = value;
+  }
+  void set_hp_water_calibration_result_supply_offset(FloatGlobal* value) {
+    this->hp_water_calibration_result_supply_offset_ = value;
+  }
+  void set_hp_water_calibration_result_supply_source(StringGlobal* value) {
+    this->hp_water_calibration_result_supply_source_ = value;
+  }
 
   void setup() override;
   void dump_config() override;
@@ -120,6 +129,9 @@ class OpenQuattServiceStatus : public Component {
   FloatGlobal* hp_water_calibration_result_hp1_out_raw_avg_{nullptr};
   FloatGlobal* hp_water_calibration_result_hp2_in_raw_avg_{nullptr};
   FloatGlobal* hp_water_calibration_result_hp2_out_raw_avg_{nullptr};
+  FloatGlobal* hp_water_calibration_result_supply_raw_avg_{nullptr};
+  FloatGlobal* hp_water_calibration_result_supply_offset_{nullptr};
+  StringGlobal* hp_water_calibration_result_supply_source_{nullptr};
 };
 
 }  // namespace openquatt_service_status
