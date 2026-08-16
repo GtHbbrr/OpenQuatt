@@ -209,9 +209,11 @@ Alleen als het probleem daar lijkt te zitten:
 
 ### Voor compressorpendelen
 
-Home Assistant toont `Compressor cycling warning` zodra minimaal één actuele
-pendelwaarschuwing actief is. Gebruik dit samengestelde signaal als eenvoudige
-trigger voor een automation. De oorzaak blijft afzonderlijk zichtbaar via:
+De diagnostische pendelwaarschuwingen zijn in Home Assistant standaard
+uitgeschakeld. Schakel `Compressor cycling warning` in om één samengesteld
+signaal te krijgen zodra minimaal één actuele pendelwaarschuwing actief is. De
+oorzaak blijft na inschakelen van de bijbehorende detailentiteiten afzonderlijk
+zichtbaar via:
 
 - `Compressor cycling warning 2h`;
 - `Compressor cycling warning 72h`;
