@@ -206,7 +206,6 @@ test("usage telemetry disclosure matches the hourly payload scope", async () => 
   const configFields = [
     "quatt_hybrid_generation_config",
     "flow_source_config",
-    "flow_source_mode",
     "heating_strategy",
     "room_temperature_source",
     "room_setpoint_source",
