@@ -29,6 +29,10 @@ const systemActionHandlers = {
     state.systemModal = "connectivity";
     render();
   },
+  "open-water-sensor-corrections-modal": () => {
+    state.systemModal = "water-sensor-corrections";
+    render();
+  },
   "open-restart-confirm": () => {
     state.systemModal = "restart-confirm";
     render();

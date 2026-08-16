@@ -16,6 +16,15 @@ const USAGE_TELEMETRY_EXAMPLE_JSON = JSON.stringify({
   hardware_revision: "1.0 (batch 42)",
   topology: "duo",
   connection: "wifi",
+  quatt_hybrid_generation_config: "v1_5",
+  flow_source_config: "outdoor_unit",
+  heating_strategy: "power_house",
+  room_temperature_source: "opentherm",
+  room_setpoint_source: "opentherm",
+  outside_temperature_source: "auto",
+  heating_enable_source: "disabled",
+  cooling_enable_source: "disabled",
+  cooling_dew_point_source: "auto",
   heap_free_b: 178432,
   heap_min_free_b: 151008,
   heap_largest_block_b: 98304,
@@ -85,6 +94,7 @@ export function renderUsageTelemetryDisclosure({ collapsible = false, idPrefix =
           <li><strong>Installatie</strong><span>Willekeurig ID, tijdstip en uptime</span></li>
           <li><strong>Software</strong><span>Versie en releasekanaal</span></li>
           <li><strong>Platform</strong><span>Hardware, opstelling, verbinding en wifi-signaal</span></li>
+          <li><strong>Configuratie</strong><span>Quatt Hybrid-versie, verwarmingsstrategie, flowbron en regelbronnen</span></li>
           <li><strong>Systeemstatus</strong><span>Geheugen, looptijd, chiptemperatuur en herstartreden</span></li>
           <li><strong>Functies</strong><span>Aan/uit-status van CiC, OpenTherm-thermostaat, ketelondersteuning, MQTT-inputs en lokale historie; plus de ketelaansluiting (aan/uit of OpenTherm)</span></li>
         </ul>
@@ -98,7 +108,7 @@ export function renderUsageTelemetryDisclosure({ collapsible = false, idPrefix =
           <li><strong>Identiteit</strong><span>Geen MAC-adres of netwerkadres</span></li>
           <li><strong>Wifi en toegang</strong><span>Nooit een wifi-netwerknaam, wifi-wachtwoord, gebruikersnaam, ander wachtwoord of inloggegevens</span></li>
           <li><strong>Installatiegedrag</strong><span>Geen verwarmingsmetingen of regelwaarden</span></li>
-          <li><strong>Lokale data</strong><span>Geen ingestelde temperaturen, grenzen, MQTT-topics of logs</span></li>
+          <li><strong>Lokale data</strong><span>Geen gemeten of ingestelde temperaturen, grenzen, MQTT-topics of logs</span></li>
         </ul>
       </section>
     </div>

@@ -153,6 +153,10 @@ Kies je expliciet `MQTT`, houd er dan rekening mee dat de MQTT-buitentemperatuur
 
 Voor `Cooling Dew Point Source` is `Auto` meestal ook de veiligste keuze. OpenQuatt gebruikt dan de hoogste geldige dauwpuntwaarde van Home Assistant en MQTT. Kies `Home Assistant` of `MQTT` alleen als je die bron expliciet wilt vereisen.
 
+De temperatuurkalibratie neemt ook de actieve aanvoertemperatuurbron mee. OpenQuatt bewaart daarvoor één offset, gekoppeld aan de concrete bron: lokale PT1000, lokale DS18B20, CIC-feed of Home Assistant-invoer. Bij een wissel van bron, lokale sensor of CIC-feed-URL wordt de oude aanvoercorrectie direct uitgeschakeld en verschijnt een melding om opnieuw te kalibreren. Een tijdelijke automatische fallback naar de water-uitmeting van de warmtepomp gebruikt geen aanvoercorrectie, maar maakt een nog passende kalibratie niet ongeldig.
+
+De brongebonden aanvoerkalibratie wordt bewust niet meegenomen in een instellingenbackup: alleen de offset herstellen zonder de bijbehorende bronidentiteit zou onveilig zijn. Kalibreer de aanvoer daarom opnieuw na het terugzetten van een backup of na een relevante wijziging van de Home Assistant-bron in een nieuwe firmwarebuild.
+
 ### 6. Hulprelais R2 (alleen Heatpump Controller Q-edition)
 
 Deze groep bestaat alleen op hardware met een tweede relais (R2) en staat standaard uit.
@@ -183,6 +187,7 @@ Begin bijna altijd met:
 Controleer daarna:
 
 - `Water Supply Temp (Selected)`
+- `Water Supply Temperature Calibration Status`
 - `Maximum water temperature`
 - `Heating Curve Supply Target` als je stooklijn gebruikt
 
@@ -201,6 +206,20 @@ Alleen als het probleem daar lijkt te zitten:
 - opgenomen vermogen;
 - power cap;
 - gedrag rond stille uren of begrenzing.
+
+### Voor compressorpendelen
+
+Home Assistant toont `Compressor cycling warning` zodra minimaal één actuele
+pendelwaarschuwing actief is. Gebruik dit samengestelde signaal als eenvoudige
+trigger voor een automation. De oorzaak blijft afzonderlijk zichtbaar via:
+
+- `Compressor cycling warning 2h`;
+- `Compressor cycling warning 72h`;
+- `Alternating compressor starts warning` bij een duo-installatie.
+
+De signalen kunnen gelijktijdig actief zijn en worden weer inactief zodra de
+bijbehorende actuele conditie is hersteld. Een eerder gedetecteerde maar alleen
+nog gelatchte melding houdt `Compressor cycling warning` niet actief.
 
 ## Wanneer zit je waarschijnlijk in de verkeerde laag?
 

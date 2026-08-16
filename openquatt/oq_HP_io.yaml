@@ -42,6 +42,7 @@ modbus_controller:
       then:
         - lambda: |-
             id(${hp_id}_is_online) = false;
+            id(${hp_id}_pump_relay).invalidate_state();
             id(oq_incident_manager).observe_transport(${hp_index}, false, millis());
             ESP_LOGW("quatt", "%sModbus OFFLINE", "${prefix}");
     on_online:

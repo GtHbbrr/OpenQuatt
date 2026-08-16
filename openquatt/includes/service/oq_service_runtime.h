@@ -48,6 +48,11 @@ inline void reset_task_runtime_state() {
   id(oq_hp_water_calibration_result_hp1_out_raw_avg_c) = NAN;
   id(oq_hp_water_calibration_result_hp2_in_raw_avg_c) = NAN;
   id(oq_hp_water_calibration_result_hp2_out_raw_avg_c) = NAN;
+  id(oq_hp_water_calibration_result_supply_raw_avg_c) = NAN;
+  id(oq_hp_water_calibration_result_supply_offset_c) = NAN;
+  id(oq_hp_water_calibration_result_supply_source_code) = 0;
+  id(oq_hp_water_calibration_result_supply_source_fingerprint) = 0;
+  id(oq_hp_water_calibration_result_supply_source).clear();
   id(oq_manual_flow_active) = false;
   id(oq_quick_flow_test_active) = false;
   id(oq_quick_flow_test_started_ms) = 0;

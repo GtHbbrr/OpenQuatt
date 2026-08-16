@@ -78,17 +78,20 @@
       hpWaterCalibrationResultReference: NaN,
       hpWaterCalibrationResultSpreadBefore: NaN,
       hpWaterCalibrationResultExpectedSpread: NaN,
+      hpWaterCalibrationResultSupplySource: "",
       hpWaterCalibrationResultRawAverages: {
         hp1In: NaN,
         hp1Out: NaN,
         hp2In: NaN,
         hp2Out: NaN,
+        supply: NaN,
       },
       hpWaterCalibrationSuggested: {
         hp1In: 0,
         hp1Out: 0,
         hp2In: 0,
         hp2Out: 0,
+        supply: 0,
       },
       boilerResult: 0,
       boilerConfidence: 0,
@@ -643,10 +646,12 @@
     state.commissioning.hpWaterCalibrationResultReference = NaN;
     state.commissioning.hpWaterCalibrationResultSpreadBefore = NaN;
     state.commissioning.hpWaterCalibrationResultExpectedSpread = NaN;
+    state.commissioning.hpWaterCalibrationResultSupplySource = "";
     state.commissioning.hpWaterCalibrationResultRawAverages.hp1In = NaN;
     state.commissioning.hpWaterCalibrationResultRawAverages.hp1Out = NaN;
     state.commissioning.hpWaterCalibrationResultRawAverages.hp2In = NaN;
     state.commissioning.hpWaterCalibrationResultRawAverages.hp2Out = NaN;
+    state.commissioning.hpWaterCalibrationResultRawAverages.supply = NaN;
     setBinary("HP water calibration active", false);
     setText("text_sensor", "HP water calibration status", status);
     setNumber("HP water calibration remaining", 0, "s");
@@ -662,6 +667,23 @@
     setNumber("HP water calibration result HP1 water out raw average", NaN, "\u00B0C");
     setNumber("HP water calibration result HP2 water in raw average", NaN, "\u00B0C");
     setNumber("HP water calibration result HP2 water out raw average", NaN, "\u00B0C");
+    setNumber("HP water calibration result supply raw average", NaN, "\u00B0C");
+    setNumber("HP water calibration result supply offset", NaN, "\u00B0C");
+    setText("text_sensor", "HP water calibration result supply source", "");
+  }
+
+  function currentWaterSupplySourceLabel() {
+    const source = String(getEntity("select", "Water Supply Source")?.value || "Unknown");
+    if (source !== "Local") return source;
+    const local = String(getEntity("select", "Local Water Supply Temp Source")?.value || "");
+    return local ? `Local - ${local}` : "Local";
+  }
+
+  function invalidateWaterSupplyCalibrationMock() {
+    const status = String(getEntity("text_sensor", "Water Supply Temperature Calibration Status")?.value || "");
+    if (!status.startsWith("Calibrated:")) return;
+    setBinary("Water Supply Temperature Calibration Required", true);
+    setText("text_sensor", "Water Supply Temperature Calibration Status", `Recalibration required: ${status.slice(11).trim()}`);
   }
 
   function scheduleCommissioningStep(delay, callback) {
@@ -790,10 +812,14 @@
     setNumber("HP water calibration result HP1 water out raw average", state.commissioning.hpWaterCalibrationResultRawAverages.hp1Out, "\u00B0C");
     setNumber("HP water calibration result HP2 water in raw average", state.commissioning.hpWaterCalibrationResultRawAverages.hp2In, "\u00B0C");
     setNumber("HP water calibration result HP2 water out raw average", state.commissioning.hpWaterCalibrationResultRawAverages.hp2Out, "\u00B0C");
+    setNumber("HP water calibration result supply raw average", state.commissioning.hpWaterCalibrationResultRawAverages.supply, "\u00B0C");
+    setNumber("HP water calibration result supply offset", state.commissioning.hpWaterCalibrationSuggested.supply, "\u00B0C");
+    setText("text_sensor", "HP water calibration result supply source", state.commissioning.hpWaterCalibrationResultSupplySource);
     setNumber("HP calibration HP1 water in offset suggested", state.commissioning.hpWaterCalibrationSuggested.hp1In, "\u00B0C");
     setNumber("HP calibration HP1 water out offset suggested", state.commissioning.hpWaterCalibrationSuggested.hp1Out, "\u00B0C");
     setNumber("HP calibration HP2 water in offset suggested", state.commissioning.hpWaterCalibrationSuggested.hp2In, "\u00B0C");
     setNumber("HP calibration HP2 water out offset suggested", state.commissioning.hpWaterCalibrationSuggested.hp2Out, "\u00B0C");
+    setNumber("HP calibration supply temperature offset suggested", state.commissioning.hpWaterCalibrationSuggested.supply, "\u00B0C");
   }
 
   function generateAuthToken() {
@@ -936,6 +962,9 @@
     hpWaterCalibrationResultHp1OutRawAvg: ["sensor", "HP water calibration result HP1 water out raw average"],
     hpWaterCalibrationResultHp2InRawAvg: ["sensor", "HP water calibration result HP2 water in raw average"],
     hpWaterCalibrationResultHp2OutRawAvg: ["sensor", "HP water calibration result HP2 water out raw average"],
+    hpWaterCalibrationResultSupplyRawAvg: ["sensor", "HP water calibration result supply raw average"],
+    hpWaterCalibrationResultSupplyOffset: ["sensor", "HP water calibration result supply offset"],
+    hpWaterCalibrationResultSupplySource: ["text_sensor", "HP water calibration result supply source"],
   };
 
   function handleServiceStatus() {
@@ -1914,14 +1943,19 @@
     setEntity("sensor", "HP water calibration result HP1 water out raw average", { value: NaN, uom: "\u00B0C" });
     setEntity("sensor", "HP water calibration result HP2 water in raw average", { value: NaN, uom: "\u00B0C" });
     setEntity("sensor", "HP water calibration result HP2 water out raw average", { value: NaN, uom: "\u00B0C" });
+    setEntity("sensor", "HP water calibration result supply raw average", { value: NaN, uom: "\u00B0C" });
+    setEntity("sensor", "HP water calibration result supply offset", { value: NaN, uom: "\u00B0C" });
+    setEntity("text_sensor", "HP water calibration result supply source", { value: "", state: "" });
     setEntity("number", "HP1 water in temperature offset", { value: 0, min_value: -5, max_value: 5, step: 0.01, uom: "\u00B0C" });
     setEntity("number", "HP1 water out temperature offset", { value: 0, min_value: -5, max_value: 5, step: 0.01, uom: "\u00B0C" });
     setEntity("number", "HP2 water in temperature offset", { value: 0, min_value: -5, max_value: 5, step: 0.01, uom: "\u00B0C" });
     setEntity("number", "HP2 water out temperature offset", { value: 0, min_value: -5, max_value: 5, step: 0.01, uom: "\u00B0C" });
+    setEntity("number", "Water Supply Temperature Calibration Offset", { value: 0, min_value: -2, max_value: 2, step: 0.01, uom: "\u00B0C" });
     setEntity("number", "HP calibration HP1 water in offset suggested", { value: 0, min_value: -5, max_value: 5, step: 0.01, uom: "\u00B0C" });
     setEntity("number", "HP calibration HP1 water out offset suggested", { value: 0, min_value: -5, max_value: 5, step: 0.01, uom: "\u00B0C" });
     setEntity("number", "HP calibration HP2 water in offset suggested", { value: 0, min_value: -5, max_value: 5, step: 0.01, uom: "\u00B0C" });
     setEntity("number", "HP calibration HP2 water out offset suggested", { value: 0, min_value: -5, max_value: 5, step: 0.01, uom: "\u00B0C" });
+    setEntity("number", "HP calibration supply temperature offset suggested", { value: 0, min_value: -2, max_value: 2, step: 0.01, uom: "\u00B0C" });
     setEntity("select", "Quatt Hybrid version", {
       value: "V1.5",
       state: "V1.5",
@@ -2253,6 +2287,7 @@
       ["Room Temperature Effective Source", "OT thermostat"],
       ["Room Setpoint Effective Source", "OT thermostat"],
       ["Water Supply Temp Effective Source", "Local - PT1000"],
+      ["Water Supply Temperature Calibration Status", "Not calibrated"],
       ["Heating Enable Effective Source", "None"],
       ["Cooling Enable Effective Source", "HA input"],
       ["Boiler command source", "Power House"],
@@ -2295,6 +2330,7 @@
       ["Lowflow fault active", false],
       ["PT1000 read problem", false],
       ["Water Supply Temp Fallback Active", false],
+      ["Water Supply Temperature Calibration Required", false],
       ["Flow mismatch (HP1 vs HP2)", false],
       ["OT - Thermostat CH Enable", false],
       ["OT - Thermostat Status Valid", true],
@@ -3739,6 +3775,7 @@
   }
 
   function handleSelectSet(name, value) {
+    const previousValue = String(getEntity("select", name)?.value || "");
     if (name === "Manual HP1 service mode" || name === "Manual HP2 service mode") {
       const hp = name.includes("HP1") ? "HP1" : "HP2";
       const otherName = hp === "HP1" ? "Manual HP2 service mode" : "Manual HP1 service mode";
@@ -3772,6 +3809,12 @@
       setNumber(levelName, 0, "");
     }
     setText("select", name, value);
+    if (previousValue !== String(value || "") &&
+        (name === "Water Supply Source" ||
+         (name === "Local Water Supply Temp Source" &&
+          String(getEntity("select", "Water Supply Source")?.value || "") === "Local"))) {
+      invalidateWaterSupplyCalibrationMock();
+    }
     if (name === "Preset") {
       applyPreset(value);
     } else if (name === "Firmware Update Channel") {
@@ -3876,7 +3919,12 @@
   }
 
   function handleTextSet(name, value) {
+    const previousValue = String(getEntity("text", name)?.value || "");
     setText("text", name, String(value || "").trim());
+    if (name === "CIC - Feed URL" && previousValue !== String(value || "").trim() &&
+        String(getEntity("select", "Water Supply Source")?.value || "") === "CIC") {
+      invalidateWaterSupplyCalibrationMock();
+    }
     updateSummary();
     notifyMockUpdated();
   }
@@ -4352,6 +4400,7 @@
         state.commissioning.hpWaterCalibrationResultReference = NaN;
         state.commissioning.hpWaterCalibrationResultSpreadBefore = NaN;
         state.commissioning.hpWaterCalibrationResultExpectedSpread = NaN;
+        state.commissioning.hpWaterCalibrationResultSupplySource = "";
         setCommissioningPhase("hp-water-calibration", "requested");
         setText("text_sensor", "Control Mode (Label)", "CM100 - Commissioning");
         setText("text_sensor", "Flow Mode", "HP WATER CAL");
@@ -4387,11 +4436,18 @@
           const hp2Out = Number(getEntity("sensor", "HP2 - Water out temperature raw")?.value || getEntity("sensor", "HP2 - Water out temperature")?.value || hp1Out - 0.05);
           const values = single ? [hp1In, hp1Out] : [hp1In, hp1Out, hp2In, hp2Out];
           const reference = values.reduce((sum, value) => sum + value, 0) / values.length;
-          const supply = Number(getEntity("sensor", "Water Supply Temp (Selected)")?.value);
+          const supplySelected = Number(getEntity("sensor", "Water Supply Temp (Selected)")?.value);
+          const calibrationValid = !Boolean(getEntity("binary_sensor", "Water Supply Temperature Calibration Required")?.value) &&
+            String(getEntity("text_sensor", "Water Supply Temperature Calibration Status")?.value || "").startsWith("Calibrated:");
+          const activeSupplyOffset = calibrationValid
+            ? Number(getEntity("number", "Water Supply Temperature Calibration Offset")?.value || 0)
+            : 0;
+          const supply = Number.isFinite(supplySelected) ? supplySelected - activeSupplyOffset : NaN;
           state.commissioning.hpWaterCalibrationSuggested.hp1In = Number((reference - hp1In).toFixed(2));
           state.commissioning.hpWaterCalibrationSuggested.hp1Out = Number((reference - hp1Out).toFixed(2));
           state.commissioning.hpWaterCalibrationSuggested.hp2In = single ? 0 : Number((reference - hp2In).toFixed(2));
           state.commissioning.hpWaterCalibrationSuggested.hp2Out = single ? 0 : Number((reference - hp2Out).toFixed(2));
+          state.commissioning.hpWaterCalibrationSuggested.supply = Number.isFinite(supply) ? Number((reference - supply).toFixed(2)) : 0;
           state.commissioning.hpWaterCalibrationSpread = Number((Math.max(...values) - Math.min(...values)).toFixed(2));
           state.commissioning.hpWaterCalibrationSupplyDelta = Number.isFinite(supply) ? Number((reference - supply).toFixed(2)) : NaN;
           state.commissioning.hpWaterCalibrationStableProgress = 60;
@@ -4402,9 +4458,11 @@
           state.commissioning.hpWaterCalibrationResultRawAverages.hp1Out = Number(hp1Out.toFixed(2));
           state.commissioning.hpWaterCalibrationResultRawAverages.hp2In = single ? NaN : Number(hp2In.toFixed(2));
           state.commissioning.hpWaterCalibrationResultRawAverages.hp2Out = single ? NaN : Number(hp2Out.toFixed(2));
+          state.commissioning.hpWaterCalibrationResultRawAverages.supply = Number.isFinite(supply) ? Number(supply.toFixed(2)) : NaN;
+          state.commissioning.hpWaterCalibrationResultSupplySource = currentWaterSupplySourceLabel();
           state.commissioning.hpWaterCalibrationRemaining = 0;
           state.commissioning.hpWaterCalibrationPhase = 4;
-          state.commissioning.hpWaterCalibrationStatusText = single ? "DONE: HP1 relative offsets" : "DONE: 4 sensor offsets";
+          state.commissioning.hpWaterCalibrationStatusText = single ? "DONE: HP1 and supply offsets" : "DONE: 4 HP and supply offsets";
           state.commissioning.globalStatus = "CM100 READY";
           setCommissioningPhase("hp-water-calibration", "done");
           setText("text_sensor", "HP water calibration status", state.commissioning.hpWaterCalibrationStatusText);
@@ -4427,6 +4485,9 @@
       setNumber("HP1 water out temperature offset", suggested.hp1Out, "\u00B0C");
       setNumber("HP2 water in temperature offset", suggested.hp2In, "\u00B0C");
       setNumber("HP2 water out temperature offset", suggested.hp2Out, "\u00B0C");
+      setNumber("Water Supply Temperature Calibration Offset", suggested.supply, "\u00B0C");
+      setBinary("Water Supply Temperature Calibration Required", false);
+      setText("text_sensor", "Water Supply Temperature Calibration Status", `Calibrated: ${state.commissioning.hpWaterCalibrationResultSupplySource || currentWaterSupplySourceLabel()}`);
       [
         ["HP1", "in"],
         ["HP1", "out"],

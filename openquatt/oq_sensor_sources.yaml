@@ -32,6 +32,34 @@ globals:
     restore_value: false
     initial_value: 'false'
 
+  - id: oq_water_supply_temp_current_source_code
+    type: int32_t
+    restore_value: false
+    initial_value: '0'
+  - id: oq_water_supply_temp_current_source_fingerprint
+    type: uint32_t
+    restore_value: false
+    initial_value: '0'
+  - id: oq_water_supply_temp_current_source_ready
+    type: bool
+    restore_value: false
+    initial_value: 'false'
+
+  # Positive source codes are valid records; negative codes are stale records
+  # retained only so the UI can explain which source must be recalibrated.
+  - id: oq_water_supply_temp_calibration_source_code
+    type: int32_t
+    restore_value: true
+    initial_value: '0'
+  - id: oq_water_supply_temp_calibration_source_fingerprint
+    type: uint32_t
+    restore_value: true
+    initial_value: '0'
+  - id: oq_water_supply_temp_calibration_checksum
+    type: uint32_t
+    restore_value: true
+    initial_value: '0'
+
   - id: oq_outside_temp_selected_last_valid_c
     type: float
     restore_value: false
@@ -84,6 +112,28 @@ select:
       - CIC
       - HA input
     initial_option: Local
+    on_value:
+      - lambda: |-
+          // Invalidate a bound calibration before the newly selected source can enter control.
+          if (!id(oq_water_supply_temp_current_source_ready)) return;
+          const int32_t current = id(oq_water_supply_temp_current_source_code);
+          const bool same_source =
+              (x == "Local" &&
+               (current == oq_supply_calibration::SOURCE_LOCAL_PT1000 ||
+                current == oq_supply_calibration::SOURCE_LOCAL_DS18B20)) ||
+              (x == "CIC" && current == oq_supply_calibration::SOURCE_CIC) ||
+              (x == "HA input" && current == oq_supply_calibration::SOURCE_HA_INPUT);
+          if (same_source) return;
+
+          const int32_t calibrated_source = id(oq_water_supply_temp_calibration_source_code);
+          if (calibrated_source > 0) {
+            id(oq_water_supply_temp_calibration_checksum) = 0;
+            id(oq_water_supply_temp_calibration_source_code) =
+                oq_supply_calibration::stale_source_code(calibrated_source);
+          }
+          id(oq_water_supply_temp_current_source_ready) = false;
+          if (id(oq_hp_water_calibration_active)) id(oq_hp_water_calibration_abort) = true;
+          id(water_supply_temp_selected).update();
 
   - platform: template
     name: "Flow Source"
@@ -135,6 +185,15 @@ switch:
     optimistic: true
 
 binary_sensor:
+  - platform: template
+    id: oq_water_supply_temp_calibration_required
+    name: "Water Supply Temperature Calibration Required"
+    icon: mdi:thermometer-alert
+    device_class: problem
+    entity_category: diagnostic
+    lambda: |-
+      return id(oq_water_supply_temp_calibration_source_code) < 0;
+
   - platform: template
     id: oq_water_supply_temp_fallback_active
     name: "Water Supply Temp Fallback Active"
@@ -248,6 +307,33 @@ binary_sensor:
       return false;
 
 text_sensor:
+  - platform: template
+    id: oq_water_supply_temp_calibration_status
+    name: "Water Supply Temperature Calibration Status"
+    icon: mdi:thermometer-check
+    entity_category: diagnostic
+    update_interval: 5s
+    lambda: |-
+      // Report whether the persisted record is active for the exact configured source.
+      const int32_t source_code = id(oq_water_supply_temp_calibration_source_code);
+      if (source_code < 0) {
+        return {std::string("Recalibration required: ") +
+                oq_supply_calibration::source_label(source_code)};
+      }
+      if (source_code == 0) return {"Not calibrated"};
+      if (!id(oq_water_supply_temp_current_source_ready)) return {"Calibration inactive: source not ready"};
+
+      const oq_supply_calibration::SourceIdentity current{
+          static_cast<oq_supply_calibration::SourceCode>(id(oq_water_supply_temp_current_source_code)),
+          id(oq_water_supply_temp_current_source_fingerprint), true};
+      const float offset_c = id(water_supply_temp_calibration_offset).state;
+      if (!oq_supply_calibration::record_matches(
+              source_code, id(oq_water_supply_temp_calibration_source_fingerprint),
+              id(oq_water_supply_temp_calibration_checksum), offset_c, current)) {
+        return {"Calibration inactive: validation failed"};
+      }
+      return {std::string("Calibrated: ") + oq_supply_calibration::source_label(source_code)};
+
   - platform: template
     id: oq_water_supply_temp_effective_source
     name: "Water Supply Temp Effective Source"
@@ -374,6 +460,44 @@ sensor:
       const uint32_t fallback_stale_ms = (uint32_t)(${oq_hp_water_temp_stale_s}UL * 1000UL);
       const uint32_t now_ms = (uint32_t) millis();
 
+      std::string local_source;
+      bool local_source_ready = false;
+      #if OQ_HARDWARE_HEATPUMP_CONTROLLER_Q
+      local_source_ready = id(${oq_local_supply_temp_selector_id}).has_state();
+      if (local_source_ready) local_source = id(${oq_local_supply_temp_selector_id}).current_option();
+      #endif
+      const bool cic_url_configured = id(cic_feed_url).has_state();
+      const std::string cic_url = cic_url_configured ? id(cic_feed_url).state : std::string();
+      const bool cic_url_ready = cic_url_configured && id(cic_component).is_url_ready(cic_url);
+      const auto source_identity = oq_supply_calibration::source_identity(
+          source.c_str(), OQ_HARDWARE_HEATPUMP_CONTROLLER_Q, local_source.c_str(), local_source_ready,
+          cic_url.c_str(), cic_url_ready, "${ha_water_supply_temp_entity_id}");
+
+      if (source_identity.ready) {
+        const bool source_changed = id(oq_water_supply_temp_current_source_ready) &&
+            (id(oq_water_supply_temp_current_source_code) != static_cast<int32_t>(source_identity.code) ||
+             id(oq_water_supply_temp_current_source_fingerprint) != source_identity.fingerprint);
+        const int32_t calibrated_source = id(oq_water_supply_temp_calibration_source_code);
+        const bool offset_ready = id(water_supply_temp_calibration_offset).has_state();
+        const float offset_c = id(water_supply_temp_calibration_offset).state;
+        const bool record_invalid = calibrated_source > 0 && offset_ready &&
+            !oq_supply_calibration::record_matches(
+                calibrated_source, id(oq_water_supply_temp_calibration_source_fingerprint),
+                id(oq_water_supply_temp_calibration_checksum), offset_c, source_identity);
+        if ((source_changed || record_invalid) && calibrated_source > 0) {
+          id(oq_water_supply_temp_calibration_checksum) = 0;
+          id(oq_water_supply_temp_calibration_source_code) =
+              oq_supply_calibration::stale_source_code(calibrated_source);
+        }
+        id(oq_water_supply_temp_current_source_code) = static_cast<int32_t>(source_identity.code);
+        id(oq_water_supply_temp_current_source_fingerprint) = source_identity.fingerprint;
+        id(oq_water_supply_temp_current_source_ready) = true;
+      } else {
+        id(oq_water_supply_temp_current_source_code) = 0;
+        id(oq_water_supply_temp_current_source_fingerprint) = 0;
+        id(oq_water_supply_temp_current_source_ready) = false;
+      }
+
       auto publish_effective_source = [&](const std::string &value) {
         if (!id(oq_water_supply_temp_effective_source).has_state() ||
             id(oq_water_supply_temp_effective_source).state != value) {
@@ -398,6 +522,13 @@ sensor:
 
       const bool selected_valid = !isnan(selected_c);
       if (selected_valid) {
+        const int32_t calibrated_source = id(oq_water_supply_temp_calibration_source_code);
+        const float offset_c = id(water_supply_temp_calibration_offset).state;
+        if (oq_supply_calibration::record_matches(
+                calibrated_source, id(oq_water_supply_temp_calibration_source_fingerprint),
+                id(oq_water_supply_temp_calibration_checksum), offset_c, source_identity)) {
+          selected_c += offset_c;
+        }
         if (hold_enabled) {
           id(oq_water_supply_temp_selected_last_valid_c) = selected_c;
           id(oq_water_supply_temp_selected_last_valid_ms) = now_ms;
@@ -470,11 +601,31 @@ sensor:
       if (source == "Outdoor unit") {
         #if OQ_HARDWARE_HEATPUMP_CONTROLLER_Q
         const auto q_flow_source = id(${oq_q_flow_source_selector_id}).current_option();
-        if (q_flow_source == "Local") {
+        bool q_uses_exclusively_local_flow = q_flow_source == "Local";
+        #if !OQ_TOPOLOGY_DUO
+        // Q V1 Auto resolves to the local controller meter in a single topology.
+        q_uses_exclusively_local_flow =
+          q_uses_exclusively_local_flow ||
+          (q_flow_source == "Auto" &&
+           id(hp_generation).has_state() &&
+           id(hp_generation).current_option() == "V1");
+        #endif
+        if (q_uses_exclusively_local_flow) {
           if (id(${oq_controller_flow_sensor_id}).has_state()) return id(${oq_controller_flow_sensor_id}).state;
           return NAN;
         }
         #endif
+        const oq_flow::PumpRelayState hp1_pump{
+          id(hp1_is_online) && id(hp1_pump_relay).has_state(), id(hp1_pump_relay).state
+        };
+        const oq_flow::PumpRelayState hp2_pump{
+          id(${secondary_hp_id}_is_online) && id(${secondary_hp_id}_pump_relay).has_state(),
+          id(${secondary_hp_id}_pump_relay).state
+        };
+        if (oq_flow::all_relevant_pumps_stopped(
+              (${flow_secondary_enabled} != 0), hp1_pump, hp2_pump)) {
+          return 0.0f;
+        }
         #if OQ_TOPOLOGY_DUO
         // Duo-only outdoor-unit flow selector:
         // - HP1/HP2 = direct individual outdoor-unit flowmeter

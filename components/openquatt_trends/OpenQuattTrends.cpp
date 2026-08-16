@@ -445,7 +445,14 @@ void OpenQuattTrends::load_archive_if_needed_() {
     this->scan_flash_archive_();
   }
 
-  if (this->flash_archive_seeded_) {
+  const TrendArchiveLoadAction load_action =
+      trend_archive_load_action(this->flash_archive_scanned_, this->flash_index_count_, this->flash_archive_seeded_);
+  if (load_action == TrendArchiveLoadAction::WAIT) {
+    return;
+  }
+
+  if (load_action == TrendArchiveLoadAction::MARK_EMPTY_AS_SEEDED) {
+    this->flash_archive_seeded_ = true;
     return;
   }
 

@@ -6,16 +6,52 @@
 #include "components/openquatt_usage_telemetry/OpenQuattUsageTelemetryPolicy.h"
 
 using esphome::openquatt_usage_telemetry::append_json_escaped;
+using esphome::openquatt_usage_telemetry::configured_source_wire_value;
 using esphome::openquatt_usage_telemetry::FixedBufferWriter;
+using esphome::openquatt_usage_telemetry::flow_source_config_wire_value;
+using esphome::openquatt_usage_telemetry::heating_strategy_wire_value;
 using esphome::openquatt_usage_telemetry::mqtt_cleanup_decision;
+using esphome::openquatt_usage_telemetry::MQTT_PUBLISH_RETAIN;
 using esphome::openquatt_usage_telemetry::MqttCleanupDecision;
+using esphome::openquatt_usage_telemetry::quatt_hybrid_generation_wire_value;
 
 int main() {
+  assert(MQTT_PUBLISH_RETAIN == 0);
+
   assert(mqtt_cleanup_decision(true, false, false, 0U) == MqttCleanupDecision::DESTROY);
   assert(mqtt_cleanup_decision(false, true, false, 1U) == MqttCleanupDecision::FORCE_DISCONNECT);
   assert(mqtt_cleanup_decision(false, false, false, 1U) == MqttCleanupDecision::RETRY_STOP);
   assert(mqtt_cleanup_decision(false, false, false, 2U) == MqttCleanupDecision::DESTROY_ALREADY_STOPPED);
   assert(mqtt_cleanup_decision(false, true, true, 2U) == MqttCleanupDecision::DESTROY_ALREADY_STOPPED);
+
+  assert(std::strcmp(quatt_hybrid_generation_wire_value("V1"), "v1") == 0);
+  assert(std::strcmp(quatt_hybrid_generation_wire_value("V1.5"), "v1_5") == 0);
+  assert(std::strcmp(quatt_hybrid_generation_wire_value("V2"), "v2") == 0);
+  assert(quatt_hybrid_generation_wire_value("unknown") == nullptr);
+
+  assert(std::strcmp(heating_strategy_wire_value("Power House"), "power_house") == 0);
+  assert(std::strcmp(heating_strategy_wire_value("Water Temperature Control (heating curve)"), "heating_curve") == 0);
+  assert(heating_strategy_wire_value("unknown") == nullptr);
+
+  assert(std::strcmp(configured_source_wire_value("Auto"), "auto") == 0);
+  assert(std::strcmp(configured_source_wire_value("Local"), "local") == 0);
+  assert(std::strcmp(configured_source_wire_value("Outdoor unit"), "outdoor_unit") == 0);
+  assert(std::strcmp(configured_source_wire_value("CIC"), "cic") == 0);
+  assert(std::strcmp(configured_source_wire_value("OT thermostat"), "opentherm") == 0);
+  assert(std::strcmp(configured_source_wire_value("HA input"), "home_assistant") == 0);
+  assert(std::strcmp(configured_source_wire_value("Home Assistant"), "home_assistant") == 0);
+  assert(std::strcmp(configured_source_wire_value("MQTT"), "mqtt") == 0);
+  assert(std::strcmp(configured_source_wire_value("CIC or HA input"), "cic_or_home_assistant") == 0);
+  assert(std::strcmp(configured_source_wire_value("Disabled"), "disabled") == 0);
+  assert(configured_source_wire_value("unknown") == nullptr);
+
+  assert(std::strcmp(flow_source_config_wire_value("CIC", false, ""), "cic") == 0);
+  assert(std::strcmp(flow_source_config_wire_value("Outdoor unit", false, ""), "outdoor_unit") == 0);
+  assert(std::strcmp(flow_source_config_wire_value("Outdoor unit", true, "Local"), "controller_local") == 0);
+  assert(std::strcmp(flow_source_config_wire_value("Outdoor unit", true, "Auto"), "outdoor_unit") == 0);
+  assert(std::strcmp(flow_source_config_wire_value("Outdoor unit", true, "Outdoor unit"), "outdoor_unit") == 0);
+  assert(flow_source_config_wire_value("Outdoor unit", true, "") == nullptr);
+  assert(flow_source_config_wire_value("unknown", false, "") == nullptr);
 
   std::array<char, 128U> escaped{};
   FixedBufferWriter json(escaped.data(), escaped.size());

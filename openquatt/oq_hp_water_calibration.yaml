@@ -96,12 +96,66 @@ globals:
     restore_value: false
     initial_value: 'NAN'
 
+  - id: oq_hp_water_calibration_result_supply_raw_avg_c
+    type: float
+    restore_value: false
+    initial_value: 'NAN'
+
+  - id: oq_hp_water_calibration_result_supply_offset_c
+    type: float
+    restore_value: false
+    initial_value: 'NAN'
+
+  - id: oq_hp_water_calibration_result_supply_source_code
+    type: int32_t
+    restore_value: false
+    initial_value: '0'
+
+  - id: oq_hp_water_calibration_result_supply_source_fingerprint
+    type: uint32_t
+    restore_value: false
+    initial_value: '0'
+
+  - id: oq_hp_water_calibration_result_supply_source
+    type: std::string
+    restore_value: false
+    initial_value: '""'
+
   - id: oq_hp_water_calibration_status_value
     type: std::string
     restore_value: false
     initial_value: '"IDLE"'
 
 number:
+  - platform: template
+    id: water_supply_temp_calibration_offset
+    name: "Water Supply Temperature Calibration Offset"
+    internal: true
+    icon: mdi:thermometer-plus
+    unit_of_measurement: "°C"
+    mode: slider
+    min_value: -2
+    max_value: 2
+    step: 0.01
+    restore_value: true
+    optimistic: true
+    initial_value: 0
+    entity_category: config
+    disabled_by_default: true
+    on_value:
+      - lambda: |-
+          // A manual offset write has no matching source-bound checksum.
+          const int32_t source_code = id(oq_water_supply_temp_calibration_source_code);
+          if (source_code <= 0 || !id(oq_water_supply_temp_current_source_ready)) return;
+          const uint32_t expected = oq_supply_calibration::record_checksum(
+              source_code, id(oq_water_supply_temp_calibration_source_fingerprint), x);
+          if (expected == id(oq_water_supply_temp_calibration_checksum)) return;
+
+          id(oq_water_supply_temp_calibration_checksum) = 0;
+          id(oq_water_supply_temp_calibration_source_code) =
+              oq_supply_calibration::stale_source_code(source_code);
+          id(water_supply_temp_selected).update();
+
   - platform: template
     id: hp1_water_in_temp_offset
     name: "HP1 water in temperature offset"
@@ -169,6 +223,22 @@ number:
   - platform: template
     id: oq_hp_calibration_hp1_water_in_offset_suggested
     name: "HP calibration HP1 water in offset suggested"
+    internal: true
+    icon: mdi:thermometer-check
+    unit_of_measurement: "°C"
+    mode: slider
+    min_value: -2
+    max_value: 2
+    step: 0.01
+    restore_value: false
+    optimistic: true
+    initial_value: 0
+    entity_category: diagnostic
+    disabled_by_default: true
+
+  - platform: template
+    id: oq_hp_calibration_supply_offset_suggested
+    name: "HP calibration supply temperature offset suggested"
     internal: true
     icon: mdi:thermometer-check
     unit_of_measurement: "°C"
