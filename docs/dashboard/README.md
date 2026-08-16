@@ -4,7 +4,7 @@ De Home Assistant-dashboards, optionele packages en bijbehorende handleidingen
 hebben een eigen releasecyclus. De primaire bron staat in de publieke companion-
 repository:
 
-**[OpenQuatt/openquatt-home-assistant](https://github.com/OpenQuatt/openquatt-home-assistant)**
+**[OpenQuatt/home-assistant-openquatt](https://github.com/OpenQuatt/home-assistant-openquatt)**
 
 Daar vind je:
 
