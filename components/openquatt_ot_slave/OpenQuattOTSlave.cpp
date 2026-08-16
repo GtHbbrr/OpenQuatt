@@ -287,21 +287,26 @@ void OpenQuattOTSlave::on_ota_global_state(ota::OTAState state, float progress, 
 #endif
 
 void OpenQuattOTSlave::processRequestThermostat(unsigned long request, OpenThermResponseStatus status) {
-  if (request == 0) return;
+  if (status != OpenThermResponseStatus::SUCCESS) {
+    return;
+  }
 
-  OpenThermMessageType requestType = m_ot_thermostat_->getMessageType(request);
-  OpenThermMessageID requestDataID = m_ot_thermostat_->getDataID(request);
-  uint16_t requestData = (uint16_t)request;
-  unsigned long response = 0;
-  if (status == OpenThermResponseStatus::SUCCESS) {
-    m_lastSuccessfulFrameMs = now_millis();
-    parseRequest(requestType, requestDataID, requestData);
-    if (m_response_enabled) {
-      response = build_slave_response_(requestType, requestDataID, requestData);
-    }
-    if (response != 0) {
-      m_ot_thermostat_->sendResponse(response);
-    }
+  m_lastSuccessfulFrameMs = now_millis();
+
+  const OpenThermMessageType request_type = m_ot_thermostat_->getMessageType(request);
+  const OpenThermMessageID request_data_id = m_ot_thermostat_->getDataID(request);
+  const uint16_t request_data = static_cast<uint16_t>(request);
+
+  parseRequest(request_type, request_data_id, request_data);
+
+  if (!m_response_enabled) {
+    return;
+  }
+
+  const unsigned long response = build_slave_response_(request_type, request_data_id, request_data);
+
+  if (response != 0) {
+    m_ot_thermostat_->sendResponse(response);
   }
 }
 
