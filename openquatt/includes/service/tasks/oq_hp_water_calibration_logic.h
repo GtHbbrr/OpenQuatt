@@ -269,6 +269,22 @@ class HpWaterCalibrationRuntime {
       publish("APPLY_FAILED: SUPPLY_RECORD");
       return;
     }
+    switch (supply_source.code) {
+      case oq_supply_calibration::SOURCE_LOCAL_PT1000:
+        id(oq_water_supply_temp_calibration_pt1000_backup).update();
+        break;
+      case oq_supply_calibration::SOURCE_LOCAL_DS18B20:
+        id(oq_water_supply_temp_calibration_ds18b20_backup).update();
+        break;
+      case oq_supply_calibration::SOURCE_CIC:
+        id(oq_water_supply_temp_calibration_cic_backup).update();
+        break;
+      case oq_supply_calibration::SOURCE_HA_INPUT:
+        id(oq_water_supply_temp_calibration_ha_input_backup).update();
+        break;
+      default:
+        break;
+    }
     id(water_supply_temp_selected).update();
 
     publish("APPLIED");

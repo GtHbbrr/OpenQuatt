@@ -56,6 +56,7 @@ globalThis.__settingsBackupCheckConfig = {
   SETTINGS_KEYS,
   SETTINGS_BACKUP_SECTIONS,
   SETTINGS_BACKUP_KEYS,
+  SETTINGS_BACKUP_CALIBRATION_KEYS,
   SETTINGS_BACKUP_WRITABLE_DOMAINS: [...SETTINGS_BACKUP_WRITABLE_DOMAINS],
   SETTINGS_BACKUP_EXPECTED_EXTRA_KEYS: [...SETTINGS_BACKUP_EXPECTED_EXTRA_KEYS],
   SETTINGS_BACKUP_EXCLUDED_KEYS: [...SETTINGS_BACKUP_EXCLUDED_KEYS],
@@ -73,6 +74,7 @@ export async function checkSettingsBackupConfig(configPath = DEFAULT_CONFIG_PATH
     SETTINGS_KEYS,
     SETTINGS_BACKUP_SECTIONS,
     SETTINGS_BACKUP_KEYS,
+    SETTINGS_BACKUP_CALIBRATION_KEYS,
     SETTINGS_BACKUP_WRITABLE_DOMAINS,
     SETTINGS_BACKUP_EXPECTED_EXTRA_KEYS,
     SETTINGS_BACKUP_EXCLUDED_KEYS,
@@ -83,10 +85,12 @@ export async function checkSettingsBackupConfig(configPath = DEFAULT_CONFIG_PATH
   const settingsKeys = SETTINGS_KEYS || [];
   const backupSections = SETTINGS_BACKUP_SECTIONS || [];
   const backupKeys = SETTINGS_BACKUP_KEYS || [];
+  const calibrationKeys = SETTINGS_BACKUP_CALIBRATION_KEYS || [];
   const writableDomains = new Set(SETTINGS_BACKUP_WRITABLE_DOMAINS || []);
   const expectedExtraKeys = new Set(SETTINGS_BACKUP_EXPECTED_EXTRA_KEYS || []);
   const excludedKeys = new Set(SETTINGS_BACKUP_EXCLUDED_KEYS || []);
   const backupKeySet = new Set(backupKeys);
+  const coveredKeySet = new Set([...backupKeys, ...calibrationKeys]);
 
   const invalidSections = backupSections
     .filter((section) => !validateSectionShape(section))
@@ -122,6 +126,16 @@ export async function checkSettingsBackupConfig(configPath = DEFAULT_CONFIG_PATH
     errors.push(`backup keys without entity definition: ${formatList(backupKeysWithoutEntity)}`);
   }
 
+  const calibrationKeysWithoutEntity = sorted(calibrationKeys.filter((key) => !entityDefs[key]));
+  if (calibrationKeysWithoutEntity.length) {
+    errors.push(`calibration backup keys without entity definition: ${formatList(calibrationKeysWithoutEntity)}`);
+  }
+
+  const calibrationKeysInSettings = sorted(calibrationKeys.filter((key) => backupKeySet.has(key)));
+  if (calibrationKeysInSettings.length) {
+    errors.push(`calibration backup keys duplicated in settings sections: ${formatList(calibrationKeysInSettings)}`);
+  }
+
   const expectedBackupKeys = new Set();
   settingsKeys.forEach((key) => {
     const entity = entityDefs[key];
@@ -134,22 +148,22 @@ export async function checkSettingsBackupConfig(configPath = DEFAULT_CONFIG_PATH
   });
   expectedExtraKeys.forEach((key) => expectedBackupKeys.add(key));
 
-  const excludedKeysInBackup = sorted(backupKeys.filter((key) => excludedKeys.has(key)));
+  const excludedKeysInBackup = sorted([...coveredKeySet].filter((key) => excludedKeys.has(key)));
   if (excludedKeysInBackup.length) {
     errors.push(`excluded keys are still in backup: ${formatList(excludedKeysInBackup)}`);
   }
 
-  const missingExpectedKeys = sorted([...expectedBackupKeys].filter((key) => !backupKeySet.has(key)));
+  const missingExpectedKeys = sorted([...expectedBackupKeys].filter((key) => !coveredKeySet.has(key)));
   if (missingExpectedKeys.length) {
     errors.push(`backup is missing expected settings: ${formatList(missingExpectedKeys)}`);
   }
 
-  const unexpectedBackupKeys = sorted(backupKeys.filter((key) => !expectedBackupKeys.has(key)));
+  const unexpectedBackupKeys = sorted([...coveredKeySet].filter((key) => !expectedBackupKeys.has(key)));
   if (unexpectedBackupKeys.length) {
     errors.push(`backup contains unexpected keys: ${formatList(unexpectedBackupKeys)}`);
   }
 
-  const nonWritableBackupKeys = sorted(backupKeys.filter((key) => {
+  const nonWritableBackupKeys = sorted([...coveredKeySet].filter((key) => {
     const entity = entityDefs[key];
     return entity && !writableDomains.has(entity.domain) && !expectedExtraKeys.has(key);
   }));
@@ -161,7 +175,7 @@ export async function checkSettingsBackupConfig(configPath = DEFAULT_CONFIG_PATH
     throw new Error(`Settings backup config is out of sync:\n- ${errors.join("\n- ")}`);
   }
 
-  console.log(`Settings backup config ok: ${backupKeys.length} keys across ${backupSections.length} sections`);
+  console.log(`Settings backup config ok: ${backupKeys.length} settings and ${calibrationKeys.length} calibration keys across ${backupSections.length} sections`);
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === __filename) {

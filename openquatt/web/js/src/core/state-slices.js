@@ -154,6 +154,7 @@ export function createSettingsState() {
     settingsRenderSignature: "",
     settingsBackupDraft: null,
     settingsBackupMqttPassword: "",
+    settingsBackupRestoreCalibrations: true,
     settingsBackupRestoreResult: null,
     settingsBackupError: "",
     settingsBackupBusy: false,

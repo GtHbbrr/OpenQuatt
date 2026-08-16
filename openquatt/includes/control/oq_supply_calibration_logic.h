@@ -128,8 +128,10 @@ inline bool record_valid(const CalibrationRecord& record, int32_t source_code, f
 }
 
 inline bool record_matches(const CalibrationRecord& record, const SourceIdentity& current, float max_offset_c = 2.0f) {
-  return current.ready && record.fingerprint == current.fingerprint &&
-         record_valid(record, static_cast<int32_t>(current.code), max_offset_c);
+  // CIC URL fingerprints still distinguish runtime connections and held data,
+  // but calibration is bound to the single CIC source type.
+  const bool fingerprint_matches = current.code == SOURCE_CIC || record.fingerprint == current.fingerprint;
+  return current.ready && fingerprint_matches && record_valid(record, static_cast<int32_t>(current.code), max_offset_c);
 }
 
 inline bool calibration_required(const CalibrationRecord& record, const SourceIdentity& current,
@@ -154,16 +156,31 @@ inline bool store_record(uint32_t (&storage)[kRecordStorageWords], const SourceI
   return true;
 }
 
+template <typename RecordComponent>
+inline void force_queue_record_persistence(RecordComponent* component) {
+  auto& storage = component->value();
+  const uint32_t checksum = storage[kRecordChecksumIndex];
+
+  // RestoringGlobalsComponent remembers the last queued value even when the
+  // later NVS sync fails. Toggle and restore one word synchronously so every
+  // retry queues the exact current record again. The final queued value always
+  // contains the original checksum.
+  storage[kRecordChecksumIndex] = checksum ^ 1U;
+  component->update();
+  storage[kRecordChecksumIndex] = checksum;
+  component->update();
+}
+
 inline bool migrate_legacy_record(uint32_t (&storage)[kRecordStorageWords], int32_t source_code,
                                   uint32_t source_fingerprint, uint32_t checksum, float offset_c,
                                   float max_offset_c = 2.0f) {
   const CalibrationRecord current = load_record(storage);
+  // Legacy migration is a one-time seed. A valid source slot is authoritative
+  // and must never be overwritten by the compatibility record.
+  if (record_valid(current, source_code, max_offset_c)) return false;
+
   CalibrationRecord legacy{source_fingerprint, checksum, offset_c};
   if (!record_valid(legacy, source_code, max_offset_c)) return false;
-  if (current.fingerprint == legacy.fingerprint && current.checksum == legacy.checksum &&
-      offset_bits(current.offset_c) == offset_bits(legacy.offset_c)) {
-    return false;
-  }
 
   const SourceIdentity legacy_source{static_cast<SourceCode>(source_code), source_fingerprint, true};
   return store_record(storage, legacy_source, offset_c, max_offset_c);
@@ -171,8 +188,9 @@ inline bool migrate_legacy_record(uint32_t (&storage)[kRecordStorageWords], int3
 
 inline bool record_matches(int32_t source_code, uint32_t source_fingerprint, uint32_t checksum, float offset_c,
                            const SourceIdentity& current, float max_offset_c = 2.0f) {
+  const bool fingerprint_matches = current.code == SOURCE_CIC || source_fingerprint == current.fingerprint;
   return current.ready && source_code > SOURCE_NONE && source_code == static_cast<int32_t>(current.code) &&
-         source_fingerprint == current.fingerprint && isfinite(offset_c) && fabsf(offset_c) <= max_offset_c &&
+         fingerprint_matches && isfinite(offset_c) && fabsf(offset_c) <= max_offset_c &&
          checksum == record_checksum(source_code, source_fingerprint, offset_c);
 }
 

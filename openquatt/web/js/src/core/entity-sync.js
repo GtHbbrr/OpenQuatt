@@ -1,5 +1,5 @@
 import { getSetupCompleteState, isTrendHistoryEnabled, renderAppSummary } from "./app-shared.js";
-import { AUX_RELAY_SETTING_KEYS, AUX_RELAY_STATE_KEYS, BOILER_DIAGNOSTIC_KEYS, BOILER_SETTING_KEYS, BOILER_SUPPORT_SWITCHING_KEYS, BULK_POLL_INTERVAL_MS, CIC_COMPATIBILITY_KEYS, CIC_POLLING_DIAGNOSTIC_KEYS, CIC_POLLING_SETTING_KEYS, COMMISSIONING_STATE_KEYS, COMPRESSOR_SETTING_KEYS, CONNECTIVITY_PROBE_SUCCESS_TTL_MS, CONNECTIVITY_PROBE_TIMEOUT_MS, CONTROL_REPLAY_STATE_KEYS, COOLING_SETTING_KEYS, CURVE_POINTS, CURVE_SETTING_KEYS, ENTITY_DEFS, ENTITY_REFRESH_CONCURRENCY, FAST_OVERVIEW_KEYS, FAST_VIEW_ENTITY_REFRESH_CONCURRENCY, FIRMWARE_ENTITY_KEYS, FIRMWARE_MODAL_KEYS, FLOW_SETTING_KEYS, FLOW_TUNING_KEYS, HEADER_ENTITY_KEYS, HIDDEN_POLL_INTERVAL_MS, INSTALLATION_MONITORING_STATE_KEYS, LIMIT_KEYS, ODU_RUNTIME_FREQUENCY_KEYS, OPENTHERM_DIAGNOSTIC_KEYS, OPENTHERM_SETTING_KEYS, OTB_DIAGNOSTIC_KEYS, OVERVIEW_ENERGY_COLUMN_CONFIGS, OVERVIEW_KEYS, OVERVIEW_METADATA_KEYS, POWER_HOUSE_KEYS, QUICK_START_FLOW_SOURCE_KEYS, QUICK_START_THERMOSTAT_SOURCE_KEYS, SENSOR_CALIBRATION_KEYS, SENSOR_CALIBRATION_STATE_KEYS, SENSOR_SELECTION_KEYS, SENSOR_SELECTION_STATE_KEYS, SERVICE_CONTROL_KEYS, SERVICE_STATUS_ENTITY_KEYS, SETTINGS_GROUP_IDS, SETTINGS_GROUPS, SETTINGS_KEYS, SILENT_SETTING_KEYS, STATIC_POLL_INTERVAL_MS } from "./config.js";
+import { AUX_RELAY_SETTING_KEYS, AUX_RELAY_STATE_KEYS, BOILER_DIAGNOSTIC_KEYS, BOILER_SETTING_KEYS, BOILER_SUPPORT_SWITCHING_KEYS, BULK_POLL_INTERVAL_MS, CIC_COMPATIBILITY_KEYS, CIC_POLLING_DIAGNOSTIC_KEYS, CIC_POLLING_SETTING_KEYS, COMMISSIONING_STATE_KEYS, COMPRESSOR_SETTING_KEYS, CONNECTIVITY_PROBE_SUCCESS_TTL_MS, CONNECTIVITY_PROBE_TIMEOUT_MS, CONTROL_REPLAY_STATE_KEYS, COOLING_SETTING_KEYS, CURVE_POINTS, CURVE_SETTING_KEYS, ENTITY_DEFS, ENTITY_REFRESH_CONCURRENCY, FAST_OVERVIEW_KEYS, FAST_VIEW_ENTITY_REFRESH_CONCURRENCY, FIRMWARE_ENTITY_KEYS, FIRMWARE_MODAL_KEYS, FLOW_SETTING_KEYS, FLOW_TUNING_KEYS, HEADER_ENTITY_KEYS, HIDDEN_POLL_INTERVAL_MS, INSTALLATION_MONITORING_STATE_KEYS, LIMIT_KEYS, ODU_RUNTIME_FREQUENCY_KEYS, OPENTHERM_DIAGNOSTIC_KEYS, OPENTHERM_SETTING_KEYS, OTB_DIAGNOSTIC_KEYS, OVERVIEW_ENERGY_COLUMN_CONFIGS, OVERVIEW_KEYS, OVERVIEW_METADATA_KEYS, POWER_HOUSE_KEYS, QUICK_START_FLOW_SOURCE_KEYS, QUICK_START_THERMOSTAT_SOURCE_KEYS, SENSOR_CALIBRATION_KEYS, SENSOR_CALIBRATION_STATE_KEYS, SENSOR_SELECTION_KEYS, SENSOR_SELECTION_STATE_KEYS, SERVICE_CONTROL_KEYS, SERVICE_STATUS_ENTITY_KEYS, SETTINGS_BACKUP_CALIBRATION_COMMIT_KEY, SETTINGS_BACKUP_CALIBRATION_KEYS, SETTINGS_GROUP_IDS, SETTINGS_GROUPS, SETTINGS_KEYS, SILENT_SETTING_KEYS, STATIC_POLL_INTERVAL_MS } from "./config.js";
 import { buildEntityPath, isCurveMode } from "./domain-helpers.js";
 import { getEntityValue, parseLooseNumber } from "./entity-store.js";
 import { state } from "./state.js";
@@ -21,6 +21,11 @@ import { getMqttSensorsModalRenderSignature, refreshMqttStatus, shouldRefreshMqt
 import { getApiSecurityStatusSignature, refreshApiSecurityStatus, refreshAuthStatus, shouldRefreshApiSecurityStatusForCurrentSurface, shouldRefreshAuthStatusForCurrentSurface } from "../features/security-actions.js";
 import { render } from "./render-scheduler.js";
 import { fetchWithTimeout } from "./browser-utils.js";
+
+  const SETTINGS_BACKUP_CALIBRATION_ENTITY_KEY_SET = new Set([
+    ...SETTINGS_BACKUP_CALIBRATION_KEYS,
+    SETTINGS_BACKUP_CALIBRATION_COMMIT_KEY,
+  ]);
 
   export function scheduleOverviewPrefetch() {
     if (state.nativeOpen || state.appView !== "settings") {
@@ -958,7 +963,7 @@ import { fetchWithTimeout } from "./browser-utils.js";
       forceMissing || SERVICE_STATUS_ENTITY_KEYS.has(key) || !isKnownOptionalMissingEntity(key, now)
     );
     if (!refreshKeys.length) {
-      return;
+      return { ok: true, message: "" };
     }
     const serviceStatusKeys = refreshKeys.filter((key) => SERVICE_STATUS_ENTITY_KEYS.has(key));
     const regularKeys = refreshKeys.filter((key) => !SERVICE_STATUS_ENTITY_KEYS.has(key));
@@ -973,7 +978,7 @@ import { fetchWithTimeout } from "./browser-utils.js";
         noteEntityRefreshSuccess();
         state.controlError = "";
       }
-      return;
+      return { ok: true, message: "" };
     }
 
     const requestedConcurrency = Number(options.concurrency);
@@ -1022,6 +1027,9 @@ import { fetchWithTimeout } from "./browser-utils.js";
         if (entity?.optional) {
           if (missing.has(key)) {
             markOptionalMissingEntity(key, now);
+            if (SETTINGS_BACKUP_CALIBRATION_ENTITY_KEY_SET.has(key)) {
+              delete state.entities[key];
+            }
           }
         } else if (!firstError) {
           firstError = `${entity?.name || key} ontbreekt in bulk response`;
@@ -1042,6 +1050,7 @@ import { fetchWithTimeout } from "./browser-utils.js";
       noteEntityRefreshSuccess();
       state.controlError = "";
     }
+    return { ok: !firstError, message: firstError };
   }
 
   export function mergeEntityPayload(key, previous = {}, payload = {}) {
@@ -1054,10 +1063,11 @@ import { fetchWithTimeout } from "./browser-utils.js";
       return next;
     }
 
-    if (!String(payload.state ?? "").trim() && String(previous?.state ?? "").trim()) {
+    const preservePreviousEmptyValue = !SETTINGS_BACKUP_CALIBRATION_ENTITY_KEY_SET.has(key);
+    if (preservePreviousEmptyValue && !String(payload.state ?? "").trim() && String(previous?.state ?? "").trim()) {
       next.state = previous.state;
     }
-    if (!String(payload.value ?? "").trim() && String(previous?.value ?? "").trim()) {
+    if (preservePreviousEmptyValue && !String(payload.value ?? "").trim() && String(previous?.value ?? "").trim()) {
       next.value = previous.value;
     }
     if (!Array.isArray(payload.option) && Array.isArray(previous?.option)) {

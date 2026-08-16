@@ -1,4 +1,5 @@
 export const SETTINGS_BACKUP_MIN_SCHEMA_VERSION = 1;
+export const SETTINGS_BACKUP_MAX_CALIBRATION_OFFSET_C = 2;
 
 export const SETTINGS_BACKUP_MQTT_INPUT_KEYS = Object.freeze([
   "cooling_dew_point",
@@ -26,6 +27,56 @@ const SETTINGS_BACKUP_MQTT_SOURCE_KEYS = new Set([
 
 function isObject(value) {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function normalizeCalibrationOffset(value, label) {
+  if (typeof value !== "number" || !Number.isFinite(value) || Math.abs(value) > SETTINGS_BACKUP_MAX_CALIBRATION_OFFSET_C) {
+    throw new Error(`Kalibratiewaarde ${label} in backup is ongeldig.`);
+  }
+  return Object.is(value, -0) ? 0 : value;
+}
+
+export function buildSettingsBackupCalibrationConfig(values, fields) {
+  const offsets = {};
+  const source = isObject(values) ? values : {};
+  (fields || []).forEach((field) => {
+    if (!Object.prototype.hasOwnProperty.call(source, field.key)) {
+      return;
+    }
+    offsets[field.id] = normalizeCalibrationOffset(source[field.key], field.label || field.id);
+  });
+  return { temperature_offsets: offsets };
+}
+
+export function normalizeSettingsBackupCalibrationConfig(value, fields, legacySettings = null) {
+  if (value !== null && value !== undefined && !isObject(value)) {
+    throw new Error("Kalibraties in backup zijn ongeldig.");
+  }
+  const offsets = value === null || value === undefined
+    ? {}
+    : value.temperature_offsets;
+  if (offsets !== undefined && !isObject(offsets)) {
+    throw new Error("Temperatuurkalibraties in backup zijn ongeldig.");
+  }
+
+  const normalized = {};
+  const legacyValues = isObject(legacySettings?.sensor_sources) ? legacySettings.sensor_sources : {};
+  (fields || []).forEach((field) => {
+    const hasCurrentValue = isObject(offsets) && Object.prototype.hasOwnProperty.call(offsets, field.id);
+    const hasLegacyValue = Object.prototype.hasOwnProperty.call(legacyValues, field.key);
+    if (!hasCurrentValue && !hasLegacyValue) {
+      return;
+    }
+    const rawValue = hasCurrentValue ? offsets[field.id] : legacyValues[field.key];
+    normalized[field.id] = normalizeCalibrationOffset(rawValue, field.label || field.id);
+  });
+  return { temperature_offsets: normalized };
+}
+
+export function collectUnknownSettingsBackupCalibrationIds(value, fields) {
+  const offsets = isObject(value?.temperature_offsets) ? value.temperature_offsets : {};
+  const knownIds = new Set((fields || []).map((field) => field.id));
+  return Object.keys(offsets).filter((id) => !knownIds.has(id)).sort();
 }
 
 function pickBooleanMap(source, keys, fallback = false) {

@@ -159,6 +159,13 @@ const actionDelegates = [
       return;
     }
 
+    if (event.target.dataset.oqBackupRestoreCalibrations !== undefined) {
+      state.settingsBackupRestoreCalibrations = Boolean(event.target.checked);
+      state.settingsBackupError = "";
+      event.target.closest(".oq-helper-modal")?.querySelector(".oq-settings-backup-error")?.remove();
+      return;
+    }
+
     const field = event.target.dataset.oqField;
     if (!field) {
       if (event.target.dataset.oqQuickstartCicUrl !== undefined) {

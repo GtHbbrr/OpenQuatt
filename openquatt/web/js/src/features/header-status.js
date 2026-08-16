@@ -480,7 +480,7 @@ import { render } from "../core/render-scheduler.js";
 
     if (state.systemModal === "settings-backup-success") {
       const notice = state.controlNotice || "Backup hersteld.";
-      const result = state.settingsBackupRestoreResult || { applied: [], skipped: [], unknown: [], mqttIncluded: false };
+      const result = state.settingsBackupRestoreResult || { applied: [], skipped: [], unknown: [], calibrationsIncluded: 0, calibrationsRequested: false, calibrationsRestored: 0, mqttIncluded: false };
       const resultItems = [...result.skipped, ...result.unknown];
       const resultDetails = resultItems.length ? `
         <details class="oq-settings-backup-result-details" open>
@@ -522,6 +522,7 @@ import { render } from "../core/render-scheduler.js";
             <div><span>Onbekend</span><strong>${escapeHtml(String(result.unknown.length))}</strong></div>
           </div>
           ${resultDetails}
+          ${result.calibrationsIncluded ? `<p class="oq-settings-action-note">${result.calibrationsRequested ? `Sensorcorrecties: ${escapeHtml(String(result.calibrationsRestored))} van ${escapeHtml(String(result.calibrationsIncluded))} kalibratiewaarden door de controller bevestigd.` : "Sensorcorrecties zijn op verzoek niet hersteld; de huidige waarden zijn behouden."}</p>` : ""}
           ${result.mqttIncluded ? "" : `<p class="oq-settings-action-note oq-settings-action-note--warning">Deze backup bevatte geen MQTT-configuratie. Bestaande MQTT-instellingen en MQTT-afhankelijke bronselecties zijn behouden.</p>`}
           <div class="oq-helper-modal-actions">
             <button class="oq-helper-button oq-helper-button--primary" type="button" data-oq-action="close-system-modal">Gereed</button>

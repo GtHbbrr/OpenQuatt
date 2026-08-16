@@ -50,7 +50,8 @@ text:
     initial_value: "http://192.168.2.117:8080/beta/feed/data.json"
     on_value:
       - lambda: |-
-          // The feed URL is part of the CIC identity; exact record matching happens in the selected-source path.
+          // A URL change resets the connection state, but the single CIC keeps
+          // its source-type-bound calibration.
           id(cic_component).notify_url_changed(x);
           if (id(water_supply_source).has_state() &&
               id(water_supply_source).current_option() == "CIC") {

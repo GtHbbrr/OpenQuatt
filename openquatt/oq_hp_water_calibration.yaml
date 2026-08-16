@@ -10,6 +10,18 @@
 #
 # ==============================================================================
 
+esphome:
+  on_boot:
+    priority: -100
+    then:
+      - lambda: |-
+          // Template numbers with lambdas do not publish during setup. Seed
+          // their backup-facing state immediately after restored globals load.
+          id(oq_water_supply_temp_calibration_pt1000_backup).update();
+          id(oq_water_supply_temp_calibration_ds18b20_backup).update();
+          id(oq_water_supply_temp_calibration_cic_backup).update();
+          id(oq_water_supply_temp_calibration_ha_input_backup).update();
+
 globals:
   - id: oq_hp_water_calibration_active
     type: bool
@@ -142,6 +154,180 @@ number:
     initial_value: 0
     entity_category: config
     disabled_by_default: true
+
+  # Read/write backup bridges for the four source-bound records. Only the
+  # offset crosses the web API; firmware reconstructs identity and checksum.
+  - platform: template
+    id: oq_water_supply_temp_calibration_pt1000_backup
+    name: "Water Supply PT1000 Calibration Offset"
+    internal: true
+    icon: mdi:thermometer-plus
+    unit_of_measurement: "°C"
+    mode: box
+    min_value: -2
+    max_value: 2
+    step: 0.01
+    update_interval: 5s
+    entity_category: config
+    disabled_by_default: true
+    lambda: |-
+      const oq_supply_calibration::SourceIdentity source{
+          oq_supply_calibration::SOURCE_LOCAL_PT1000,
+          oq_supply_calibration::fingerprint(
+              oq_supply_calibration::SOURCE_LOCAL_PT1000, "local:pt1000"),
+          true};
+      const auto record = oq_supply_calibration::load_record(
+          id(oq_water_supply_temp_calibration_pt1000_record));
+      return oq_supply_calibration::record_matches(record, source) ? record.offset_c : NAN;
+    set_action:
+      - lambda: |-
+          const oq_supply_calibration::SourceIdentity source{
+              oq_supply_calibration::SOURCE_LOCAL_PT1000,
+              oq_supply_calibration::fingerprint(
+                  oq_supply_calibration::SOURCE_LOCAL_PT1000, "local:pt1000"),
+              true};
+          if (!oq_supply_calibration::store_record(
+                  id(oq_water_supply_temp_calibration_pt1000_record), source, x)) return;
+          oq_water_supply_temp_calibration_pt1000_record->update();
+          id(oq_water_supply_temp_calibration_pt1000_backup).publish_state(x);
+          id(water_supply_temp_selected).update();
+
+  - platform: template
+    id: oq_water_supply_temp_calibration_ds18b20_backup
+    name: "Water Supply DS18B20 Calibration Offset"
+    internal: true
+    icon: mdi:thermometer-plus
+    unit_of_measurement: "°C"
+    mode: box
+    min_value: -2
+    max_value: 2
+    step: 0.01
+    update_interval: 5s
+    entity_category: config
+    disabled_by_default: true
+    lambda: |-
+      const oq_supply_calibration::SourceIdentity source{
+          oq_supply_calibration::SOURCE_LOCAL_DS18B20,
+          oq_supply_calibration::fingerprint(
+              oq_supply_calibration::SOURCE_LOCAL_DS18B20, "local:ds18b20"),
+          true};
+      const auto record = oq_supply_calibration::load_record(
+          id(oq_water_supply_temp_calibration_ds18b20_record));
+      return oq_supply_calibration::record_matches(record, source) ? record.offset_c : NAN;
+    set_action:
+      - lambda: |-
+          const oq_supply_calibration::SourceIdentity source{
+              oq_supply_calibration::SOURCE_LOCAL_DS18B20,
+              oq_supply_calibration::fingerprint(
+                  oq_supply_calibration::SOURCE_LOCAL_DS18B20, "local:ds18b20"),
+              true};
+          if (!oq_supply_calibration::store_record(
+                  id(oq_water_supply_temp_calibration_ds18b20_record), source, x)) return;
+          oq_water_supply_temp_calibration_ds18b20_record->update();
+          id(oq_water_supply_temp_calibration_ds18b20_backup).publish_state(x);
+          id(water_supply_temp_selected).update();
+
+  - platform: template
+    id: oq_water_supply_temp_calibration_cic_backup
+    name: "Water Supply CIC Calibration Offset"
+    internal: true
+    icon: mdi:thermometer-plus
+    unit_of_measurement: "°C"
+    mode: box
+    min_value: -2
+    max_value: 2
+    step: 0.01
+    update_interval: 5s
+    entity_category: config
+    disabled_by_default: true
+    lambda: |-
+      const auto record = oq_supply_calibration::load_record(
+          id(oq_water_supply_temp_calibration_cic_record));
+      return oq_supply_calibration::record_valid(
+          record, oq_supply_calibration::SOURCE_CIC) ? record.offset_c : NAN;
+    set_action:
+      - lambda: |-
+          // Rebuild a URL-compatible record; matching remains CIC-type-bound.
+          const std::string cic_url = id(cic_feed_url).has_state()
+              ? id(cic_feed_url).state
+              : std::string();
+          const oq_supply_calibration::SourceIdentity source{
+              oq_supply_calibration::SOURCE_CIC,
+              oq_supply_calibration::fingerprint(
+                  oq_supply_calibration::SOURCE_CIC, cic_url.c_str()),
+              !cic_url.empty()};
+          if (!oq_supply_calibration::store_record(
+                  id(oq_water_supply_temp_calibration_cic_record), source, x)) return;
+          oq_water_supply_temp_calibration_cic_record->update();
+          id(oq_water_supply_temp_calibration_cic_backup).publish_state(x);
+          id(water_supply_temp_selected).update();
+
+  - platform: template
+    id: oq_water_supply_temp_calibration_ha_input_backup
+    name: "Water Supply HA Input Calibration Offset"
+    internal: true
+    icon: mdi:thermometer-plus
+    unit_of_measurement: "°C"
+    mode: box
+    min_value: -2
+    max_value: 2
+    step: 0.01
+    update_interval: 5s
+    entity_category: config
+    disabled_by_default: true
+    lambda: |-
+      const oq_supply_calibration::SourceIdentity source{
+          oq_supply_calibration::SOURCE_HA_INPUT,
+          oq_supply_calibration::fingerprint(
+              oq_supply_calibration::SOURCE_HA_INPUT, "${ha_water_supply_temp_entity_id}"),
+          true};
+      const auto record = oq_supply_calibration::load_record(
+          id(oq_water_supply_temp_calibration_ha_input_record));
+      return oq_supply_calibration::record_matches(record, source) ? record.offset_c : NAN;
+    set_action:
+      - lambda: |-
+          const oq_supply_calibration::SourceIdentity source{
+              oq_supply_calibration::SOURCE_HA_INPUT,
+              oq_supply_calibration::fingerprint(
+                  oq_supply_calibration::SOURCE_HA_INPUT, "${ha_water_supply_temp_entity_id}"),
+              true};
+          if (!oq_supply_calibration::store_record(
+                  id(oq_water_supply_temp_calibration_ha_input_record), source, x)) return;
+          oq_water_supply_temp_calibration_ha_input_record->update();
+          id(oq_water_supply_temp_calibration_ha_input_backup).publish_state(x);
+          id(water_supply_temp_selected).update();
+
+  # Persistence acknowledgement for the complete calibration backup restore.
+  # The web UI writes a unique token after all eight offsets and accepts the
+  # restore only when that exact token is read back.
+  - platform: template
+    id: oq_calibration_backup_commit_token
+    name: "Calibration Backup Commit Token"
+    internal: true
+    icon: mdi:content-save-check
+    mode: box
+    min_value: 1
+    max_value: 1000000
+    step: 1
+    update_interval: never
+    entity_category: config
+    disabled_by_default: true
+    lambda: |-
+      return NAN;
+    set_action:
+      - lambda: |-
+          // Queue every source-bound record before flushing all pending
+          // preferences, including the four HP template-number offsets.
+          oq_supply_calibration::force_queue_record_persistence(
+              oq_water_supply_temp_calibration_pt1000_record);
+          oq_supply_calibration::force_queue_record_persistence(
+              oq_water_supply_temp_calibration_ds18b20_record);
+          oq_supply_calibration::force_queue_record_persistence(
+              oq_water_supply_temp_calibration_cic_record);
+          oq_supply_calibration::force_queue_record_persistence(
+              oq_water_supply_temp_calibration_ha_input_record);
+          const bool synced = global_preferences != nullptr && global_preferences->sync();
+          id(oq_calibration_backup_commit_token).publish_state(synced ? x : NAN);
 
   - platform: template
     id: hp1_water_in_temp_offset
