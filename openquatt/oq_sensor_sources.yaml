@@ -15,14 +15,6 @@ packages:
   oq_cooling_safety: !include oq_cooling_safety.yaml
 
 globals:
-  - id: oq_water_supply_temp_selected_last_valid_c
-    type: float
-    restore_value: false
-    initial_value: 'NAN'
-  - id: oq_water_supply_temp_selected_last_valid_ms
-    type: uint32_t
-    restore_value: false
-    initial_value: '0'
   - id: oq_water_supply_temp_selected_hold_active
     type: bool
     restore_value: false
@@ -450,15 +442,16 @@ sensor:
     update_interval: 5s
     lambda: |-
       // Prefer the configured source, then the topology's last heat-pump outlet.
-      // If both are unavailable, keep the existing short HA reload hold as a last resort.
+      // If both are unavailable, briefly hold the last value from the exact same source.
       const bool source_available = id(water_supply_source).has_state();
       const std::string source = source_available
           ? id(water_supply_source).current_option()
           : std::string();
-      const bool hold_enabled = source == "HA input";
-      const uint32_t hold_ms = (uint32_t)(${oq_selected_input_stale_hold_s}UL * 1000UL);
+      const uint32_t local_cic_hold_ms = (uint32_t)(${oq_water_supply_temp_local_cic_hold_s}UL * 1000UL);
+      const uint32_t ha_hold_ms = (uint32_t)(${oq_selected_input_stale_hold_s}UL * 1000UL);
       const uint32_t fallback_stale_ms = (uint32_t)(${oq_hp_water_temp_stale_s}UL * 1000UL);
       const uint32_t now_ms = (uint32_t) millis();
+      static oq_supply_hold::State selected_hold;
 
       std::string local_source;
       bool local_source_ready = false;
@@ -473,6 +466,13 @@ sensor:
           source.c_str(), OQ_HARDWARE_HEATPUMP_CONTROLLER_Q, local_source.c_str(), local_source_ready,
           cic_url.c_str(), cic_url_ready, "${ha_water_supply_temp_entity_id}");
 
+      auto clear_selected_hold = [&]() {
+        selected_hold.reset();
+        id(oq_water_supply_temp_selected_hold_active) = false;
+      };
+      const bool cached_source_changed = selected_hold.has_value() && !selected_hold.matches_source(source_identity);
+      if (cached_source_changed) clear_selected_hold();
+
       if (source_identity.ready) {
         const bool source_changed = id(oq_water_supply_temp_current_source_ready) &&
             (id(oq_water_supply_temp_current_source_code) != static_cast<int32_t>(source_identity.code) ||
@@ -484,6 +484,7 @@ sensor:
             !oq_supply_calibration::record_matches(
                 calibrated_source, id(oq_water_supply_temp_calibration_source_fingerprint),
                 id(oq_water_supply_temp_calibration_checksum), offset_c, source_identity);
+        if (record_invalid) clear_selected_hold();
         if ((source_changed || record_invalid) && calibrated_source > 0) {
           id(oq_water_supply_temp_calibration_checksum) = 0;
           id(oq_water_supply_temp_calibration_source_code) =
@@ -529,12 +530,10 @@ sensor:
                 id(oq_water_supply_temp_calibration_checksum), offset_c, source_identity)) {
           selected_c += offset_c;
         }
-        if (hold_enabled) {
-          id(oq_water_supply_temp_selected_last_valid_c) = selected_c;
-          id(oq_water_supply_temp_selected_last_valid_ms) = now_ms;
+        if (source_identity.ready) {
+          selected_hold.remember(selected_c, now_ms, source_identity);
         } else {
-          id(oq_water_supply_temp_selected_last_valid_c) = NAN;
-          id(oq_water_supply_temp_selected_last_valid_ms) = 0;
+          clear_selected_hold();
         }
         id(oq_water_supply_temp_selected_hold_active) = false;
         id(oq_water_supply_temp_fallback_runtime_active) = false;
@@ -555,6 +554,10 @@ sensor:
       }
 
       id(oq_water_supply_temp_selected_hold_active) = false;
+      const uint32_t hold_ms = oq_supply_hold::timeout_ms(source_identity, local_cic_hold_ms, ha_hold_ms);
+      const bool selected_hold_available = selected_hold.available(source_identity, now_ms, hold_ms);
+      if (!selected_hold_available) clear_selected_hold();
+
       const uint32_t fallback_last_update_ms = id(${secondary_water_out_last_update_ms_id});
       const bool fallback_fresh =
           fallback_last_update_ms > 0 &&
@@ -569,16 +572,14 @@ sensor:
       }
 
       id(oq_water_supply_temp_fallback_runtime_active) = false;
-      if (hold_enabled &&
-          hold_ms > 0 &&
-          id(oq_water_supply_temp_selected_last_valid_ms) > 0 &&
-          (uint32_t)(now_ms - id(oq_water_supply_temp_selected_last_valid_ms)) < hold_ms &&
-          !isnan(id(oq_water_supply_temp_selected_last_valid_c))) {
+      if (selected_hold_available) {
         id(oq_water_supply_temp_selected_hold_active) = true;
-        publish_effective_source("HA input");
-        return id(oq_water_supply_temp_selected_last_valid_c);
+        publish_effective_source(
+            std::string(oq_supply_calibration::source_label(selected_hold.source_code)) + " (held)");
+        return selected_hold.last_valid_c;
       }
 
+      clear_selected_hold();
       publish_effective_source("Unavailable");
       return NAN;
 

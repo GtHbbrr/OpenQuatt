@@ -140,6 +140,11 @@ These offsets spread network and bus work; they are not readiness guarantees. A 
 
 Runtime selectors decide per signal whether selected values come from local, CIC, or HA-input sources.
 
+`water_supply_temp_selected` first uses the configured source and then a fresh heat-pump outlet fallback. If neither is
+available, it briefly holds the last value from that exact source: 15 seconds for Local/CIC sensor dropouts and 300
+seconds for HA input so a Home Assistant restart does not interrupt control. Any source change clears the held value;
+after the applicable timeout the signal returns to the existing `NaN` fail-safe path.
+
 ### 4.3 Demand layer
 
 Strategy packages compute:

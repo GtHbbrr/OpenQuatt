@@ -127,6 +127,8 @@ select:
           }
           id(oq_water_supply_temp_current_source_ready) = false;
           if (id(oq_hp_water_calibration_active)) id(oq_hp_water_calibration_abort) = true;
+          // Refresh the local proxy first so the old physical source cannot be cached under the new identity.
+          id(water_supply_temp_esp).update();
           id(water_supply_temp_selected).update();
 
   - platform: template
