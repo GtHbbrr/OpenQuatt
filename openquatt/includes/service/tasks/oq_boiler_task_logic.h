@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <string>
 
+#include "../../boiler/oq_boiler_logic.h"
 #include "../oq_service_runtime.h"
 
 namespace oq_boiler_task {
