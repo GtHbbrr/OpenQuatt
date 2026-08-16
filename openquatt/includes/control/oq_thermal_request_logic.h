@@ -186,8 +186,13 @@ inline uint32_t capped_loop_dt_ms(uint32_t now_ms, uint32_t last_loop_ms, uint32
 }
 
 inline bool min_runtime_window_active(uint32_t now_ms, uint32_t last_real_start_ms, uint32_t min_runtime_ms) {
-  return last_real_start_ms > 0 && now_ms > last_real_start_ms &&
-         (uint32_t)(now_ms - last_real_start_ms) < min_runtime_ms;
+  return last_real_start_ms > 0 && (uint32_t)(now_ms - last_real_start_ms) < min_runtime_ms;
+}
+
+inline bool min_runtime_hold_required(int requested_level, bool runtime_hold_blocked, bool runtime_window_active,
+                                      int previous_applied_level, bool measured_thermal) {
+  return requested_level == 0 && !runtime_hold_blocked && runtime_window_active &&
+         (previous_applied_level > 0 || measured_thermal);
 }
 
 }  // namespace oq_request
