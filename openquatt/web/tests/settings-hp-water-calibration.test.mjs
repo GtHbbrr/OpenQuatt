@@ -9,7 +9,7 @@ globalThis.window = {
 };
 
 const { state } = await import("../js/src/core/state.js");
-const { renderHpWaterCalibrationWizard } = await import("../js/src/settings/service.js");
+const { getSettingsServiceModel, renderHpWaterCalibrationWizard } = await import("../js/src/settings/service.js");
 const { handleSystemAction } = await import("../js/src/features/system-actions.js");
 const { getWaterSupplyCorrectionView, renderHpWaterSensorOffsetSettings, renderHpWaterSensorOffsetsModal, renderWaterSettingsFields } = await import("../js/src/settings/water.js");
 
@@ -72,6 +72,32 @@ test("lege resultaatbron valt tijdens de meting terug op de actieve bron", () =>
   assert.match(markup, /Aanvoer \(CIC\)/);
   assert.doesNotMatch(markup, /Aanvoer \(IDLE\)/);
   assert.doesNotMatch(markup, /Supply verschil|Voorlopige aanvoercorrectie/);
+});
+
+test("kalibratie mengt drie minuten en toont de verwachte totale duur", () => {
+  state.loadingEntities = false;
+  state.entities = {
+    cm100Active: { value: true, state: "ON" },
+    hpWaterCalibrationStatus: { value: "MIXING", state: "MIXING" },
+    hpWaterCalibrationRemaining: { value: 300, uom: "s" },
+    hpWaterCalibrationPhase: { value: 1 },
+  };
+
+  const markup = renderHpWaterCalibrationWizard({
+    status: "MIXING",
+    running: true,
+    resultReady: false,
+    startDisabled: true,
+    abortDisabled: false,
+    applyDisabled: true,
+    busy: false,
+    controlsAvailable: true,
+  });
+  const task = getSettingsServiceModel().tasks.find(({ key }) => key === "hp-water-calibration");
+
+  assert.match(markup, /meting start over 180 s/);
+  assert.match(task.cardMarkup, /ongeveer 3 tot 5 minuten/);
+  assert.match(task.cardMarkup, /mengt het water 3 minuten/);
 });
 
 test("sensorcorrecties tonen de actieve aanvoercorrectie alleen-lezen", () => {

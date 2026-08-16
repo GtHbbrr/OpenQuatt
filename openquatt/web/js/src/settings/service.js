@@ -218,7 +218,7 @@ import { renderModalShell } from "../core/modal-shell.js";
     const mixing = running && (phaseCode === 1 || normalizedStatus.includes("MIXING"));
     const measuring = running && !mixing;
     const maxDurationS = 300;
-    const minMixingS = 60;
+    const minMixingS = 180;
     const elapsed = Number.isFinite(remaining) ? Math.max(0, maxDurationS - remaining) : NaN;
     const mixingRemaining = Number.isFinite(elapsed) ? Math.max(0, minMixingS - elapsed) : NaN;
     const progressValue = mixing && Number.isFinite(elapsed)
@@ -596,7 +596,7 @@ import { renderModalShell } from "../core/modal-shell.js";
         cardMarkup: renderCommissioningTaskCard({
           taskKey: "hp-water-calibration",
           title: "Temperatuursensoren kalibreren",
-          copy: "Doorloop voorbereiding, meting en toepassen in vaste volgorde. De meting stopt eerder zodra de sensoren stabiel genoeg zijn.",
+          copy: "Reken op ongeveer 3 tot 5 minuten. Eerst mengt het water 3 minuten; daarna stopt de meting zodra de sensoren stabiel genoeg zijn.",
           subcopy: "De voorgestelde waarden worden pas actief wanneer je ze toepast. De aanvoer-offset is brongebonden en wordt bij een bronwissel uitgeschakeld.",
           status: hpWaterCalibrationStatusDisplay,
           statusCopy: hpWaterCalibrationTaskRunning

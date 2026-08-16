@@ -66,7 +66,7 @@ struct WindowStats {
 
 inline RuntimeConfig make_runtime_config(int sample_time_s) {
   return RuntimeConfig{
-      sample_time_s <= 0 ? 1 : sample_time_s, 60, 60, 300, 120, 650, 50, 850, 20.0f, 0.35f, 0.20f, 2.0f};
+      sample_time_s <= 0 ? 1 : sample_time_s, 180, 60, 300, 120, 650, 50, 850, 20.0f, 0.35f, 0.20f, 2.0f};
 }
 
 inline int clamp_ipwm(int value, int min_ipwm, int max_ipwm) {
