@@ -488,6 +488,13 @@ def validate_command(args: argparse.Namespace) -> int:
         log_path=log_dir / "web-docs-sync.log",
         label="web/docs contract",
     )
+    run_logged(
+        ["npm", "run", "build:web"],
+        cwd=command_root,
+        env=env,
+        log_path=log_dir / "web-bundles.log",
+        label="web bundles",
+    )
 
     for config in args.configs:
         stem = config_log_stem(config)

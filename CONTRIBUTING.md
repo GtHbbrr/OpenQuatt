@@ -111,6 +111,15 @@ Use the project helper for normal local checks:
 - `python3 scripts/dev.py validate --config-only`
 - `python3 scripts/dev.py validate --jobs 2`
 
+For C/C++ source files, install the exact version from `.clang-format-version` and use the repository formatting commands. The cross-platform `uv` tool installer provides the pinned binary:
+
+- `uv tool install --force clang-format==22.1.8`
+- `clang-format --version`
+- `npm run check:cpp-format`
+- `npm run fix:cpp-format`
+
+The formatting commands reject any version other than the one pinned in `.clang-format-version` and include both tracked and new, non-ignored C/C++ files. If `clang-format` is installed but not in `PATH`, set `CLANG_FORMAT_BIN` to the executable path before running the npm command. CI enforces the same version and formatting, so run the local fix command before opening or updating a pull request.
+
 For quick iterations, the standalone checks remain useful:
 
 - `python3 scripts/check_style_consistency.py`
@@ -120,13 +129,11 @@ The checker is intended as a local quality gate. Add new rules only once the cur
 
 ## Generated Web Bundles
 
-The files `openquatt/web/js/openquatt-app.js` and `openquatt/web/css/openquatt-app.css` are generated and committed for firmware and release builds. Configure their merge driver once per clone:
+The files `openquatt/web/js/openquatt-app.js` and `openquatt/web/css/openquatt-app.css` are generated artifacts and are no longer committed. CI and local validate rebuild them before firmware compilation.
 
-- `rtk npm run setup:git-merge-driver`
-
-The driver keeps the current bundle during a merge instead of creating generated-file conflicts. Resolve conflicts only in `openquatt/web/js/src/` and `openquatt/web/css/src/`, then regenerate and verify the committed bundles:
+When you change web sources, validate the generated output locally with:
 
 - `rtk npm run build:web`
 - `rtk npm run check:web`
 
-CI runs the check and fails when the committed bundles do not match their sources.
+CI runs the same checks and rebuilds bundles during the pipeline.

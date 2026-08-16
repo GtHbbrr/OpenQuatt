@@ -143,15 +143,8 @@ Controleer:
 
 Koeling is bewust terughoudend. Zonder goede dauwpuntinformatie kan blokkeren precies het veilige gedrag zijn.
 
-Gebruik je dauwpuntbronnen uit Home Assistant, controleer dan ook:
-
-- staat `openquatt_ha_dynamic_cooling_package.yaml` in `/config/packages/`;
-- is `input_number.openquatt_cooling_room_count` groter dan `0`;
-- is per kamer een directe dauwpuntbron ingevuld, of temperatuur plus luchtvochtigheid;
-- staat `binary_sensor.openquatt_ext_cooling_dew_point_valid` op `on`;
-- lijkt `sensor.openquatt_ext_cooling_dew_point` logisch.
-
-Zie [Dashboard installeren](dashboard/README.md#optioneel-dynamische-koelbronnen-via-home-assistant) voor de dynamische koelbronnen in Home Assistant.
+Gebruik je dauwpuntbronnen uit Home Assistant, volg dan de actuele
+[handleiding voor dynamische koelbronnen](https://github.com/OpenQuatt/openquatt-home-assistant/blob/main/docs/cooling.md).
 
 Gebruik je MQTT voor het dauwpunt, controleer dan ook:
 

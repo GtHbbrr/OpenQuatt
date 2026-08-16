@@ -12,8 +12,7 @@ static constexpr uint16_t HALF_BIT_MAX_US = 620;
 static constexpr uint16_t FULL_BIT_MIN_US = 880;
 static constexpr uint16_t FULL_BIT_MAX_US = 1120;
 
-inline bool completion_is_within_deadline(
-    uint32_t completed_us, uint32_t deadline_us) {
+inline bool completion_is_within_deadline(uint32_t completed_us, uint32_t deadline_us) {
   return static_cast<int32_t>(completed_us - deadline_us) <= 0;
 }
 
@@ -59,7 +58,7 @@ inline bool has_even_parity(uint32_t value) {
   return (~value) & 1U;
 }
 
-inline DecodeResult decode(const Pulse *pulses, size_t pulse_count) {
+inline DecodeResult decode(const Pulse* pulses, size_t pulse_count) {
   DecodeResult result{};
   result.pulse_count = pulse_count;
   uint8_t half_bits[HALF_BITS]{};
@@ -67,7 +66,7 @@ inline DecodeResult decode(const Pulse *pulses, size_t pulse_count) {
   size_t half_bit_count = 0;
 
   for (size_t pulse_index = 0; pulse_index < pulse_count; pulse_index++) {
-    const Pulse &pulse = pulses[pulse_index];
+    const Pulse& pulse = pulses[pulse_index];
     if (pulse.duration_us == 0) {
       continue;
     }

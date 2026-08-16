@@ -52,7 +52,7 @@ Draadkleuren in de schema's en stappenhulp zijn illustratief. De klemmarkeringen
 
 - **M1** is de primaire Modbuspoort voor de Quatt-buitenunit(s). Deze verbinding is nodig voor de normale regeling.
 - **M2** is de optionele Modbuspoort voor CiC-compatibiliteit. Verbind M2 alleen met de vrijgekomen Modbuspoort van de CiC als de Quatt app moet blijven meekijken.
-- **R2** is een tweede potentiaalvrij wisselrelais met `NC`, `COM` en `NO`. Momenteel zijn er geen functies aan R2 gekoppeld; laat deze aansluiting vrij.
+- **R2** is een tweede potentiaalvrij wisselrelais met `NC`, `COM` en `NO`. R2 kan optioneel als hulprelais worden ingesteld via **Instellingen → Installatie → Hulprelais (R2)**, bijvoorbeeld om een fancoil, pomp of klep te laten volgen op de warmte- of koelvraag van OpenQuatt. Standaard staat deze functie uit en blijft R2 onbekrachtigd. Sluit apparatuur die moet inschakelen bij een actief relais aan op `COM` + `NO`; heb je geen hulpuitgang nodig, laat deze aansluiting dan vrij.
 - **T** is een 1-Wire-aansluiting voor een optionele Dallas/DS18B20-temperatuursensor: `+3.3V`, `GND` en `DATA`.
 
 ### Aansluitingen op de HCQ
@@ -160,7 +160,7 @@ Volg de route die de web-app voor jouw installatie toont. De basisstappen zijn:
 8. **Flowregeling en afstelling:** leg vast hoe de pomp geregeld moet worden en welke waarden daarbij horen.
 9. **Watertemperatuur beveiligen:** controleer de normale bovengrens en de tripgrens.
 10. **Stille uren en niveaus:** stel het stille venster en de compressorlimieten voor dag en nacht in.
-11. **Gebruiksstatistieken:** controleer of OpenQuatt beperkte technische systeemstatus en aan/uit-statussen van functies mag delen; tijdens een nieuwe Quick Start staat dit standaard aan en kan het hier worden uitgezet. Wifi-gegevens, gebruikersnamen en wachtwoorden worden nooit meegestuurd.
+11. **Gebruiksstatistieken:** controleer of OpenQuatt beperkte technische systeemstatus, aan/uit-statussen van functies en configuratiekeuzes zoals Quatt Hybrid-versie, verwarmingsstrategie, flowbron en regelbronnen mag delen; tijdens een nieuwe Quick Start staat dit standaard aan en kan het hier worden uitgezet. Gemeten of ingestelde temperaturen, wifi-gegevens, gebruikersnamen en wachtwoorden worden nooit meegestuurd.
 12. **Bevestigen en afronden:** controleer je keuzes en markeer Quick Start als voltooid.
 
 ## Je installatie is klaar wanneer

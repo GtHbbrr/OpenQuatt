@@ -6,8 +6,8 @@
 
 namespace {
 
-using esphome::opentherm::rmt_decoder::DecodeError;
 using esphome::opentherm::rmt_decoder::CaptureFailure;
+using esphome::opentherm::rmt_decoder::DecodeError;
 using esphome::opentherm::rmt_decoder::Pulse;
 
 uint32_t with_even_parity(uint32_t value_without_parity) {
@@ -73,16 +73,11 @@ EncodedFrame encode(uint32_t data, int jitter_us = 0) {
 }  // namespace
 
 int main() {
-  assert(esphome::opentherm::rmt_decoder::completion_is_within_deadline(
-      1000U, 1000U));
-  assert(esphome::opentherm::rmt_decoder::completion_is_within_deadline(
-      999U, 1000U));
-  assert(!esphome::opentherm::rmt_decoder::completion_is_within_deadline(
-      1001U, 1000U));
-  assert(esphome::opentherm::rmt_decoder::completion_is_within_deadline(
-      UINT32_MAX - 10U, 5U));
-  assert(!esphome::opentherm::rmt_decoder::completion_is_within_deadline(
-      20U, 5U));
+  assert(esphome::opentherm::rmt_decoder::completion_is_within_deadline(1000U, 1000U));
+  assert(esphome::opentherm::rmt_decoder::completion_is_within_deadline(999U, 1000U));
+  assert(!esphome::opentherm::rmt_decoder::completion_is_within_deadline(1001U, 1000U));
+  assert(esphome::opentherm::rmt_decoder::completion_is_within_deadline(UINT32_MAX - 10U, 5U));
+  assert(!esphome::opentherm::rmt_decoder::completion_is_within_deadline(20U, 5U));
 
   const uint32_t data = with_even_parity(0x40001234U);
 
@@ -105,8 +100,7 @@ int main() {
   auto missing_leading_half = nominal;
   assert(missing_leading_half.pulses[0].duration_us == 500);
   missing_leading_half.erase_first();
-  decoded =
-      esphome::opentherm::rmt_decoder::decode(missing_leading_half.pulses, missing_leading_half.size);
+  decoded = esphome::opentherm::rmt_decoder::decode(missing_leading_half.pulses, missing_leading_half.size);
   assert(decoded.error == DecodeError::NONE);
   assert(decoded.data == data);
 
@@ -114,8 +108,7 @@ int main() {
   auto missing_trailing_half = encode(trailing_data);
   assert(missing_trailing_half.pulses[missing_trailing_half.size - 1U].duration_us == 500);
   missing_trailing_half.erase_last();
-  decoded =
-      esphome::opentherm::rmt_decoder::decode(missing_trailing_half.pulses, missing_trailing_half.size);
+  decoded = esphome::opentherm::rmt_decoder::decode(missing_trailing_half.pulses, missing_trailing_half.size);
   assert(decoded.error == DecodeError::NONE);
   assert(decoded.data == trailing_data);
 
@@ -137,8 +130,7 @@ int main() {
 
   auto too_many_half_bits = nominal;
   too_many_half_bits.pulses[too_many_half_bits.size++] = Pulse{1000U, false};
-  decoded =
-      esphome::opentherm::rmt_decoder::decode(too_many_half_bits.pulses, too_many_half_bits.size);
+  decoded = esphome::opentherm::rmt_decoder::decode(too_many_half_bits.pulses, too_many_half_bits.size);
   assert(decoded.error == DecodeError::TIMING);
   assert(decoded.capture_failure == CaptureFailure::HALF_BIT_OVERFLOW);
   assert(decoded.failure_pulse_index == too_many_half_bits.size - 1U);
@@ -148,8 +140,7 @@ int main() {
   auto too_few_half_bits = nominal;
   too_few_half_bits.erase_last();
   too_few_half_bits.erase_last();
-  decoded =
-      esphome::opentherm::rmt_decoder::decode(too_few_half_bits.pulses, too_few_half_bits.size);
+  decoded = esphome::opentherm::rmt_decoder::decode(too_few_half_bits.pulses, too_few_half_bits.size);
   assert(decoded.error == DecodeError::TIMING);
   assert(decoded.capture_failure == CaptureFailure::HALF_BIT_COUNT);
   assert(decoded.failure_pulse_index == too_few_half_bits.size);
@@ -158,8 +149,7 @@ int main() {
 
   auto invalid_manchester = nominal;
   invalid_manchester.pulses[1].level = invalid_manchester.pulses[0].level;
-  decoded =
-      esphome::opentherm::rmt_decoder::decode(invalid_manchester.pulses, invalid_manchester.size);
+  decoded = esphome::opentherm::rmt_decoder::decode(invalid_manchester.pulses, invalid_manchester.size);
   assert(decoded.error != DecodeError::NONE);
 
   const auto invalid_parity = encode(data ^ 0x1U);

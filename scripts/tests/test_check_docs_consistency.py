@@ -79,36 +79,30 @@ Docs-impact motivatie:
         self.assertIn("Gebruikersentiteiten en instellingen raakt gebruikersdocumentatie", output)
         self.assertNotIn("Service/debug entities changed", output)
 
-    def test_dashboard_yaml_change_does_not_require_markdown_change(self) -> None:
-        exit_code, output = self.run_strict_check(
-            "",
-            changed_file="docs/dashboard/openquatt_ha_dashboard_duo_en.yaml",
-        )
+    def test_companion_link_guard_fails_when_reference_is_removed(self) -> None:
+        read_text = check_docs_consistency.read_text
 
-        self.assertEqual(0, exit_code, output)
-        self.assertIn("Docs consistency checks passed.", output)
-
-    def test_dashboard_view_contract_still_fails_on_title_drift(self) -> None:
-        parse_titles = check_docs_consistency.parse_dashboard_titles
-
-        def titles_with_drift(path: Path) -> list[str]:
-            titles = parse_titles(path)
-            if path.name == "openquatt_ha_dashboard_duo_en.yaml":
-                return [*titles, "Unexpected"]
-            return titles
+        def text_without_companion_link(path: Path) -> str:
+            text = read_text(path)
+            if path == check_docs_consistency.REPO_ROOT / "docs/dashboard/README.md":
+                return text.replace(
+                    "https://github.com/OpenQuatt/openquatt-home-assistant",
+                    "",
+                )
+            return text
 
         with mock.patch.object(
             check_docs_consistency,
-            "parse_dashboard_titles",
-            side_effect=titles_with_drift,
+            "read_text",
+            side_effect=text_without_companion_link,
         ):
             exit_code, output = self.run_strict_check(
                 "",
-                changed_file="docs/dashboard/openquatt_ha_dashboard_duo_en.yaml",
+                changed_file="docs/dashboard/README.md",
             )
 
         self.assertEqual(1, exit_code, output)
-        self.assertIn("View titles differ from expected", output)
+        self.assertIn("Missing companion repository reference", output)
 
 
 if __name__ == "__main__":

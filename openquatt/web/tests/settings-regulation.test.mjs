@@ -118,6 +118,51 @@ test("nieuwe installatie- en service-entiteiten worden bij het juiste scherm gel
   assert.ok(!SETTINGS_GROUP_KEY_MAP.service.includes("resetCumulativeEnergyCounters"));
 });
 
+test("koelsterkte licht de lagere limiet tijdens stille modus toe", () => {
+  const baseEntities = {
+    coolingDemandMax: numberEntity(8, "", { min_value: 1, max_value: 10, step: 1 }),
+    silentMax: numberEntity(6, "", { min_value: 1, max_value: 10, step: 1 }),
+    silentModeOverride: { value: "Schedule", state: "Schedule" },
+    silentActive: { value: false, state: "OFF" },
+  };
+
+  resetSettingsState(baseEntities);
+  let markup = renderSettingsCoolingSection();
+  assert.match(markup, /Tijdens stille modus wordt koelen begrensd op niveau 6/);
+  assert.match(markup, /Deze maximale koelsterkte wordt dan niet volledig gebruikt/);
+
+  resetSettingsState({
+    ...baseEntities,
+    silentActive: { value: true, state: "ON" },
+  });
+  markup = renderSettingsCoolingSection();
+  assert.match(markup, /Stille modus is nu actief\. Koelen wordt begrensd op niveau 6/);
+
+  resetSettingsState({
+    ...baseEntities,
+    silentModeOverride: { value: "Off", state: "Off" },
+  });
+  assert.doesNotMatch(renderSettingsCoolingSection(), /oq-settings-cooling-limit-warning/);
+
+  resetSettingsState({
+    ...baseEntities,
+    coolingDemandMax: numberEntity(6, "", { min_value: 1, max_value: 10, step: 1 }),
+  });
+  assert.doesNotMatch(renderSettingsCoolingSection(), /oq-settings-cooling-limit-warning/);
+
+  resetSettingsState({
+    coolingDemandMax: baseEntities.coolingDemandMax,
+    silentModeOverride: baseEntities.silentModeOverride,
+  });
+  assert.doesNotMatch(renderSettingsCoolingSection(), /oq-settings-cooling-limit-warning/);
+});
+
+test("koelscherm laadt de stille-moduslimiet en actuele status", () => {
+  assert.ok(SETTINGS_GROUP_KEY_MAP.cooling.includes("silentModeOverride"));
+  assert.ok(SETTINGS_GROUP_KEY_MAP.cooling.includes("silentActive"));
+  assert.ok(SETTINGS_GROUP_KEY_MAP.cooling.includes("silentMax"));
+});
+
 test("Service toont runtime, draaiurenreset en de bevestigde tijdelijke override", () => {
   resetSettingsState({
     controlModeOverride: {

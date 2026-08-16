@@ -55,7 +55,7 @@ inline RuntimeConfig default_config() {
 
 class BoilerPowerTestRuntime {
  public:
-  void start(const RuntimeConfig &cfg, uint32_t now_ms) {
+  void start(const RuntimeConfig& cfg, uint32_t now_ms) {
     const int cm_code = id(oq_control_mode_code);
     const bool task_running = id(oq_commissioning_active) && id(oq_commissioning_task_code) != TASK_NONE;
     if (!id(oq_boiler_assist_enabled).state) {
@@ -80,12 +80,9 @@ class BoilerPowerTestRuntime {
     }
 
     ESP_LOGI("quatt.cm100.boiler",
-             "Boiler power test requested (cm=%d flow_mode=%s flow_sp=%.0fL/h current_task=%d active=%d)",
-             cm_code,
-             id(oq_flow_control_mode).current_option().c_str(),
-             id(oq_flow_setpoint_lph).state,
-             id(oq_commissioning_task_code),
-             (int) id(oq_commissioning_active));
+             "Boiler power test requested (cm=%d flow_mode=%s flow_sp=%.0fL/h current_task=%d active=%d)", cm_code,
+             id(oq_flow_control_mode).current_option().c_str(), id(oq_flow_setpoint_lph).state,
+             id(oq_commissioning_task_code), (int)id(oq_commissioning_active));
 
     reset_measurement();
     id(oq_commissioning_task_code) = TASK_BOILER_POWER_TEST;
@@ -101,11 +98,8 @@ class BoilerPowerTestRuntime {
 
     prev_flow_setpoint_lph_ = id(oq_flow_setpoint_lph).state;
     flow_setpoint_saved_ = true;
-    ESP_LOGI("quatt.cm100.boiler",
-             "Boiler test armed: target_flow=%.0fL/h saved_flow=%.0fL/h state=%d",
-             cfg.target_flow_lph,
-             prev_flow_setpoint_lph_,
-             id(oq_commissioning_state_code));
+    ESP_LOGI("quatt.cm100.boiler", "Boiler test armed: target_flow=%.0fL/h saved_flow=%.0fL/h state=%d",
+             cfg.target_flow_lph, prev_flow_setpoint_lph_, id(oq_commissioning_state_code));
     set_number_value(id(oq_flow_setpoint_lph), cfg.target_flow_lph);
 
     oq_service_status::set_commissioning("BOILER TEST STARTED");
@@ -133,7 +127,7 @@ class BoilerPowerTestRuntime {
     clear_container();
   }
 
-  void tick(const RuntimeConfig &cfg, uint32_t now_ms) {
+  void tick(const RuntimeConfig& cfg, uint32_t now_ms) {
     const int cm_code = id(oq_control_mode_code);
     const bool in_cm100 = cm_code == 100;
     const int task_code = id(oq_commissioning_task_code);
@@ -156,8 +150,8 @@ class BoilerPowerTestRuntime {
 
     if (id(oq_commissioning_abort_requested)) {
       ESP_LOGW("quatt.cm100.boiler", "Boiler test abort requested (state=%d cm=%d active=%d pending=%d)",
-               id(oq_commissioning_state_code), cm_code,
-               (int) id(oq_commissioning_active), (int) id(oq_commissioning_request_pending));
+               id(oq_commissioning_state_code), cm_code, (int)id(oq_commissioning_active),
+               (int)id(oq_commissioning_request_pending));
       finish_task("ABORTED", STATE_ABORT, true, true);
       return;
     }
@@ -240,17 +234,17 @@ class BoilerPowerTestRuntime {
   std::string last_status_{};
 
   template <typename NumberEntity>
-  void set_number_value(NumberEntity &number_entity, float value) {
+  void set_number_value(NumberEntity& number_entity, float value) {
     auto call = number_entity.make_call();
     call.set_value(value);
     call.perform();
   }
 
-  bool flow_on_target(float flow_lph, const RuntimeConfig &cfg) const {
+  bool flow_on_target(float flow_lph, const RuntimeConfig& cfg) const {
     return !isnan(flow_lph) && flow_lph > 0.0f && fabsf(flow_lph - cfg.target_flow_lph) <= cfg.flow_band_lph;
   }
 
-  void publish_status(const char *status) {
+  void publish_status(const char* status) {
     if (last_status_ != status) {
       oq_service_status::set_boiler_power_test(status);
       last_status_ = status;
@@ -285,7 +279,7 @@ class BoilerPowerTestRuntime {
     oq_service_status::set_commissioning("IDLE");
   }
 
-  void finish_task(const char *status, int next_state, bool keep_result, bool keep_cm100) {
+  void finish_task(const char* status, int next_state, bool keep_result, bool keep_cm100) {
     id(oq_commissioning_boiler_request) = false;
     restore_flow_setpoint();
     oq_commissioning::clear_container(keep_cm100, next_state);
@@ -349,7 +343,7 @@ class BoilerPowerTestRuntime {
     return true;
   }
 
-  void run_flow_settle(const RuntimeConfig &cfg, uint32_t now_ms, float flow_lph, bool flow_stable_now) {
+  void run_flow_settle(const RuntimeConfig& cfg, uint32_t now_ms, float flow_lph, bool flow_stable_now) {
     stable_flow_count_ = flow_stable_now ? stable_flow_count_ + 1 : 0;
     if (stable_flow_count_ >= cfg.stable_flow_samples &&
         (uint32_t)(now_ms - id(oq_commissioning_state_since_ms)) >= cfg.flow_settle_min_ms) {
@@ -358,26 +352,22 @@ class BoilerPowerTestRuntime {
       id(oq_commissioning_state_code) = STATE_BOILER_SETTLE;
       id(oq_commissioning_state_since_ms) = now_ms;
       stable_flow_count_ = 0;
-      ESP_LOGI("quatt.cm100.boiler",
-               "Flow settled at %.0fL/h after %lus; requesting boiler relay",
-               flow_lph,
-               (unsigned long) ((now_ms - id(oq_commissioning_started_ms)) / 1000UL));
+      ESP_LOGI("quatt.cm100.boiler", "Flow settled at %.0fL/h after %lus; requesting boiler relay", flow_lph,
+               (unsigned long)((now_ms - id(oq_commissioning_started_ms)) / 1000UL));
       publish_status("BOILER_SETTLING");
     } else {
       publish_status("FLOW_SETTLING");
     }
   }
 
-  void run_boiler_settle(const RuntimeConfig &cfg, uint32_t now_ms, float flow_lph, float heat_w, bool flow_stable_now) {
+  void run_boiler_settle(const RuntimeConfig& cfg, uint32_t now_ms, float flow_lph, float heat_w,
+                         bool flow_stable_now) {
     stable_flow_count_ = flow_stable_now ? stable_flow_count_ + 1 : 0;
     const uint32_t state_age_ms = now_ms - id(oq_commissioning_state_since_ms);
     if (!id(boiler_active).state) {
       if (state_age_ms >= cfg.boiler_settle_min_ms) {
-        ESP_LOGW("quatt.cm100.boiler",
-                 "Boiler did not start in time (flow=%.0fL/h boiler_req=%d elapsed=%lus)",
-                 flow_lph,
-                 (int) id(oq_commissioning_boiler_request),
-                 (unsigned long) (state_age_ms / 1000UL));
+        ESP_LOGW("quatt.cm100.boiler", "Boiler did not start in time (flow=%.0fL/h boiler_req=%d elapsed=%lus)",
+                 flow_lph, (int)id(oq_commissioning_boiler_request), (unsigned long)(state_age_ms / 1000UL));
         finish_task("FAILED: boiler did not start", STATE_FAILED, false, true);
       } else {
         publish_status("BOILER_SETTLING");
@@ -389,15 +379,15 @@ class BoilerPowerTestRuntime {
       id(oq_commissioning_state_since_ms) = now_ms;
       reset_measurement();
       ESP_LOGI("quatt.cm100.boiler",
-               "Boiler settled; starting measurement window (flow=%.0fL/h heat=%.0fW boiler_active=%d)",
-               flow_lph, heat_w, (int) id(boiler_active).state);
+               "Boiler settled; starting measurement window (flow=%.0fL/h heat=%.0fW boiler_active=%d)", flow_lph,
+               heat_w, (int)id(boiler_active).state);
       publish_status("MEASURING");
     } else {
       publish_status("BOILER_SETTLING");
     }
   }
 
-  void run_measure(const RuntimeConfig &cfg, uint32_t now_ms, bool flow_stable_now, bool heat_valid, float heat_w) {
+  void run_measure(const RuntimeConfig& cfg, uint32_t now_ms, bool flow_stable_now, bool heat_valid, float heat_w) {
     if (flow_stable_now && heat_valid && heat_w > 0.0f) {
       if (isnan(peak_w_) || heat_w > peak_w_) {
         peak_w_ = heat_w;
@@ -427,7 +417,7 @@ class BoilerPowerTestRuntime {
       return;
     }
 
-    const float sample_count_f = (float) sample_count_;
+    const float sample_count_f = (float)sample_count_;
     const float avg_w = sum_w_ / sample_count_f;
     const float spread_w = max_w_ - min_w_;
     float confidence = 100.0f;
@@ -442,52 +432,43 @@ class BoilerPowerTestRuntime {
     id(oq_commissioning_state_code) = STATE_COOLDOWN;
     id(oq_commissioning_state_since_ms) = now_ms;
     id(oq_commissioning_boiler_request) = false;
-    ESP_LOGI("quatt.cm100.boiler",
-             "Measurement complete: avg=%.0fW min=%.0fW max=%.0fW samples=%u conf=%.0f%%",
-             avg_w, min_w_, max_w_, (unsigned int) sample_count_, confidence);
+    ESP_LOGI("quatt.cm100.boiler", "Measurement complete: avg=%.0fW min=%.0fW max=%.0fW samples=%u conf=%.0f%%", avg_w,
+             min_w_, max_w_, (unsigned int)sample_count_, confidence);
     restore_flow_setpoint();
     publish_status("COOLDOWN");
   }
 
-  void run_cooldown(const RuntimeConfig &cfg, uint32_t now_ms) {
+  void run_cooldown(const RuntimeConfig& cfg, uint32_t now_ms) {
     if ((uint32_t)(now_ms - id(oq_commissioning_state_since_ms)) < cfg.cooldown_ms) {
       publish_status("COOLDOWN");
       return;
     }
     char msg[128];
-    snprintf(msg, sizeof(msg), "DONE: %.0fW (conf %.0f%%)",
-             id(oq_commissioning_result_w), id(oq_commissioning_result_confidence));
-    ESP_LOGI("quatt.cm100.boiler",
-             "Cooldown complete; CM100 idle after boiler test (flow restored, boiler off, %s)",
+    snprintf(msg, sizeof(msg), "DONE: %.0fW (conf %.0f%%)", id(oq_commissioning_result_w),
+             id(oq_commissioning_result_confidence));
+    ESP_LOGI("quatt.cm100.boiler", "Cooldown complete; CM100 idle after boiler test (flow restored, boiler off, %s)",
              msg);
     finish_task(msg, STATE_DONE, true, true);
   }
 
   void publish_done_status() {
     char msg[128];
-    snprintf(msg, sizeof(msg), "DONE: %.0fW (conf %.0f%%)",
-             id(oq_commissioning_result_w), id(oq_commissioning_result_confidence));
+    snprintf(msg, sizeof(msg), "DONE: %.0fW (conf %.0f%%)", id(oq_commissioning_result_w),
+             id(oq_commissioning_result_confidence));
     publish_status(msg);
   }
 
-  void log_heartbeat(bool task_is_boiler, int cm_code, float flow_lph, float heat_w, uint32_t now_ms, const RuntimeConfig &cfg) {
-    const uint32_t elapsed_ms =
-        (id(oq_commissioning_started_ms) == 0) ? 0 : (now_ms - id(oq_commissioning_started_ms));
+  void log_heartbeat(bool task_is_boiler, int cm_code, float flow_lph, float heat_w, uint32_t now_ms,
+                     const RuntimeConfig& cfg) {
+    const uint32_t elapsed_ms = (id(oq_commissioning_started_ms) == 0) ? 0 : (now_ms - id(oq_commissioning_started_ms));
     if (task_is_boiler && id(oq_commissioning_state_code) != last_state_logged_) {
       ESP_LOGI("quatt.cm100.boiler",
-               "state=%d cm=%d active=%d pending=%d flow=%.0fL/h target=%.0fL/h stable=%d/%d boiler_req=%d boiler_active=%d heat=%.0fW elapsed=%lus",
-               id(oq_commissioning_state_code),
-               cm_code,
-               (int) id(oq_commissioning_active),
-               (int) id(oq_commissioning_request_pending),
-               flow_lph,
-               cfg.target_flow_lph,
-               stable_flow_count_,
-               cfg.stable_flow_samples,
-               (int) id(oq_commissioning_boiler_request),
-               (int) id(boiler_active).state,
-               heat_w,
-               (unsigned long) (elapsed_ms / 1000UL));
+               "state=%d cm=%d active=%d pending=%d flow=%.0fL/h target=%.0fL/h stable=%d/%d boiler_req=%d "
+               "boiler_active=%d heat=%.0fW elapsed=%lus",
+               id(oq_commissioning_state_code), cm_code, (int)id(oq_commissioning_active),
+               (int)id(oq_commissioning_request_pending), flow_lph, cfg.target_flow_lph, stable_flow_count_,
+               cfg.stable_flow_samples, (int)id(oq_commissioning_boiler_request), (int)id(boiler_active).state, heat_w,
+               (unsigned long)(elapsed_ms / 1000UL));
       last_state_logged_ = id(oq_commissioning_state_code);
     }
     if (task_is_boiler && id(oq_commissioning_state_code) >= STATE_FLOW_SETTLE &&
@@ -502,7 +483,7 @@ class BoilerPowerTestRuntime {
   }
 };
 
-inline BoilerPowerTestRuntime &runtime() {
+inline BoilerPowerTestRuntime& runtime() {
   static BoilerPowerTestRuntime instance;
   return instance;
 }

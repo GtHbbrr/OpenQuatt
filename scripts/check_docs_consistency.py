@@ -86,18 +86,6 @@ def lines_with_phrase(path: Path, phrase: str) -> Iterable[int]:
             yield idx
 
 
-def parse_dashboard_titles(path: Path) -> list[str]:
-    titles: list[str] = []
-    rx = re.compile(r"^\s*-\s+title:\s*(.+?)\s*$")
-    for line in read_text(path).splitlines():
-        m = rx.match(line)
-        if not m:
-            continue
-        title = m.group(1).strip().strip("'").strip('"')
-        titles.append(title)
-    return titles
-
-
 def add(
     findings: list[Finding],
     file: str,
@@ -255,13 +243,9 @@ def main() -> int:
         docs_impact_rules = []
         add(findings, ".github/docs-impact.json", 1, str(exc))
 
-    docs_home = REPO_ROOT / "docs/dashboardoverzicht.md"
+    companion_repo_url = "https://github.com/OpenQuatt/openquatt-home-assistant"
     docs_settings = REPO_ROOT / "docs/instellingen-en-meetwaarden.md"
     docs_tuning = REPO_ROOT / "docs/diagnose-en-afstelling.md"
-    dash_en = REPO_ROOT / "docs/dashboard/openquatt_ha_dashboard_duo_en.yaml"
-    dash_nl = REPO_ROOT / "docs/dashboard/openquatt_ha_dashboard_duo_nl.yaml"
-    dash_single_nl = REPO_ROOT / "docs/dashboard/openquatt_ha_dashboard_single_nl.yaml"
-    dash_single_en = REPO_ROOT / "docs/dashboard/openquatt_ha_dashboard_single_en.yaml"
 
     # 1) Known drift guard: flow mismatch threshold is compile-time, not runtime.
     flow_related = {
@@ -269,18 +253,12 @@ def main() -> int:
         "openquatt/oq_substitutions_common.yaml",
         "docs/instellingen-en-meetwaarden.md",
         "docs/diagnose-en-afstelling.md",
-        "docs/dashboardoverzicht.md",
-        "docs/dashboard/openquatt_ha_dashboard_duo_en.yaml",
-        "docs/dashboard/openquatt_ha_dashboard_duo_nl.yaml",
-        "docs/dashboard/openquatt_ha_dashboard_single_nl.yaml",
-        "docs/dashboard/openquatt_ha_dashboard_single_en.yaml",
     }
     if not args.changed_only or any_changed(changed, flow_related):
         for rel in [
             "README.md",
             "docs/instellingen-en-meetwaarden.md",
             "docs/diagnose-en-afstelling.md",
-            "docs/dashboardoverzicht.md",
         ]:
             path = REPO_ROOT / rel
             for ln in lines_with_phrase(path, "Flow mismatch threshold"):
@@ -301,87 +279,15 @@ def main() -> int:
         if "oq_flow_mismatch_fallback_lph" in settings_text:
             add(findings, "docs/instellingen-en-meetwaarden.md", 1, "Obsolete `oq_flow_mismatch_fallback_lph` found.")
 
-    # 2) Dashboard docs should stay aligned with dashboard YAML view sets.
-    dashboard_related = {
+    # 2) Stable local entrypoints must point at the companion repository.
+    home_assistant_docs = {
+        "docs/dashboard/README.md",
         "docs/dashboardoverzicht.md",
-        "docs/dashboard/openquatt_ha_dashboard_duo_en.yaml",
-        "docs/dashboard/openquatt_ha_dashboard_duo_nl.yaml",
-        "docs/dashboard/openquatt_ha_dashboard_single_nl.yaml",
-        "docs/dashboard/openquatt_ha_dashboard_single_en.yaml",
     }
-    if not args.changed_only or any_changed(changed, dashboard_related):
-        en_expected = [
-            "Overview",
-            "Energy",
-            "Flow",
-            "Heat control",
-            "Cooling",
-            "HPs",
-            "Sensor Configuration",
-            "Tuning",
-            "Service & Test",
-            "Diagnostics",
-        ]
-        nl_expected = [
-            "Overzicht",
-            "Energie",
-            "Flow",
-            "Warmteregeling",
-            "Koeling",
-            "Warmtepompen",
-            "Sensorconfiguratie",
-            "Instellingen",
-            "Service en test",
-            "Diagnostiek",
-        ]
-        single_nl_expected = [
-            "Overzicht",
-            "Energie",
-            "Flow",
-            "Warmteregeling",
-            "Koeling",
-            "HP1",
-            "Sensorconfiguratie",
-            "Instellingen",
-            "Service en test",
-            "Diagnostiek",
-        ]
-        single_en_expected = [
-            "Overview",
-            "Energy",
-            "Flow",
-            "Heat control",
-            "Cooling",
-            "HP1",
-            "Sensor Configuration",
-            "Tuning",
-            "Service & Test",
-            "Diagnostics",
-        ]
-        en_actual = parse_dashboard_titles(dash_en)
-        nl_actual = parse_dashboard_titles(dash_nl)
-        single_nl_actual = parse_dashboard_titles(dash_single_nl)
-        single_en_actual = parse_dashboard_titles(dash_single_en)
-
-        if en_actual != en_expected:
-            add(findings, "docs/dashboard/openquatt_ha_dashboard_duo_en.yaml", 1, f"View titles differ from expected: {en_actual}")
-        if nl_actual != nl_expected:
-            add(findings, "docs/dashboard/openquatt_ha_dashboard_duo_nl.yaml", 1, f"View titles differ from expected: {nl_actual}")
-        if single_nl_actual != single_nl_expected:
-            add(findings, "docs/dashboard/openquatt_ha_dashboard_single_nl.yaml", 1, f"View titles differ from expected: {single_nl_actual}")
-        if single_en_actual != single_en_expected:
-            add(findings, "docs/dashboard/openquatt_ha_dashboard_single_en.yaml", 1, f"View titles differ from expected: {single_en_actual}")
-
-        home_text = read_text(docs_home)
-        required_phrases = [
-            "Service en test",
-            "`service-test`",
-            "Diagnostiek",
-            "Instellingen",
-        ]
-        for phrase in required_phrases:
-            if phrase not in home_text:
-                add(findings, "docs/dashboardoverzicht.md", 1, f"Missing dashboard docs phrase: {phrase}")
+    if not args.changed_only or any_changed(changed, home_assistant_docs):
+        for rel in sorted(home_assistant_docs):
+            if companion_repo_url not in read_text(REPO_ROOT / rel):
+                add(findings, rel, 1, f"Missing companion repository reference: {companion_repo_url}")
 
     # 3) Changed-file documentation impact guards.
     if args.changed_only and changed:

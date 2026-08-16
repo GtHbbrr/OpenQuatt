@@ -9,6 +9,23 @@ permissions:
   contents: read
 
 jobs:
+  cpp-format:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install clang-format
+        run: |
+          clang_format_version="$(tr -d '[:space:]' < .clang-format-version)"
+          clang_format_venv="${RUNNER_TEMP}/clang-format"
+          python3 -m venv "${clang_format_venv}"
+          "${clang_format_venv}/bin/python" -m pip install --disable-pip-version-check "clang-format==${clang_format_version}"
+          echo "${clang_format_venv}/bin" >> "${GITHUB_PATH}"
+
+      - name: Check C/C++ formatting
+        run: python3 scripts/cpp_format.py check
+
   docs-consistency:
     runs-on: ubuntu-latest
     steps:
@@ -42,9 +59,7 @@ jobs:
       - name: Install web build dependencies
         run: npm ci
 
-      - name: Check generated web bundles
-        env:
-          OPENQUATT_WEB_BUNDLE_BASE_REF: ${{ github.event.pull_request.base.sha }}
+      - name: Build and test web bundles
         run: npm run check:web
 
       - name: Run web smoke checks
@@ -60,7 +75,7 @@ jobs:
         run: ./scripts/run_host_regression_tests.sh
 
   validate-and-compile:
-    needs: [docs-consistency, validate-web-settings-backup, host-regression-tests]
+    needs: [cpp-format, docs-consistency, validate-web-settings-backup, host-regression-tests]
     uses: ./.github/workflows/esphome-build.yml
     with:
       artifact_suffix: firmware-${{ github.sha }}

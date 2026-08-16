@@ -4,10 +4,10 @@
 
 int main() {
   using oq_incident_actuator::Action;
-  using oq_incident_actuator::Inputs;
   using oq_incident_actuator::apply_start_gate_before_active_write;
   using oq_incident_actuator::apply_stop_notification_before_safe_write;
   using oq_incident_actuator::decide;
+  using oq_incident_actuator::Inputs;
   using oq_incident_actuator::safe_stop_write_retry_due;
 
   auto decision = decide(Inputs{5, 0, true, false});
@@ -43,8 +43,7 @@ int main() {
         ++start_gate_calls;
         return false;
       },
-      [&]() { ++active_writes; },
-      [&]() { ++safe_writes; });
+      [&]() { ++active_writes; }, [&]() { ++safe_writes; });
   assert(!denied);
   assert(start_gate_calls == 1);
   assert(active_writes == 0);
@@ -54,9 +53,7 @@ int main() {
   int stop_notification_order = 0;
   int safe_write_order = 0;
   apply_stop_notification_before_safe_write(
-      true,
-      [&]() { stop_notification_order = ++sequence; },
-      [&]() { safe_write_order = ++sequence; });
+      true, [&]() { stop_notification_order = ++sequence; }, [&]() { safe_write_order = ++sequence; });
   assert(stop_notification_order == 1);
   assert(safe_write_order == 2);
 

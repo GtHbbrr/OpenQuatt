@@ -37,98 +37,98 @@ class OpenQuattMqttConfig : public Component {
     COOLING_ENABLE = 1,
   };
 
-  void set_bootstrap_broker(const std::string &bootstrap_broker) { this->bootstrap_broker_ = bootstrap_broker; }
+  void set_bootstrap_broker(const std::string& bootstrap_broker) { this->bootstrap_broker_ = bootstrap_broker; }
   void set_bootstrap_port(uint16_t bootstrap_port) { this->bootstrap_port_ = bootstrap_port; }
-  void set_bootstrap_username(const std::string &bootstrap_username) { this->bootstrap_username_ = bootstrap_username; }
-  void set_bootstrap_password(const std::string &bootstrap_password) { this->bootstrap_password_ = bootstrap_password; }
-  void set_dew_point_topic(const std::string &dew_point_topic) {
+  void set_bootstrap_username(const std::string& bootstrap_username) { this->bootstrap_username_ = bootstrap_username; }
+  void set_bootstrap_password(const std::string& bootstrap_password) { this->bootstrap_password_ = bootstrap_password; }
+  void set_dew_point_topic(const std::string& dew_point_topic) {
     this->set_numeric_input_topic_(NumericInputKind::COOLING_DEW_POINT, dew_point_topic);
   }
   void set_dew_point_stale_ms(uint32_t dew_point_stale_ms) {
     this->set_numeric_input_stale_ms_(NumericInputKind::COOLING_DEW_POINT, dew_point_stale_ms);
   }
-  void set_dew_point_sensor(sensor::Sensor *sensor) {
+  void set_dew_point_sensor(sensor::Sensor* sensor) {
     this->set_numeric_input_sensor_(NumericInputKind::COOLING_DEW_POINT, sensor);
   }
-  void set_dew_point_age_sensor(sensor::Sensor *sensor) {
+  void set_dew_point_age_sensor(sensor::Sensor* sensor) {
     this->set_numeric_input_age_sensor_(NumericInputKind::COOLING_DEW_POINT, sensor);
   }
-  void set_dew_point_valid_binary_sensor(binary_sensor::BinarySensor *binary_sensor) {
+  void set_dew_point_valid_binary_sensor(binary_sensor::BinarySensor* binary_sensor) {
     this->set_numeric_input_valid_binary_sensor_(NumericInputKind::COOLING_DEW_POINT, binary_sensor);
   }
-  void set_outside_temperature_topic(const std::string &topic) {
+  void set_outside_temperature_topic(const std::string& topic) {
     this->set_numeric_input_topic_(NumericInputKind::OUTSIDE_TEMPERATURE, topic);
   }
   void set_outside_temperature_stale_ms(uint32_t stale_ms) {
     this->set_numeric_input_stale_ms_(NumericInputKind::OUTSIDE_TEMPERATURE, stale_ms);
   }
-  void set_outside_temperature_sensor(sensor::Sensor *sensor) {
+  void set_outside_temperature_sensor(sensor::Sensor* sensor) {
     this->set_numeric_input_sensor_(NumericInputKind::OUTSIDE_TEMPERATURE, sensor);
   }
-  void set_outside_temperature_age_sensor(sensor::Sensor *sensor) {
+  void set_outside_temperature_age_sensor(sensor::Sensor* sensor) {
     this->set_numeric_input_age_sensor_(NumericInputKind::OUTSIDE_TEMPERATURE, sensor);
   }
-  void set_outside_temperature_valid_binary_sensor(binary_sensor::BinarySensor *binary_sensor) {
+  void set_outside_temperature_valid_binary_sensor(binary_sensor::BinarySensor* binary_sensor) {
     this->set_numeric_input_valid_binary_sensor_(NumericInputKind::OUTSIDE_TEMPERATURE, binary_sensor);
   }
-  void set_room_temperature_topic(const std::string &topic) {
+  void set_room_temperature_topic(const std::string& topic) {
     this->set_numeric_input_topic_(NumericInputKind::ROOM_TEMPERATURE, topic);
   }
   void set_room_temperature_stale_ms(uint32_t stale_ms) {
     this->set_numeric_input_stale_ms_(NumericInputKind::ROOM_TEMPERATURE, stale_ms);
   }
-  void set_room_temperature_sensor(sensor::Sensor *sensor) {
+  void set_room_temperature_sensor(sensor::Sensor* sensor) {
     this->set_numeric_input_sensor_(NumericInputKind::ROOM_TEMPERATURE, sensor);
   }
-  void set_room_temperature_age_sensor(sensor::Sensor *sensor) {
+  void set_room_temperature_age_sensor(sensor::Sensor* sensor) {
     this->set_numeric_input_age_sensor_(NumericInputKind::ROOM_TEMPERATURE, sensor);
   }
-  void set_room_temperature_valid_binary_sensor(binary_sensor::BinarySensor *binary_sensor) {
+  void set_room_temperature_valid_binary_sensor(binary_sensor::BinarySensor* binary_sensor) {
     this->set_numeric_input_valid_binary_sensor_(NumericInputKind::ROOM_TEMPERATURE, binary_sensor);
   }
-  void set_room_setpoint_topic(const std::string &topic) {
+  void set_room_setpoint_topic(const std::string& topic) {
     this->set_numeric_input_topic_(NumericInputKind::ROOM_SETPOINT, topic);
   }
   void set_room_setpoint_stale_ms(uint32_t stale_ms) {
     this->set_numeric_input_stale_ms_(NumericInputKind::ROOM_SETPOINT, stale_ms);
   }
-  void set_room_setpoint_sensor(sensor::Sensor *sensor) {
+  void set_room_setpoint_sensor(sensor::Sensor* sensor) {
     this->set_numeric_input_sensor_(NumericInputKind::ROOM_SETPOINT, sensor);
   }
-  void set_room_setpoint_age_sensor(sensor::Sensor *sensor) {
+  void set_room_setpoint_age_sensor(sensor::Sensor* sensor) {
     this->set_numeric_input_age_sensor_(NumericInputKind::ROOM_SETPOINT, sensor);
   }
-  void set_room_setpoint_valid_binary_sensor(binary_sensor::BinarySensor *binary_sensor) {
+  void set_room_setpoint_valid_binary_sensor(binary_sensor::BinarySensor* binary_sensor) {
     this->set_numeric_input_valid_binary_sensor_(NumericInputKind::ROOM_SETPOINT, binary_sensor);
   }
-  void set_heating_enable_topic(const std::string &topic) {
+  void set_heating_enable_topic(const std::string& topic) {
     this->set_binary_input_topic_(BinaryInputKind::HEATING_ENABLE, topic);
   }
   void set_heating_enable_stale_ms(uint32_t stale_ms) {
     this->set_binary_input_stale_ms_(BinaryInputKind::HEATING_ENABLE, stale_ms);
   }
-  void set_heating_enable_binary_sensor(binary_sensor::BinarySensor *binary_sensor) {
+  void set_heating_enable_binary_sensor(binary_sensor::BinarySensor* binary_sensor) {
     this->set_binary_input_binary_sensor_(BinaryInputKind::HEATING_ENABLE, binary_sensor);
   }
-  void set_heating_enable_age_sensor(sensor::Sensor *sensor) {
+  void set_heating_enable_age_sensor(sensor::Sensor* sensor) {
     this->set_binary_input_age_sensor_(BinaryInputKind::HEATING_ENABLE, sensor);
   }
-  void set_heating_enable_valid_binary_sensor(binary_sensor::BinarySensor *binary_sensor) {
+  void set_heating_enable_valid_binary_sensor(binary_sensor::BinarySensor* binary_sensor) {
     this->set_binary_input_valid_binary_sensor_(BinaryInputKind::HEATING_ENABLE, binary_sensor);
   }
-  void set_cooling_enable_topic(const std::string &topic) {
+  void set_cooling_enable_topic(const std::string& topic) {
     this->set_binary_input_topic_(BinaryInputKind::COOLING_ENABLE, topic);
   }
   void set_cooling_enable_stale_ms(uint32_t stale_ms) {
     this->set_binary_input_stale_ms_(BinaryInputKind::COOLING_ENABLE, stale_ms);
   }
-  void set_cooling_enable_binary_sensor(binary_sensor::BinarySensor *binary_sensor) {
+  void set_cooling_enable_binary_sensor(binary_sensor::BinarySensor* binary_sensor) {
     this->set_binary_input_binary_sensor_(BinaryInputKind::COOLING_ENABLE, binary_sensor);
   }
-  void set_cooling_enable_age_sensor(sensor::Sensor *sensor) {
+  void set_cooling_enable_age_sensor(sensor::Sensor* sensor) {
     this->set_binary_input_age_sensor_(BinaryInputKind::COOLING_ENABLE, sensor);
   }
-  void set_cooling_enable_valid_binary_sensor(binary_sensor::BinarySensor *binary_sensor) {
+  void set_cooling_enable_valid_binary_sensor(binary_sensor::BinarySensor* binary_sensor) {
     this->set_binary_input_valid_binary_sensor_(BinaryInputKind::COOLING_ENABLE, binary_sensor);
   }
   void set_default_enabled(bool default_enabled) { this->default_enabled_ = default_enabled; }
@@ -162,10 +162,10 @@ class OpenQuattMqttConfig : public Component {
   };
 
   StatusSnapshot get_status_snapshot();
-  bool set_runtime_config(const std::string &broker, uint16_t port, const std::string &username,
-                          const std::string &password, bool clear_password, bool enabled);
-  bool set_input_enabled(const std::string &key, bool enabled);
-  bool set_input_accept_retained(const std::string &key, bool accept_retained);
+  bool set_runtime_config(const std::string& broker, uint16_t port, const std::string& username,
+                          const std::string& password, bool clear_password, bool enabled);
+  bool set_input_enabled(const std::string& key, bool enabled);
+  bool set_input_accept_retained(const std::string& key, bool accept_retained);
 
  protected:
   static constexpr uint32_t STORAGE_MAGIC = 0x4F514D49;
@@ -196,32 +196,32 @@ class OpenQuattMqttConfig : public Component {
   static_assert(offsetof(Storage, retained_disabled_mask) == 269,
                 "Retained policy must use the existing version 1 padding byte");
 
-  bool load_storage_(Storage *storage);
-  bool save_storage_(const Storage &storage, bool sync = true);
-  bool apply_storage_(const Storage &storage, const char *source);
-  bool build_storage_(const std::string &broker, uint16_t port, const std::string &username,
-                      const std::string &password, bool enabled, uint8_t input_disabled_mask,
-                      uint8_t retained_disabled_mask, Storage *storage);
-  bool is_valid_storage_(const Storage &storage) const;
+  bool load_storage_(Storage* storage);
+  bool save_storage_(const Storage& storage, bool sync = true);
+  bool apply_storage_(const Storage& storage, const char* source);
+  bool build_storage_(const std::string& broker, uint16_t port, const std::string& username,
+                      const std::string& password, bool enabled, uint8_t input_disabled_mask,
+                      uint8_t retained_disabled_mask, Storage* storage);
+  bool is_valid_storage_(const Storage& storage) const;
   bool register_http_handlers_();
   void rotate_csrf_token_();
   bool start_client_();
   void stop_client_();
   void request_client_stop_();
   void request_client_start_();
-  static void start_client_task_(void *arg);
+  static void start_client_task_(void* arg);
   struct NumericInput {
-    NumericInput(const char *key, const char *log_name, float min_value, float max_value)
+    NumericInput(const char* key, const char* log_name, float min_value, float max_value)
         : key(key), log_name(log_name), min_value(min_value), max_value(max_value) {}
-    const char *key;
-    const char *log_name;
+    const char* key;
+    const char* log_name;
     float min_value;
     float max_value;
     std::string topic;
     uint32_t stale_ms{900000};
-    sensor::Sensor *sensor{nullptr};
-    sensor::Sensor *age_sensor{nullptr};
-    binary_sensor::BinarySensor *valid_binary_sensor{nullptr};
+    sensor::Sensor* sensor{nullptr};
+    sensor::Sensor* age_sensor{nullptr};
+    binary_sensor::BinarySensor* valid_binary_sensor{nullptr};
     char pending_payload[PAYLOAD_MAX_LEN]{};
     bool pending_payload_ready{false};
     bool pending_invalid_payload_ready{false};
@@ -232,14 +232,14 @@ class OpenQuattMqttConfig : public Component {
     bool last_valid_retained{false};
   };
   struct BinaryInput {
-    BinaryInput(const char *key, const char *log_name) : key(key), log_name(log_name) {}
-    const char *key;
-    const char *log_name;
+    BinaryInput(const char* key, const char* log_name) : key(key), log_name(log_name) {}
+    const char* key;
+    const char* log_name;
     std::string topic;
     uint32_t stale_ms{900000};
-    binary_sensor::BinarySensor *binary_sensor{nullptr};
-    sensor::Sensor *age_sensor{nullptr};
-    binary_sensor::BinarySensor *valid_binary_sensor{nullptr};
+    binary_sensor::BinarySensor* binary_sensor{nullptr};
+    sensor::Sensor* age_sensor{nullptr};
+    binary_sensor::BinarySensor* valid_binary_sensor{nullptr};
     char pending_payload[PAYLOAD_MAX_LEN]{};
     bool pending_payload_ready{false};
     bool pending_invalid_payload_ready{false};
@@ -250,52 +250,52 @@ class OpenQuattMqttConfig : public Component {
     bool last_valid_retained{false};
   };
 
-  void set_numeric_input_topic_(NumericInputKind kind, const std::string &topic);
+  void set_numeric_input_topic_(NumericInputKind kind, const std::string& topic);
   void set_numeric_input_stale_ms_(NumericInputKind kind, uint32_t stale_ms);
-  void set_numeric_input_sensor_(NumericInputKind kind, sensor::Sensor *sensor);
-  void set_numeric_input_age_sensor_(NumericInputKind kind, sensor::Sensor *sensor);
-  void set_numeric_input_valid_binary_sensor_(NumericInputKind kind, binary_sensor::BinarySensor *binary_sensor);
-  NumericInput &numeric_input_(NumericInputKind kind);
-  const NumericInput &numeric_input_(NumericInputKind kind) const;
-  void set_binary_input_topic_(BinaryInputKind kind, const std::string &topic);
+  void set_numeric_input_sensor_(NumericInputKind kind, sensor::Sensor* sensor);
+  void set_numeric_input_age_sensor_(NumericInputKind kind, sensor::Sensor* sensor);
+  void set_numeric_input_valid_binary_sensor_(NumericInputKind kind, binary_sensor::BinarySensor* binary_sensor);
+  NumericInput& numeric_input_(NumericInputKind kind);
+  const NumericInput& numeric_input_(NumericInputKind kind) const;
+  void set_binary_input_topic_(BinaryInputKind kind, const std::string& topic);
   void set_binary_input_stale_ms_(BinaryInputKind kind, uint32_t stale_ms);
-  void set_binary_input_binary_sensor_(BinaryInputKind kind, binary_sensor::BinarySensor *binary_sensor);
-  void set_binary_input_age_sensor_(BinaryInputKind kind, sensor::Sensor *sensor);
-  void set_binary_input_valid_binary_sensor_(BinaryInputKind kind, binary_sensor::BinarySensor *binary_sensor);
-  BinaryInput &binary_input_(BinaryInputKind kind);
-  const BinaryInput &binary_input_(BinaryInputKind kind) const;
+  void set_binary_input_binary_sensor_(BinaryInputKind kind, binary_sensor::BinarySensor* binary_sensor);
+  void set_binary_input_age_sensor_(BinaryInputKind kind, sensor::Sensor* sensor);
+  void set_binary_input_valid_binary_sensor_(BinaryInputKind kind, binary_sensor::BinarySensor* binary_sensor);
+  BinaryInput& binary_input_(BinaryInputKind kind);
+  const BinaryInput& binary_input_(BinaryInputKind kind) const;
   static uint8_t numeric_input_mask_(NumericInputKind kind);
   static uint8_t binary_input_mask_(BinaryInputKind kind);
   bool is_numeric_input_enabled_(size_t input_index) const;
   bool is_binary_input_enabled_(size_t input_index) const;
   bool is_numeric_input_accept_retained_(size_t input_index) const;
   bool is_binary_input_accept_retained_(size_t input_index) const;
-  bool input_mask_for_key_(const std::string &key, uint8_t *mask) const;
+  bool input_mask_for_key_(const std::string& key, uint8_t* mask) const;
   void clear_all_inputs_();
   void clear_disabled_inputs_();
   void clear_input_(uint8_t input_mask);
   void clear_session_scoped_inputs_();
   void process_pending_input_subscriptions_();
   void subscribe_inputs_(esp_mqtt_client_handle_t client);
-  int find_numeric_input_index_by_topic_(const char *topic, int topic_len) const;
-  int find_binary_input_index_by_topic_(const char *topic, int topic_len) const;
-  static void mqtt_event_handler_(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data);
-  void queue_numeric_payload_(size_t input_index, const char *data, int len, bool retained);
-  void queue_binary_payload_(size_t input_index, const char *data, int len, bool retained);
+  int find_numeric_input_index_by_topic_(const char* topic, int topic_len) const;
+  int find_binary_input_index_by_topic_(const char* topic, int topic_len) const;
+  static void mqtt_event_handler_(void* handler_args, esp_event_base_t base, int32_t event_id, void* event_data);
+  void queue_numeric_payload_(size_t input_index, const char* data, int len, bool retained);
+  void queue_binary_payload_(size_t input_index, const char* data, int len, bool retained);
   void consume_pending_numeric_payloads_();
   void consume_pending_binary_payloads_();
-  void handle_numeric_payload_(size_t input_index, const char *payload, bool retained);
-  void handle_binary_payload_(size_t input_index, const char *payload, bool retained);
+  void handle_numeric_payload_(size_t input_index, const char* payload, bool retained);
+  void handle_binary_payload_(size_t input_index, const char* payload, bool retained);
   void invalidate_numeric_input_(size_t input_index);
   void invalidate_binary_input_(size_t input_index);
   void publish_runtime_state_(bool force);
-  void publish_float_if_changed_(sensor::Sensor *sensor, float value, bool force);
-  void publish_binary_if_changed_(binary_sensor::BinarySensor *binary_sensor, bool value, bool force);
+  void publish_float_if_changed_(sensor::Sensor* sensor, float value, bool force);
+  void publish_binary_if_changed_(binary_sensor::BinarySensor* binary_sensor, bool value, bool force);
   void lock_config_();
   void unlock_config_();
   void lock_runtime_();
   void unlock_runtime_();
-  static void copy_string_field_(char *destination, size_t max_len, const std::string &value);
+  static void copy_string_field_(char* destination, size_t max_len, const std::string& value);
 
   static constexpr uint32_t SENSOR_PUBLISH_INTERVAL_MS = 10000;
   static constexpr uint32_t NON_RETAINED_STATEFUL_STALE_MS = 30UL * 60UL * 1000UL;

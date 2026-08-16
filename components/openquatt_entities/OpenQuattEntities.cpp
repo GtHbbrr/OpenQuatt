@@ -12,13 +12,13 @@ namespace esphome {
 namespace openquatt_entities {
 
 using openquatt_common::PsramBuffer;
-using EntityJsonGenerator = json::SerializationBuffer<> (*)(web_server::WebServer *, void *);
+using EntityJsonGenerator = json::SerializationBuffer<> (*)(web_server::WebServer*, void*);
 
-static const char *const TAG = "openquatt.entities";
+static const char* const TAG = "openquatt.entities";
 
 namespace {
 
-bool url_path_matches(const char *url, const char *path) {
+bool url_path_matches(const char* url, const char* path) {
   if (url == nullptr || path == nullptr) {
     return false;
   }
@@ -28,18 +28,18 @@ bool url_path_matches(const char *url, const char *path) {
 
 class ChunkedJsonWriter {
  public:
-  explicit ChunkedJsonWriter(httpd_req_t *req) : req_(req) { this->buffer_.allocate(BUFFER_SIZE); }
+  explicit ChunkedJsonWriter(httpd_req_t* req) : req_(req) { this->buffer_.allocate(BUFFER_SIZE); }
 
   bool write_char(char c) { return this->write_bytes_(&c, 1); }
 
-  bool write_literal(const char *text) {
+  bool write_literal(const char* text) {
     if (text == nullptr) {
       return true;
     }
     return this->write_bytes_(text, std::strlen(text));
   }
 
-  bool write_json_string(const char *value, size_t len) {
+  bool write_json_string(const char* value, size_t len) {
     if (!this->write_char('"')) {
       return false;
     }
@@ -112,7 +112,7 @@ class ChunkedJsonWriter {
  private:
   static constexpr size_t BUFFER_SIZE = 512;
 
-  bool write_bytes_(const char *data, size_t len) {
+  bool write_bytes_(const char* data, size_t len) {
     if (!this->buffer_) {
       return false;
     }
@@ -121,7 +121,7 @@ class ChunkedJsonWriter {
     }
 
     size_t remaining = len;
-    const char *cursor = data;
+    const char* cursor = data;
     while (remaining > 0) {
       if (this->used_ == BUFFER_SIZE && !this->flush()) {
         return false;
@@ -138,7 +138,7 @@ class ChunkedJsonWriter {
     return true;
   }
 
-  httpd_req_t *req_;
+  httpd_req_t* req_;
   PsramBuffer<char> buffer_{};
   size_t used_{0};
 };
@@ -150,19 +150,19 @@ struct RequestedEntity {
 };
 
 struct EntityPayload {
-  void *source{nullptr};
+  void* source{nullptr};
   EntityJsonGenerator state_generator{nullptr};
   EntityJsonGenerator all_generator{nullptr};
 };
 
-bool entity_name_matches(EntityBase *entity, const std::string &name) {
+bool entity_name_matches(EntityBase* entity, const std::string& name) {
   return entity != nullptr && entity->get_name() == name;
 }
 
-template<typename EntitiesT>
-EntityPayload find_entity_in(const EntitiesT &entities, const std::string &name, EntityJsonGenerator state_generator,
+template <typename EntitiesT>
+EntityPayload find_entity_in(const EntitiesT& entities, const std::string& name, EntityJsonGenerator state_generator,
                              EntityJsonGenerator all_generator, bool include_internal) {
-  for (auto *entity : entities) {
+  for (auto* entity : entities) {
     if (entity == nullptr || (!include_internal && entity->is_internal()) || !entity_name_matches(entity, name)) {
       continue;
     }
@@ -171,7 +171,7 @@ EntityPayload find_entity_in(const EntitiesT &entities, const std::string &name,
   return EntityPayload{};
 }
 
-EntityPayload find_entity_payload(const RequestedEntity &entity, bool include_internal) {
+EntityPayload find_entity_payload(const RequestedEntity& entity, bool include_internal) {
 #ifdef USE_SENSOR
   if (entity.domain == "sensor") {
     return find_entity_in(App.get_sensors(), entity.name, web_server::WebServer::sensor_state_json_generator,
@@ -248,7 +248,7 @@ EntityPayload find_entity_payload(const RequestedEntity &entity, bool include_in
   return EntityPayload{};
 }
 
-bool parse_entity_line(const std::string &line, RequestedEntity *entity) {
+bool parse_entity_line(const std::string& line, RequestedEntity* entity) {
   if (entity == nullptr || line.empty()) {
     return false;
   }
@@ -268,7 +268,7 @@ bool parse_entity_line(const std::string &line, RequestedEntity *entity) {
   return !entity->key.empty() && !entity->domain.empty() && !entity->name.empty();
 }
 
-std::vector<RequestedEntity> parse_entities(const std::string &raw) {
+std::vector<RequestedEntity> parse_entities(const std::string& raw) {
   std::vector<RequestedEntity> entities;
   size_t start = 0;
   while (start < raw.size()) {
@@ -288,22 +288,22 @@ std::vector<RequestedEntity> parse_entities(const std::string &raw) {
 
 class OpenQuattEntitiesRequestHandler : public AsyncWebHandler {
  public:
-  explicit OpenQuattEntitiesRequestHandler(OpenQuattEntities *parent) : parent_(parent) {}
+  explicit OpenQuattEntitiesRequestHandler(OpenQuattEntities* parent) : parent_(parent) {}
 
-  bool canHandle(AsyncWebServerRequest *request) const override {
+  bool canHandle(AsyncWebServerRequest* request) const override {
     char url_buf[AsyncWebServerRequest::URL_BUF_SIZE];
     request->url_to(url_buf);
     return url_path_matches(url_buf, "/openquatt/entities") && request->method() == HTTP_POST;
   }
 
-  void handleRequest(AsyncWebServerRequest *request) override {
+  void handleRequest(AsyncWebServerRequest* request) override {
     const std::string entities = request->arg("entities");
     if (entities.empty()) {
       request->send(409, "application/json", R"({"ok":false,"error":"missing_entities"})");
       return;
     }
 
-    httpd_req_t *req = *request;
+    httpd_req_t* req = *request;
     httpd_resp_set_status(req, HTTPD_200);
     httpd_resp_set_type(req, "application/json; charset=utf-8");
     httpd_resp_set_hdr(req, "Cache-Control", "no-store");
@@ -311,7 +311,7 @@ class OpenQuattEntitiesRequestHandler : public AsyncWebHandler {
   }
 
  protected:
-  OpenQuattEntities *parent_;
+  OpenQuattEntities* parent_;
 };
 
 }  // namespace
@@ -331,7 +331,7 @@ void OpenQuattEntities::dump_config() {
   ESP_LOGCONFIG(TAG, "  Web server: %s", this->web_server_ != nullptr ? "configured" : "missing");
 }
 
-void OpenQuattEntities::write_entities(httpd_req_t *req, const std::string &detail, const std::string &entities) const {
+void OpenQuattEntities::write_entities(httpd_req_t* req, const std::string& detail, const std::string& entities) const {
   ChunkedJsonWriter writer(req);
   const bool detail_all = detail == "all";
   // Mirror ESPHome's direct entity endpoints: an explicitly requested internal entity is returned,
@@ -348,15 +348,15 @@ void OpenQuattEntities::write_entities(httpd_req_t *req, const std::string &deta
   }
 
   bool first_entity = true;
-  for (const auto &entity : parse_entities(entities)) {
+  for (const auto& entity : parse_entities(entities)) {
     const EntityPayload payload = find_entity_payload(entity, include_internal);
     if (payload.source == nullptr || payload.all_generator == nullptr) {
       missing.push_back(entity.key);
       continue;
     }
 
-    const EntityJsonGenerator generator = detail_all || payload.state_generator == nullptr ? payload.all_generator
-                                                                                           : payload.state_generator;
+    const EntityJsonGenerator generator =
+        detail_all || payload.state_generator == nullptr ? payload.all_generator : payload.state_generator;
     auto data = generator(this->web_server_, payload.source);
 
     if (!first_entity && !writer.write_char(',')) {

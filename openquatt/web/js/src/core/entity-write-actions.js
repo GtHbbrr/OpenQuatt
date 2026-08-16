@@ -16,10 +16,17 @@ import { updateFirmwareState } from "./feature-state.js";
 import { stopLoginAuthStatusPolling } from "../features/security-actions.js";
 import { refreshSettingsStorageStateSoon, SETTINGS_STORAGE_KEYS } from "../features/storage-history.js";
 import { clearWebServerLogOutput, refreshWebServerLogHistory } from "../features/webserver-logs.js";
-import { isUsageTelemetryChoiceConfirmed } from "./usage-telemetry-domain.js";
+import { waitForUsageTelemetryChoiceConfirmation } from "./usage-telemetry-domain.js";
 
 async function commitUsageTelemetrySwitch(entity, enabled) {
   const key = "usageTelemetryEnabled";
+  const confirmChoice = (expectedEnabled) => waitForUsageTelemetryChoiceConfirmation({
+    refresh: async () => {
+      await refreshEntities([key, "usageTelemetryChoiceConfigured", "usageTelemetryInstallationId"], "all");
+      return [getEntityValue(key), getEntityValue("usageTelemetryChoiceConfigured")];
+    },
+    expectedEnabled,
+  });
   const previousEntity = state.entities[key] ? { ...state.entities[key] } : null;
   state.busyAction = `switch-${key}`;
   state.controlNotice = "";
@@ -32,14 +39,10 @@ async function commitUsageTelemetrySwitch(entity, enabled) {
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}`);
     }
-    await refreshEntities([key, "usageTelemetryChoiceConfigured", "usageTelemetryInstallationId"], "all");
-    if (!isUsageTelemetryChoiceConfirmed({
-      telemetryValue: getEntityValue(key),
-      choiceValue: getEntityValue("usageTelemetryChoiceConfigured"),
-      expectedEnabled: enabled,
-    })) {
+    if (!await confirmChoice(enabled)) {
       throw new Error("de controller heeft de opgeslagen keuze niet bevestigd");
     }
+    state.controlError = "";
     state.controlNotice = `${entity.name} ${enabled ? "ingeschakeld" : "uitgeschakeld"}.`;
   } catch (error) {
     let disabledConfirmed = false;
@@ -48,16 +51,12 @@ async function commitUsageTelemetrySwitch(entity, enabled) {
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);
       }
-      await refreshEntities([key, "usageTelemetryChoiceConfigured", "usageTelemetryInstallationId"], "all");
-      disabledConfirmed = isUsageTelemetryChoiceConfirmed({
-        telemetryValue: getEntityValue(key),
-        choiceValue: getEntityValue("usageTelemetryChoiceConfigured"),
-        expectedEnabled: false,
-      });
+      disabledConfirmed = await confirmChoice(false);
     } catch (_disableError) {
       // Report an unknown state instead of presenting an unverified privacy choice.
     }
     if (disabledConfirmed) {
+      state.controlError = "";
       state.controlNotice = enabled
         ? "Inschakelen kon niet worden bevestigd. Delen is veilig uitgeschakeld."
         : "Delen is uitgeschakeld.";

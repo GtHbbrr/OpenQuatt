@@ -6,17 +6,17 @@
 
 namespace esphome::opentherm {
 
-class BeforeSendTrigger final : public Trigger<OpenthermData &> {
+class BeforeSendTrigger final : public Trigger<OpenthermData&> {
  public:
-  BeforeSendTrigger(OpenthermHub *hub) {
-    hub->add_on_before_send_callback([this](OpenthermData &x) { this->trigger(x); });
+  BeforeSendTrigger(OpenthermHub* hub) {
+    hub->add_on_before_send_callback([this](OpenthermData& x) { this->trigger(x); });
   }
 };
 
-class BeforeProcessResponseTrigger final : public Trigger<OpenthermData &> {
+class BeforeProcessResponseTrigger final : public Trigger<OpenthermData&> {
  public:
-  BeforeProcessResponseTrigger(OpenthermHub *hub) {
-    hub->add_on_before_process_response_callback([this](OpenthermData &x) { this->trigger(x); });
+  BeforeProcessResponseTrigger(OpenthermHub* hub) {
+    hub->add_on_before_process_response_callback([this](OpenthermData& x) { this->trigger(x); });
   }
 };
 

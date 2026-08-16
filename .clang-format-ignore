@@ -1,0 +1,15 @@
+# Build/output and local environments
+.esphome/**
+.pio/**
+.venv*/**
+.cache/**
+.tmp/**
+tmp/**
+output/**
+
+# Dependencies and VCS internals
+node_modules/**
+.git/**
+
+# Python caches
+**/__pycache__/**

@@ -7,8 +7,7 @@
 
 namespace oq_commissioning {
 
-inline void clear_container(bool keep_cm100,
-                            int next_state = TASK_STATE_IDLE) {
+inline void clear_container(bool keep_cm100, int next_state = TASK_STATE_IDLE) {
   id(oq_commissioning_request_pending) = false;
   id(oq_commissioning_active) = keep_cm100;
   id(oq_commissioning_abort_requested) = false;
@@ -71,12 +70,9 @@ inline bool request_running_task_abort() {
   const int task_code = id(oq_commissioning_task_code);
   if (task_active(id(oq_commissioning_active), task_code, TASK_FLOW_AUTOTUNE)) {
     id(oq_flow_autotune_abort) = true;
-  } else if (stop_routes_to_commissioning_abort(id(oq_commissioning_active),
-                                                task_code)) {
+  } else if (stop_routes_to_commissioning_abort(id(oq_commissioning_active), task_code)) {
     id(oq_commissioning_abort_requested) = true;
-  } else if (stop_routes_to_autotune_abort(id(oq_commissioning_active),
-                                           task_code,
-                                           id(oq_flow_autotune_req))) {
+  } else if (stop_routes_to_autotune_abort(id(oq_commissioning_active), task_code, id(oq_flow_autotune_req))) {
     id(oq_flow_autotune_abort) = true;
     id(oq_commissioning_abort_requested) = true;
   } else {

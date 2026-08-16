@@ -62,18 +62,7 @@ struct WindowStats {
 
 inline RuntimeConfig make_runtime_config(int sample_time_s) {
   return RuntimeConfig{
-      sample_time_s <= 0 ? 1 : sample_time_s,
-      60,
-      60,
-      300,
-      120,
-      650,
-      50,
-      850,
-      20.0f,
-      0.35f,
-      0.20f,
-      2.0f};
+      sample_time_s <= 0 ? 1 : sample_time_s, 60, 60, 300, 120, 650, 50, 850, 20.0f, 0.35f, 0.20f, 2.0f};
 }
 
 inline int clamp_ipwm(int value, int min_ipwm, int max_ipwm) {
@@ -101,9 +90,9 @@ class HpWaterCalibrationRuntime {
     id(oq_hp_water_calibration_stable_required_s) = 0;
   }
 
-  void start(const RuntimeConfig &cfg, uint32_t now_ms) {
-    const bool task_running = oq_commissioning::task_running(
-        id(oq_commissioning_active), id(oq_commissioning_task_code));
+  void start(const RuntimeConfig& cfg, uint32_t now_ms) {
+    const bool task_running =
+        oq_commissioning::task_running(id(oq_commissioning_active), id(oq_commissioning_task_code));
 
     if (id(oq_hp_water_calibration_active) || task_running || id(oq_commissioning_request_pending)) {
       publish("REFUSED: BUSY");
@@ -127,9 +116,10 @@ class HpWaterCalibrationRuntime {
     }
 
     ESP_LOGI("quatt.cm100.hpcal",
-             "HP water sensor calibration requested (min_mix=%ds stable_window=%ds max=%ds flow_setpoint=normal spread<=%.2fC drift<=%.2fC/min max_offset=%.2fC)",
-             cfg.min_mixing_s, cfg.stable_window_s, cfg.max_duration_s,
-             cfg.stable_spread_c, cfg.stable_drift_c_per_min, cfg.max_offset_c);
+             "HP water sensor calibration requested (min_mix=%ds stable_window=%ds max=%ds flow_setpoint=normal "
+             "spread<=%.2fC drift<=%.2fC/min max_offset=%.2fC)",
+             cfg.min_mixing_s, cfg.stable_window_s, cfg.max_duration_s, cfg.stable_spread_c, cfg.stable_drift_c_per_min,
+             cfg.max_offset_c);
 
     clear_samples();
     reset_result_globals();
@@ -160,8 +150,7 @@ class HpWaterCalibrationRuntime {
 
   void abort_or_clear() {
     if (id(oq_hp_water_calibration_active) ||
-        oq_commissioning::task_selected(id(oq_commissioning_task_code),
-                                        oq_commissioning::TASK_HP_WATER_CALIBRATION)) {
+        oq_commissioning::task_selected(id(oq_commissioning_task_code), oq_commissioning::TASK_HP_WATER_CALIBRATION)) {
       id(oq_hp_water_calibration_abort) = true;
       id(oq_commissioning_abort_requested) = true;
       publish("ABORT REQUESTED");
@@ -172,7 +161,7 @@ class HpWaterCalibrationRuntime {
     publish("IDLE");
   }
 
-  void apply(const RuntimeConfig &cfg) {
+  void apply(const RuntimeConfig& cfg) {
     const float hp1_in = id(oq_hp_calibration_hp1_water_in_offset_suggested).state;
     const float hp1_out = id(oq_hp_calibration_hp1_water_out_offset_suggested).state;
     const float hp2_in = id(oq_hp_calibration_hp2_water_in_offset_suggested).state;
@@ -186,29 +175,28 @@ class HpWaterCalibrationRuntime {
       publish("APPLY_FAILED");
       return;
     }
-    #if OQ_TOPOLOGY_DUO
+#if OQ_TOPOLOGY_DUO
     if (!valid_offset(hp2_in, cfg.max_offset_c) || !valid_offset(hp2_out, cfg.max_offset_c)) {
       publish("APPLY_FAILED");
       return;
     }
-    #endif
+#endif
 
     set_number_value(id(hp1_water_in_temp_offset), hp1_in);
     set_number_value(id(hp1_water_out_temp_offset), hp1_out);
 
-    #if OQ_TOPOLOGY_DUO
+#if OQ_TOPOLOGY_DUO
     set_number_value(id(hp2_water_in_temp_offset), hp2_in);
     set_number_value(id(hp2_water_out_temp_offset), hp2_out);
-    #endif
+#endif
 
     publish("APPLIED");
   }
 
-  void tick(const RuntimeConfig &cfg, uint32_t now_ms) {
+  void tick(const RuntimeConfig& cfg, uint32_t now_ms) {
     if (!id(oq_hp_water_calibration_active)) return;
 
-    if (!oq_commissioning::hp_water_calibration_mode_valid(id(oq_control_mode_code),
-                                                           id(oq_commissioning_task_code))) {
+    if (!oq_commissioning::hp_water_calibration_mode_valid(id(oq_control_mode_code), id(oq_commissioning_task_code))) {
       finish("ABORT: not CM100", STATE_ABORT);
       return;
     }
@@ -235,9 +223,8 @@ class HpWaterCalibrationRuntime {
       return;
     }
 
-    const int elapsed_s = (int) ((uint32_t)(now_ms - started_ms) / 1000UL);
-    id(oq_hp_water_calibration_remaining_s) =
-        (elapsed_s >= cfg.max_duration_s) ? 0 : (cfg.max_duration_s - elapsed_s);
+    const int elapsed_s = (int)((uint32_t)(now_ms - started_ms) / 1000UL);
+    id(oq_hp_water_calibration_remaining_s) = (elapsed_s >= cfg.max_duration_s) ? 0 : (cfg.max_duration_s - elapsed_s);
 
     const float flow_lph = id(flow_rate_selected).state;
     const bool flow_seen = !isnan(flow_lph) && flow_lph >= cfg.min_flow_lph;
@@ -293,7 +280,7 @@ class HpWaterCalibrationRuntime {
   SampleSet samples_[MAX_WINDOW_SAMPLES];
 
   template <typename NumberEntity>
-  void set_number_value(NumberEntity &number_entity, float value) {
+  void set_number_value(NumberEntity& number_entity, float value) {
     auto call = number_entity.make_call();
     call.set_value(value);
     call.perform();
@@ -317,15 +304,11 @@ class HpWaterCalibrationRuntime {
     id(oq_hp_water_calibration_result_hp2_out_raw_avg_c) = NAN;
   }
 
-  bool valid_offset(float value, float max_offset_c) const {
-    return !isnan(value) && fabsf(value) <= max_offset_c;
-  }
+  bool valid_offset(float value, float max_offset_c) const { return !isnan(value) && fabsf(value) <= max_offset_c; }
 
   bool result_ready() const {
-    return !id(oq_hp_water_calibration_active) &&
-           id(oq_hp_water_calibration_phase) == PHASE_DONE &&
-           id(oq_commissioning_state_code) == STATE_DONE &&
-           !isnan(id(oq_hp_water_calibration_result_reference_c)) &&
+    return !id(oq_hp_water_calibration_active) && id(oq_hp_water_calibration_phase) == PHASE_DONE &&
+           id(oq_commissioning_state_code) == STATE_DONE && !isnan(id(oq_hp_water_calibration_result_reference_c)) &&
            !isnan(id(oq_hp_water_calibration_result_spread_before_c)) &&
            !isnan(id(oq_hp_water_calibration_result_expected_spread_c));
   }
@@ -339,28 +322,28 @@ class HpWaterCalibrationRuntime {
     id(oq_commissioning_state_code) = state_code;
   }
 
-  bool read_raw_sample(SampleSet &sample) {
+  bool read_raw_sample(SampleSet& sample) {
     sample.hp1_in = id(hp1_water_in_temp_raw).state;
     sample.hp1_out = id(hp1_water_out_temp_raw).state;
     sample.hp2_in = NAN;
     sample.hp2_out = NAN;
     if (isnan(sample.hp1_in) || isnan(sample.hp1_out)) return false;
 
-    #if OQ_TOPOLOGY_DUO
+#if OQ_TOPOLOGY_DUO
     sample.hp2_in = id(hp2_water_in_temp_raw).state;
     sample.hp2_out = id(hp2_water_out_temp_raw).state;
     if (isnan(sample.hp2_in) || isnan(sample.hp2_out)) return false;
-    #endif
+#endif
     return true;
   }
 
-  void push_sample(const SampleSet &sample) {
+  void push_sample(const SampleSet& sample) {
     samples_[sample_next_] = sample;
     sample_next_ = (sample_next_ + 1) % MAX_WINDOW_SAMPLES;
     if (sample_count_ < MAX_WINDOW_SAMPLES) sample_count_++;
   }
 
-  int required_window_samples(const RuntimeConfig &cfg) const {
+  int required_window_samples(const RuntimeConfig& cfg) const {
     int samples = (cfg.stable_window_s + cfg.sample_time_s - 1) / cfg.sample_time_s;
     if (samples < 2) samples = 2;
     if (samples > MAX_WINDOW_SAMPLES) samples = MAX_WINDOW_SAMPLES;
@@ -372,7 +355,7 @@ class HpWaterCalibrationRuntime {
     return (oldest + oldest_offset) % MAX_WINDOW_SAMPLES;
   }
 
-  bool compute_window_stats(const RuntimeConfig &cfg, WindowStats &stats) {
+  bool compute_window_stats(const RuntimeConfig& cfg, WindowStats& stats) {
     const int required = required_window_samples(cfg);
     id(oq_hp_water_calibration_stable_required_s) = cfg.stable_window_s;
     id(oq_hp_water_calibration_stable_progress_s) =
@@ -392,10 +375,10 @@ class HpWaterCalibrationRuntime {
       const SampleSet sample = samples_[sample_index_from_oldest(offset)];
       hp1_in_sum += sample.hp1_in;
       hp1_out_sum += sample.hp1_out;
-      #if OQ_TOPOLOGY_DUO
+#if OQ_TOPOLOGY_DUO
       hp2_in_sum += sample.hp2_in;
       hp2_out_sum += sample.hp2_out;
-      #endif
+#endif
     }
 
     stats.count = required;
@@ -409,14 +392,14 @@ class HpWaterCalibrationRuntime {
 
     stats.hp2_in_avg = NAN;
     stats.hp2_out_avg = NAN;
-    #if OQ_TOPOLOGY_DUO
+#if OQ_TOPOLOGY_DUO
     stats.hp2_in_avg = hp2_in_sum / required;
     stats.hp2_out_avg = hp2_out_sum / required;
     stats.reference = (stats.hp1_in_avg + stats.hp1_out_avg + stats.hp2_in_avg + stats.hp2_out_avg) * 0.25f;
     min_avg = fminf(min_avg, fminf(stats.hp2_in_avg, stats.hp2_out_avg));
     max_avg = fmaxf(max_avg, fmaxf(stats.hp2_in_avg, stats.hp2_out_avg));
     stats.drift = fmaxf(stats.drift, fmaxf(fabsf(last.hp2_in - first.hp2_in), fabsf(last.hp2_out - first.hp2_out)));
-    #endif
+#endif
 
     stats.spread = max_avg - min_avg;
     id(oq_hp_water_calibration_spread_c) = stats.spread;
@@ -425,21 +408,19 @@ class HpWaterCalibrationRuntime {
     return true;
   }
 
-  void update_window_diagnostics(const RuntimeConfig &cfg) {
+  void update_window_diagnostics(const RuntimeConfig& cfg) {
     WindowStats stats;
     compute_window_stats(cfg, stats);
   }
 
-  bool window_is_stable(const RuntimeConfig &cfg, const WindowStats &stats) const {
-    const float allowed_drift = cfg.stable_drift_c_per_min * ((float) stats.span_s / 60.0f);
+  bool window_is_stable(const RuntimeConfig& cfg, const WindowStats& stats) const {
+    const float allowed_drift = cfg.stable_drift_c_per_min * ((float)stats.span_s / 60.0f);
     return stats.spread <= cfg.stable_spread_c && stats.drift <= allowed_drift;
   }
 
-  float rounded_offset(float value) const {
-    return roundf(value * 100.0f) * 0.01f;
-  }
+  float rounded_offset(float value) const { return roundf(value * 100.0f) * 0.01f; }
 
-  void compute_result(const RuntimeConfig &cfg, const WindowStats &stats) {
+  void compute_result(const RuntimeConfig& cfg, const WindowStats& stats) {
     const float hp1_in_offset = rounded_offset(stats.reference - stats.hp1_in_avg);
     const float hp1_out_offset = rounded_offset(stats.reference - stats.hp1_out_avg);
     if (fabsf(hp1_in_offset) > cfg.max_offset_c || fabsf(hp1_out_offset) > cfg.max_offset_c) {
@@ -450,7 +431,7 @@ class HpWaterCalibrationRuntime {
     set_number_value(id(oq_hp_calibration_hp1_water_in_offset_suggested), hp1_in_offset);
     set_number_value(id(oq_hp_calibration_hp1_water_out_offset_suggested), hp1_out_offset);
 
-    #if OQ_TOPOLOGY_DUO
+#if OQ_TOPOLOGY_DUO
     const float hp2_in_offset = rounded_offset(stats.reference - stats.hp2_in_avg);
     const float hp2_out_offset = rounded_offset(stats.reference - stats.hp2_out_avg);
     if (fabsf(hp2_in_offset) > cfg.max_offset_c || fabsf(hp2_out_offset) > cfg.max_offset_c) {
@@ -459,7 +440,7 @@ class HpWaterCalibrationRuntime {
     }
     set_number_value(id(oq_hp_calibration_hp2_water_in_offset_suggested), hp2_in_offset);
     set_number_value(id(oq_hp_calibration_hp2_water_out_offset_suggested), hp2_out_offset);
-    #endif
+#endif
 
     id(oq_hp_water_calibration_result_reference_c) = stats.reference;
     id(oq_hp_water_calibration_result_spread_before_c) = stats.spread;
@@ -485,7 +466,7 @@ class HpWaterCalibrationRuntime {
     if (hp1) {
       if (id(hp1_compressor_level).has_state()) {
         auto idx = id(hp1_compressor_level).active_index();
-        level = idx.has_value() ? (int) idx.value() : 0;
+        level = idx.has_value() ? (int)idx.value() : 0;
       }
       last_applied = id(hp1_last_applied_level);
       working_mode = id(hp1_working_mode).state;
@@ -493,20 +474,20 @@ class HpWaterCalibrationRuntime {
       defrost = id(hp1_defrost).state;
       fault = id(hp1_ot_fault_active).state;
     } else {
-      #if OQ_TOPOLOGY_DUO
+#if OQ_TOPOLOGY_DUO
       if (id(hp2_compressor_level).has_state()) {
         auto idx = id(hp2_compressor_level).active_index();
-        level = idx.has_value() ? (int) idx.value() : 0;
+        level = idx.has_value() ? (int)idx.value() : 0;
       }
       last_applied = id(hp2_last_applied_level);
       working_mode = id(hp2_working_mode).state;
       freq = id(hp2_compressor_frequency).state;
       defrost = id(hp2_defrost).state;
       fault = id(hp2_ot_fault_active).state;
-      #endif
+#endif
     }
 
-    const int mode = isnan(working_mode) ? 0 : (int) roundf(working_mode);
+    const int mode = isnan(working_mode) ? 0 : (int)roundf(working_mode);
     const bool thermal_mode = (mode == 1 || mode == 2);
     const bool compressor_running = !isnan(freq) && freq > 0.5f;
     return level > 0 || last_applied > 0 || thermal_mode || compressor_running || defrost || fault;
@@ -514,13 +495,13 @@ class HpWaterCalibrationRuntime {
 
   bool heat_pumps_idle() {
     if (hp_active(true)) return false;
-    #if OQ_TOPOLOGY_DUO
+#if OQ_TOPOLOGY_DUO
     if (hp_active(false)) return false;
-    #endif
+#endif
     return true;
   }
 
-  void finish(const char *status, int next_state) {
+  void finish(const char* status, int next_state) {
     id(oq_hp_water_calibration_active) = false;
     id(oq_hp_water_calibration_abort) = false;
     id(oq_hp_water_calibration_phase) = next_state == STATE_DONE ? PHASE_DONE : PHASE_IDLE;
@@ -534,25 +515,20 @@ class HpWaterCalibrationRuntime {
     phase_ = PHASE_IDLE;
   }
 
-  void publish(const char *status) {
+  void publish(const char* status) {
     const std::string s(status ? status : "");
     if (s != last_status_) {
       oq_service_status::set_hp_water_calibration(s);
-      ESP_LOGI("quatt.cm100.hpcal",
-               "status=%s phase=%d remaining=%ds flow=%.0fL/h spread=%.2fC stable=%ds/%ds",
-               s.c_str(),
-               id(oq_hp_water_calibration_phase),
-               id(oq_hp_water_calibration_remaining_s),
-               id(flow_rate_selected).state,
-               id(oq_hp_water_calibration_spread_c),
-               id(oq_hp_water_calibration_stable_progress_s),
-               id(oq_hp_water_calibration_stable_required_s));
+      ESP_LOGI("quatt.cm100.hpcal", "status=%s phase=%d remaining=%ds flow=%.0fL/h spread=%.2fC stable=%ds/%ds",
+               s.c_str(), id(oq_hp_water_calibration_phase), id(oq_hp_water_calibration_remaining_s),
+               id(flow_rate_selected).state, id(oq_hp_water_calibration_spread_c),
+               id(oq_hp_water_calibration_stable_progress_s), id(oq_hp_water_calibration_stable_required_s));
       last_status_ = s;
     }
   }
 };
 
-inline HpWaterCalibrationRuntime &runtime() {
+inline HpWaterCalibrationRuntime& runtime() {
   static HpWaterCalibrationRuntime instance;
   return instance;
 }

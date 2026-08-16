@@ -164,6 +164,10 @@ export function formatSettingsOptionLabel(option) {
     Custom: "Aangepast",
     [STRATEGY_OPTION_CURVE]: "Stooklijn",
     [STRATEGY_OPTION_POWER_HOUSE]: "Power House",
+    "Heating demand": "Warmtevraag",
+    "Cooling demand": "Koelvraag",
+    "Heating or cooling demand": "Warmte- of koelvraag",
+    "External control": "Externe bediening",
     "Dew point required": "Dauwpuntmeting vereist",
     "Dew point": "Dauwpunt",
     "Dew point (MQTT)": "Dauwpunt (MQTT)",
@@ -457,7 +461,7 @@ export function renderSettingsSliderField(key, title, copy, className = "", opti
   const minLabel = options.minLabel || `${meta.min}${meta.uom || ""}`;
   const maxLabel = options.maxLabel || `${meta.max}${meta.uom || ""}`;
   const valueLabel = options.valueLabel || formatValue(key, value);
-  return renderSettingsFieldCard(key, title, copy, `<label class="oq-helper-slider-field"><div class="oq-helper-slider-meta"><span>${escapeHtml(minLabel)}</span><strong>${escapeHtml(valueLabel)}</strong><span>${escapeHtml(maxLabel)}</span></div><input class="oq-helper-range" type="range" data-oq-field="${escapeHtml(key)}" min="${meta.min}" max="${meta.max}" step="${meta.step}" value="${value}" ${state.loadingEntities ? "disabled" : ""}></label>`, className);
+  return renderSettingsFieldCard(key, title, copy, `<label class="oq-helper-slider-field"><div class="oq-helper-slider-meta"><span>${escapeHtml(minLabel)}</span><strong>${escapeHtml(valueLabel)}</strong><span>${escapeHtml(maxLabel)}</span></div><input class="oq-helper-range" type="range" data-oq-field="${escapeHtml(key)}" min="${meta.min}" max="${meta.max}" step="${meta.step}" value="${value}" ${state.loadingEntities ? "disabled" : ""}></label>`, className, options.footerMarkup || "");
 }
 
 export function renderSettingsMiniNumberField(key, title, copy, options = {}) {

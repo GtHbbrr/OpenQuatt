@@ -52,7 +52,7 @@ class TelemetryState {
     this->last_response_ms_ = 0;
     this->last_response_id_ = -1;
     this->last_response_type_ = -1;
-    for (auto &field : this->fields_) {
+    for (auto& field : this->fields_) {
       field = {};
     }
   }
@@ -64,8 +64,7 @@ class TelemetryState {
     this->last_response_type_ = message_type;
     this->accepted_response_count_++;
 
-    const bool acknowledged =
-        message_type == MESSAGE_TYPE_READ_ACK || message_type == MESSAGE_TYPE_WRITE_ACK;
+    const bool acknowledged = message_type == MESSAGE_TYPE_READ_ACK || message_type == MESSAGE_TYPE_WRITE_ACK;
     if (acknowledged) {
       this->acknowledged_response_count_++;
     } else if (message_type == MESSAGE_TYPE_DATA_INVALID) {
@@ -79,7 +78,7 @@ class TelemetryState {
     const int field_index = field_index_for_message_id(message_id);
     if (field_index < 0) return;
 
-    auto &field = this->fields_[field_index];
+    auto& field = this->fields_[field_index];
     // All tracked telemetry messages are read requests. A WRITE_ACK for one of
     // them is therefore not a valid sample, even though it is a valid frame.
     if (message_type == MESSAGE_TYPE_READ_ACK) {
@@ -93,14 +92,12 @@ class TelemetryState {
   bool field_is_valid(Field field) const { return this->fields_[field].valid; }
 
   bool field_is_fresh(Field field, uint32_t now_ms, uint32_t max_age_ms) const {
-    const auto &state = this->fields_[field];
-    return state.valid && (uint32_t) (now_ms - state.last_valid_ms) <= max_age_ms;
+    const auto& state = this->fields_[field];
+    return state.valid && (uint32_t)(now_ms - state.last_valid_ms) <= max_age_ms;
   }
 
-  bool expire_response_session_if_stale(
-      uint32_t now_ms, uint32_t max_age_ms) {
-    if (!this->session_has_response_ ||
-        (uint32_t) (now_ms - this->last_response_ms_) <= max_age_ms) {
+  bool expire_response_session_if_stale(uint32_t now_ms, uint32_t max_age_ms) {
+    if (!this->session_has_response_ || (uint32_t)(now_ms - this->last_response_ms_) <= max_age_ms) {
       return false;
     }
 
@@ -109,7 +106,7 @@ class TelemetryState {
     // fresh again for one timeout window after roughly 49.7 days.
     this->session_has_response_ = false;
     this->last_response_ms_ = 0;
-    for (auto &field : this->fields_) {
+    for (auto& field : this->fields_) {
       field.valid = false;
     }
     return true;
@@ -122,19 +119,15 @@ class TelemetryState {
     if (field_index_for_message_id(message_id) >= 0) {
       return message_type == MESSAGE_TYPE_READ_ACK;
     }
-    return message_type == MESSAGE_TYPE_READ_ACK ||
-           message_type == MESSAGE_TYPE_WRITE_ACK;
+    return message_type == MESSAGE_TYPE_READ_ACK || message_type == MESSAGE_TYPE_WRITE_ACK;
   }
 
-  bool transport_is_available(
-      uint32_t now_ms, uint32_t response_max_age_ms,
-      uint32_t status_max_age_ms) const {
-    return this->session_has_response_ &&
-           (uint32_t) (now_ms - this->last_response_ms_) <= response_max_age_ms &&
+  bool transport_is_available(uint32_t now_ms, uint32_t response_max_age_ms, uint32_t status_max_age_ms) const {
+    return this->session_has_response_ && (uint32_t)(now_ms - this->last_response_ms_) <= response_max_age_ms &&
            this->field_is_fresh(FIELD_STATUS, now_ms, status_max_age_ms);
   }
 
-  void record_log_message(uint32_t now_ms, const char *tag, const char *message) {
+  void record_log_message(uint32_t now_ms, const char* tag, const char* message) {
     if (tag == nullptr || message == nullptr || strcmp(tag, "opentherm") != 0) return;
 
     TransportError error = TRANSPORT_ERROR_NONE;
@@ -197,7 +190,7 @@ class TelemetryState {
   uint32_t last_transport_error_ms() const { return this->last_transport_error_ms_; }
   TransportError last_transport_error() const { return this->last_transport_error_; }
 
-  const char *last_response_type_name() const {
+  const char* last_response_type_name() const {
     switch (this->last_response_type_) {
       case MESSAGE_TYPE_READ_ACK:
         return "READ_ACK";
@@ -214,7 +207,7 @@ class TelemetryState {
     }
   }
 
-  const char *last_transport_error_name() const {
+  const char* last_transport_error_name() const {
     switch (this->last_transport_error_) {
       case TRANSPORT_ERROR_NO_TRANSITION:
         return "NO_TRANSITION";

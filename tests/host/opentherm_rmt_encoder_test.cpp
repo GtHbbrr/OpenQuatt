@@ -8,7 +8,7 @@ namespace {
 
 namespace encoder = esphome::opentherm::rmt_encoder;
 
-void assert_symbol(const encoder::Symbol &symbol, bool bit) {
+void assert_symbol(const encoder::Symbol& symbol, bool bit) {
   assert(symbol.level0 == !bit);
   assert(symbol.duration0_us == 500U);
   assert(symbol.level1 == bit);

@@ -2,13 +2,12 @@
 
 namespace esphome::opentherm {
 
-static const char *const TAG = "opentherm.number";
+static const char* const TAG = "opentherm.number";
 
 void OpenthermNumber::control(float value) {
   this->publish_state(value);
 
-  if (this->restore_value_)
-    this->pref_.save(&value);
+  if (this->restore_value_) this->pref_.save(&value);
 }
 
 void OpenthermNumber::setup() {

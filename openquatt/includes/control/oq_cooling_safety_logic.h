@@ -14,23 +14,19 @@ class CoolingSafetyRuntime {
   }
   bool without_dew_point_user_responsibility_enabled() {
     return id(cooling_without_dew_point_mode).has_state() &&
-           id(cooling_without_dew_point_mode).current_option() ==
-               "Allow without dew point, user responsibility";
+           id(cooling_without_dew_point_mode).current_option() == "Allow without dew point, user responsibility";
   }
   bool fallback_active() {
     return !dew_selected_valid() && id(cooling_without_dew_point_enabled).state && fallback_min_valid();
   }
   bool permitted_core() {
     const bool dew_ok = id(cooling_dew_point_available).state && dew_selected_valid() &&
-                        id(minimum_safe_supply_temp).has_state() &&
-                        finite(id(minimum_safe_supply_temp).state);
+                        id(minimum_safe_supply_temp).has_state() && finite(id(minimum_safe_supply_temp).state);
     const bool fallback_ok = id(cooling_without_dew_point_enabled).state && fallback_min_valid();
     const bool user_ok = id(cooling_without_dew_point_user_responsibility_enabled).state &&
-                         id(cooling_min_supply_temp).has_state() &&
-                         finite(id(cooling_min_supply_temp).state);
-    return id(cooling_without_dew_point_user_responsibility_enabled).state
-        ? user_ok
-        : (dew_ok || fallback_ok || user_ok);
+                         id(cooling_min_supply_temp).has_state() && finite(id(cooling_min_supply_temp).state);
+    return id(cooling_without_dew_point_user_responsibility_enabled).state ? user_ok
+                                                                           : (dew_ok || fallback_ok || user_ok);
   }
   bool request_active() {
     if (!id(cooling_room_request_required).state) {
@@ -56,11 +52,10 @@ class CoolingSafetyRuntime {
     return id(oq_cooling_request_latched);
   }
   bool permitted(float min_flow_lph) {
-    return id(cooling_permitted_core).has_state() && id(cooling_permitted_core).state &&
-           flow_valid() && id(flow_rate_selected).state >= min_flow_lph &&
-           !id(oq_lowflow_fault_active);
+    return id(cooling_permitted_core).has_state() && id(cooling_permitted_core).state && flow_valid() &&
+           id(flow_rate_selected).state >= min_flow_lph && !id(oq_lowflow_fault_active);
   }
-  const char *guard_mode() {
+  const char* guard_mode() {
     if (id(cooling_without_dew_point_user_responsibility_enabled).state) return "User responsibility";
     if (id(cooling_dew_point_available).state) {
       if (id(cooling_dew_point_source).has_state()) {
@@ -72,7 +67,7 @@ class CoolingSafetyRuntime {
     if (!id(cooling_without_dew_point_enabled).state) return "Blocked";
     return fallback_min_valid() ? "Fallback" : "Fallback blocked";
   }
-  const char *block_reason(float min_flow_lph) {
+  const char* block_reason(float min_flow_lph) {
     if (!id(cooling_enable_selected).has_state() || !id(cooling_enable_selected).state) {
       return "Cooling disabled";
     }
@@ -81,8 +76,7 @@ class CoolingSafetyRuntime {
         (!id(cooling_min_supply_temp).has_state() || !finite(id(cooling_min_supply_temp).state))) {
       return "Cooling minimum unavailable";
     }
-    if (!id(cooling_dew_point_available).state &&
-        !id(cooling_without_dew_point_user_responsibility_enabled).state) {
+    if (!id(cooling_dew_point_available).state && !id(cooling_without_dew_point_user_responsibility_enabled).state) {
       return fallback_block_reason();
     }
     if (!id(cooling_permitted_core).has_state() || !id(cooling_permitted_core).state) {
@@ -95,9 +89,7 @@ class CoolingSafetyRuntime {
     if (id(oq_lowflow_fault_active) || id(flow_rate_selected).state < min_flow_lph) return "Flow too low";
     return "Ready";
   }
-  float safety_margin_selected() {
-    return clamp_float(id(cooling_safety_margin).state, 0.0f, 4.0f);
-  }
+  float safety_margin_selected() { return clamp_float(id(cooling_safety_margin).state, 0.0f, 4.0f); }
   float selected_dew_point(uint32_t now_ms, uint32_t hold_ms) {
     const int source_mode_code = dew_source_mode_code();
     const bool ha_ok = ha_dew_valid();
@@ -122,8 +114,7 @@ class CoolingSafetyRuntime {
       return selected_c;
     }
     id(oq_cooling_dew_point_selected_hold_active) = false;
-    if (hold_ms > 0 &&
-        id(oq_cooling_dew_point_selected_last_route_code) != 2 &&
+    if (hold_ms > 0 && id(oq_cooling_dew_point_selected_last_route_code) != 2 &&
         id(oq_cooling_dew_point_selected_last_valid_ms) > 0 &&
         id(oq_cooling_dew_point_selected_last_mode_code) == source_mode_code &&
         (uint32_t)(now_ms - id(oq_cooling_dew_point_selected_last_valid_ms)) < hold_ms &&
@@ -142,14 +133,11 @@ class CoolingSafetyRuntime {
   float fallback_night_min_outdoor_temp() {
     if (!id(oq_time).now().is_valid()) return NAN;
     const auto now = id(oq_time).now();
-    if (now.hour < 6 &&
-        id(oq_cooling_fallback_night_window_day_key) >= 0 &&
+    if (now.hour < 6 && id(oq_cooling_fallback_night_window_day_key) >= 0 &&
         finite(id(oq_cooling_fallback_night_min_current_c))) {
       return id(oq_cooling_fallback_night_min_current_c);
     }
-    return finite(id(oq_cooling_fallback_night_min_last_c))
-        ? id(oq_cooling_fallback_night_min_last_c)
-        : NAN;
+    return finite(id(oq_cooling_fallback_night_min_last_c)) ? id(oq_cooling_fallback_night_min_last_c) : NAN;
   }
   float fallback_min_supply_temp() {
     if (!outside_valid() || id(outside_temp_selected).state < 20.0f) return NAN;
@@ -157,9 +145,12 @@ class CoolingSafetyRuntime {
     float fallback_floor_c = clamp_float(19.0f + ((outside_c - 20.0f) * 0.25f), 19.0f, 22.0f);
     if (fallback_night_min_valid()) {
       const float night_min_c = id(cooling_fallback_night_min_outdoor_temp).state;
-      if (night_min_c >= 20.0f) fallback_floor_c += 1.5f;
-      else if (night_min_c >= 19.0f) fallback_floor_c += 1.0f;
-      else if (night_min_c >= 18.0f) fallback_floor_c += 0.5f;
+      if (night_min_c >= 20.0f)
+        fallback_floor_c += 1.5f;
+      else if (night_min_c >= 19.0f)
+        fallback_floor_c += 1.0f;
+      else if (night_min_c >= 18.0f)
+        fallback_floor_c += 0.5f;
     }
     if (room_valid()) {
       const float room_usability_floor_c = id(room_temp_selected).state - 1.0f;
@@ -168,17 +159,14 @@ class CoolingSafetyRuntime {
     return fallback_floor_c;
   }
   float effective_min_supply_temp() {
-    if (id(cooling_without_dew_point_user_responsibility_enabled).state &&
-        id(cooling_min_supply_temp).has_state() &&
+    if (id(cooling_without_dew_point_user_responsibility_enabled).state && id(cooling_min_supply_temp).has_state() &&
         finite(id(cooling_min_supply_temp).state)) {
       return id(cooling_min_supply_temp).state;
     }
     if (id(minimum_safe_supply_temp).has_state() && finite(id(minimum_safe_supply_temp).state)) {
       return id(minimum_safe_supply_temp).state;
     }
-    return id(cooling_fallback_active).state && fallback_min_valid()
-        ? id(cooling_fallback_min_supply_temp).state
-        : NAN;
+    return id(cooling_fallback_active).state && fallback_min_valid() ? id(cooling_fallback_min_supply_temp).state : NAN;
   }
   void update_fallback_night_min() {
     if (!id(oq_time).now().is_valid() || !outside_valid()) return;
@@ -202,35 +190,40 @@ class CoolingSafetyRuntime {
       id(oq_cooling_fallback_night_min_last_day_key) = id(oq_cooling_fallback_night_window_day_key);
     }
   }
+
  private:
   bool finite(float value) const { return !isnan(value); }
   float clamp_float(float value, float min_value, float max_value) const {
     if (value < min_value) return min_value;
     return value > max_value ? max_value : value;
   }
-  bool option_allows_fallback(const std::string &option) const {
+  bool option_allows_fallback(const std::string& option) const {
     return option == "Allow without dew point, use dew point approximation" ||
-           option == "Allow without dew point, use fallback" ||
-           option == "Allow without dew point";
+           option == "Allow without dew point, use fallback" || option == "Allow without dew point";
   }
   int dew_source_mode_code() const {
     if (!id(cooling_dew_point_source).has_state()) return 3;
     const auto source = id(cooling_dew_point_source).current_option();
     return source == "MQTT" ? 2 : (source == "Home Assistant" ? 1 : 3);
   }
-  const char *fallback_block_reason() {
+  const char* fallback_block_reason() {
     if (!id(cooling_without_dew_point_enabled).state) return "No dew point source";
     if (!outside_valid()) return "Fallback outside temperature unavailable";
-    if (id(outside_temp_selected).state < 20.0f) return "Fallback blocked below 20\xC2\xB0" "C outdoor";
+    if (id(outside_temp_selected).state < 20.0f)
+      return "Fallback blocked below 20\xC2\xB0"
+             "C outdoor";
     if (!fallback_min_valid()) return "Fallback minimum unavailable";
     if (fallback_night_min_valid() && id(cooling_fallback_night_min_outdoor_temp).state >= 18.0f) {
       if (id(cooling_fallback_night_min_outdoor_temp).state >= 20.0f) {
-        return "Fallback active (+1.5\xC2\xB0" "C tropical night)";
+        return "Fallback active (+1.5\xC2\xB0"
+               "C tropical night)";
       }
       if (id(cooling_fallback_night_min_outdoor_temp).state >= 19.0f) {
-        return "Fallback active (+1.0\xC2\xB0" "C very warm night)";
+        return "Fallback active (+1.0\xC2\xB0"
+               "C very warm night)";
       }
-      return "Fallback active (+0.5\xC2\xB0" "C warm night)";
+      return "Fallback active (+0.5\xC2\xB0"
+             "C warm night)";
     }
     return "Fallback active";
   }
@@ -247,15 +240,11 @@ class CoolingSafetyRuntime {
   bool outside_valid() const {
     return id(outside_temp_selected).has_state() && finite(id(outside_temp_selected).state);
   }
-  bool room_valid() const {
-    return id(room_temp_selected).has_state() && finite(id(room_temp_selected).state);
-  }
+  bool room_valid() const { return id(room_temp_selected).has_state() && finite(id(room_temp_selected).state); }
   bool setpoint_valid() const {
     return id(room_setpoint_selected).has_state() && finite(id(room_setpoint_selected).state);
   }
-  bool flow_valid() const {
-    return id(flow_rate_selected).has_state() && finite(id(flow_rate_selected).state);
-  }
+  bool flow_valid() const { return id(flow_rate_selected).has_state() && finite(id(flow_rate_selected).state); }
   bool ha_dew_valid() const {
     return id(cooling_dew_point_valid_ha).has_state() && id(cooling_dew_point_valid_ha).state &&
            id(cooling_dew_point_ha).has_state() && finite(id(cooling_dew_point_ha).state);
@@ -265,6 +254,9 @@ class CoolingSafetyRuntime {
            id(mqtt_cooling_dew_point).has_state() && finite(id(mqtt_cooling_dew_point).state);
   }
 };
-inline CoolingSafetyRuntime &runtime() { static CoolingSafetyRuntime instance; return instance; }
+inline CoolingSafetyRuntime& runtime() {
+  static CoolingSafetyRuntime instance;
+  return instance;
+}
 
 }  // namespace oq_cooling_safety

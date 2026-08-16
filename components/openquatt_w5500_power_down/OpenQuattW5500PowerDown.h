@@ -8,10 +8,9 @@
 namespace esphome {
 namespace openquatt_w5500_power_down {
 
-class OpenQuattW5500PowerDown
-    : public Component,
-      public spi::SPIDevice<spi::BIT_ORDER_MSB_FIRST, spi::CLOCK_POLARITY_LOW, spi::CLOCK_PHASE_LEADING,
-                            spi::DATA_RATE_8MHZ> {
+class OpenQuattW5500PowerDown : public Component,
+                                public spi::SPIDevice<spi::BIT_ORDER_MSB_FIRST, spi::CLOCK_POLARITY_LOW,
+                                                      spi::CLOCK_PHASE_LEADING, spi::DATA_RATE_8MHZ> {
  public:
   void setup() override;
   void dump_config() override;

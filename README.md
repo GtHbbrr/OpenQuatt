@@ -102,8 +102,7 @@ Belangrijkste pagina's voor gebruikers:
 - [Heatpump Controller Q-edition aansluiten en in gebruik nemen](docs/q-edition.md) voor de normale route met nieuwe OpenQuatt-hardware
 - [Andere modules installeren](docs/installatie-en-ingebruikname.md) voor een bestaande Waveshare- of Heatpump Listener-module
 - [Web-app gebruiken](docs/web-app.md) voor Quick Start, instellingen, updates, backup en beveiliging
-- [Dashboard installeren](docs/dashboard/README.md) voor het importeren van dashboards
-- [Dashboard gebruiken](docs/dashboardoverzicht.md) voor dagelijkse controle in Home Assistant
+- [OpenQuatt Home Assistant](docs/dashboard/README.md) voor dashboards, optionele HA-packages en de companion-repository
 - [Verwarmen en koelen uitgelegd](docs/verwarmen-en-koelen.md) voor een eenvoudige uitleg van `Power House`, stooklijnregeling, koeling, `Single` en `Duo`
 - [MQTT inputbronnen](docs/mqtt.md) voor externe MQTT-bronwaarden zoals dauwpunt, buiten- en kamerwaarden en toestemmingssignalen
 - [Problemen oplossen](docs/problemen-oplossen.md) voor diagnose zonder meteen te gaan tunen

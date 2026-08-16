@@ -178,6 +178,7 @@
     flowSetpoint: { domain: "number", name: "Flow Setpoint" },
     coolingFlowSetpoint: { domain: "number", name: "Cooling Flow Setpoint", optional: true },
     manualIpwm: { domain: "number", name: "Manual iPWM" },
+    flowOutputIpwm: { domain: "sensor", name: "Flow Output iPWM", optional: true },
     compressorStarts2hWarningLimit: { domain: "number", name: "Compressor starts 2h warning limit", optional: true },
     compressorStarts72hWarningLimit: { domain: "number", name: "Compressor starts 72h warning limit", optional: true },
     compressorCyclingWarning2h: { domain: "binary_sensor", name: "Compressor cycling warning 2h", optional: true },
@@ -263,6 +264,8 @@
     otbDeviceVersion: { domain: "sensor", name: "OTB - Device Product Version", optional: true },
     otbLastResponseAge: { domain: "sensor", name: "OTB - Last Response Age", optional: true },
     otbResponseCount: { domain: "sensor", name: "OTB - Valid Response Count", optional: true },
+    otbTransportErrorCount: { domain: "sensor", name: "OTB - Transport Error Count", optional: true },
+    otbResponseTimeoutCount: { domain: "sensor", name: "OTB - Response Timeout Count", optional: true },
     otbLastResponseId: { domain: "sensor", name: "OTB - Last Response Message ID", optional: true },
     flowKp: { domain: "number", name: "Flow PI Kp", optional: true },
     flowKi: { domain: "number", name: "Flow PI Ki", optional: true },
@@ -363,6 +366,13 @@
     boilerCommandSource: { domain: "text_sensor", name: "Boiler command source", optional: true },
     boilerBlockReason: { domain: "text_sensor", name: "Boiler block reason", optional: true },
     boilerHeatPower: { domain: "sensor", name: "Boiler Heat Power", optional: true },
+    auxRelayFunction: { domain: "select", name: "Aux Relay Function", optional: true },
+    auxWaitForSupplyTemp: { domain: "switch", name: "Aux Relay Wait For Supply Temp", optional: true },
+    auxHeatingStartTemp: { domain: "number", name: "Aux Relay Heating Start Temp", optional: true },
+    auxCoolingStartTemp: { domain: "number", name: "Aux Relay Cooling Start Temp", optional: true },
+    auxTempHysteresis: { domain: "number", name: "Aux Relay Temp Hysteresis", optional: true },
+    auxRelayActive: { domain: "binary_sensor", name: "Aux relay active", optional: true },
+    auxRelayStatus: { domain: "text_sensor", name: "Aux relay status", optional: true },
     systemHeatPower: { domain: "sensor", name: "System Heat Power", optional: true },
     flowSelected: { domain: "sensor", name: "Flow average (Selected)" },
     flowLocal: { domain: "sensor", name: "Flow average (local)", optional: true },
@@ -1155,6 +1165,10 @@
     "heatingCurvePidKd",
   ];
   export const COMPRESSOR_SETTING_KEYS = ["minRuntime", "hp1ExcludedA", "hp1ExcludedB", "hp2ExcludedA", "hp2ExcludedB"];
+  // Restore order: gate + thresholds first, the function last, so a backup
+  // restore cannot energize the relay with stale gate settings in between.
+  export const AUX_RELAY_SETTING_KEYS = ["auxWaitForSupplyTemp", "auxHeatingStartTemp", "auxCoolingStartTemp", "auxTempHysteresis", "auxRelayFunction"];
+  export const AUX_RELAY_STATE_KEYS = ["auxRelayActive", "auxRelayStatus"];
   export const SILENT_SETTING_KEYS = ["silentStartTime", "silentEndTime", "silentMax", "dayMax"];
   export const BOILER_SUPPORT_SWITCHING_KEYS = ["boilerSupportStartThreshold", "boilerSupportStopThreshold"];
   export const SERVICE_CONTROL_KEYS = [
@@ -1310,6 +1324,31 @@
     "alternatingCompressorStartsWarning",
     "cicDataStale",
     "otLinkProblem",
+    "flowOutputIpwm",
+    "hp1CompressorStarts2h",
+    "hp1CompressorStarts6h",
+    "hp1CompressorStarts24h",
+    "hp1CompressorStarts72h",
+    "hp2CompressorStarts2h",
+    "hp2CompressorStarts6h",
+    "hp2CompressorStarts24h",
+    "hp2CompressorStarts72h",
+    "boilerActive",
+    "boilerCommandValid",
+    "boilerCommandActive",
+    "boilerCommandAge",
+    "boilerCommandSource",
+    "boilerCommandTargetTemperature",
+    "boilerBlockReason",
+    "otbLinkAvailable",
+    "otbChCommand",
+    "otbControlSetpointCommand",
+    "otbChActive",
+    "otbFlameOn",
+    "otbLastResponseAge",
+    "otbResponseCount",
+    "otbTransportErrorCount",
+    "otbResponseTimeoutCount",
   ];
   export const FIRMWARE_ENTITY_KEYS = ["firmwareUpdate", "firmwareUpdateChannel", "firmwareUpdateTarget", "firmwareUpdateProgress", "firmwareUpdateStatus"];
   export const FIRMWARE_TEST_ENTITY_KEYS = ["firmwareTestOtaUrl", "firmwareTestOtaMd5Url", "installFirmwareTestOta"];
@@ -1623,11 +1662,14 @@
     "boilerRatedHeatPower",
     ...BOILER_SETTING_KEYS,
     ...BOILER_SUPPORT_SWITCHING_KEYS,
+    ...AUX_RELAY_SETTING_KEYS,
+    ...AUX_RELAY_STATE_KEYS,
     ...COMMISSIONING_STATE_KEYS,
     "manualCoolingEnable",
     "usageTelemetryEnabled",
     "usageTelemetryInstallationId",
     "silentModeOverride",
+    "silentActive",
     "trendHistoryEnabled",
     "trendHistoryFlashEnabled",
     "trendHistoryFlush",
@@ -1693,6 +1735,7 @@
         "boilerRatedHeatPower",
         ...BOILER_SETTING_KEYS,
         ...BOILER_SUPPORT_SWITCHING_KEYS,
+        ...AUX_RELAY_SETTING_KEYS,
       ],
     },
     {
