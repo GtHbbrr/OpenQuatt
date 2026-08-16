@@ -24,6 +24,37 @@ enum ReasonCode {
   REASON_CAPACITY_CAP = 14,
 };
 
+enum WaterStopReasonCode {
+  WATER_STOP_NONE = 0,
+  WATER_STOP_LIMITER = 1,
+  WATER_STOP_DEW = 2,
+  WATER_STOP_FALLBACK = 3,
+  WATER_STOP_PROJECTED_FLOOR = 4,
+  WATER_STOP_REQUEST_CLEARED = 5,
+  WATER_STOP_FLOW_PERMISSION_LOST = 6,
+  WATER_STOP_CORE_PERMISSION_LOST = 7,
+};
+
+struct WaterCycleState {
+  bool active = false;
+  float stop_buffer_gap_c = 0.0f;
+  int stop_reason_code = WATER_STOP_NONE;
+};
+
+inline bool record_pi_zero_stop(int previous_demand, int demand, float filtered_gap_c, WaterCycleState& state) {
+  if (!state.active || previous_demand <= 0 || demand > 0) return false;
+
+  state.active = false;
+  state.stop_buffer_gap_c = filtered_gap_c;
+  if (state.stop_reason_code == WATER_STOP_NONE) state.stop_reason_code = WATER_STOP_LIMITER;
+  return true;
+}
+
+inline bool water_restart_gap_recovered(const WaterCycleState& state, float filtered_gap_c, float restart_delta_c) {
+  if (state.stop_reason_code == WATER_STOP_NONE || state.stop_reason_code == WATER_STOP_PROJECTED_FLOOR) return true;
+  return filtered_gap_c >= state.stop_buffer_gap_c + restart_delta_c;
+}
+
 struct LimiterTuning {
   float hard_dew_stop_base_gap_c = 0.15f;
   float hard_dew_stop_margin_gain_c = 0.30f;
