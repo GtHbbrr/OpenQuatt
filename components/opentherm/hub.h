@@ -64,6 +64,9 @@ class OpenthermHub final : public Component {
 
   bool sending_initial_ = true;
   bool priority_sequence_active_ = false;
+  bool deferred_priority_pending_ = false;
+  MessageId deferred_priority_first_ = MessageId::STATUS;
+  MessageId deferred_priority_second_ = MessageId::STATUS;
   // The OpenQuatt transport owner explicitly starts polling after restore.
   bool polling_enabled_ = false;
   std::unordered_map<MessageId, uint8_t> configured_messages_;
@@ -90,6 +93,8 @@ class OpenthermHub final : public Component {
   void handle_timeout_error_();
   void handle_timer_error_();
   void stop_opentherm_();
+  void activate_priority_sequence_(MessageId first, MessageId second);
+  void apply_deferred_priority_();
   void start_conversation_();
   void read_response_();
   void check_timings_(uint32_t cur_time);
@@ -164,6 +169,7 @@ class OpenthermHub final : public Component {
   void set_sync_mode(bool sync_mode) { this->sync_mode_ = sync_mode; }
 
   void prioritize_messages(MessageId first, MessageId second);
+  void defer_priority_messages(MessageId first, MessageId second);
   void start_priority_polling(MessageId first, MessageId second);
   void resume_polling();
   void suspend_polling();

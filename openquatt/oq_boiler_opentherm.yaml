@@ -825,9 +825,10 @@ interval:
             id(oq_otb_ch_enable).turn_on();
             if (applied_start) {
               // A full repeating cycle can take about half a minute. Put the
-              // target ahead of the CH-enable STATUS frame so commissioning
-              // does not time out before the boiler receives both commands.
-              id(oq_otb_hub).prioritize_messages(
+              // target ahead of the CH-enable STATUS frame after the current
+              // conversation finishes. Unlike a fail-safe stop, starting must
+              // not truncate an in-flight request or boiler response.
+              id(oq_otb_hub).defer_priority_messages(
                   esphome::opentherm::MessageId::CH_SETPOINT,
                   esphome::opentherm::MessageId::STATUS);
             }
