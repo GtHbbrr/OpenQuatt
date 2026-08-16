@@ -6,6 +6,7 @@ import { isInstallationMonitoringBinaryActive, isInstallationMonitoringIntegrati
 import { state } from "../core/state.js";
 import { formatMqttSensorValiditySummary, getMqttStatusDetail, getMqttStatusLabel, getMqttValidityLabel } from "../features/mqtt.js";
 import { formatSettingsOptionLabel, getSelectEntityOptions, getSettingsStatValue, getSettingsTextStatValue, renderSettingsInfoToggle, renderSettingsIntegrationSwitchCard, renderSettingsSection } from "./controls.js";
+import { getWaterSupplyCorrectionView } from "./water.js";
 import { escapeHtml } from "../core/html.js";
 
   export function renderSettingsOpenThermCicSection() {
@@ -628,6 +629,11 @@ import { escapeHtml } from "../core/html.js";
     const currentFlowSource = String(getEntityValue("flowSource") || "");
     const currentQFlowSource = String(getEntityValue("qFlowSource") || "");
     const currentOutsideTempSource = String(getEntityValue("outsideTempSource") || "").trim();
+    const waterSupplyCorrection = getWaterSupplyCorrectionView();
+    const waterSupplyCalibrated = waterSupplyCorrection.calibrationActive;
+    const waterSupplyCalibrationTitle = waterSupplyCalibrated
+      ? "Aanvoertemperatuur gekalibreerd voor de actieve bron"
+      : waterSupplyCorrection.statusLabel;
     const heatingEnableSourceDisabled = String(getEntityValue("heatingEnableSource") || "").trim() === "Disabled";
     const heatingEnableSourceLabel = formattedSourceValue("heatingEnableSource", { optionLabels: { Disabled: "Niet gebruiken" } });
     const coolingEnableSourceDisabled = String(getEntityValue("coolingEnableSource") || "").trim() === "Disabled";
@@ -689,11 +695,10 @@ import { escapeHtml } from "../core/html.js";
           when: currentWaterSupplySource === "Local" && hasEntity("localWaterSupplyTempSource"),
         },
         activeRows: [
-          renderSourceRow({ label: "Waarde", key: "supplyTemp" }),
+          renderSourceRow({ label: "Waarde", key: "supplyTemp", status: "i", statusTone: waterSupplyCalibrated ? "valid" : "error", statusTitle: waterSupplyCalibrationTitle }),
           renderSourceRow({ label: "Bron", value: getWaterSupplyUsedSource() }),
-          renderSourceRow({ label: "Kalibratie", value: getSettingsTextStatValue("waterSupplyCalibrationStatus", "Niet gekalibreerd") }),
         ],
-        warning: isInstallationMonitoringBinaryActive("waterSupplyCalibrationRequired")
+        warning: waterSupplyCorrection.calibrationRequired
           ? "De aanvoerbron of bronconfiguratie is gewijzigd. De oude correctie is uitgeschakeld; voer de temperatuurkalibratie opnieuw uit."
           : "",
         measurementRows: [

@@ -138,7 +138,16 @@ test("bronwissel toont dat de aanvoerkalibratie opnieuw moet", () => {
 
   const markup = renderSettingsSensorSelectionSection();
 
-  assert.match(markup, /Kalibratie<\/span>\s*<strong>Recalibration required: Local - PT1000<\/strong>/);
+  assert.match(markup, /Waarde<em class="oq-settings-source-status oq-settings-source-status--error" title="Opnieuw kalibreren"[^>]*>i<\/em>/);
+  assert.doesNotMatch(markup, /<span>Kalibratie<\/span>/);
   assert.match(markup, /De aanvoerbron of bronconfiguratie is gewijzigd\./);
   assert.match(markup, /voer de temperatuurkalibratie opnieuw uit/);
+
+  state.entities.waterSupplyCalibrationStatus = { value: "Calibrated: CIC", state: "Calibrated: CIC" };
+  state.entities.waterSupplyCalibrationRequired = { value: false, state: "OFF" };
+  state.entities.waterSupplyCalibrationOffset = { value: -0.6, uom: "°C" };
+  const calibratedMarkup = renderSettingsSensorSelectionSection();
+
+  assert.match(calibratedMarkup, /Waarde<em class="oq-settings-source-status oq-settings-source-status--valid" title="Aanvoertemperatuur gekalibreerd voor de actieve bron"[^>]*>i<\/em>/);
+  assert.doesNotMatch(calibratedMarkup, /<span>Kalibratie<\/span>|voer de temperatuurkalibratie opnieuw uit/);
 });

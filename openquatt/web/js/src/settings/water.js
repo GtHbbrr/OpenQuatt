@@ -38,6 +38,8 @@ import { escapeHtml } from "../core/html.js";
     return {
       source,
       statusLabel,
+      calibrationActive,
+      calibrationRequired,
       rawValue: Number.isFinite(activeValue) ? activeValue - activeOffset : NaN,
       offsetValue: activeOffset,
       activeValue,
