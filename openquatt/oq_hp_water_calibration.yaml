@@ -142,19 +142,6 @@ number:
     initial_value: 0
     entity_category: config
     disabled_by_default: true
-    on_value:
-      - lambda: |-
-          // A manual offset write has no matching source-bound checksum.
-          const int32_t source_code = id(oq_water_supply_temp_calibration_source_code);
-          if (source_code <= 0 || !id(oq_water_supply_temp_current_source_ready)) return;
-          const uint32_t expected = oq_supply_calibration::record_checksum(
-              source_code, id(oq_water_supply_temp_calibration_source_fingerprint), x);
-          if (expected == id(oq_water_supply_temp_calibration_checksum)) return;
-
-          id(oq_water_supply_temp_calibration_checksum) = 0;
-          id(oq_water_supply_temp_calibration_source_code) =
-              oq_supply_calibration::stale_source_code(source_code);
-          id(water_supply_temp_selected).update();
 
   - platform: template
     id: hp1_water_in_temp_offset

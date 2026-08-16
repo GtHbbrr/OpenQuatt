@@ -20,6 +20,19 @@ struct SourceIdentity {
   bool ready;
 };
 
+struct CalibrationRecord {
+  uint32_t fingerprint{0};
+  uint32_t checksum{0};
+  float offset_c{0.0f};
+};
+
+static_assert(sizeof(CalibrationRecord) == 12U, "Supply calibration record layout changed");
+
+static constexpr uint8_t kRecordFingerprintIndex = 0U;
+static constexpr uint8_t kRecordChecksumIndex = 1U;
+static constexpr uint8_t kRecordOffsetIndex = 2U;
+static constexpr uint8_t kRecordStorageWords = 3U;
+
 inline uint32_t fnv1a_byte(uint32_t hash, uint8_t value) { return (hash ^ value) * 16777619UL; }
 
 inline uint32_t fingerprint(SourceCode code, const char* identity) {
@@ -64,13 +77,25 @@ inline SourceIdentity source_identity(const char* selected_source, bool q_hardwa
   return {SOURCE_NONE, 0, false};
 }
 
-inline uint32_t record_checksum(int32_t source_code, uint32_t source_fingerprint, float offset_c) {
+inline uint32_t offset_bits(float offset_c) {
   uint32_t offset_bits = 0;
   static_assert(sizeof(offset_bits) == sizeof(offset_c), "Unexpected float size");
   memcpy(&offset_bits, &offset_c, sizeof(offset_bits));
+  return offset_bits;
+}
+
+inline float offset_from_bits(uint32_t bits) {
+  float offset_c = 0.0f;
+  static_assert(sizeof(bits) == sizeof(offset_c), "Unexpected float size");
+  memcpy(&offset_c, &bits, sizeof(offset_c));
+  return offset_c;
+}
+
+inline uint32_t record_checksum(int32_t source_code, uint32_t source_fingerprint, float offset_c) {
+  const uint32_t stored_offset_bits = offset_bits(offset_c);
 
   uint32_t hash = 2166136261UL;
-  const uint32_t values[] = {static_cast<uint32_t>(source_code), source_fingerprint, offset_bits};
+  const uint32_t values[] = {static_cast<uint32_t>(source_code), source_fingerprint, stored_offset_bits};
   for (uint32_t value : values) {
     for (unsigned shift = 0; shift < 32; shift += 8) {
       hash = fnv1a_byte(hash, static_cast<uint8_t>((value >> shift) & 0xFFU));
@@ -79,14 +104,77 @@ inline uint32_t record_checksum(int32_t source_code, uint32_t source_fingerprint
   return hash == 0 ? 1 : hash;
 }
 
+inline bool source_supported(int32_t source_code) {
+  return source_code >= SOURCE_LOCAL_PT1000 && source_code <= SOURCE_HA_INPUT;
+}
+
+inline CalibrationRecord make_record(uint32_t fingerprint, uint32_t checksum, float offset_c) {
+  return {fingerprint, checksum, offset_c};
+}
+
+inline CalibrationRecord load_record(const uint32_t (&storage)[kRecordStorageWords]) {
+  return make_record(storage[kRecordFingerprintIndex], storage[kRecordChecksumIndex],
+                     offset_from_bits(storage[kRecordOffsetIndex]));
+}
+
+inline bool record_present(const CalibrationRecord& record) {
+  return record.fingerprint != 0 || record.checksum != 0 || record.offset_c != 0.0f;
+}
+
+inline bool record_valid(const CalibrationRecord& record, int32_t source_code, float max_offset_c = 2.0f) {
+  return source_supported(source_code) && record.fingerprint != 0 && isfinite(record.offset_c) &&
+         fabsf(record.offset_c) <= max_offset_c &&
+         record.checksum == record_checksum(source_code, record.fingerprint, record.offset_c);
+}
+
+inline bool record_matches(const CalibrationRecord& record, const SourceIdentity& current, float max_offset_c = 2.0f) {
+  return current.ready && record.fingerprint == current.fingerprint &&
+         record_valid(record, static_cast<int32_t>(current.code), max_offset_c);
+}
+
+inline bool calibration_required(const CalibrationRecord& record, const SourceIdentity& current,
+                                 float max_offset_c = 2.0f) {
+  return current.ready && record_present(record) && !record_matches(record, current, max_offset_c);
+}
+
+inline bool record_input_valid(const SourceIdentity& current, float offset_c, float max_offset_c = 2.0f) {
+  return current.ready && source_supported(static_cast<int32_t>(current.code)) && current.fingerprint != 0 &&
+         isfinite(offset_c) && fabsf(offset_c) <= max_offset_c;
+}
+
+inline bool store_record(uint32_t (&storage)[kRecordStorageWords], const SourceIdentity& current, float offset_c,
+                         float max_offset_c = 2.0f) {
+  if (!record_input_valid(current, offset_c, max_offset_c)) return false;
+
+  // Commit the checksum last so an incomplete in-memory update cannot become active.
+  storage[kRecordChecksumIndex] = 0;
+  storage[kRecordFingerprintIndex] = current.fingerprint;
+  storage[kRecordOffsetIndex] = offset_bits(offset_c);
+  storage[kRecordChecksumIndex] = record_checksum(static_cast<int32_t>(current.code), current.fingerprint, offset_c);
+  return true;
+}
+
+inline bool migrate_legacy_record(uint32_t (&storage)[kRecordStorageWords], int32_t source_code,
+                                  uint32_t source_fingerprint, uint32_t checksum, float offset_c,
+                                  float max_offset_c = 2.0f) {
+  const CalibrationRecord current = load_record(storage);
+  CalibrationRecord legacy{source_fingerprint, checksum, offset_c};
+  if (!record_valid(legacy, source_code, max_offset_c)) return false;
+  if (current.fingerprint == legacy.fingerprint && current.checksum == legacy.checksum &&
+      offset_bits(current.offset_c) == offset_bits(legacy.offset_c)) {
+    return false;
+  }
+
+  const SourceIdentity legacy_source{static_cast<SourceCode>(source_code), source_fingerprint, true};
+  return store_record(storage, legacy_source, offset_c, max_offset_c);
+}
+
 inline bool record_matches(int32_t source_code, uint32_t source_fingerprint, uint32_t checksum, float offset_c,
                            const SourceIdentity& current, float max_offset_c = 2.0f) {
   return current.ready && source_code > SOURCE_NONE && source_code == static_cast<int32_t>(current.code) &&
          source_fingerprint == current.fingerprint && isfinite(offset_c) && fabsf(offset_c) <= max_offset_c &&
          checksum == record_checksum(source_code, source_fingerprint, offset_c);
 }
-
-inline int32_t stale_source_code(int32_t source_code) { return source_code > SOURCE_NONE ? -source_code : source_code; }
 
 inline const char* source_label(int32_t source_code) {
   switch (source_code) {

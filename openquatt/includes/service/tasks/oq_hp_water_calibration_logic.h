@@ -221,6 +221,11 @@ class HpWaterCalibrationRuntime {
       return;
     }
 
+    if (!oq_supply_calibration::record_input_valid(supply_source, supply_offset, cfg.max_offset_c)) {
+      publish("APPLY_FAILED: SUPPLY_RECORD");
+      return;
+    }
+
     set_number_value(id(hp1_water_in_temp_offset), hp1_in);
     set_number_value(id(hp1_water_out_temp_offset), hp1_out);
 
@@ -229,9 +234,8 @@ class HpWaterCalibrationRuntime {
     set_number_value(id(hp2_water_out_temp_offset), hp2_out);
 #endif
 
-    // Persist the source-bound record fail-closed. The source code and checksum
-    // are committed last so an interrupted preference write cannot activate a
-    // partially updated offset on the next boot.
+    // Persist the compatibility record first. A downgrade can use it directly;
+    // a later upgrade can import it if an older firmware calibrated this source.
     id(oq_water_supply_temp_calibration_source_code) = 0;
     id(oq_water_supply_temp_calibration_checksum) = 0;
     set_number_value(id(water_supply_temp_calibration_offset), supply_offset);
@@ -239,6 +243,32 @@ class HpWaterCalibrationRuntime {
     id(oq_water_supply_temp_calibration_source_code) = result_source;
     id(oq_water_supply_temp_calibration_checksum) =
         oq_supply_calibration::record_checksum(result_source, supply_source.fingerprint, supply_offset);
+
+    bool supply_record_stored = false;
+    switch (supply_source.code) {
+      case oq_supply_calibration::SOURCE_LOCAL_PT1000:
+        supply_record_stored = oq_supply_calibration::store_record(id(oq_water_supply_temp_calibration_pt1000_record),
+                                                                   supply_source, supply_offset, cfg.max_offset_c);
+        break;
+      case oq_supply_calibration::SOURCE_LOCAL_DS18B20:
+        supply_record_stored = oq_supply_calibration::store_record(id(oq_water_supply_temp_calibration_ds18b20_record),
+                                                                   supply_source, supply_offset, cfg.max_offset_c);
+        break;
+      case oq_supply_calibration::SOURCE_CIC:
+        supply_record_stored = oq_supply_calibration::store_record(id(oq_water_supply_temp_calibration_cic_record),
+                                                                   supply_source, supply_offset, cfg.max_offset_c);
+        break;
+      case oq_supply_calibration::SOURCE_HA_INPUT:
+        supply_record_stored = oq_supply_calibration::store_record(id(oq_water_supply_temp_calibration_ha_input_record),
+                                                                   supply_source, supply_offset, cfg.max_offset_c);
+        break;
+      default:
+        break;
+    }
+    if (!supply_record_stored) {
+      publish("APPLY_FAILED: SUPPLY_RECORD");
+      return;
+    }
     id(water_supply_temp_selected).update();
 
     publish("APPLIED");
