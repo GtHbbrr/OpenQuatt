@@ -9,7 +9,6 @@ using esphome::openquatt_usage_telemetry::append_json_escaped;
 using esphome::openquatt_usage_telemetry::configured_source_wire_value;
 using esphome::openquatt_usage_telemetry::FixedBufferWriter;
 using esphome::openquatt_usage_telemetry::flow_source_config_wire_value;
-using esphome::openquatt_usage_telemetry::flow_source_mode_wire_value;
 using esphome::openquatt_usage_telemetry::heating_strategy_wire_value;
 using esphome::openquatt_usage_telemetry::mqtt_cleanup_decision;
 using esphome::openquatt_usage_telemetry::MQTT_PUBLISH_RETAIN;
@@ -53,11 +52,6 @@ int main() {
   assert(std::strcmp(flow_source_config_wire_value("Outdoor unit", true, "Outdoor unit"), "outdoor_unit") == 0);
   assert(flow_source_config_wire_value("Outdoor unit", true, "") == nullptr);
   assert(flow_source_config_wire_value("unknown", false, "") == nullptr);
-  assert(std::strcmp(flow_source_mode_wire_value("CIC", true, "Auto"), "explicit") == 0);
-  assert(std::strcmp(flow_source_mode_wire_value("Outdoor unit", false, ""), "explicit") == 0);
-  assert(std::strcmp(flow_source_mode_wire_value("Outdoor unit", true, "Auto"), "auto") == 0);
-  assert(std::strcmp(flow_source_mode_wire_value("Outdoor unit", true, "Local"), "explicit") == 0);
-  assert(flow_source_mode_wire_value("Outdoor unit", true, "") == nullptr);
 
   std::array<char, 128U> escaped{};
   FixedBufferWriter json(escaped.data(), escaped.size());

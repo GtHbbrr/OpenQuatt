@@ -18,7 +18,6 @@ const USAGE_TELEMETRY_EXAMPLE_JSON = JSON.stringify({
   connection: "wifi",
   quatt_hybrid_generation_config: "v1_5",
   flow_source_config: "outdoor_unit",
-  flow_source_mode: "explicit",
   heating_strategy: "power_house",
   room_temperature_source: "opentherm",
   room_setpoint_source: "opentherm",

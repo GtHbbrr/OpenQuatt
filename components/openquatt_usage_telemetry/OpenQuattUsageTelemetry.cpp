@@ -121,8 +121,6 @@ void append_json_flow_source_(FixedBufferWriter& payload, const select::Select* 
       q_source_available && q_flow_source->has_state() ? q_flow_source->current_option() : empty_option;
   append_json_wire_value_(payload, "flow_source_config",
                           flow_source_config_wire_value(flow_option, q_source_available, q_flow_option));
-  append_json_wire_value_(payload, "flow_source_mode",
-                          flow_source_mode_wire_value(flow_option, q_source_available, q_flow_option));
 }
 
 void append_json_boiler_connection_(FixedBufferWriter& payload, const select::Select* source) {

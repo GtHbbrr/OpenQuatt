@@ -187,26 +187,6 @@ inline const char* flow_source_config_wire_value(const std::string& flow_source,
   return nullptr;
 }
 
-inline const char* flow_source_mode_wire_value(const std::string& flow_source, bool q_source_available,
-                                               const std::string& q_flow_source) {
-  if (flow_source == "CIC") {
-    return "explicit";
-  }
-  if (flow_source != "Outdoor unit") {
-    return nullptr;
-  }
-  if (!q_source_available) {
-    return "explicit";
-  }
-  if (q_flow_source == "Auto") {
-    return "auto";
-  }
-  if (q_flow_source == "Local" || q_flow_source == "Outdoor unit") {
-    return "explicit";
-  }
-  return nullptr;
-}
-
 inline MqttCleanupDecision mqtt_cleanup_decision(bool stop_succeeded, bool connected_seen, bool disconnected_seen,
                                                  uint8_t consecutive_stop_failures) {
   if (stop_succeeded) {
