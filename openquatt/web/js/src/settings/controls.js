@@ -6,13 +6,13 @@ import { escapeHtml } from "../core/html.js";
 import { renderNumberInputControl } from "../core/number-controls.js";
 import { state } from "../core/state.js";
 
-export function renderSettingsInfoToggle(infoId, title, copy) {
+export function renderSettingsInfoToggle(infoId, title, copy, buttonLabel = "i", className = "") {
   if (!copy) {
     return "";
   }
 
   return `
-    <div class="oq-settings-info${state.settingsInfoOpen === infoId ? " is-open" : ""}" data-oq-settings-info="${escapeHtml(infoId)}">
+    <div class="oq-settings-info${className ? ` ${escapeHtml(className)}` : ""}${state.settingsInfoOpen === infoId ? " is-open" : ""}" data-oq-settings-info="${escapeHtml(infoId)}">
       <button
         class="oq-settings-info-button"
         type="button"
@@ -20,7 +20,7 @@ export function renderSettingsInfoToggle(infoId, title, copy) {
         data-info-id="${escapeHtml(infoId)}"
         aria-label="${escapeHtml(`Uitleg bij ${title}`)}"
         aria-expanded="${state.settingsInfoOpen === infoId ? "true" : "false"}"
-      >i</button>
+      >${escapeHtml(buttonLabel)}</button>
       <div class="oq-settings-info-popover" ${state.settingsInfoOpen === infoId ? "" : "hidden"}>
         <p>${escapeHtml(copy)}</p>
       </div>

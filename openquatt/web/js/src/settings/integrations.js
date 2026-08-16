@@ -451,13 +451,13 @@ import { escapeHtml } from "../core/html.js";
         return "";
       }
       const safeStatusTone = String(statusTone || "").replace(/[^a-z0-9_-]/gi, "");
-      const safeStatusTitle = statusTitle || status;
+      const infoText = statusTitle || status;
       const statusMarkup = status
-        ? `<em class="oq-settings-source-status${safeStatusTone ? ` oq-settings-source-status--${escapeHtml(safeStatusTone)}` : ""}" title="${escapeHtml(safeStatusTitle)}" aria-label="${escapeHtml(`${status}: ${safeStatusTitle}`)}">${escapeHtml(status)}</em>`
+        ? renderSettingsInfoToggle(`${key}-info`, label, infoText, status, `oq-settings-source-info oq-settings-source-info--${safeStatusTone}${status === "i" ? " oq-settings-source-info--circle" : ""}`)
         : "";
       return `
         <div class="oq-settings-source-row${active ? " is-warning" : ""}${status ? " has-status" : ""}">
-          <span>${escapeHtml(label)}${statusMarkup}</span>
+          <div class="oq-settings-source-row-label">${escapeHtml(label)}${statusMarkup}</div>
           <strong>${escapeHtml(text)}</strong>
         </div>
       `;
@@ -570,7 +570,6 @@ import { escapeHtml } from "../core/html.js";
       secondarySelects = null,
       activeRows = [],
       measurementRows = [],
-      activeCopy = "",
       rows = [],
       warning = "",
     }) => {
@@ -601,8 +600,8 @@ import { escapeHtml } from "../core/html.js";
             ${warningCopy ? `<p class="oq-settings-source-warning">${escapeHtml(warningCopy)}</p>` : ""}
           ` : "",
         }),
-        renderSourceGroup({ title: "Actief", icon: "target", rows: activeRows, copy: activeCopy, className: "oq-settings-source-group--active" }),
-        renderSourceGroup({ title: "Metingen", icon: "activity", rows: measurementRows, className: "oq-settings-source-group--measurements" }),
+        renderSourceGroup({ title: "Actief", icon: "target", rows: activeRows, className: "oq-settings-source-group--active" }),
+        renderSourceGroup({ title: key === "water-supply" ? "Ruwe metingen" : "Metingen", icon: "activity", rows: measurementRows, className: "oq-settings-source-group--measurements" }),
       ].filter(Boolean).join("");
       if (!groupedMarkup && !controlsMarkup && !bodyRows) {
         return "";
@@ -631,9 +630,11 @@ import { escapeHtml } from "../core/html.js";
     const currentOutsideTempSource = String(getEntityValue("outsideTempSource") || "").trim();
     const waterSupplyCorrection = getWaterSupplyCorrectionView();
     const waterSupplyCalibrated = waterSupplyCorrection.calibrationActive;
-    const waterSupplyCalibrationTitle = waterSupplyCalibrated
-      ? "Aanvoertemperatuur gekalibreerd voor de actieve bron"
-      : waterSupplyCorrection.statusLabel;
+    const supplyInfo = waterSupplyCalibrated
+      ? "Gekalibreerd; ruwe metingen hieronder."
+      : waterSupplyCorrection.calibrationRequired
+        ? "Ruwe waarde; kalibreer via Service."
+        : "Ruwe waarde; niet gekalibreerd.";
     const heatingEnableSourceDisabled = String(getEntityValue("heatingEnableSource") || "").trim() === "Disabled";
     const heatingEnableSourceLabel = formattedSourceValue("heatingEnableSource", { optionLabels: { Disabled: "Niet gebruiken" } });
     const coolingEnableSourceDisabled = String(getEntityValue("coolingEnableSource") || "").trim() === "Disabled";
@@ -695,7 +696,13 @@ import { escapeHtml } from "../core/html.js";
           when: currentWaterSupplySource === "Local" && hasEntity("localWaterSupplyTempSource"),
         },
         activeRows: [
-          renderSourceRow({ label: "Waarde", key: "supplyTemp", status: "i", statusTone: waterSupplyCalibrated ? "valid" : "error", statusTitle: waterSupplyCalibrationTitle }),
+          renderSourceRow({
+            label: "Gebruikte waarde",
+            key: "supplyTemp",
+            status: "i",
+            statusTone: waterSupplyCalibrated ? "valid" : "error",
+            statusTitle: supplyInfo,
+          }),
           renderSourceRow({ label: "Bron", value: getWaterSupplyUsedSource() }),
         ],
         warning: waterSupplyCorrection.calibrationRequired
