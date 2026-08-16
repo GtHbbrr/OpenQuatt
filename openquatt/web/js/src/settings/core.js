@@ -19,7 +19,7 @@ import { getApiSecurityStatusDetail, getApiSecurityStatusLabel, renderSettingsAc
 import { renderSettingsCounterServiceSection, renderSettingsServiceSection } from "./service.js";
 import { renderSettingsSilentSection } from "./silent.js";
 import { renderSettingsBackupSection, renderSettingsTrendSection } from "./storage.js";
-import { getHpWaterRawValue, renderSettingsWaterSection } from "./water.js";
+import { getHpWaterRawValue, getWaterSupplyCorrectionView, renderSettingsWaterSection } from "./water.js";
 import { escapeHtml } from "../core/html.js";
 
 
@@ -419,6 +419,31 @@ import { escapeHtml } from "../core/html.js";
         finalNode.textContent = finalFromDraft;
       }
     });
+
+    const supplyOffsetRow = stack.querySelector("[data-oq-supply-offset-row]");
+    const supplyOffsetExpected = hasEntity("supplyTemp") && hasEntity("waterSupplyCalibrationOffset");
+    if (Boolean(supplyOffsetRow) !== supplyOffsetExpected) {
+      return false;
+    }
+    if (supplyOffsetRow) {
+      const view = getWaterSupplyCorrectionView();
+      const formatSupplyValue = (value) => Number.isFinite(value)
+        ? formatSettingsNumberValue(value, view.uom, 2)
+        : "—";
+      const values = {
+        "[data-oq-supply-offset-label]": `Aanvoer (${view.source})`,
+        "[data-oq-supply-offset-summary]": `${formatSupplyValue(view.activeValue)} actief · ${view.statusLabel}`,
+        "[data-oq-supply-offset-raw]": formatSupplyValue(view.rawValue),
+        "[data-oq-supply-offset-value]": formatSupplyValue(view.offsetValue),
+        "[data-oq-supply-offset-active]": formatSupplyValue(view.activeValue),
+      };
+      Object.entries(values).forEach(([selector, value]) => {
+        const node = supplyOffsetRow.querySelector(selector);
+        if (node && node.textContent !== value) {
+          node.textContent = value;
+        }
+      });
+    }
 
     const curveShell = stack.querySelector(".oq-settings-curve-shell");
     const currentCurveMode = isCurveMode();

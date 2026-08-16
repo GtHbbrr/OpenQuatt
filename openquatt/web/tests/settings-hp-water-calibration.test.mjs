@@ -10,6 +10,7 @@ globalThis.window = {
 
 const { state } = await import("../js/src/core/state.js");
 const { renderHpWaterCalibrationWizard } = await import("../js/src/settings/service.js");
+const { getWaterSupplyCorrectionView, renderHpWaterSensorOffsetSettings } = await import("../js/src/settings/water.js");
 
 test("kalibratieresultaat bevat de brongebonden aanvoer-offset", () => {
   state.loadingEntities = false;
@@ -69,4 +70,70 @@ test("lege resultaatbron valt tijdens de meting terug op de actieve bron", () =>
 
   assert.match(markup, /Aanvoer \(CIC\)/);
   assert.doesNotMatch(markup, /Aanvoer \(IDLE\)/);
+  assert.doesNotMatch(markup, /Supply verschil|Voorlopige aanvoercorrectie/);
+});
+
+test("sensorcorrecties tonen de actieve aanvoercorrectie alleen-lezen", () => {
+  state.loadingEntities = false;
+  state.entities = {
+    supplyTemp: { value: 22.54, uom: "°C" },
+    waterSupplyCalibrationOffset: { value: -0.6, uom: "°C" },
+    waterSupplyCalibrationStatus: { value: "Calibrated: CIC", state: "Calibrated: CIC" },
+    waterSupplyCalibrationRequired: { value: false, state: "OFF" },
+    waterSupplyTempEffectiveSource: { value: "CIC", state: "CIC" },
+    waterSupplyTempFallbackActive: { value: false, state: "OFF" },
+  };
+
+  const view = getWaterSupplyCorrectionView();
+  const markup = renderHpWaterSensorOffsetSettings();
+
+  assert.equal(view.rawValue, 23.14);
+  assert.equal(view.offsetValue, -0.6);
+  assert.equal(view.activeValue, 22.54);
+  assert.match(markup, /Watertemperatuurcorrecties/);
+  assert.match(markup, /Aanvoer \(CIC\)/);
+  assert.match(markup, /Brongebonden kalibratie actief/);
+  assert.match(markup, /23\.14 °C/);
+  assert.match(markup, /-0\.60 °C/);
+  assert.doesNotMatch(markup, /data-oq-settings-field="waterSupplyCalibrationOffset"/);
+});
+
+test("sensorcorrecties tonen een stale aanvoer-offset niet als actief", () => {
+  state.loadingEntities = false;
+  state.entities = {
+    supplyTemp: { value: 22.54, uom: "°C" },
+    waterSupplyCalibrationOffset: { value: -0.6, uom: "°C" },
+    waterSupplyCalibrationStatus: { value: "Recalibration required: CIC", state: "Recalibration required: CIC" },
+    waterSupplyCalibrationRequired: { value: true, state: "ON" },
+    waterSupplyTempEffectiveSource: { value: "CIC", state: "CIC" },
+    waterSupplyTempFallbackActive: { value: false, state: "OFF" },
+  };
+
+  const view = getWaterSupplyCorrectionView();
+  const markup = renderHpWaterSensorOffsetSettings();
+
+  assert.equal(view.rawValue, 22.54);
+  assert.equal(view.offsetValue, 0);
+  assert.match(markup, /Opnieuw kalibreren/);
+  assert.doesNotMatch(markup, /-0\.60 °C/);
+});
+
+test("sensorcorrecties passen de bronoffset niet toe op een runtime-fallback", () => {
+  state.loadingEntities = false;
+  state.entities = {
+    supplyTemp: { value: 21.9, uom: "°C" },
+    waterSupplyCalibrationOffset: { value: -0.6, uom: "°C" },
+    waterSupplyCalibrationStatus: { value: "Calibrated: CIC", state: "Calibrated: CIC" },
+    waterSupplyCalibrationRequired: { value: false, state: "OFF" },
+    waterSupplyTempEffectiveSource: { value: "HP2 water out (fallback)", state: "HP2 water out (fallback)" },
+    waterSupplyTempFallbackActive: { value: true, state: "ON" },
+  };
+
+  const view = getWaterSupplyCorrectionView();
+  const markup = renderHpWaterSensorOffsetSettings();
+
+  assert.equal(view.rawValue, 21.9);
+  assert.equal(view.offsetValue, 0);
+  assert.match(markup, /Fallback actief; correctie tijdelijk uit/);
+  assert.doesNotMatch(markup, /-0\.60 °C/);
 });

@@ -342,10 +342,6 @@ import { renderModalShell } from "../core/modal-shell.js";
               <span>Spreiding</span>
               <strong>${escapeHtml(getSettingsTemperatureValue("hpWaterCalibrationSpread", 2))}</strong>
             </article>
-            <article class="oq-settings-hp-calibration-live-card">
-              <span>Supply verschil</span>
-              <strong>${escapeHtml(getSettingsTemperatureValue("hpWaterCalibrationSupplyDelta", 2))}</strong>
-            </article>
           </div>
           <p class="oq-settings-hp-calibration-note">De actieve aanvoerbron wordt raw gemeten. Een bestaande aanvoercorrectie telt niet mee in het nieuwe voorstel.</p>
         ` : ""}
