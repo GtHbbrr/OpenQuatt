@@ -340,4 +340,14 @@ inline const char* block_reason_text(uint8_t reason) {
   }
 }
 
+inline const char* commissioning_start_failure_reason(uint8_t block_reason, bool opentherm_selected,
+                                                      bool output_requested, bool opentherm_link_available) {
+  const char* controller_reason = block_reason_text(block_reason);
+  if (controller_reason[0] != '\0') return controller_reason;
+  if (opentherm_selected && !opentherm_link_available) return "OpenTherm link unavailable";
+  if (!output_requested) return "boiler request not applied";
+  if (opentherm_selected) return "OpenTherm CH active not confirmed";
+  return "boiler active state not confirmed";
+}
+
 }  // namespace oq_boiler

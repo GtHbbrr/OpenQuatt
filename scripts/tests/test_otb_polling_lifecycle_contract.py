@@ -52,6 +52,22 @@ class OtbPollingLifecycleContractTest(unittest.TestCase):
             lifecycle_yaml,
         )
 
+    def test_start_edge_prioritizes_setpoint_before_ch_status(self) -> None:
+        self.assertIn(
+            "!id(oq_otb_applied_command_active) && command_active",
+            OTB_PACKAGE,
+        )
+        start_edge = OTB_PACKAGE.index("if (applied_start)")
+        applied_state = OTB_PACKAGE.index(
+            "id(oq_otb_applied_command_active) = command_active;", start_edge
+        )
+        start_block = OTB_PACKAGE[start_edge:applied_state]
+        self.assertIn("id(oq_otb_hub).prioritize_messages(", start_block)
+        self.assertLess(
+            start_block.index("esphome::opentherm::MessageId::CH_SETPOINT"),
+            start_block.index("esphome::opentherm::MessageId::STATUS"),
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
