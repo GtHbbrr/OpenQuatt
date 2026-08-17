@@ -229,9 +229,11 @@ script:
               esphome::opentherm::MessageId::STATUS,
               esphome::opentherm::MessageId::CH_SETPOINT);
 
-          // Phase 2: advance only the OT hub until both off requests are
-          // acknowledged or the bounded shutdown budget is exhausted.
-          constexpr uint32_t flush_timeout_ms = 3500;
+          // Phase 2: finish any active exchange, then advance only the OT hub
+          // until both off requests are acknowledged or the bounded shutdown
+          // budget is exhausted. The extra budget covers one full pre-existing
+          // conversation without allowing overlapping bus traffic.
+          constexpr uint32_t flush_timeout_ms = 4500;
           const uint32_t started_ms = millis();
           while (!oq_otb::off_flush_state.complete() &&
                  (uint32_t) (millis() - started_ms) < flush_timeout_ms) {
@@ -808,8 +810,9 @@ interval:
           }
           if (applied_stop && opentherm_selected &&
               id(oq_otb_link_available_state)) {
-            // Put both physical off frames ahead of non-control telemetry.
-            // The hub restores its normal repeating sequence afterwards.
+            // Queue both physical off frames ahead of non-control telemetry.
+            // A request/response already on the bus finishes first; the hub
+            // restores its normal repeating sequence afterwards.
             id(oq_otb_hub).prioritize_messages(
                 esphome::opentherm::MessageId::STATUS,
                 esphome::opentherm::MessageId::CH_SETPOINT);

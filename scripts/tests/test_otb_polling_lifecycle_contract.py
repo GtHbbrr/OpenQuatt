@@ -74,14 +74,45 @@ class OtbPollingLifecycleContractTest(unittest.TestCase):
             ),
         )
 
-    def test_immediate_lifecycle_priority_cancels_deferred_start(self) -> None:
-        immediate_start = HUB_CPP.index("void OpenthermHub::prioritize_messages(")
-        immediate_end = HUB_CPP.index(
-            "void OpenthermHub::defer_priority_messages(", immediate_start
+    def test_urgent_lifecycle_priority_waits_for_idle(self) -> None:
+        urgent_start = HUB_CPP.index("void OpenthermHub::prioritize_messages(")
+        urgent_end = HUB_CPP.index(
+            "void OpenthermHub::defer_priority_messages(", urgent_start
         )
-        immediate_method = HUB_CPP[immediate_start:immediate_end]
-        self.assertIn("this->deferred_priority_pending_ = false;", immediate_method)
-        self.assertIn("this->opentherm_->stop();", immediate_method)
+        urgent_method = HUB_CPP[urgent_start:urgent_end]
+        self.assertIn("this->deferred_priority_pending_ = false;", urgent_method)
+        self.assertIn("this->urgent_priority_pending_ = true;", urgent_method)
+        self.assertNotIn("this->opentherm_->stop();", urgent_method)
+        self.assertNotIn("last_conversation_start_", urgent_method)
+        self.assertNotIn("last_conversation_end_", urgent_method)
+
+        apply_start = HUB_CPP.index(
+            "void OpenthermHub::apply_urgent_priority_()"
+        )
+        apply_end = HUB_CPP.index(
+            "void OpenthermHub::apply_deferred_priority_()", apply_start
+        )
+        apply_method = HUB_CPP[apply_start:apply_end]
+        self.assertIn("this->urgent_priority_pending_", apply_method)
+        self.assertIn(
+            "this->activate_priority_sequence_(this->urgent_priority_first_, "
+            "this->urgent_priority_second_);",
+            apply_method,
+        )
+        self.assertIn("this->urgent_priority_pending_ = false;", apply_method)
+        self.assertNotIn("this->opentherm_->stop();", apply_method)
+
+        conversation_start = HUB_CPP.index(
+            "void OpenthermHub::start_conversation_()"
+        )
+        conversation_end = HUB_CPP.index(
+            "void OpenthermHub::read_response_()", conversation_start
+        )
+        conversation_method = HUB_CPP[conversation_start:conversation_end]
+        self.assertLess(
+            conversation_method.index("this->apply_urgent_priority_();"),
+            conversation_method.index("this->apply_deferred_priority_();"),
+        )
 
         resume_start = HUB_CPP.index("void OpenthermHub::resume_polling()")
         suspend_start = HUB_CPP.index(
@@ -92,10 +123,11 @@ class OtbPollingLifecycleContractTest(unittest.TestCase):
         )
         resume_method = HUB_CPP[resume_start:suspend_start]
         suspend_method = HUB_CPP[suspend_start:write_initial_start]
-        self.assertIn("this->deferred_priority_pending_ = false;", resume_method)
-        self.assertIn("this->deferred_priority_pending_ = false;", suspend_method)
+        for method in (resume_method, suspend_method):
+            self.assertIn("this->urgent_priority_pending_ = false;", method)
+            self.assertIn("this->deferred_priority_pending_ = false;", method)
 
-    def test_fail_safe_off_sequences_remain_immediate(self) -> None:
+    def test_fail_safe_off_sequences_remain_urgent(self) -> None:
         flush_start = OTB_PACKAGE.index("id: oq_otb_withdraw_and_flush")
         flush_end = OTB_PACKAGE.index("id: oq_otb_invalidate_telemetry", flush_start)
         flush_block = OTB_PACKAGE[flush_start:flush_end]

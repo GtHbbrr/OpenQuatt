@@ -161,13 +161,19 @@ void OpenthermHub::setup() {
 void OpenthermHub::on_shutdown() { this->suspend_polling(); }
 
 void OpenthermHub::prioritize_messages(MessageId first, MessageId second) {
-  // Immediate priority is reserved for fail-safe lifecycle transitions. It
-  // always supersedes a deferred runtime start.
+  // Urgent priority is reserved for fail-safe lifecycle transitions. It
+  // always supersedes a deferred runtime start, but it must not truncate an
+  // active request/response exchange: a slow but valid boiler response may
+  // still be on the bus. start_conversation_() installs the sequence as soon
+  // as the current exchange reaches IDLE.
   this->deferred_priority_pending_ = false;
-  this->opentherm_->stop();
-  this->activate_priority_sequence_(first, second);
-  this->last_conversation_start_ = 0;
-  this->last_conversation_end_ = 0;
+  if (!this->polling_enabled_) {
+    this->urgent_priority_pending_ = false;
+    return;
+  }
+  this->urgent_priority_first_ = first;
+  this->urgent_priority_second_ = second;
+  this->urgent_priority_pending_ = true;
 }
 
 void OpenthermHub::defer_priority_messages(MessageId first, MessageId second) {
@@ -192,6 +198,7 @@ void OpenthermHub::start_priority_polling(MessageId first, MessageId second) {
 
 void OpenthermHub::resume_polling() {
   this->polling_enabled_ = true;
+  this->urgent_priority_pending_ = false;
   this->deferred_priority_pending_ = false;
   this->opentherm_->stop();
   this->sending_initial_ = true;
@@ -205,6 +212,7 @@ void OpenthermHub::resume_polling() {
 
 void OpenthermHub::suspend_polling() {
   this->polling_enabled_ = false;
+  this->urgent_priority_pending_ = false;
   this->deferred_priority_pending_ = false;
   if (this->opentherm_ != nullptr) {
     this->opentherm_->stop();
@@ -398,6 +406,14 @@ void OpenthermHub::activate_priority_sequence_(MessageId first, MessageId second
   this->priority_sequence_active_ = true;
 }
 
+void OpenthermHub::apply_urgent_priority_() {
+  if (!this->urgent_priority_pending_) {
+    return;
+  }
+  this->activate_priority_sequence_(this->urgent_priority_first_, this->urgent_priority_second_);
+  this->urgent_priority_pending_ = false;
+}
+
 void OpenthermHub::apply_deferred_priority_() {
   if (!this->deferred_priority_pending_) {
     return;
@@ -414,6 +430,7 @@ void OpenthermHub::apply_deferred_priority_() {
 }
 
 void OpenthermHub::start_conversation_() {
+  this->apply_urgent_priority_();
   this->apply_deferred_priority_();
   if (this->message_iterator_ == this->messages_.end()) {
     if (this->priority_sequence_active_) {
@@ -475,6 +492,7 @@ void OpenthermHub::handle_timeout_error_() {
 }
 
 void OpenthermHub::handle_timer_error_() {
+  this->urgent_priority_pending_ = false;
   this->deferred_priority_pending_ = false;
   this->opentherm_->report_and_reset_timer_error();
   this->stop_opentherm_();

@@ -64,6 +64,9 @@ class OpenthermHub final : public Component {
 
   bool sending_initial_ = true;
   bool priority_sequence_active_ = false;
+  bool urgent_priority_pending_ = false;
+  MessageId urgent_priority_first_ = MessageId::STATUS;
+  MessageId urgent_priority_second_ = MessageId::STATUS;
   bool deferred_priority_pending_ = false;
   MessageId deferred_priority_first_ = MessageId::STATUS;
   MessageId deferred_priority_second_ = MessageId::STATUS;
@@ -94,6 +97,7 @@ class OpenthermHub final : public Component {
   void handle_timer_error_();
   void stop_opentherm_();
   void activate_priority_sequence_(MessageId first, MessageId second);
+  void apply_urgent_priority_();
   void apply_deferred_priority_();
   void start_conversation_();
   void read_response_();
