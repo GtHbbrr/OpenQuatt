@@ -6,6 +6,7 @@ import { formatSettingsNumberValue, getCommissioningStatusValue, getSettingsStat
 import { getHpWaterRawValue } from "./water.js";
 import { escapeHtml } from "../core/html.js";
 import { renderModalShell } from "../core/modal-shell.js";
+import { renderOduEepromDumpPanel } from "../features/odu-eeprom-dump.js";
 
   export function getManualHpActualValue(levelKey, frequencyKey) {
     const level = getEntityNumericValue(levelKey);
@@ -1028,6 +1029,17 @@ import { renderModalShell } from "../core/modal-shell.js";
           </div>
         </div>
       `,
+    );
+  }
+
+  export function renderSettingsOduEepromDumpSection() {
+    return renderSettingsSection(
+      "Diagnostiek",
+      "ODU EEPROM-export",
+      "Maak een volledige, controleerbare momentopname voor vergelijking van ODU-hardware en firmware.",
+      renderOduEepromDumpPanel(),
+      "",
+      "oq-settings-section--odu-eeprom",
     );
   }
 

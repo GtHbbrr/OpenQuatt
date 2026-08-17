@@ -186,6 +186,10 @@
       fields: [],
       samples: [],
     },
+    oduEepromDumps: {
+      1: { active: false, ready: false, startedAt: 0, completedAt: 0, jobId: 0 },
+      2: { active: false, ready: false, startedAt: 0, completedAt: 0, jobId: 0 },
+    },
     oduRuntimeFrequency: {
       HP1: {
         cooling: [0, 30, 36, 42, 47, 52, 56, 61, 66, 71, 74],
@@ -5024,6 +5028,207 @@
     return mockResponse(200, buildDebugRecordingDownloadPayload());
   }
 
+  function calculateMockCrc(words) {
+    let crc = 0xffff;
+    for (let index = 0; index < 510; index += 1) {
+      crc ^= Number(words[index] || 0) & 0xff;
+      for (let bit = 0; bit < 8; bit += 1) {
+        crc = (crc & 1) !== 0 ? ((crc >>> 1) ^ 0xa001) : (crc >>> 1);
+      }
+    }
+    return crc & 0xffff;
+  }
+
+  function encodeMockAsciiWords(value, count = 20) {
+    const bytes = [...String(value || "")].map((character) => character.charCodeAt(0) & 0xff);
+    const words = [];
+    for (let index = 0; index < count; index += 1) {
+      const high = bytes[index * 2] || 0;
+      const low = bytes[index * 2 + 1] || 0;
+      words.push((high << 8) | low);
+    }
+    return words;
+  }
+
+  function buildMockOduEepromWords(hp) {
+    const words = Array.from({ length: 512 }, (_, index) => (index * 7 + hp * 13) & 0xff);
+    const frequency = state.oduRuntimeFrequency[`HP${hp}`];
+    words[0] = 255;
+    frequency.cooling.forEach((value, index) => { words[index + 1] = Number(value); });
+    frequency.heating.forEach((value, index) => { words[index + 12] = Number(value); });
+    words[310] = hp === 2 ? 2 : 1;
+    words[317] = hp === 2 ? 0x0204 : 0x0102;
+    words[456] = hp === 2 ? 13 : 12;
+    words[459] = hp === 2 ? 2 : 1;
+    words[498] = 32;
+    [38, 42, 46, 50, 54, 58].forEach((value, index) => { words[502 + index] = value + hp; });
+    const crc = calculateMockCrc(words);
+    words[510] = crc & 0xff;
+    words[511] = (crc >>> 8) & 0xff;
+    return words;
+  }
+
+  function getMockOduIdentity(hp) {
+    const v2 = hp === 2;
+    const pcbProgram = v2 ? 0x0204 : 0x0102;
+    const eepromProgram = v2 ? 0x0032 : 0x0021;
+    const officialFirmware = v2 ? 0x0206 : 0x0108;
+    const model = v2 ? "QUATT ODU V2" : "QUATT ODU V1";
+    const serial = v2 ? "QV2-MOCK-000002" : "QV1-MOCK-000001";
+    const core = Array(14).fill(0);
+    core[0] = v2 ? 2 : 1;
+    core[1] = hp;
+    core[7] = 0;
+    core[8] = pcbProgram;
+    core[9] = eepromProgram;
+    core[13] = v2 ? 0x1202 : 0x1101;
+    return {
+      model,
+      customerModel: model,
+      serial,
+      pcbProgram,
+      pcbLabel: `V${String((pcbProgram >>> 8) & 0xff).padStart(3, "0")}_T${String(pcbProgram & 0xff).padStart(2, "0")}`,
+      eepromProgram,
+      officialFirmware,
+      officialLabel: `${(officialFirmware >>> 8) & 0xff}.${officialFirmware & 0xff}`,
+      core,
+      extended: [hp, v2 ? 202 : 101, v2 ? 2 : 1, officialFirmware, 0, eepromProgram],
+      modelWords: encodeMockAsciiWords(model),
+      customerModelWords: encodeMockAsciiWords(model),
+      serialWords: encodeMockAsciiWords(serial),
+    };
+  }
+
+  function syncMockOduEepromDump(hp) {
+    const dump = state.oduEepromDumps[hp];
+    if (!dump.active) return;
+    const elapsed = Math.max(0, Date.now() - dump.startedAt);
+    if (elapsed >= 6000) {
+      dump.active = false;
+      dump.ready = true;
+      dump.completedAt = Date.now();
+    }
+  }
+
+  function getMockOduEepromStatus(hp) {
+    syncMockOduEepromDump(hp);
+    const dump = state.oduEepromDumps[hp];
+    const elapsed = dump.active ? Math.max(0, Date.now() - dump.startedAt) : 0;
+    const progress = dump.ready ? 100 : dump.active ? Math.max(2, Math.min(99, Math.round(elapsed / 60))) : 0;
+    const registersRead = dump.ready ? 512 : dump.active ? Math.min(511, Math.round(Math.max(0, progress - 10) / 90 * 512)) : 0;
+    const identity = getMockOduIdentity(hp);
+    const words = buildMockOduEepromWords(hp);
+    const crc = calculateMockCrc(words);
+    return {
+      ok: true,
+      available: true,
+      hp,
+      modbus_device_address: hp,
+      active: dump.active,
+      dump_ready: dump.ready,
+      job_id: dump.jobId,
+      phase: dump.ready ? "complete" : dump.active ? progress < 10 ? "reading extended ODU identity" : progress < 98 ? "reading EEPROM shadow" : "verifying EEPROM CRC" : "idle",
+      progress_percent: progress,
+      registers_read: registersRead,
+      register_count: 512,
+      warning_flags: 0,
+      error: "",
+      crc: {
+        calculated: `0x${crc.toString(16).toUpperCase().padStart(4, "0")}`,
+        stored: `0x${crc.toString(16).toUpperCase().padStart(4, "0")}`,
+        valid: dump.ready,
+        retry_count: 0,
+      },
+      identity: {
+        extended_supported: true,
+        model: dump.ready ? identity.model : "",
+        core_available: dump.ready,
+        pcb_program_raw: dump.ready ? identity.pcbProgram : 0,
+        pcb_program: dump.ready ? identity.pcbLabel : "",
+        eeprom_program_raw: dump.ready ? identity.eepromProgram : 0,
+      },
+    };
+  }
+
+  function handleMockOduEepromStart(hp) {
+    const dump = state.oduEepromDumps[hp];
+    syncMockOduEepromDump(hp);
+    if (dump.active) return mockResponse(409, { ok: false, error: "dump_busy" });
+    dump.active = true;
+    dump.ready = false;
+    dump.startedAt = Date.now();
+    dump.completedAt = 0;
+    dump.jobId += 1;
+    return mockResponse(200, getMockOduEepromStatus(hp));
+  }
+
+  function buildMockOduEepromDownload(hp) {
+    const dump = state.oduEepromDumps[hp];
+    const identity = getMockOduIdentity(hp);
+    const words = buildMockOduEepromWords(hp);
+    const crc = calculateMockCrc(words);
+    const crcHex = `0x${crc.toString(16).toUpperCase().padStart(4, "0")}`;
+    return {
+      format: "openquatt-odu-eeprom-v1",
+      schema_version: 1,
+      captured_at_epoch: Math.floor((dump.completedAt || Date.now()) / 1000),
+      source: { device: "OpenQuatt", hp, modbus_device_address: hp, snapshot: "runtime_eeprom_shadow" },
+      job: { id: dump.jobId, duration_ms: Math.max(0, (dump.completedAt || Date.now()) - dump.startedAt), warning_flags: 0, warnings: [] },
+      identity: {
+        core_available: true,
+        compressor_code: identity.core[0],
+        odu_dip_switch: identity.core[1],
+        failures_raw: 0,
+        eeprom_failure: false,
+        pcb_program: { raw: identity.pcbProgram, hex: `0x${identity.pcbProgram.toString(16).toUpperCase().padStart(4, "0")}`, main: identity.pcbProgram >>> 8, sub: identity.pcbProgram & 0xff, label: identity.pcbLabel },
+        eeprom_program: { raw: identity.eepromProgram, hex: `0x${identity.eepromProgram.toString(16).toUpperCase().padStart(4, "0")}` },
+        control_board_item: { raw: identity.core[13], hex: `0x${identity.core[13].toString(16).toUpperCase().padStart(4, "0")}` },
+        extended_supported: true,
+        odu_address: identity.extended[0],
+        project_code: identity.extended[1],
+        hardware_version: identity.extended[2],
+        official_firmware: { raw: identity.officialFirmware, label: identity.officialLabel },
+        beta_version: 0,
+        extended_eeprom_version: identity.eepromProgram,
+        model: identity.model,
+        customer_model: identity.customerModel,
+        serial: identity.serial,
+        raw_blocks: {
+          core: { modbus_start: 2114, values: identity.core },
+          extended: { modbus_start: 11004, values: identity.extended },
+          model: { modbus_start: 11120, values: identity.modelWords },
+          customer_model: { modbus_start: 11160, values: identity.customerModelWords },
+          serial: { modbus_start: 11219, values: identity.serialWords },
+        },
+      },
+      eeprom: {
+        complete: true,
+        sheet_start: 3000,
+        modbus_start: 2999,
+        register_count: 512,
+        crc: { algorithm: "CRC16/Modbus", data: "low byte of sheet 3000..3509", init: 0xffff, polynomial: 0xa001, calculated: crcHex, stored: crcHex, valid: true, retry_count: 0 },
+        fingerprints: { fan_count: words[310], model_main_pcb_address: words[317], minimum_flow: words[456], flow_sensor_type: words[459], refrigerant: words[498], pump_fan_power_words: words.slice(502, 508) },
+        registers: words.map((word, index) => ({ sheet_address: 3000 + index, modbus_address: 2999 + index, word, hex: `0x${word.toString(16).toUpperCase().padStart(4, "0")}`, high_byte: (word >>> 8) & 0xff, low_byte: word & 0xff })),
+      },
+    };
+  }
+
+  function handleMockOduEepromRequest(url, method) {
+    const match = url.pathname.match(/\/openquatt\/odu-eeprom\/hp([12])\/(status|start|download)$/);
+    if (!match) return null;
+    const hp = Number(match[1]);
+    const action = match[2];
+    if (hp === 2 && state.installation !== "duo") return mockResponse(404, { ok: false, error: "not_found" });
+    if (action === "status" && method === "GET") return mockResponse(200, getMockOduEepromStatus(hp));
+    if (action === "start" && method === "POST") return handleMockOduEepromStart(hp);
+    if (action === "download" && method === "GET") {
+      syncMockOduEepromDump(hp);
+      if (!state.oduEepromDumps[hp].ready) return mockResponse(409, { ok: false, error: "dump_not_ready" });
+      return mockResponse(200, buildMockOduEepromDownload(hp));
+    }
+    return mockResponse(405, { ok: false, error: "method_not_allowed" });
+  }
+
   function parseMockRequest(input) {
     const url = new URL(String(typeof input === "string" ? input : input.url), window.location.href);
     const parts = url.pathname.split("/").filter(Boolean);
@@ -5110,6 +5315,10 @@
       }
       if (url.pathname.endsWith("/openquatt/debug-recording/download") && method === "GET") {
         return handleDebugRecordingDownload();
+      }
+      const oduEepromResponse = handleMockOduEepromRequest(url, method);
+      if (oduEepromResponse) {
+        return oduEepromResponse;
       }
       if (url.pathname.endsWith("/openquatt/incidents") && method === "GET") {
         return handleIncidentSnapshot();
