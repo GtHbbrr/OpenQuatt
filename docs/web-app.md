@@ -288,7 +288,7 @@ Maak een backup voordat je grotere wijzigingen doet of voordat je een factory-up
 
 De backup bevat de instellingen die de web-app beheert, inclusief de vier warmtepompoffsets en iedere geldige aanvoeroffset die per bron is opgeslagen. De MQTT-configuratie wordt ook meegenomen, maar het MQTT-wachtwoord nooit. Bij restore vergelijkt OpenQuatt de backup met de huidige installatie, zodat je verschillen kunt controleren voordat je ze terugzet.
 
-**Kalibratiewaarden herstellen** staat standaard aan. De controller schrijft deze waarden eerst terug en controleert ze voordat een opgeslagen aanvoerbron opnieuw wordt geselecteerd. Zet deze optie uit wanneer je alleen de overige instellingen wilt herstellen. Kalibreer na restore opnieuw als de controller of een temperatuursensor fysiek is vervangen; een gewone bron- of CIC-URL-wijziging verwijdert een geldige kalibratie niet.
+De kalibratiewaarden worden op dezelfde manier als de overige instellingen hersteld, vóór de opgeslagen aanvoerbron wordt geselecteerd. Kalibreer na restore opnieuw als de controller of een temperatuursensor fysiek is vervangen; een gewone bron- of CIC-URL-wijziging verwijdert een geldige kalibratie niet.
 
 Een backup is vooral handig bij:
 

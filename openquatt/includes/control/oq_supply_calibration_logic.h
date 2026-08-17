@@ -156,21 +156,6 @@ inline bool store_record(uint32_t (&storage)[kRecordStorageWords], const SourceI
   return true;
 }
 
-template <typename RecordComponent>
-inline void force_queue_record_persistence(RecordComponent* component) {
-  auto& storage = component->value();
-  const uint32_t checksum = storage[kRecordChecksumIndex];
-
-  // RestoringGlobalsComponent remembers the last queued value even when the
-  // later NVS sync fails. Toggle and restore one word synchronously so every
-  // retry queues the exact current record again. The final queued value always
-  // contains the original checksum.
-  storage[kRecordChecksumIndex] = checksum ^ 1U;
-  component->update();
-  storage[kRecordChecksumIndex] = checksum;
-  component->update();
-}
-
 inline bool migrate_legacy_record(uint32_t (&storage)[kRecordStorageWords], int32_t source_code,
                                   uint32_t source_fingerprint, uint32_t checksum, float offset_c,
                                   float max_offset_c = 2.0f) {

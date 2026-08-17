@@ -120,27 +120,6 @@
   width: 100%;
 }
 
-.oq-settings-backup-calibration-check {
-  padding: 14px 16px;
-  border: 1px solid var(--oq-helper-line);
-  border-radius: 16px;
-  background: var(--oq-settings-backup-compare-background);
-}
-
-.oq-settings-backup-calibration-check span {
-  display: grid;
-  gap: 3px;
-}
-
-.oq-settings-backup-calibration-check strong {
-  color: var(--oq-helper-ink);
-}
-
-.oq-settings-backup-calibration-check em {
-  color: var(--oq-helper-faint);
-  font-style: normal;
-}
-
 .oq-settings-backup-result-summary {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

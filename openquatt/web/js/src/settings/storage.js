@@ -730,14 +730,6 @@ import { renderModalShell } from "../core/modal-shell.js";
     const mqttMeta = mqtt
       ? `${mqtt.broker || "Geen broker"}:${mqtt.port} · ${mqtt.password_was_set ? "Wachtwoord niet opgeslagen" : "Geen wachtwoord ingesteld"}`
       : "MQTT-configuratie en MQTT-afhankelijke bronselecties worden niet hersteld.";
-    const calibrationSummary = summary.calibrations || { present: 0, currentPresent: 0, differenceCount: 0, rows: [] };
-    const restoreCalibrations = state.settingsBackupRestoreCalibrations !== false;
-    const calibrationValue = calibrationSummary.present
-      ? `${calibrationSummary.present} ${calibrationSummary.present === 1 ? "waarde" : "waarden"}`
-      : "Niet in backup";
-    const calibrationMeta = calibrationSummary.present
-      ? `${calibrationSummary.differenceCount} ${calibrationSummary.differenceCount === 1 ? "verschil" : "verschillen"} · ${calibrationSummary.currentPresent} nu gekalibreerd`
-      : "De huidige sensorcorrecties blijven behouden.";
     const warningText = topologyMismatch || installationMismatch
       ? "De backup lijkt van een andere installatie te komen. Je kunt nog steeds doorzetten, maar controleer de secties even goed."
       : summary.requiredMissing
@@ -781,21 +773,7 @@ import { renderModalShell } from "../core/modal-shell.js";
               <strong class="oq-helper-modal-value">${escapeHtml(mqttValue)}</strong>
               <span class="oq-helper-modal-subvalue">${escapeHtml(mqttMeta)}</span>
             </div>
-            <div class="oq-helper-modal-row">
-              <span class="oq-helper-modal-label">Sensorcorrecties</span>
-              <strong class="oq-helper-modal-value">${escapeHtml(calibrationValue)}</strong>
-              <span class="oq-helper-modal-subvalue">${escapeHtml(calibrationMeta)}</span>
-            </div>
           </div>
-          ${calibrationSummary.present ? `
-            <label class="oq-helper-modal-check oq-settings-backup-calibration-check">
-              <input type="checkbox" data-oq-backup-restore-calibrations="true" ${restoreCalibrations ? "checked" : ""} ${state.settingsBackupBusy ? "disabled" : ""}>
-              <span>
-                <strong>Kalibratiewaarden herstellen</strong>
-                <em>Herstelt de vier warmtepompoffsets en de opgeslagen aanvoeroffset per bron. Kalibreer opnieuw als de controller of temperatuursensor fysiek is vervangen.</em>
-              </span>
-            </label>
-          ` : ""}
           ${mqttNeedsPassword ? `
             <label class="oq-settings-backup-mqtt-password">
               <span class="oq-helper-modal-label">MQTT-wachtwoord</span>
@@ -811,42 +789,6 @@ import { renderModalShell } from "../core/modal-shell.js";
             </label>
           ` : ""}
           <div class="oq-settings-backup-modal-sections">
-            ${calibrationSummary.present ? `
-              <details class="oq-settings-backup-modal-section">
-                <summary class="oq-settings-backup-modal-section-head">
-                  <span class="oq-settings-backup-modal-section-head-copy">
-                    <strong>Sensorcorrecties</strong>
-                    <em>${escapeHtml(`${calibrationSummary.present} ${calibrationSummary.present === 1 ? "waarde" : "waarden"} · ${calibrationSummary.differenceCount ? `${calibrationSummary.differenceCount} ${calibrationSummary.differenceCount === 1 ? "verschil" : "verschillen"}` : "Alles gelijk"}`)}</em>
-                  </span>
-                </summary>
-                <div class="oq-settings-backup-modal-section-body">
-                  <p>Alleen geldige, opgeslagen kalibratiewaarden staan in de backup.</p>
-                  <div class="oq-settings-backup-compare-list">
-                    ${calibrationSummary.rows.map((row) => {
-                      const status = row.different ? "different" : "same";
-                      return `
-                        <div class="oq-settings-backup-compare oq-settings-backup-compare--${status}">
-                          <div class="oq-settings-backup-compare-head">
-                            <strong>${escapeHtml(row.label)}</strong>
-                            <span>${row.different ? "Wijkt af" : "Gelijk"}</span>
-                          </div>
-                          <div class="oq-settings-backup-compare-values">
-                            <div class="oq-settings-backup-compare-value" data-change="${status}">
-                              <span>Backup</span>
-                              <strong>${escapeHtml(row.backupDisplay)}</strong>
-                            </div>
-                            <div class="oq-settings-backup-compare-value" data-change="${status}">
-                              <span>Nu</span>
-                              <strong>${escapeHtml(row.currentDisplay)}</strong>
-                            </div>
-                          </div>
-                        </div>
-                      `;
-                    }).join("")}
-                  </div>
-                </div>
-              </details>
-            ` : ""}
             ${summary.sectionSummaries.map((section) => `
               <details class="oq-settings-backup-modal-section">
                 <summary class="oq-settings-backup-modal-section-head">

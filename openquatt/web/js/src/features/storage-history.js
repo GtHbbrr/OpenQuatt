@@ -1,15 +1,15 @@
 import { getSetupCompleteState, hasEntity, isEntityActive, isTrendHistoryEnabled } from "../core/app-shared.js";
 import { invokeActionMap } from "../core/action-router.js";
 import { downloadBlobFile, downloadJsonFile } from "../core/browser-utils.js";
-import { ENTITY_DEFS, FAST_VIEW_ENTITY_REFRESH_CONCURRENCY, SETTINGS_BACKUP_CALIBRATION_COMMIT_KEY, SETTINGS_BACKUP_CALIBRATION_FIELDS, SETTINGS_BACKUP_CALIBRATION_KEYS, SETTINGS_BACKUP_KEY_SET, SETTINGS_BACKUP_KEYS, SETTINGS_BACKUP_SCHEMA_VERSION, SETTINGS_BACKUP_SECTIONS, TREND_HISTORY_REFRESH_INTERVAL_MS } from "../core/config.js";
+import { ENTITY_DEFS, FAST_VIEW_ENTITY_REFRESH_CONCURRENCY, SETTINGS_BACKUP_KEY_SET, SETTINGS_BACKUP_KEYS, SETTINGS_BACKUP_SCHEMA_VERSION, SETTINGS_BACKUP_SECTIONS, TREND_HISTORY_REFRESH_INTERVAL_MS } from "../core/config.js";
 import { buildEntityPath } from "../core/domain-helpers.js";
 import { getEnergyHistoryRequestQuery } from "../core/energy-history-query.js";
 import { getEnergyHistoryDateKeyFromDate, parseEnergyHistoryDateKey } from "../core/energy-history-domain.js";
 import { updateEnergyHistoryState } from "../core/feature-state.js";
-import { ENTITY_BACKUP_REQUEST_TIMEOUT_MS, setEntityBackupValue, verifyEntityBackupNumberState, verifyEntityBackupSwitchState, waitForEntityBackupNumberState } from "../core/entity-backup.js";
+import { setEntityBackupValue, verifyEntityBackupSwitchState } from "../core/entity-backup.js";
 import { formatValue, getEntityValue, normalizeDateTimeValue, normalizeTimeValue, parseLooseNumber } from "../core/entity-store.js";
 import { refreshEntities, syncEntities } from "../core/entity-sync.js";
-import { buildSettingsBackupCalibrationConfig, buildSettingsBackupMqttConfig, collectUnknownSettingsBackupCalibrationIds, collectUnknownSettingsBackupItems, isSettingsBackupMqttSourceSelection, normalizeSettingsBackupCalibrationConfig, normalizeSettingsBackupMqttConfig, SETTINGS_BACKUP_MIN_SCHEMA_VERSION, SETTINGS_BACKUP_MQTT_INPUT_KEYS, SETTINGS_BACKUP_MQTT_RETAINED_KEYS, settingsBackupMqttNeedsPassword } from "../core/settings-backup-domain.js";
+import { buildSettingsBackupMqttConfig, collectUnknownSettingsBackupItems, isSettingsBackupMqttSourceSelection, normalizeSettingsBackupMqttConfig, SETTINGS_BACKUP_MIN_SCHEMA_VERSION, SETTINGS_BACKUP_MQTT_INPUT_KEYS, SETTINGS_BACKUP_MQTT_RETAINED_KEYS, settingsBackupMqttNeedsPassword } from "../core/settings-backup-domain.js";
 import { DEFAULT_TREND_WINDOW_HOURS, state } from "../core/state.js";
 import { ENERGY_HISTORY_VIEW_KEYS, getSettingsStorageRefreshKeys, SETTINGS_STORAGE_KEYS, TREND_HISTORY_VIEW_KEYS } from "../core/storage-history-keys.js";
 import { setStorageHistoryControls } from "../core/storage-history-controls.js";
@@ -19,9 +19,6 @@ import { getBasePath } from "../core/url-path.js";
 import { getFirmwareDeviceLabel, getInstallationLabel, getInstallationTopology } from "./device-context.js";
 import { getFirmwareCurrentVersion } from "./firmware-update.js";
 import { render } from "../core/render-scheduler.js";
-
-  const SETTINGS_BACKUP_CALIBRATION_SOURCE_KEYS = new Set(["localWaterSupplyTempSource", "waterSupplySource"]);
-  const SETTINGS_BACKUP_CALIBRATION_COMMIT_TOKEN_MAX = 1000000;
 
   export function energyHistoryImportRecordHasHour(row) {
     return Object.prototype.hasOwnProperty.call(row, "hour") ||
@@ -1003,7 +1000,6 @@ import { render } from "../core/render-scheduler.js";
   export function clearSettingsBackupDraft() {
     state.settingsBackupDraft = null;
     state.settingsBackupMqttPassword = "";
-    state.settingsBackupRestoreCalibrations = true;
     state.settingsBackupError = "";
     state.settingsBackupBusy = false;
   }
@@ -1053,20 +1049,6 @@ import { render } from "../core/render-scheduler.js";
     return text || undefined;
   }
 
-  export function getSettingsBackupCalibrationValues() {
-    return Object.fromEntries(SETTINGS_BACKUP_CALIBRATION_FIELDS.flatMap((field) => {
-      const value = getSettingsBackupValue(field.key);
-      return value === undefined ? [] : [[field.key, value]];
-    }));
-  }
-
-  export async function refreshSettingsBackupEntities(keys) {
-    const result = await refreshEntities(keys, "all", { forceMissing: true });
-    if (result?.ok === false) {
-      throw new Error(`Niet alle backupvelden konden worden ververst. ${result.message}`);
-    }
-  }
-
   export function buildSettingsBackupSnapshot(mqtt = null) {
     const settings = {};
     SETTINGS_BACKUP_SECTIONS.forEach((section) => {
@@ -1085,10 +1067,6 @@ import { render } from "../core/render-scheduler.js";
       exported_at: new Date().toISOString(),
       source: getSettingsBackupSourceMeta(),
       settings,
-      calibrations: buildSettingsBackupCalibrationConfig(
-        getSettingsBackupCalibrationValues(),
-        SETTINGS_BACKUP_CALIBRATION_FIELDS,
-      ),
       mqtt,
     };
   }
@@ -1151,10 +1129,6 @@ import { render } from "../core/render-scheduler.js";
     return text || "—";
   }
 
-  export function formatSettingsBackupCalibrationValue(value) {
-    return `${Number(value).toFixed(2)} °C`;
-  }
-
   export function getSettingsBackupFieldStatusLabel(status) {
     switch (status) {
       case "same":
@@ -1177,25 +1151,6 @@ import { render } from "../core/render-scheduler.js";
     const settings = snapshot?.settings && typeof snapshot.settings === "object" ? snapshot.settings : {};
     const source = snapshot?.source && typeof snapshot.source === "object" ? snapshot.source : {};
     const backupKeySet = SETTINGS_BACKUP_KEY_SET;
-    const calibrationOffsets = snapshot?.calibrations?.temperature_offsets || {};
-    const calibrationRows = SETTINGS_BACKUP_CALIBRATION_FIELDS.flatMap((field) => {
-      if (!Object.prototype.hasOwnProperty.call(calibrationOffsets, field.id)) {
-        return [];
-      }
-      const backupValue = calibrationOffsets[field.id];
-      const currentValue = getSettingsBackupValue(field.key);
-      const currentAvailable = hasEntity(field.key);
-      return [{
-        ...field,
-        backupValue,
-        currentValue,
-        backupDisplay: formatSettingsBackupCalibrationValue(backupValue),
-        currentDisplay: currentValue === undefined
-          ? (currentAvailable ? "Nog niet gekalibreerd" : "Niet beschikbaar op deze installatie")
-          : formatSettingsBackupCalibrationValue(currentValue),
-        different: currentValue === undefined || Number(currentValue) !== Number(backupValue),
-      }];
-    });
     let requiredPresent = 0;
     let requiredMissing = 0;
     let optionalPresent = 0;
@@ -1302,7 +1257,6 @@ import { render } from "../core/render-scheduler.js";
         }
       });
     });
-    unknown += Array.isArray(snapshot?.unknown_calibrations) ? snapshot.unknown_calibrations.length : 0;
 
     return {
       source,
@@ -1317,12 +1271,6 @@ import { render } from "../core/render-scheduler.js";
       currentPresent,
       requiredTotal,
       total: SETTINGS_BACKUP_KEYS.length,
-      calibrations: {
-        present: calibrationRows.length,
-        currentPresent: calibrationRows.filter((row) => row.currentValue !== undefined).length,
-        differenceCount: calibrationRows.filter((row) => row.different).length,
-        rows: calibrationRows,
-      },
     };
   }
 
@@ -1337,28 +1285,13 @@ import { render } from "../core/render-scheduler.js";
       throw new Error("Onbekende backupversie.");
     }
 
-    const rawSettings = parsed.settings && typeof parsed.settings === "object" ? parsed.settings : {};
-    const calibrations = normalizeSettingsBackupCalibrationConfig(
-      schemaVersion >= 3 ? parsed.calibrations : null,
-      SETTINGS_BACKUP_CALIBRATION_FIELDS,
-      schemaVersion < 3 ? rawSettings : null,
-    );
-    const unknownCalibrations = schemaVersion >= 3
-      ? collectUnknownSettingsBackupCalibrationIds(parsed.calibrations, SETTINGS_BACKUP_CALIBRATION_FIELDS)
-      : [];
-    const settings = { ...rawSettings };
-    if (rawSettings.sensor_sources && typeof rawSettings.sensor_sources === "object") {
-      settings.sensor_sources = { ...rawSettings.sensor_sources };
-      SETTINGS_BACKUP_CALIBRATION_KEYS.forEach((key) => delete settings.sensor_sources[key]);
-    }
+    const settings = parsed.settings && typeof parsed.settings === "object" ? parsed.settings : {};
     const mqtt = schemaVersion >= 2 ? normalizeSettingsBackupMqttConfig(parsed.mqtt) : null;
     const snapshot = {
       schema_version: schemaVersion,
       exported_at: String(parsed.exported_at || ""),
       source: parsed.source && typeof parsed.source === "object" ? parsed.source : {},
       settings,
-      calibrations,
-      unknown_calibrations: unknownCalibrations,
       mqtt,
       file_name: fileName || "",
     };
@@ -1373,7 +1306,7 @@ import { render } from "../core/render-scheduler.js";
     render();
 
     try {
-      await refreshSettingsBackupEntities([...SETTINGS_BACKUP_KEYS, ...SETTINGS_BACKUP_CALIBRATION_KEYS]);
+      await refreshEntities(SETTINGS_BACKUP_KEYS, "all");
       const mqttStatus = await fetchSettingsBackupMqttStatus();
       return buildSettingsBackupSnapshot(buildSettingsBackupMqttConfig(mqttStatus));
     } finally {
@@ -1406,7 +1339,6 @@ import { render } from "../core/render-scheduler.js";
     state.settingsBackupBusy = true;
     state.settingsBackupDraft = null;
     state.settingsBackupMqttPassword = "";
-    state.settingsBackupRestoreCalibrations = true;
     state.settingsBackupRestoreResult = null;
     state.settingsBackupError = "";
     state.controlError = "";
@@ -1415,11 +1347,7 @@ import { render } from "../core/render-scheduler.js";
 
     try {
       const rawText = await file.text();
-      await refreshSettingsBackupEntities([
-        ...SETTINGS_BACKUP_KEYS,
-        ...SETTINGS_BACKUP_CALIBRATION_KEYS,
-        SETTINGS_BACKUP_CALIBRATION_COMMIT_KEY,
-      ]);
+      await refreshEntities(SETTINGS_BACKUP_KEYS, "all");
       const snapshot = parseSettingsBackupPayload(rawText, file.name || "");
       state.settingsBackupDraft = snapshot;
       state.systemModal = "settings-backup-restore";
@@ -1436,13 +1364,10 @@ import { render } from "../core/render-scheduler.js";
     const mqttLabels = {
       "mqtt.config": "MQTT-configuratie",
     };
-    const calibrationLabel = key === "calibrations.temperature_offsets"
-      ? "Kalibratiewaarden"
-      : SETTINGS_BACKUP_CALIBRATION_FIELDS.find((field) => field.key === key)?.label;
     return {
       key,
       section,
-      label: calibrationLabel || mqttLabels[key] || (key.startsWith("mqtt.") ? key.replace(/^mqtt\./, "MQTT ").replaceAll("_", " ") : getSettingsBackupFieldLabel(key)),
+      label: mqttLabels[key] || (key.startsWith("mqtt.") ? key.replace(/^mqtt\./, "MQTT ").replaceAll("_", " ") : getSettingsBackupFieldLabel(key)),
       reason,
       detail,
       severity,
@@ -1450,7 +1375,7 @@ import { render } from "../core/render-scheduler.js";
   }
 
   export function getSettingsBackupUnknownItems(draft) {
-    const settingItems = collectUnknownSettingsBackupItems(draft?.settings, SETTINGS_BACKUP_SECTIONS).map(({ section, key }) => ({
+    return collectUnknownSettingsBackupItems(draft?.settings, SETTINGS_BACKUP_SECTIONS).map(({ section, key }) => ({
       key,
       section,
       label: getSettingsBackupFieldLabel(key),
@@ -1458,172 +1383,6 @@ import { render } from "../core/render-scheduler.js";
       detail: "Deze firmware kent dit veld niet; de waarde is niet toegepast.",
       severity: "warning",
     }));
-    const calibrationItems = (draft?.unknown_calibrations || []).map((id) => ({
-      key: `calibrations.temperature_offsets.${id}`,
-      section: "Sensorcorrecties",
-      label: id,
-      reason: "Onbekende kalibratiewaarde",
-      detail: "Deze firmware kent deze sensorcorrectie niet; de waarde is niet toegepast.",
-      severity: "warning",
-    }));
-    return [...settingItems, ...calibrationItems];
-  }
-
-  export function getSettingsBackupCalibrationRestoreEntries(draft) {
-    const offsets = draft?.calibrations?.temperature_offsets;
-    if (!offsets || typeof offsets !== "object") {
-      return [];
-    }
-    return SETTINGS_BACKUP_CALIBRATION_FIELDS.flatMap((field) => (
-      Object.prototype.hasOwnProperty.call(offsets, field.id)
-        ? [{ ...field, value: offsets[field.id] }]
-        : []
-    ));
-  }
-
-  export function getSettingsBackupSupplyCalibrationDependency(draft, key, value) {
-    const sourceSettings = draft?.settings?.sensor_sources || {};
-    const desiredWaterSource = key === "waterSupplySource"
-      ? String(value || "")
-      : String(sourceSettings.waterSupplySource || getEntityValue("waterSupplySource") || "");
-    const hasLocalSourceSelector = hasEntity("localWaterSupplyTempSource");
-    const localSourceFallback = hasLocalSourceSelector
-      ? getEntityValue("localWaterSupplyTempSource")
-      : "DS18B20";
-    const desiredLocalSource = !hasLocalSourceSelector
-      ? "DS18B20"
-      : key === "localWaterSupplyTempSource"
-        ? String(value || "")
-        : String(sourceSettings.localWaterSupplyTempSource || localSourceFallback || "");
-
-    if (key === "localWaterSupplyTempSource" && desiredWaterSource !== "Local") {
-      return "";
-    }
-    if (desiredWaterSource === "CIC") {
-      return "waterSupplyCicCalibrationOffset";
-    }
-    if (desiredWaterSource === "HA input") {
-      return "waterSupplyHaInputCalibrationOffset";
-    }
-    if (desiredWaterSource === "Local") {
-      return desiredLocalSource === "DS18B20"
-        ? "waterSupplyDs18b20CalibrationOffset"
-        : "waterSupplyPt1000CalibrationOffset";
-    }
-    return "";
-  }
-
-  export function getSettingsBackupCalibrationCommitToken() {
-    const current = Math.trunc(parseLooseNumber(getEntityValue(SETTINGS_BACKUP_CALIBRATION_COMMIT_KEY)));
-    return Number.isFinite(current) && current >= 1 && current <= SETTINGS_BACKUP_CALIBRATION_COMMIT_TOKEN_MAX
-      ? (current % SETTINGS_BACKUP_CALIBRATION_COMMIT_TOKEN_MAX) + 1
-      : 1;
-  }
-
-  export async function restoreSettingsBackupCalibrations(
-    draft,
-    applied,
-    skipped,
-    requestTimeoutMs = ENTITY_BACKUP_REQUEST_TIMEOUT_MS,
-  ) {
-    const entries = getSettingsBackupCalibrationRestoreEntries(draft);
-    const pending = [];
-    const failedKeys = new Set();
-
-    for (const entry of entries) {
-      if (!ENTITY_DEFS[entry.key] || !hasEntity(entry.key)) {
-        failedKeys.add(entry.key);
-        skipped.push(createSettingsBackupRestoreItem(
-          entry.key,
-          "Sensorcorrecties",
-          "Niet beschikbaar",
-          "Deze kalibratiewaarde bestaat niet op de huidige installatie of firmware.",
-        ));
-        continue;
-      }
-
-      let writeError = "";
-      try {
-        await setEntityBackupValue(entry.key, entry.value, requestTimeoutMs);
-      } catch (error) {
-        writeError = String(error?.message || error);
-      }
-      pending.push({ ...entry, writeError });
-    }
-
-    let persistenceConfirmed = pending.length === 0;
-    let persistenceError = "";
-    if (pending.length && (!ENTITY_DEFS[SETTINGS_BACKUP_CALIBRATION_COMMIT_KEY] || !hasEntity(SETTINGS_BACKUP_CALIBRATION_COMMIT_KEY))) {
-      persistenceError = "De firmware kan de kalibratiewaarden niet direct naar flash bevestigen.";
-    } else if (pending.length) {
-      const commitToken = getSettingsBackupCalibrationCommitToken();
-      try {
-        await setEntityBackupValue(SETTINGS_BACKUP_CALIBRATION_COMMIT_KEY, commitToken, requestTimeoutMs);
-      } catch (error) {
-        persistenceError = String(error?.message || error);
-      }
-      try {
-        persistenceConfirmed = await waitForEntityBackupNumberState(
-          SETTINGS_BACKUP_CALIBRATION_COMMIT_KEY,
-          commitToken,
-          {
-            tolerance: 0.1,
-            timeoutMs: requestTimeoutMs,
-            pollIntervalMs: Math.min(100, requestTimeoutMs),
-          },
-        );
-        if (persistenceConfirmed) {
-          state.entities[SETTINGS_BACKUP_CALIBRATION_COMMIT_KEY] = {
-            ...state.entities[SETTINGS_BACKUP_CALIBRATION_COMMIT_KEY],
-            state: String(commitToken),
-            value: commitToken,
-          };
-        }
-        if (!persistenceConfirmed && !persistenceError) {
-          persistenceError = "De controller bevestigde de flashopslag niet.";
-        }
-      } catch (error) {
-        persistenceError = persistenceError
-          ? `${persistenceError} Controle: ${String(error?.message || error)}`
-          : String(error?.message || error);
-      }
-    }
-
-    if (!persistenceConfirmed) {
-      pending.forEach((entry) => {
-        failedKeys.add(entry.key);
-        skipped.push(createSettingsBackupRestoreItem(
-          entry.key,
-          "Sensorcorrecties",
-          "Flashopslag niet bevestigd",
-          entry.writeError ? `${entry.writeError} Opslag: ${persistenceError}` : persistenceError,
-          "error",
-        ));
-      });
-      return { attempted: entries.length, failedKeys };
-    }
-
-    for (const entry of pending) {
-      try {
-        const confirmed = await verifyEntityBackupNumberState(entry.key, entry.value, 0.0051, requestTimeoutMs);
-        if (!confirmed) {
-          throw new Error("De controller bevestigde de opgeslagen waarde niet.");
-        }
-        applied.push(entry.key);
-      } catch (error) {
-        failedKeys.add(entry.key);
-        const verificationError = String(error?.message || error);
-        skipped.push(createSettingsBackupRestoreItem(
-          entry.key,
-          "Sensorcorrecties",
-          "Opslaan niet bevestigd",
-          entry.writeError ? `${entry.writeError} Controle: ${verificationError}` : verificationError,
-          "error",
-        ));
-      }
-    }
-
-    return { attempted: entries.length, failedKeys };
   }
 
   export async function postSettingsBackupMqtt(path, csrfToken, values) {
@@ -1710,8 +1469,6 @@ import { render } from "../core/render-scheduler.js";
       return;
     }
 
-    const calibrationEntries = getSettingsBackupCalibrationRestoreEntries(draft);
-    const restoreCalibrations = state.settingsBackupRestoreCalibrations !== false && calibrationEntries.length > 0;
     const mqttPassword = String(state.settingsBackupMqttPassword || "");
     if (settingsBackupMqttNeedsPassword(draft.mqtt) && !mqttPassword) {
       state.settingsBackupError = "Vul het MQTT-wachtwoord in om deze backup te herstellen.";
@@ -1729,8 +1486,6 @@ import { render } from "../core/render-scheduler.js";
     const skipped = [];
     const unknown = getSettingsBackupUnknownItems(draft);
     const deferredMqttSources = [];
-    const deferredCalibrationSources = [];
-    let calibrationRestoreResult = { attempted: 0, failedKeys: new Set() };
     let shouldCompleteSetup = false;
     let setupWasComplete = false;
     let setupCompletionSafe = true;
@@ -1739,12 +1494,7 @@ import { render } from "../core/render-scheduler.js";
     let mqttRestoreFailureDetail = draft.mqtt ? "" : "Backup bevat geen MQTT-configuratie.";
 
     try {
-      await refreshSettingsBackupEntities([
-        ...SETTINGS_BACKUP_KEYS,
-        ...SETTINGS_BACKUP_CALIBRATION_KEYS,
-        SETTINGS_BACKUP_CALIBRATION_COMMIT_KEY,
-        "usageTelemetryEnabled",
-      ]);
+      await refreshEntities([...SETTINGS_BACKUP_KEYS, "usageTelemetryEnabled"], "all");
       setupWasComplete = isEntityActive("setupComplete");
 
       if (draft.mqtt) {
@@ -1785,11 +1535,6 @@ import { render } from "../core/render-scheduler.js";
           }
 
           if (key === "openquattEnabled") {
-            continue;
-          }
-
-          if (restoreCalibrations && SETTINGS_BACKUP_CALIBRATION_SOURCE_KEYS.has(key)) {
-            deferredCalibrationSources.push({ key, value, section });
             continue;
           }
 
@@ -1835,63 +1580,6 @@ import { render } from "../core/render-scheduler.js";
             "mqtt",
             "MQTT herstellen mislukt",
             `${mqttRestoreFailureDetail} MQTT blijft uitgeschakeld.`,
-            "error",
-          ));
-        }
-      }
-
-      if (restoreCalibrations) {
-        calibrationRestoreResult = await restoreSettingsBackupCalibrations(draft, applied, skipped);
-      } else if (calibrationEntries.length) {
-        skipped.push(createSettingsBackupRestoreItem(
-          "calibrations.temperature_offsets",
-          "Sensorcorrecties",
-          "Bewust niet toegepast",
-          "Kalibratiewaarden herstellen stond uit; de huidige correcties zijn behouden.",
-          "info",
-        ));
-      }
-
-      const desiredWaterSource = String(draft.settings?.sensor_sources?.waterSupplySource || "");
-      deferredCalibrationSources.sort(({ key: left }, { key: right }) => {
-        const preferredFirst = desiredWaterSource === "Local" ? "localWaterSupplyTempSource" : "waterSupplySource";
-        if (left === preferredFirst) return -1;
-        if (right === preferredFirst) return 1;
-        return 0;
-      });
-      for (const { key, value, section } of deferredCalibrationSources) {
-        const dependency = getSettingsBackupSupplyCalibrationDependency(draft, key, value);
-        if (dependency && calibrationRestoreResult.failedKeys.has(dependency)) {
-          skipped.push(createSettingsBackupRestoreItem(
-            key,
-            section.label,
-            "Bronselectie niet toegepast",
-            "De bijbehorende aanvoerkalibratie kon niet worden hersteld; de huidige bronselectie is behouden.",
-            "error",
-          ));
-          continue;
-        }
-
-        const entity = ENTITY_DEFS[key];
-        if (!entity || !hasEntity(key)) {
-          skipped.push(createSettingsBackupRestoreItem(
-            key,
-            section.label,
-            "Niet beschikbaar",
-            "Deze instelling bestaat niet op de huidige installatie of firmware.",
-          ));
-          continue;
-        }
-
-        try {
-          await setEntityBackupValue(key, value);
-          applied.push(key);
-        } catch (error) {
-          skipped.push(createSettingsBackupRestoreItem(
-            key,
-            section.label,
-            "Schrijven mislukt",
-            String(error?.message || error),
             "error",
           ));
         }
@@ -2033,11 +1721,6 @@ import { render } from "../core/render-scheduler.js";
         applied,
         skipped,
         unknown,
-        calibrationsIncluded: calibrationEntries.length,
-        calibrationsRequested: restoreCalibrations,
-        calibrationsRestored: restoreCalibrations
-          ? calibrationRestoreResult.attempted - calibrationRestoreResult.failedKeys.size
-          : 0,
         mqttIncluded: Boolean(draft.mqtt),
         sourceSchemaVersion: draft.schema_version,
       };
@@ -2343,7 +2026,6 @@ import { render } from "../core/render-scheduler.js";
     "download-settings-backup": () => exportSettingsBackup(),
     "open-settings-backup-import": () => {
       state.settingsBackupMqttPassword = "";
-      state.settingsBackupRestoreCalibrations = true;
       state.settingsBackupRestoreResult = null;
       state.settingsBackupError = "";
       state.systemModal = "settings-backup-import";

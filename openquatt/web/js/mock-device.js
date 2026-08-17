@@ -1971,7 +1971,6 @@
     setEntity("number", "Water Supply DS18B20 Calibration Offset", { value: NaN, min_value: -2, max_value: 2, step: 0.01, uom: "\u00B0C" });
     setEntity("number", "Water Supply CIC Calibration Offset", { value: NaN, min_value: -2, max_value: 2, step: 0.01, uom: "\u00B0C" });
     setEntity("number", "Water Supply HA Input Calibration Offset", { value: NaN, min_value: -2, max_value: 2, step: 0.01, uom: "\u00B0C" });
-    setEntity("number", "Calibration Backup Commit Token", { value: 0, min_value: 1, max_value: 1000000, step: 1, uom: "" });
     setEntity("number", "HP calibration HP1 water in offset suggested", { value: 0, min_value: -2, max_value: 2, step: 0.01, uom: "\u00B0C" });
     setEntity("number", "HP calibration HP1 water out offset suggested", { value: 0, min_value: -2, max_value: 2, step: 0.01, uom: "\u00B0C" });
     setEntity("number", "HP calibration HP2 water in offset suggested", { value: 0, min_value: -2, max_value: 2, step: 0.01, uom: "\u00B0C" });

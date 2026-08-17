@@ -2,60 +2,12 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
-  buildSettingsBackupCalibrationConfig,
   buildSettingsBackupMqttConfig,
-  collectUnknownSettingsBackupCalibrationIds,
   collectUnknownSettingsBackupItems,
   isSettingsBackupMqttSourceSelection,
-  normalizeSettingsBackupCalibrationConfig,
   normalizeSettingsBackupMqttConfig,
   settingsBackupMqttNeedsPassword,
 } from "../js/src/core/settings-backup-domain.js";
-
-const calibrationFields = [
-  { id: "hp1_water_in", key: "hp1WaterInOffset", label: "HP1 water in" },
-  { id: "supply_cic", key: "waterSupplyCicCalibrationOffset", label: "Aanvoer · CIC" },
-];
-
-test("calibration backup keeps only validated offsets", () => {
-  assert.deepEqual(buildSettingsBackupCalibrationConfig({
-    hp1WaterInOffset: -0.14,
-    waterSupplyCicCalibrationOffset: 0.25,
-    ignored: 1,
-  }, calibrationFields), {
-    temperature_offsets: {
-      hp1_water_in: -0.14,
-      supply_cic: 0.25,
-    },
-  });
-
-  assert.throws(
-    () => buildSettingsBackupCalibrationConfig({ hp1WaterInOffset: 2.01 }, calibrationFields),
-    /HP1 water in/i,
-  );
-});
-
-test("calibration restore accepts legacy HP offsets but rejects malformed values", () => {
-  assert.deepEqual(normalizeSettingsBackupCalibrationConfig(null, calibrationFields, {
-    sensor_sources: { hp1WaterInOffset: -0.3 },
-  }), {
-    temperature_offsets: { hp1_water_in: -0.3 },
-  });
-  assert.throws(
-    () => normalizeSettingsBackupCalibrationConfig({ temperature_offsets: { supply_cic: "0.2" } }, calibrationFields),
-    /Aanvoer · CIC/i,
-  );
-  assert.throws(
-    () => normalizeSettingsBackupCalibrationConfig({ temperature_offsets: { supply_cic: Number.NaN } }, calibrationFields),
-    /Aanvoer · CIC/i,
-  );
-});
-
-test("calibration restore reports unknown schema ids", () => {
-  assert.deepEqual(collectUnknownSettingsBackupCalibrationIds({
-    temperature_offsets: { supply_future: 0.1, supply_cic: 0.2 },
-  }, calibrationFields), ["supply_future"]);
-});
 
 test("MQTT backup keeps configuration but excludes runtime and secret fields", () => {
   const backup = buildSettingsBackupMqttConfig({

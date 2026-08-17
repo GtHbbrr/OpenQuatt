@@ -344,7 +344,6 @@
     waterSupplyDs18b20CalibrationOffset: { domain: "number", name: "Water Supply DS18B20 Calibration Offset", optional: true },
     waterSupplyCicCalibrationOffset: { domain: "number", name: "Water Supply CIC Calibration Offset", optional: true },
     waterSupplyHaInputCalibrationOffset: { domain: "number", name: "Water Supply HA Input Calibration Offset", optional: true },
-    calibrationBackupCommitToken: { domain: "number", name: "Calibration Backup Commit Token", optional: true },
     hp1WaterInOffsetSuggested: { domain: "number", name: "HP calibration HP1 water in offset suggested", optional: true },
     hp1WaterOutOffsetSuggested: { domain: "number", name: "HP calibration HP1 water out offset suggested", optional: true },
     hp2WaterInOffsetSuggested: { domain: "number", name: "HP calibration HP2 water in offset suggested", optional: true },
@@ -770,18 +769,6 @@
     "waterSupplyCicCalibrationOffset",
     "waterSupplyHaInputCalibrationOffset",
   ];
-  export const SETTINGS_BACKUP_CALIBRATION_FIELDS = [
-    { id: "hp1_water_in", key: "hp1WaterInOffset", label: "HP1 water in" },
-    { id: "hp1_water_out", key: "hp1WaterOutOffset", label: "HP1 water uit" },
-    { id: "hp2_water_in", key: "hp2WaterInOffset", label: "HP2 water in" },
-    { id: "hp2_water_out", key: "hp2WaterOutOffset", label: "HP2 water uit" },
-    { id: "supply_local_pt1000", key: "waterSupplyPt1000CalibrationOffset", label: "Aanvoer · lokaal PT1000" },
-    { id: "supply_local_ds18b20", key: "waterSupplyDs18b20CalibrationOffset", label: "Aanvoer · lokaal DS18B20" },
-    { id: "supply_cic", key: "waterSupplyCicCalibrationOffset", label: "Aanvoer · CIC" },
-    { id: "supply_ha_input", key: "waterSupplyHaInputCalibrationOffset", label: "Aanvoer · HA-invoer" },
-  ];
-  export const SETTINGS_BACKUP_CALIBRATION_KEYS = SETTINGS_BACKUP_CALIBRATION_FIELDS.map((field) => field.key);
-  export const SETTINGS_BACKUP_CALIBRATION_COMMIT_KEY = "calibrationBackupCommitToken";
   export const SENSOR_CALIBRATION_STATE_KEYS = [
     "hp1WaterInRaw",
     "hp1WaterIn",
@@ -1805,6 +1792,8 @@
       id: "sensor_sources",
       label: "Sensorbronnen",
       keys: [
+        ...SENSOR_CALIBRATION_KEYS,
+        ...SUPPLY_CALIBRATION_BACKUP_KEYS,
         "waterSupplySource",
         "localWaterSupplyTempSource",
         "flowSource",
@@ -1897,7 +1886,7 @@
       ],
     },
   ];
-  export const SETTINGS_BACKUP_SCHEMA_VERSION = 3;
+  export const SETTINGS_BACKUP_SCHEMA_VERSION = 2;
   export const SETTINGS_BACKUP_KEYS = [...new Set(SETTINGS_BACKUP_SECTIONS.flatMap((section) => section.keys))];
   export const SETTINGS_BACKUP_KEY_SET = new Set(SETTINGS_BACKUP_KEYS);
   export const FAST_POLL_INTERVAL_MS = 5000;

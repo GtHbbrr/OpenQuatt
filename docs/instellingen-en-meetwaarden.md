@@ -155,7 +155,7 @@ Voor `Cooling Dew Point Source` is `Auto` meestal ook de veiligste keuze. OpenQu
 
 De temperatuurkalibratie neemt ook de actieve aanvoertemperatuurbron mee. OpenQuatt bewaart daarvoor vier afzonderlijke offsets: voor de lokale PT1000, lokale DS18B20, CIC-feed en Home Assistant-invoer. Bij een bronwissel activeert OpenQuatt automatisch de eerder opgeslagen correctie voor die bron. De CIC-correctie blijft geldig na een gewijzigde feed-URL; na een andere Home Assistant-entiteit blijft die correctie uitgeschakeld totdat je de HA-invoer opnieuw kalibreert. Een tijdelijke automatische fallback naar de water-uitmeting van de warmtepomp gebruikt geen aanvoercorrectie en wist geen opgeslagen kalibratie.
 
-De instellingenbackup bevat de vier warmtepompoffsets en iedere geldige brongebonden aanvoercorrectie. Bij restore reconstrueert de firmware zelf de bronidentiteit en checksum; ruwe interne identifiers staan niet in het backupbestand. **Kalibratiewaarden herstellen** staat standaard aan, maar kan vóór restore worden uitgezet. Kalibreer opnieuw wanneer de controller of temperatuursensor fysiek is vervangen of wanneer je een andere Home Assistant-invoer gebruikt.
+De instellingenbackup bevat de vier warmtepompoffsets en iedere geldige brongebonden aanvoercorrectie. Bij restore reconstrueert de firmware zelf de bronidentiteit en checksum; ruwe interne identifiers staan niet in het backupbestand. Kalibreer opnieuw wanneer de controller of temperatuursensor fysiek is vervangen of wanneer je een andere Home Assistant-invoer gebruikt.
 
 ### 6. Hulprelais R2 (alleen Heatpump Controller Q-edition)
 

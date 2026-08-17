@@ -6,8 +6,8 @@ export const WEB_BUNDLE_BUDGETS = [
     file: "js/openquatt-app.js",
     // Includes HCQ R2 settings, bounded usage-telemetry confirmation polling,
     // source-bound supply-temperature calibration status and results,
-    // its read-only sensor-correction summary, and verified calibration backup/restore.
-    raw: 896_000,
+    // its read-only sensor-correction summary, and calibration backup/restore.
+    raw: 884_000,
     // One-time migration ceiling for structured incident monitoring, replay,
     // the CSRF-protected deferred recovery actions, and their compact editor.
     // Once this bundle is the base, the normal gzip growth limit applies again.

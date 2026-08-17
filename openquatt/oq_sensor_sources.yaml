@@ -315,7 +315,7 @@ text_sensor:
     entity_category: diagnostic
     update_interval: 5s
     lambda: |-
-      // Report whether this source's persisted record matches its exact configuration.
+      // Report whether this source's persisted record is applicable to the current source.
       if (!id(oq_water_supply_temp_current_source_ready)) return {"Calibration inactive: source not ready"};
 
       const oq_supply_calibration::SourceIdentity current{

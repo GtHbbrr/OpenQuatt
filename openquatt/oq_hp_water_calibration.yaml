@@ -297,38 +297,6 @@ number:
           id(oq_water_supply_temp_calibration_ha_input_backup).publish_state(x);
           id(water_supply_temp_selected).update();
 
-  # Persistence acknowledgement for the complete calibration backup restore.
-  # The web UI writes a unique token after all eight offsets and accepts the
-  # restore only when that exact token is read back.
-  - platform: template
-    id: oq_calibration_backup_commit_token
-    name: "Calibration Backup Commit Token"
-    internal: true
-    icon: mdi:content-save-check
-    mode: box
-    min_value: 1
-    max_value: 1000000
-    step: 1
-    update_interval: never
-    entity_category: config
-    disabled_by_default: true
-    lambda: |-
-      return NAN;
-    set_action:
-      - lambda: |-
-          // Queue every source-bound record before flushing all pending
-          // preferences, including the four HP template-number offsets.
-          oq_supply_calibration::force_queue_record_persistence(
-              oq_water_supply_temp_calibration_pt1000_record);
-          oq_supply_calibration::force_queue_record_persistence(
-              oq_water_supply_temp_calibration_ds18b20_record);
-          oq_supply_calibration::force_queue_record_persistence(
-              oq_water_supply_temp_calibration_cic_record);
-          oq_supply_calibration::force_queue_record_persistence(
-              oq_water_supply_temp_calibration_ha_input_record);
-          const bool synced = global_preferences != nullptr && global_preferences->sync();
-          id(oq_calibration_backup_commit_token).publish_state(synced ? x : NAN);
-
   - platform: template
     id: hp1_water_in_temp_offset
     name: "HP1 water in temperature offset"
