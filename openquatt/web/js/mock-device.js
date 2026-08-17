@@ -679,6 +679,8 @@
     return local ? `Local - ${local}` : "Local";
   }
 
+  const MOCK_HA_CALIBRATION_IDENTITY = "8f1a2b3c";
+
   function currentWaterSupplyCalibrationBridgeName() {
     const source = String(getEntity("select", "Water Supply Source")?.value || "");
     if (source === "CIC") return "Water Supply CIC Calibration Offset";
@@ -690,9 +692,12 @@
   }
 
   function syncWaterSupplyCalibrationForMockSource() {
-    const rawOffset = getEntity("number", currentWaterSupplyCalibrationBridgeName())?.value;
+    const bridgeName = currentWaterSupplyCalibrationBridgeName();
+    const rawOffset = getEntity("number", bridgeName)?.value;
     const offset = Number(rawOffset);
-    if (rawOffset !== null && rawOffset !== undefined && Number.isFinite(offset)) {
+    const identityMatches = bridgeName !== "Water Supply HA Input Calibration Offset" ||
+      getEntity("text", "Water Supply HA Input Calibration Identity")?.value === MOCK_HA_CALIBRATION_IDENTITY;
+    if (rawOffset !== null && rawOffset !== undefined && Number.isFinite(offset) && identityMatches) {
       setNumber("Water Supply Temperature Calibration Offset", offset, "\u00B0C");
       setBinary("Water Supply Temperature Calibration Required", false);
       setText("text_sensor", "Water Supply Temperature Calibration Status", `Calibrated: ${currentWaterSupplySourceLabel()}`);
@@ -1970,6 +1975,7 @@
     setEntity("number", "Water Supply PT1000 Calibration Offset", { value: NaN, min_value: -2, max_value: 2, step: 0.01, uom: "\u00B0C" });
     setEntity("number", "Water Supply DS18B20 Calibration Offset", { value: NaN, min_value: -2, max_value: 2, step: 0.01, uom: "\u00B0C" });
     setEntity("number", "Water Supply CIC Calibration Offset", { value: NaN, min_value: -2, max_value: 2, step: 0.01, uom: "\u00B0C" });
+    setEntity("text", "Water Supply HA Input Calibration Identity", { value: "", state: "" });
     setEntity("number", "Water Supply HA Input Calibration Offset", { value: NaN, min_value: -2, max_value: 2, step: 0.01, uom: "\u00B0C" });
     setEntity("number", "HP calibration HP1 water in offset suggested", { value: 0, min_value: -2, max_value: 2, step: 0.01, uom: "\u00B0C" });
     setEntity("number", "HP calibration HP1 water out offset suggested", { value: 0, min_value: -2, max_value: 2, step: 0.01, uom: "\u00B0C" });
@@ -3908,8 +3914,15 @@
   }
 
   function handleNumberSet(name, value) {
+    const previousValue = getEntity("number", name)?.value;
     setNumber(name, Number(value));
-    if (name === currentWaterSupplyCalibrationBridgeName()) {
+    if (name === "Water Supply HA Input Calibration Offset" &&
+        getEntity("text", "Water Supply HA Input Calibration Identity")?.value !== MOCK_HA_CALIBRATION_IDENTITY) {
+      setNumber(name, previousValue);
+      setText("text", "Water Supply HA Input Calibration Identity",
+        Number.isFinite(Number(previousValue)) ? MOCK_HA_CALIBRATION_IDENTITY : "");
+      syncWaterSupplyCalibrationForMockSource();
+    } else if (name === currentWaterSupplyCalibrationBridgeName()) {
       setNumber("Water Supply Temperature Calibration Offset", Number(value), "\u00B0C");
       setBinary("Water Supply Temperature Calibration Required", false);
       setText("text_sensor", "Water Supply Temperature Calibration Status", `Calibrated: ${currentWaterSupplySourceLabel()}`);
@@ -4506,6 +4519,9 @@
       setNumber("HP2 water out temperature offset", suggested.hp2Out, "\u00B0C");
       setNumber("Water Supply Temperature Calibration Offset", suggested.supply, "\u00B0C");
       setNumber(currentWaterSupplyCalibrationBridgeName(), suggested.supply, "\u00B0C");
+      if (currentWaterSupplyCalibrationBridgeName() === "Water Supply HA Input Calibration Offset") {
+        setText("text", "Water Supply HA Input Calibration Identity", MOCK_HA_CALIBRATION_IDENTITY);
+      }
       setBinary("Water Supply Temperature Calibration Required", false);
       setText("text_sensor", "Water Supply Temperature Calibration Status", `Calibrated: ${state.commissioning.hpWaterCalibrationResultSupplySource || currentWaterSupplySourceLabel()}`);
       [

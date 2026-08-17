@@ -21,6 +21,24 @@ esphome:
           id(oq_water_supply_temp_calibration_ds18b20_backup).update();
           id(oq_water_supply_temp_calibration_cic_backup).update();
           id(oq_water_supply_temp_calibration_ha_input_backup).update();
+          const oq_supply_calibration::SourceIdentity ha_source{
+              oq_supply_calibration::SOURCE_HA_INPUT,
+              oq_supply_calibration::fingerprint(
+                  oq_supply_calibration::SOURCE_HA_INPUT,
+                  "${ha_water_supply_temp_entity_id}"),
+              true};
+          const auto ha_record = oq_supply_calibration::load_record(
+              id(oq_water_supply_temp_calibration_ha_input_record));
+          if (oq_supply_calibration::record_matches(ha_record, ha_source)) {
+            char fingerprint[9];
+            snprintf(fingerprint, sizeof(fingerprint), "%08lx",
+                     static_cast<unsigned long>(ha_record.fingerprint));
+            id(oq_water_supply_temp_calibration_ha_input_identity_backup)
+                .publish_state(fingerprint);
+          } else {
+            id(oq_water_supply_temp_calibration_ha_input_identity_backup)
+                .publish_state("");
+          }
 
 globals:
   - id: oq_hp_water_calibration_active
@@ -155,8 +173,8 @@ number:
     entity_category: config
     disabled_by_default: true
 
-  # Read/write backup bridges for the four source-bound records. Only the
-  # offset crosses the web API; firmware reconstructs identity and checksum.
+  # Read/write backup bridges for the four source-bound records. Firmware
+  # reconstructs each checksum; HA also carries its anonymous fingerprint.
   - platform: template
     id: oq_water_supply_temp_calibration_pt1000_backup
     name: "Water Supply PT1000 Calibration Offset"
@@ -247,15 +265,12 @@ number:
           record, oq_supply_calibration::SOURCE_CIC) ? record.offset_c : NAN;
     set_action:
       - lambda: |-
-          // Rebuild a URL-compatible record; matching remains CIC-type-bound.
-          const std::string cic_url = id(cic_feed_url).has_state()
-              ? id(cic_feed_url).state
-              : std::string();
+          // CIC calibration is type-bound, so restore must not depend on a URL.
           const oq_supply_calibration::SourceIdentity source{
               oq_supply_calibration::SOURCE_CIC,
               oq_supply_calibration::fingerprint(
-                  oq_supply_calibration::SOURCE_CIC, cic_url.c_str()),
-              !cic_url.empty()};
+                  oq_supply_calibration::SOURCE_CIC, "cic:type"),
+              true};
           if (!oq_supply_calibration::store_record(
                   id(oq_water_supply_temp_calibration_cic_record), source, x)) return;
           oq_water_supply_temp_calibration_cic_record->update();
@@ -291,9 +306,32 @@ number:
               oq_supply_calibration::fingerprint(
                   oq_supply_calibration::SOURCE_HA_INPUT, "${ha_water_supply_temp_entity_id}"),
               true};
+          char expected_fingerprint[9];
+          snprintf(expected_fingerprint, sizeof(expected_fingerprint), "%08lx",
+                   static_cast<unsigned long>(source.fingerprint));
+          // Reject a backup captured for another HA entity without replacing
+          // an existing calibration for the currently configured entity.
+          if (id(oq_water_supply_temp_calibration_ha_input_identity_backup).state !=
+              expected_fingerprint) {
+            const auto current_record = oq_supply_calibration::load_record(
+                id(oq_water_supply_temp_calibration_ha_input_record));
+            if (oq_supply_calibration::record_matches(current_record, source)) {
+              char current_fingerprint[9];
+              snprintf(current_fingerprint, sizeof(current_fingerprint), "%08lx",
+                       static_cast<unsigned long>(current_record.fingerprint));
+              id(oq_water_supply_temp_calibration_ha_input_identity_backup)
+                  .publish_state(current_fingerprint);
+            } else {
+              id(oq_water_supply_temp_calibration_ha_input_identity_backup)
+                  .publish_state("");
+            }
+            return;
+          }
           if (!oq_supply_calibration::store_record(
                   id(oq_water_supply_temp_calibration_ha_input_record), source, x)) return;
           oq_water_supply_temp_calibration_ha_input_record->update();
+          id(oq_water_supply_temp_calibration_ha_input_identity_backup)
+              .publish_state(expected_fingerprint);
           id(oq_water_supply_temp_calibration_ha_input_backup).publish_state(x);
           id(water_supply_temp_selected).update();
 
@@ -439,6 +477,19 @@ number:
     optimistic: true
     initial_value: 0
     entity_category: diagnostic
+    disabled_by_default: true
+
+text:
+  - platform: template
+    id: oq_water_supply_temp_calibration_ha_input_identity_backup
+    name: "Water Supply HA Input Calibration Identity"
+    internal: true
+    icon: mdi:fingerprint
+    mode: text
+    optimistic: true
+    restore_value: false
+    initial_value: ""
+    entity_category: config
     disabled_by_default: true
 
 button:

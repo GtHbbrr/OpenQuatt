@@ -6,12 +6,13 @@ globalThis.__OQ_PREVIEW__ = false;
 const { SENSOR_CALIBRATION_KEYS, SETTINGS_BACKUP_SECTIONS, SUPPLY_CALIBRATION_BACKUP_KEYS } = await import("../js/src/core/config.js");
 const { isUsageTelemetrySetupCompletionSafe, parseDecisionLogStorageMetadata, shouldDisableUsageTelemetryForSetupRestore } = await import("../js/src/features/storage-history.js");
 
-test("calibration offsets are restored before the supply source selection", () => {
+test("calibration records are restored before the supply source selection", () => {
   const keys = SETTINGS_BACKUP_SECTIONS.find(({ id }) => id === "sensor_sources").keys;
   assert.deepEqual(
     keys.slice(0, SENSOR_CALIBRATION_KEYS.length + SUPPLY_CALIBRATION_BACKUP_KEYS.length),
     [...SENSOR_CALIBRATION_KEYS, ...SUPPLY_CALIBRATION_BACKUP_KEYS],
   );
+  assert.ok(keys.indexOf("waterSupplyHaInputCalibrationIdentity") < keys.indexOf("waterSupplyHaInputCalibrationOffset"));
 });
 
 test("completed backup restore disables telemetry only for incomplete setup", () => {

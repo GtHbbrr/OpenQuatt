@@ -343,6 +343,7 @@
     waterSupplyPt1000CalibrationOffset: { domain: "number", name: "Water Supply PT1000 Calibration Offset", optional: true },
     waterSupplyDs18b20CalibrationOffset: { domain: "number", name: "Water Supply DS18B20 Calibration Offset", optional: true },
     waterSupplyCicCalibrationOffset: { domain: "number", name: "Water Supply CIC Calibration Offset", optional: true },
+    waterSupplyHaInputCalibrationIdentity: { domain: "text", name: "Water Supply HA Input Calibration Identity", optional: true },
     waterSupplyHaInputCalibrationOffset: { domain: "number", name: "Water Supply HA Input Calibration Offset", optional: true },
     hp1WaterInOffsetSuggested: { domain: "number", name: "HP calibration HP1 water in offset suggested", optional: true },
     hp1WaterOutOffsetSuggested: { domain: "number", name: "HP calibration HP1 water out offset suggested", optional: true },
@@ -767,6 +768,7 @@
     "waterSupplyPt1000CalibrationOffset",
     "waterSupplyDs18b20CalibrationOffset",
     "waterSupplyCicCalibrationOffset",
+    "waterSupplyHaInputCalibrationIdentity",
     "waterSupplyHaInputCalibrationOffset",
   ];
   export const SENSOR_CALIBRATION_STATE_KEYS = [

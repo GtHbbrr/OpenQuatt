@@ -40,6 +40,12 @@ int main() {
   assert(record_matches(load_record(cic_storage), cic_b));
   assert(!calibration_required(load_record(cic_storage), cic_b));
 
+  const SourceIdentity restored_cic{SOURCE_CIC, fingerprint(SOURCE_CIC, "cic:type"), true};
+  uint32_t restored_cic_storage[kRecordStorageWords]{};
+  assert(store_record(restored_cic_storage, restored_cic, offset));
+  assert(record_matches(load_record(restored_cic_storage), cic_a));
+  assert(record_matches(load_record(restored_cic_storage), cic_b));
+
   assert(store_record(pt1000_storage, pt1000, 0.21f));
   assert(record_matches(load_record(pt1000_storage), pt1000));
   assert(record_matches(load_record(cic_storage), cic_a));

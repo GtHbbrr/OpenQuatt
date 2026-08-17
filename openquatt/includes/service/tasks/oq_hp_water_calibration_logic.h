@@ -281,6 +281,11 @@ class HpWaterCalibrationRuntime {
         break;
       case oq_supply_calibration::SOURCE_HA_INPUT:
         id(oq_water_supply_temp_calibration_ha_input_backup).update();
+        {
+          char fingerprint[9];
+          snprintf(fingerprint, sizeof(fingerprint), "%08lx", static_cast<unsigned long>(supply_source.fingerprint));
+          id(oq_water_supply_temp_calibration_ha_input_identity_backup).publish_state(fingerprint);
+        }
         break;
       default:
         break;
