@@ -26,7 +26,7 @@ int main() {
   constexpr float offset = -0.37f;
   const uint32_t checksum = record_checksum(SOURCE_CIC, cic_a.fingerprint, offset);
   assert(record_matches(SOURCE_CIC, cic_a.fingerprint, checksum, offset, cic_a));
-  assert(!record_matches(SOURCE_CIC, cic_a.fingerprint, checksum, offset, cic_b));
+  assert(record_matches(SOURCE_CIC, cic_a.fingerprint, checksum, offset, cic_b));
   assert(!record_matches(SOURCE_CIC, cic_a.fingerprint, checksum, offset + 0.01f, cic_a));
   assert(!record_matches(SOURCE_CIC, cic_a.fingerprint, checksum ^ 1U, offset, cic_a));
   assert(!record_matches(-SOURCE_CIC, cic_a.fingerprint, checksum, offset, cic_a));
@@ -37,15 +37,21 @@ int main() {
   assert(!calibration_required(load_record(cic_storage), cic_a));
   assert(store_record(cic_storage, cic_a, offset));
   assert(record_matches(load_record(cic_storage), cic_a));
-  assert(!record_matches(load_record(cic_storage), cic_b));
-  assert(calibration_required(load_record(cic_storage), cic_b));
+  assert(record_matches(load_record(cic_storage), cic_b));
+  assert(!calibration_required(load_record(cic_storage), cic_b));
+
+  const SourceIdentity restored_cic{SOURCE_CIC, fingerprint(SOURCE_CIC, "cic:type"), true};
+  uint32_t restored_cic_storage[kRecordStorageWords]{};
+  assert(store_record(restored_cic_storage, restored_cic, offset));
+  assert(record_matches(load_record(restored_cic_storage), cic_a));
+  assert(record_matches(load_record(restored_cic_storage), cic_b));
 
   assert(store_record(pt1000_storage, pt1000, 0.21f));
   assert(record_matches(load_record(pt1000_storage), pt1000));
   assert(record_matches(load_record(cic_storage), cic_a));
   assert(store_record(cic_storage, cic_b, -0.18f));
   assert(record_matches(load_record(cic_storage), cic_b));
-  assert(!record_matches(load_record(cic_storage), cic_a));
+  assert(record_matches(load_record(cic_storage), cic_a));
   assert(record_matches(load_record(pt1000_storage), pt1000));
   const CalibrationRecord valid_cic_record = load_record(cic_storage);
   assert(!store_record(cic_storage, cic_b, 2.01f));
@@ -63,8 +69,12 @@ int main() {
   assert(migrate_legacy_record(migrated_storage, SOURCE_CIC, cic_a.fingerprint, checksum, offset));
   assert(record_matches(load_record(migrated_storage), cic_a));
   assert(!migrate_legacy_record(migrated_storage, SOURCE_CIC, cic_a.fingerprint, checksum, offset));
-  assert(migrate_legacy_record(migrated_storage, SOURCE_CIC, cic_b.fingerprint,
-                               record_checksum(SOURCE_CIC, cic_b.fingerprint, -0.18f), -0.18f));
+  const CalibrationRecord migrated_once = load_record(migrated_storage);
+  assert(!migrate_legacy_record(migrated_storage, SOURCE_CIC, cic_b.fingerprint,
+                                record_checksum(SOURCE_CIC, cic_b.fingerprint, -0.18f), -0.18f));
+  assert(load_record(migrated_storage).fingerprint == migrated_once.fingerprint);
+  assert(load_record(migrated_storage).checksum == migrated_once.checksum);
+  assert(load_record(migrated_storage).offset_c == migrated_once.offset_c);
   assert(record_matches(load_record(migrated_storage), cic_b));
 
   uint32_t invalid_storage[kRecordStorageWords]{};

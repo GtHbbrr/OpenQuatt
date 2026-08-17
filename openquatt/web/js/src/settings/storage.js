@@ -670,7 +670,7 @@ import { renderModalShell } from "../core/modal-shell.js";
               Backup herstellen
             </button>
           </div>
-          <p class="oq-settings-action-note">De MQTT-configuratie wordt meegenomen, maar het MQTT-wachtwoord nooit. Ontbrekende en onbekende velden worden na restore benoemd.</p>
+          <p class="oq-settings-action-note">Sensorcorrecties en de MQTT-configuratie worden meegenomen, maar het MQTT-wachtwoord nooit. Ontbrekende en onbekende velden worden na restore benoemd.</p>
           ${state.settingsBackupError ? `<p class="oq-settings-backup-error">${escapeHtml(state.settingsBackupError)}</p>` : ""}
         </div>
       `,

@@ -340,6 +340,11 @@
     hp1WaterOutOffset: { domain: "number", name: "HP1 water out temperature offset", optional: true },
     hp2WaterInOffset: { domain: "number", name: "HP2 water in temperature offset", optional: true },
     hp2WaterOutOffset: { domain: "number", name: "HP2 water out temperature offset", optional: true },
+    waterSupplyPt1000CalibrationOffset: { domain: "number", name: "Water Supply PT1000 Calibration Offset", optional: true },
+    waterSupplyDs18b20CalibrationOffset: { domain: "number", name: "Water Supply DS18B20 Calibration Offset", optional: true },
+    waterSupplyCicCalibrationOffset: { domain: "number", name: "Water Supply CIC Calibration Offset", optional: true },
+    waterSupplyHaInputCalibrationIdentity: { domain: "text", name: "Water Supply HA Input Calibration Identity", optional: true },
+    waterSupplyHaInputCalibrationOffset: { domain: "number", name: "Water Supply HA Input Calibration Offset", optional: true },
     hp1WaterInOffsetSuggested: { domain: "number", name: "HP calibration HP1 water in offset suggested", optional: true },
     hp1WaterOutOffsetSuggested: { domain: "number", name: "HP calibration HP1 water out offset suggested", optional: true },
     hp2WaterInOffsetSuggested: { domain: "number", name: "HP calibration HP2 water in offset suggested", optional: true },
@@ -758,6 +763,13 @@
     "hp1WaterOutOffset",
     "hp2WaterInOffset",
     "hp2WaterOutOffset",
+  ];
+  export const SUPPLY_CALIBRATION_BACKUP_KEYS = [
+    "waterSupplyPt1000CalibrationOffset",
+    "waterSupplyDs18b20CalibrationOffset",
+    "waterSupplyCicCalibrationOffset",
+    "waterSupplyHaInputCalibrationIdentity",
+    "waterSupplyHaInputCalibrationOffset",
   ];
   export const SENSOR_CALIBRATION_STATE_KEYS = [
     "hp1WaterInRaw",
@@ -1711,6 +1723,7 @@
     ...FLOW_SETTING_KEYS,
     ...FLOW_TUNING_KEYS,
     ...SENSOR_CALIBRATION_KEYS,
+    ...SUPPLY_CALIBRATION_BACKUP_KEYS,
     ...SENSOR_CALIBRATION_STATE_KEYS,
     ...INSTALLATION_MONITORING_STATE_KEYS,
     ...COOLING_SETTING_KEYS,
@@ -1781,6 +1794,8 @@
       id: "sensor_sources",
       label: "Sensorbronnen",
       keys: [
+        ...SENSOR_CALIBRATION_KEYS,
+        ...SUPPLY_CALIBRATION_BACKUP_KEYS,
         "waterSupplySource",
         "localWaterSupplyTempSource",
         "flowSource",
@@ -1792,7 +1807,6 @@
         "heatingEnableSource",
         "coolingEnableSource",
         "coolingDewPointSource",
-        ...SENSOR_CALIBRATION_KEYS,
       ],
     },
     {

@@ -203,7 +203,8 @@ test("waterinstellingen openen sensorcorrecties in een modal", () => {
   assert.match(modalMarkup, /Watertemperatuurcorrecties/);
   assert.match(modalMarkup, /Waarom is de aanvoercorrectie niet handmatig aanpasbaar\?/);
   assert.match(modalMarkup, /aparte correctie voor lokale PT1000, lokale DS18B20, CIC en Home Assistant/);
-  assert.match(modalMarkup, /gewijzigde CIC-URL of Home Assistant-invoer blijft ongekalibreerd/);
+  assert.match(modalMarkup, /CIC-correctie blijft geldig na een URL-wijziging/);
+  assert.match(modalMarkup, /andere Home Assistant-invoer moet opnieuw worden gekalibreerd/);
 
   state.root = null;
   assert.equal(handleSystemAction("open-water-sensor-corrections-modal", {}), true);

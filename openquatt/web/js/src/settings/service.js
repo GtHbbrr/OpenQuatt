@@ -597,7 +597,7 @@ import { renderModalShell } from "../core/modal-shell.js";
           taskKey: "hp-water-calibration",
           title: "Temperatuursensoren kalibreren",
           copy: "Reken op ongeveer 3 tot 5 minuten. Eerst mengt het water 3 minuten; daarna stopt de meting zodra de sensoren stabiel genoeg zijn.",
-          subcopy: "De voorgestelde waarden worden pas actief wanneer je ze toepast. De aanvoer-offset wordt voor de actieve bron opgeslagen en bij een latere bronwissel automatisch teruggezet als de bronconfiguratie nog exact overeenkomt.",
+          subcopy: "De voorgestelde waarden worden pas actief wanneer je ze toepast. De aanvoer-offset wordt per bron opgeslagen en bij een latere bronwissel automatisch teruggezet; een CIC-URL-wijziging verwijdert hem niet.",
           status: hpWaterCalibrationStatusDisplay,
           statusCopy: hpWaterCalibrationTaskRunning
             ? "De pomp draait en de firmware wacht op een stabiel temperatuurbeeld."

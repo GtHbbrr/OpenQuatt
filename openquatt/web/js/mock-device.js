@@ -679,11 +679,32 @@
     return local ? `Local - ${local}` : "Local";
   }
 
-  function invalidateWaterSupplyCalibrationMock() {
-    const status = String(getEntity("text_sensor", "Water Supply Temperature Calibration Status")?.value || "");
-    if (!status.startsWith("Calibrated:")) return;
+  const MOCK_HA_CALIBRATION_IDENTITY = "8f1a2b3c";
+
+  function currentWaterSupplyCalibrationBridgeName() {
+    const source = String(getEntity("select", "Water Supply Source")?.value || "");
+    if (source === "CIC") return "Water Supply CIC Calibration Offset";
+    if (source === "HA input") return "Water Supply HA Input Calibration Offset";
+    const local = String(getEntity("select", "Local Water Supply Temp Source")?.value || "PT1000");
+    return local === "DS18B20"
+      ? "Water Supply DS18B20 Calibration Offset"
+      : "Water Supply PT1000 Calibration Offset";
+  }
+
+  function syncWaterSupplyCalibrationForMockSource() {
+    const bridgeName = currentWaterSupplyCalibrationBridgeName();
+    const rawOffset = getEntity("number", bridgeName)?.value;
+    const offset = Number(rawOffset);
+    const identityMatches = bridgeName !== "Water Supply HA Input Calibration Offset" ||
+      getEntity("text", "Water Supply HA Input Calibration Identity")?.value === MOCK_HA_CALIBRATION_IDENTITY;
+    if (rawOffset !== null && rawOffset !== undefined && Number.isFinite(offset) && identityMatches) {
+      setNumber("Water Supply Temperature Calibration Offset", offset, "\u00B0C");
+      setBinary("Water Supply Temperature Calibration Required", false);
+      setText("text_sensor", "Water Supply Temperature Calibration Status", `Calibrated: ${currentWaterSupplySourceLabel()}`);
+      return;
+    }
     setBinary("Water Supply Temperature Calibration Required", true);
-    setText("text_sensor", "Water Supply Temperature Calibration Status", `Recalibration required: ${status.slice(11).trim()}`);
+    setText("text_sensor", "Water Supply Temperature Calibration Status", `Recalibration required: ${currentWaterSupplySourceLabel()}`);
   }
 
   function scheduleCommissioningStep(delay, callback) {
@@ -1946,15 +1967,20 @@
     setEntity("sensor", "HP water calibration result supply raw average", { value: NaN, uom: "\u00B0C" });
     setEntity("sensor", "HP water calibration result supply offset", { value: NaN, uom: "\u00B0C" });
     setEntity("text_sensor", "HP water calibration result supply source", { value: "", state: "" });
-    setEntity("number", "HP1 water in temperature offset", { value: 0, min_value: -5, max_value: 5, step: 0.01, uom: "\u00B0C" });
-    setEntity("number", "HP1 water out temperature offset", { value: 0, min_value: -5, max_value: 5, step: 0.01, uom: "\u00B0C" });
-    setEntity("number", "HP2 water in temperature offset", { value: 0, min_value: -5, max_value: 5, step: 0.01, uom: "\u00B0C" });
-    setEntity("number", "HP2 water out temperature offset", { value: 0, min_value: -5, max_value: 5, step: 0.01, uom: "\u00B0C" });
+    setEntity("number", "HP1 water in temperature offset", { value: 0, min_value: -2, max_value: 2, step: 0.01, uom: "\u00B0C" });
+    setEntity("number", "HP1 water out temperature offset", { value: 0, min_value: -2, max_value: 2, step: 0.01, uom: "\u00B0C" });
+    setEntity("number", "HP2 water in temperature offset", { value: 0, min_value: -2, max_value: 2, step: 0.01, uom: "\u00B0C" });
+    setEntity("number", "HP2 water out temperature offset", { value: 0, min_value: -2, max_value: 2, step: 0.01, uom: "\u00B0C" });
     setEntity("number", "Water Supply Temperature Calibration Offset", { value: 0, min_value: -2, max_value: 2, step: 0.01, uom: "\u00B0C" });
-    setEntity("number", "HP calibration HP1 water in offset suggested", { value: 0, min_value: -5, max_value: 5, step: 0.01, uom: "\u00B0C" });
-    setEntity("number", "HP calibration HP1 water out offset suggested", { value: 0, min_value: -5, max_value: 5, step: 0.01, uom: "\u00B0C" });
-    setEntity("number", "HP calibration HP2 water in offset suggested", { value: 0, min_value: -5, max_value: 5, step: 0.01, uom: "\u00B0C" });
-    setEntity("number", "HP calibration HP2 water out offset suggested", { value: 0, min_value: -5, max_value: 5, step: 0.01, uom: "\u00B0C" });
+    setEntity("number", "Water Supply PT1000 Calibration Offset", { value: NaN, min_value: -2, max_value: 2, step: 0.01, uom: "\u00B0C" });
+    setEntity("number", "Water Supply DS18B20 Calibration Offset", { value: NaN, min_value: -2, max_value: 2, step: 0.01, uom: "\u00B0C" });
+    setEntity("number", "Water Supply CIC Calibration Offset", { value: NaN, min_value: -2, max_value: 2, step: 0.01, uom: "\u00B0C" });
+    setEntity("text", "Water Supply HA Input Calibration Identity", { value: "", state: "" });
+    setEntity("number", "Water Supply HA Input Calibration Offset", { value: NaN, min_value: -2, max_value: 2, step: 0.01, uom: "\u00B0C" });
+    setEntity("number", "HP calibration HP1 water in offset suggested", { value: 0, min_value: -2, max_value: 2, step: 0.01, uom: "\u00B0C" });
+    setEntity("number", "HP calibration HP1 water out offset suggested", { value: 0, min_value: -2, max_value: 2, step: 0.01, uom: "\u00B0C" });
+    setEntity("number", "HP calibration HP2 water in offset suggested", { value: 0, min_value: -2, max_value: 2, step: 0.01, uom: "\u00B0C" });
+    setEntity("number", "HP calibration HP2 water out offset suggested", { value: 0, min_value: -2, max_value: 2, step: 0.01, uom: "\u00B0C" });
     setEntity("number", "HP calibration supply temperature offset suggested", { value: 0, min_value: -2, max_value: 2, step: 0.01, uom: "\u00B0C" });
     setEntity("select", "Quatt Hybrid version", {
       value: "V1.5",
@@ -3813,7 +3839,7 @@
         (name === "Water Supply Source" ||
          (name === "Local Water Supply Temp Source" &&
           String(getEntity("select", "Water Supply Source")?.value || "") === "Local"))) {
-      invalidateWaterSupplyCalibrationMock();
+      syncWaterSupplyCalibrationForMockSource();
     }
     if (name === "Preset") {
       applyPreset(value);
@@ -3888,8 +3914,19 @@
   }
 
   function handleNumberSet(name, value) {
+    const previousValue = getEntity("number", name)?.value;
     setNumber(name, Number(value));
-    if (name === "Manual flow service setpoint") {
+    if (name === "Water Supply HA Input Calibration Offset" &&
+        getEntity("text", "Water Supply HA Input Calibration Identity")?.value !== MOCK_HA_CALIBRATION_IDENTITY) {
+      setNumber(name, previousValue);
+      setText("text", "Water Supply HA Input Calibration Identity",
+        Number.isFinite(Number(previousValue)) ? MOCK_HA_CALIBRATION_IDENTITY : "");
+      syncWaterSupplyCalibrationForMockSource();
+    } else if (name === currentWaterSupplyCalibrationBridgeName()) {
+      setNumber("Water Supply Temperature Calibration Offset", Number(value), "\u00B0C");
+      setBinary("Water Supply Temperature Calibration Required", false);
+      setText("text_sensor", "Water Supply Temperature Calibration Status", `Calibrated: ${currentWaterSupplySourceLabel()}`);
+    } else if (name === "Manual flow service setpoint") {
       state.commissioning.manualFlowSetpoint = Number(value);
     } else if (name === "Manual HP1 compressor level") {
       state.commissioning.manualHp1Level = Number(value);
@@ -3919,12 +3956,7 @@
   }
 
   function handleTextSet(name, value) {
-    const previousValue = String(getEntity("text", name)?.value || "");
     setText("text", name, String(value || "").trim());
-    if (name === "CIC - Feed URL" && previousValue !== String(value || "").trim() &&
-        String(getEntity("select", "Water Supply Source")?.value || "") === "CIC") {
-      invalidateWaterSupplyCalibrationMock();
-    }
     updateSummary();
     notifyMockUpdated();
   }
@@ -4486,6 +4518,10 @@
       setNumber("HP2 water in temperature offset", suggested.hp2In, "\u00B0C");
       setNumber("HP2 water out temperature offset", suggested.hp2Out, "\u00B0C");
       setNumber("Water Supply Temperature Calibration Offset", suggested.supply, "\u00B0C");
+      setNumber(currentWaterSupplyCalibrationBridgeName(), suggested.supply, "\u00B0C");
+      if (currentWaterSupplyCalibrationBridgeName() === "Water Supply HA Input Calibration Offset") {
+        setText("text", "Water Supply HA Input Calibration Identity", MOCK_HA_CALIBRATION_IDENTITY);
+      }
       setBinary("Water Supply Temperature Calibration Required", false);
       setText("text_sensor", "Water Supply Temperature Calibration Status", `Calibrated: ${state.commissioning.hpWaterCalibrationResultSupplySource || currentWaterSupplySourceLabel()}`);
       [
