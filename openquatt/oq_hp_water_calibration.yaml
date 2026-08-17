@@ -34,10 +34,10 @@ esphome:
             snprintf(fingerprint, sizeof(fingerprint), "%08lx",
                      static_cast<unsigned long>(ha_record.fingerprint));
             id(oq_water_supply_temp_calibration_ha_input_identity_backup)
-                .publish_state(fingerprint);
+                ->publish_state(fingerprint);
           } else {
             id(oq_water_supply_temp_calibration_ha_input_identity_backup)
-                .publish_state("");
+                ->publish_state("");
           }
 
 globals:
@@ -320,10 +320,10 @@ number:
               snprintf(current_fingerprint, sizeof(current_fingerprint), "%08lx",
                        static_cast<unsigned long>(current_record.fingerprint));
               id(oq_water_supply_temp_calibration_ha_input_identity_backup)
-                  .publish_state(current_fingerprint);
+                  ->publish_state(current_fingerprint);
             } else {
               id(oq_water_supply_temp_calibration_ha_input_identity_backup)
-                  .publish_state("");
+                  ->publish_state("");
             }
             return;
           }
@@ -331,7 +331,7 @@ number:
                   id(oq_water_supply_temp_calibration_ha_input_record), source, x)) return;
           oq_water_supply_temp_calibration_ha_input_record->update();
           id(oq_water_supply_temp_calibration_ha_input_identity_backup)
-              .publish_state(expected_fingerprint);
+              ->publish_state(expected_fingerprint);
           id(oq_water_supply_temp_calibration_ha_input_backup).publish_state(x);
           id(water_supply_temp_selected).update();
 
