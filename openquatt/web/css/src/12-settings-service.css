@@ -154,10 +154,6 @@
   background: rgba(254, 242, 242, 0.76);
 }
 
-.oq-odu-eeprom-refresh {
-  justify-self: start;
-}
-
 @media (max-width: 640px) {
   .oq-odu-eeprom-device-head,
   .oq-odu-eeprom-meta {

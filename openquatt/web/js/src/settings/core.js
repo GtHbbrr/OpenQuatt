@@ -16,7 +16,7 @@ import { renderSettingsAuxRelaySection, renderSettingsBoilerCvSection, renderSet
 import { renderSettingsMqttSection, renderSettingsOpenThermCicSection, renderSettingsSensorSelectionSection } from "./integrations.js";
 import { renderSettingsPrivacySection } from "./privacy.js";
 import { getApiSecurityStatusDetail, getApiSecurityStatusLabel, renderSettingsAccessSecuritySection } from "./security.js";
-import { renderSettingsCounterServiceSection, renderSettingsOduEepromDumpSection, renderSettingsServiceSection } from "./service.js";
+import { renderSettingsCounterServiceSection, renderSettingsServiceSection } from "./service.js";
 import { renderSettingsSilentSection } from "./silent.js";
 import { renderSettingsBackupSection, renderSettingsTrendSection } from "./storage.js";
 import { renderSettingsWaterSection } from "./water.js";
@@ -61,7 +61,6 @@ import { escapeHtml } from "../core/html.js";
         ? [
             renderSettingsInstallationMonitoringSection(),
             renderSettingsServiceSection(),
-            renderSettingsOduEepromDumpSection(),
             renderSettingsCounterServiceSection(),
           ]
       : activeGroup === "heating"

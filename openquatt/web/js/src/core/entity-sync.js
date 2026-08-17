@@ -1250,9 +1250,9 @@ import { fetchWithTimeout } from "./browser-utils.js";
       const mqttChanged = shouldDeferSupplementary || !shouldRefreshMqttStatusForCurrentSurface()
         ? false
         : await refreshMqttStatus({ force: state.systemModal === "mqtt-sensors" });
-      const oduEepromDumpChanged = shouldDeferSupplementary || !shouldRefreshOduEepromDumpSurface()
-        ? false
-        : await refreshOduEepromDumpStatuses();
+      if (!shouldDeferSupplementary && shouldRefreshOduEepromDumpSurface()) {
+        await refreshOduEepromDumpStatuses();
+      }
       const nextHeaderSignature = getHeaderRenderSignature();
       if (shouldDeferSupplementary && !state.nativeOpen) {
         schedulePrimeSupplementaryData(getSupplementaryPrimeDelayMs(syncView));
@@ -1268,10 +1268,6 @@ import { fetchWithTimeout } from "./browser-utils.js";
           state.incidentMonitoringRenderPending = false;
           render();
         }
-        return;
-      }
-      if (oduEepromDumpChanged && state.appView === "settings" && state.settingsGroup === "service") {
-        render();
         return;
       }
       if (trendChanged && state.appView === "diagnosis" && !state.root?.querySelector(".oq-overview-trends")) {

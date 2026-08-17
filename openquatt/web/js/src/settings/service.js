@@ -6,7 +6,6 @@ import { formatSettingsNumberValue, getCommissioningStatusValue, getSettingsStat
 import { getHpWaterRawValue } from "./water.js";
 import { escapeHtml } from "../core/html.js";
 import { renderModalShell } from "../core/modal-shell.js";
-import { renderOduEepromDumpPanel } from "../features/odu-eeprom-dump.js";
 
   export function getManualHpActualValue(levelKey, frequencyKey) {
     const level = getEntityNumericValue(levelKey);
@@ -1026,21 +1025,21 @@ import { renderOduEepromDumpPanel } from "../features/odu-eeprom-dump.js";
 
           <div class="oq-settings-system-summary oq-settings-service-task-list">
             ${service.tasks.map((task) => renderSettingsServiceTaskRow(task)).join("")}
+            ${renderSettingsOduEepromDumpRow()}
           </div>
         </div>
       `,
     );
   }
 
-  export function renderSettingsOduEepromDumpSection() {
-    return renderSettingsSection(
-      "Diagnostiek",
-      "ODU EEPROM-export",
-      "Maak een volledige, controleerbare momentopname voor vergelijking van ODU-hardware en firmware.",
-      renderOduEepromDumpPanel(),
-      "",
-      "oq-settings-section--odu-eeprom",
-    );
+  export function renderSettingsOduEepromDumpRow() {
+    return renderSettingsSystemRow({
+      className: "oq-settings-service-row oq-settings-odu-eeprom-row",
+      label: "ODU EEPROM-export",
+      value: "Alleen-lezen diagnose",
+      note: "Lees de volledige EEPROM-shadow uit en download deze als JSON voor hardware- en firmwarevergelijking.",
+      action: '<button class="oq-helper-button oq-helper-button--ghost" type="button" data-oq-action="open-odu-eeprom-dump-modal">Openen</button>',
+    });
   }
 
   export function renderSettingsServiceTaskModal() {

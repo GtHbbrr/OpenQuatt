@@ -2,6 +2,7 @@ import { hasEntity } from "../core/app-shared.js";
 import { invokeActionMap } from "../core/action-router.js";
 import { downloadJsonFile, fetchWithTimeout } from "../core/browser-utils.js";
 import { escapeHtml } from "../core/html.js";
+import { renderModalShell } from "../core/modal-shell.js";
 import { render } from "../core/render-scheduler.js";
 import { state } from "../core/state.js";
 import { getBasePath } from "../core/url-path.js";
@@ -74,6 +75,10 @@ function schedulePoll() {
     return;
   }
   state.oduEepromDumpPollTimer = window.setTimeout(() => {
+    if (!shouldRefreshOduEepromDumpSurface()) {
+      clearPollTimer();
+      return;
+    }
     void refreshOduEepromDumpStatuses({ force: true, silent: true });
   }, ACTIVE_POLL_INTERVAL_MS);
 }
@@ -95,7 +100,7 @@ async function fetchStatus(hp) {
 }
 
 export function shouldRefreshOduEepromDumpSurface() {
-  return state.appView === "settings" && state.settingsGroup === "service";
+  return state.appView === "settings" && state.settingsGroup === "service" && state.systemModal === "odu-eeprom-dump";
 }
 
 export async function refreshOduEepromDumpStatuses(options = {}) {
@@ -119,11 +124,11 @@ export async function refreshOduEepromDumpStatuses(options = {}) {
       state.oduEepromDumpError = "";
       schedulePoll();
       const changed = JSON.stringify(state.oduEepromDumpStatuses) !== previousSignature;
-      if (changed && shouldRefreshOduEepromDumpSurface() && (options.silent || options.force)) render();
+      if (changed && shouldRefreshOduEepromDumpSurface()) syncOduEepromDumpModal();
       return changed;
     } catch (error) {
       state.oduEepromDumpError = `EEPROM-status kon niet worden opgehaald. ${error.message || String(error)}`;
-      if (!options.silent) render();
+      if (!options.silent) syncOduEepromDumpModal();
       return false;
     } finally {
       state.oduEepromDumpFetchPromise = null;
@@ -137,7 +142,7 @@ async function startDump(button) {
   state.oduEepromDumpBusyHp = hp;
   state.oduEepromDumpError = "";
   state.oduEepromDumpNotice = "";
-  render();
+  syncOduEepromDumpModal();
   try {
     const response = await fetchWithTimeout(
       getOduEepromDumpEndpoint(hp, "start?extended=1"),
@@ -157,7 +162,7 @@ async function startDump(button) {
     state.oduEepromDumpError = `HP${hp} kon niet worden uitgelezen. ${error.message || String(error)}`;
   } finally {
     state.oduEepromDumpBusyHp = 0;
-    render();
+    syncOduEepromDumpModal();
   }
 }
 
@@ -176,7 +181,7 @@ async function downloadDump(button) {
   state.oduEepromDumpBusyHp = hp;
   state.oduEepromDumpError = "";
   state.oduEepromDumpNotice = "";
-  render();
+  syncOduEepromDumpModal();
   try {
     const response = await fetchWithTimeout(
       getOduEepromDumpEndpoint(hp, "download"),
@@ -192,7 +197,7 @@ async function downloadDump(button) {
     state.oduEepromDumpError = `Download voor HP${hp} is mislukt. ${error.message || String(error)}`;
   } finally {
     state.oduEepromDumpBusyHp = 0;
-    render();
+    syncOduEepromDumpModal();
   }
 }
 
@@ -243,7 +248,7 @@ function renderHpPanel(hp) {
           <h4>ODU EEPROM-momentopname</h4>
           <p>${escapeHtml(identityParts.join(" · ") || "Firmware- en modelinformatie worden met de snapshot uitgelezen.")}</p>
         </div>
-        <span class="oq-odu-eeprom-state${ready && !status?.crc?.valid ? " is-warning" : ""}">${escapeHtml(statusLabel)}</span>
+        <span class="oq-odu-eeprom-state${ready && !status?.crc?.matchesStoredEeprom ? " is-warning" : ""}">${escapeHtml(statusLabel)}</span>
       </div>
       <div class="oq-odu-eeprom-progress" role="progressbar" aria-label="Uitleesvoortgang HP${hp}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${progress}">
         <span style="width:${progress}%"></span>
@@ -267,7 +272,7 @@ export function renderOduEepromDumpPanel() {
       ? `<p class="oq-odu-eeprom-feedback" role="status">${escapeHtml(state.oduEepromDumpNotice)}</p>`
       : "";
   return `
-    <div class="oq-odu-eeprom-shell">
+    <div class="oq-odu-eeprom-shell" data-oq-odu-eeprom-panel>
       <div class="oq-odu-eeprom-callout">
         <strong>Alleen-lezen diagnose</strong>
         <p>De export leest de actuele EEPROM-shadow en schrijft geen ODU-registers. De uitlezing kan circa 20 seconden duren.</p>
@@ -276,15 +281,63 @@ export function renderOduEepromDumpPanel() {
       <div class="oq-odu-eeprom-grid">
         ${getOduEepromDumpHpIndexes().map((hp) => renderHpPanel(hp)).join("")}
       </div>
-      <button class="oq-helper-button oq-helper-button--ghost oq-odu-eeprom-refresh" type="button" data-oq-action="refresh-odu-eeprom-dump" ${state.oduEepromDumpFetchPromise ? "disabled" : ""}>Status vernieuwen</button>
     </div>
   `;
 }
 
+export function syncOduEepromDumpModal() {
+  const current = state.root?.querySelector?.("[data-oq-odu-eeprom-panel]");
+  if (!current || state.systemModal !== "odu-eeprom-dump") {
+    return false;
+  }
+
+  const template = document.createElement("template");
+  template.innerHTML = renderOduEepromDumpPanel().trim();
+  const next = template.content.firstElementChild;
+  if (!next) {
+    return false;
+  }
+  const focusedButton = current.contains(document.activeElement) ? document.activeElement : null;
+  const currentButtons = current.querySelectorAll("button");
+  next.querySelectorAll("button").forEach((replacement, index) => {
+    const button = currentButtons[index];
+    if (!button) return;
+    button.disabled = replacement.disabled;
+    button.textContent = replacement.textContent;
+    replacement.replaceWith(button);
+  });
+  current.replaceWith(next);
+  if (focusedButton && !focusedButton.disabled) focusedButton.focus({ preventScroll: true });
+  return true;
+}
+
+export function renderOduEepromDumpModal() {
+  return renderModalShell({
+    modalId: "system",
+    titleId: "oq-odu-eeprom-dump-modal-title",
+    kicker: "Service · diagnose",
+    title: "ODU EEPROM-export",
+    copy: "Lees de volledige runtime EEPROM-shadow uit en download een JSON-momentopname voor vergelijking van ODU-hardware en firmware.",
+    className: "oq-helper-modal--wide oq-helper-modal--scrollable oq-helper-modal--odu-eeprom",
+    closeAction: "close-system-modal",
+    closeLabel: "Sluit ODU EEPROM-export",
+    body: renderOduEepromDumpPanel(),
+    actions: '<button class="oq-helper-button oq-helper-button--ghost" type="button" data-oq-action="close-system-modal">Sluiten</button>',
+  });
+}
+
+function openDumpModal() {
+  state.systemModal = "odu-eeprom-dump";
+  state.oduEepromDumpError = "";
+  state.oduEepromDumpNotice = "";
+  render();
+  void refreshOduEepromDumpStatuses({ force: true });
+}
+
 const actionHandlers = {
+  "open-odu-eeprom-dump-modal": () => openDumpModal(),
   "start-odu-eeprom-dump": (button) => startDump(button),
   "download-odu-eeprom-dump": (button) => downloadDump(button),
-  "refresh-odu-eeprom-dump": () => refreshOduEepromDumpStatuses({ force: true }),
 };
 
 export function handleOduEepromDumpAction(action, button) {

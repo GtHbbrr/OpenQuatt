@@ -15,7 +15,10 @@ const {
   getOduEepromDumpHpIndexes,
   getOduEepromCrcLabel,
   normalizeOduEepromDumpStatus,
+  renderOduEepromDumpModal,
+  shouldRefreshOduEepromDumpSurface,
 } = await import("../js/src/features/odu-eeprom-dump.js");
+const { renderSettingsOduEepromDumpRow } = await import("../js/src/settings/service.js");
 const { state } = await import("../js/src/core/state.js");
 
 test("ODU EEPROM endpoint blijft per HP en onder het actuele webpad", () => {
@@ -68,6 +71,33 @@ test("CRC-tekst onderscheidt runtimewijzigingen van een ongeldige uitlezing", ()
     getOduEepromCrcLabel(status),
     "Runtimewaarden wijken af van opgeslagen EEPROM (runtime 0x9DD5, EEPROM 0xB191)",
   );
+});
+
+test("EEPROM-export staat compact op Service en opent als modal", (t) => {
+  const originalDocument = globalThis.document;
+  globalThis.document = { activeElement: null, body: {}, querySelector: () => null };
+  t.after(() => {
+    globalThis.document = originalDocument;
+  });
+
+  state.appView = "settings";
+  state.settingsGroup = "service";
+  state.systemModal = "";
+  state.oduEepromDumpStatuses = {};
+
+  const row = renderSettingsOduEepromDumpRow();
+  assert.match(row, /data-oq-action="open-odu-eeprom-dump-modal"/);
+  assert.doesNotMatch(row, /oq-odu-eeprom-progress/);
+  assert.equal(shouldRefreshOduEepromDumpSurface(), false);
+
+  state.systemModal = "odu-eeprom-dump";
+  const modal = renderOduEepromDumpModal();
+  assert.match(modal, /id="oq-odu-eeprom-dump-modal-title"/);
+  assert.match(modal, /oq-helper-modal--odu-eeprom/);
+  assert.match(modal, /oq-odu-eeprom-progress/);
+  assert.doesNotMatch(modal, /Status vernieuwen/);
+  assert.doesNotMatch(modal, /refresh-odu-eeprom-dump/);
+  assert.equal(shouldRefreshOduEepromDumpSurface(), true);
 });
 
 test("firmware gebruikt sheet minus een en blokkeert de frequentietabel tijdens export", async () => {
