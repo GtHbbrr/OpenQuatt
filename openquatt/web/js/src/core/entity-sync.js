@@ -264,6 +264,9 @@ import { fetchWithTimeout } from "./browser-utils.js";
       ...CIC_POLLING_DIAGNOSTIC_KEYS,
       ...SENSOR_SELECTION_KEYS,
       ...SENSOR_SELECTION_STATE_KEYS,
+      "waterSupplyCalibrationOffset",
+      "waterSupplyCalibrationRequired",
+      "waterSupplyCalibrationStatus",
       ...CIC_COMPATIBILITY_KEYS,
     ],
     system: [

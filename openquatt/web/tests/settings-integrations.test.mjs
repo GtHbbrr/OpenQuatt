@@ -9,6 +9,7 @@ globalThis.window = {
 };
 
 const { state } = await import("../js/src/core/state.js");
+const { SETTINGS_GROUP_KEY_MAP } = await import("../js/src/core/entity-sync.js");
 const { renderSettingsSensorSelectionSection } = await import("../js/src/settings/integrations.js");
 
 const MQTT_SOURCE_SELECT_KEYS = [
@@ -61,6 +62,12 @@ function setSourceSelectionState(mqttEnabled) {
     mqttCoolingDewPointValid: { value: true, state: "ON" },
   };
 }
+
+test("integraties laden de aanvoerkalibratiestatus direct", () => {
+  assert.ok(SETTINGS_GROUP_KEY_MAP.integrations.includes("waterSupplyCalibrationOffset"));
+  assert.ok(SETTINGS_GROUP_KEY_MAP.integrations.includes("waterSupplyCalibrationRequired"));
+  assert.ok(SETTINGS_GROUP_KEY_MAP.integrations.includes("waterSupplyCalibrationStatus"));
+});
 
 test("MQTT verdwijnt uit alle bronselecties en metingen wanneer de integratie uitstaat", () => {
   setSourceSelectionState(true);
