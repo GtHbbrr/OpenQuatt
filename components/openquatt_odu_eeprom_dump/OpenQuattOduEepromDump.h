@@ -80,7 +80,7 @@ class OpenQuattOduEepromDump : public Component {
     WARNING_NONE = 0,
     WARNING_EXTENDED_UNAVAILABLE = 1U << 0U,
     WARNING_CORE_UNAVAILABLE = 1U << 1U,
-    WARNING_CRC_MISMATCH = 1U << 2U,
+    WARNING_RUNTIME_DIFFERS = 1U << 2U,
   };
 
   modbus_controller::ModbusController* controller_{nullptr};
@@ -106,7 +106,7 @@ class OpenQuattOduEepromDump : public Component {
   std::atomic<uint8_t> warning_flags_{WARNING_NONE};
   std::atomic<bool> extended_supported_{false};
   std::atomic<bool> core_available_{false};
-  std::atomic<bool> crc_valid_{false};
+  std::atomic<bool> crc_matches_stored_eeprom_{false};
   std::atomic<uint16_t> calculated_crc_{0};
   std::atomic<uint16_t> stored_crc_{0};
   std::atomic<uint8_t> crc_retry_count_{0};

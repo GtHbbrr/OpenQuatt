@@ -13,6 +13,7 @@ globalThis.window = {
 const {
   getOduEepromDumpEndpoint,
   getOduEepromDumpHpIndexes,
+  getOduEepromCrcLabel,
   normalizeOduEepromDumpStatus,
 } = await import("../js/src/features/odu-eeprom-dump.js");
 const { state } = await import("../js/src/core/state.js");
@@ -38,7 +39,7 @@ test("ODU EEPROM status normaliseert voortgang, CRC en identiteit", () => {
     registers_read: 220,
     register_count: 512,
     phase: "reading EEPROM shadow",
-    crc: { calculated: "0xB191", stored: "0xB191", valid: true, retry_count: 1 },
+    crc: { calculated: "0xB191", stored: "0xB191", matches_stored_eeprom: true, retry_count: 1 },
     identity: {
       extended_supported: true,
       model: "QUATT ODU V2",
@@ -52,10 +53,21 @@ test("ODU EEPROM status normaliseert voortgang, CRC en identiteit", () => {
   assert.equal(status.hp, 2);
   assert.equal(status.progress, 100);
   assert.equal(status.registersRead, 220);
-  assert.equal(status.crc.valid, true);
+  assert.equal(status.crc.matchesStoredEeprom, true);
   assert.equal(status.crc.retryCount, 1);
   assert.equal(status.identity.model, "QUATT ODU V2");
   assert.equal(status.identity.pcbProgram, "V002_T04");
+});
+
+test("CRC-tekst onderscheidt runtimewijzigingen van een ongeldige uitlezing", () => {
+  const status = normalizeOduEepromDumpStatus({
+    dump_ready: true,
+    crc: { calculated: "0x9DD5", stored: "0xB191", matches_stored_eeprom: false },
+  });
+  assert.equal(
+    getOduEepromCrcLabel(status),
+    "Runtimewaarden wijken af van opgeslagen EEPROM (runtime 0x9DD5, EEPROM 0xB191)",
+  );
 });
 
 test("firmware gebruikt sheet minus een en blokkeert de frequentietabel tijdens export", async () => {
@@ -72,6 +84,7 @@ test("firmware gebruikt sheet minus een en blokkeert de frequentietabel tijdens 
   assert.match(componentHeader, /request_is_authenticated/);
   assert.match(componentSource, /request_token/);
   assert.match(componentSource, /captured_at_epoch_/);
+  assert.match(componentSource, /runtime_shadow_differs_from_stored_eeprom/);
   assert.match(hpPackage, /id\(\$\{hp_id\}_odu_eeprom_dump\)\.is_active\(\)/);
   assert.match(frequencyHelper, /BLOCKED: EEPROM dump active/);
 });

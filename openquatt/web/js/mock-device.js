@@ -5136,7 +5136,7 @@
       crc: {
         calculated: `0x${crc.toString(16).toUpperCase().padStart(4, "0")}`,
         stored: `0x${crc.toString(16).toUpperCase().padStart(4, "0")}`,
-        valid: dump.ready,
+        matches_stored_eeprom: dump.ready,
         retry_count: 0,
       },
       identity: {
@@ -5206,7 +5206,7 @@
         sheet_start: 3000,
         modbus_start: 2999,
         register_count: 512,
-        crc: { algorithm: "CRC16/Modbus", data: "low byte of sheet 3000..3509", init: 0xffff, polynomial: 0xa001, calculated: crcHex, stored: crcHex, valid: true, retry_count: 0 },
+        crc: { algorithm: "CRC16/Modbus", data: "low byte of sheet 3000..3509", init: 0xffff, polynomial: 0xa001, calculated: crcHex, stored: crcHex, matches_stored_eeprom: true, retry_count: 0 },
         fingerprints: { fan_count: words[310], model_main_pcb_address: words[317], minimum_flow: words[456], flow_sensor_type: words[459], refrigerant: words[498], pump_fan_power_words: words.slice(502, 508) },
         registers: words.map((word, index) => ({ sheet_address: 3000 + index, modbus_address: 2999 + index, word, hex: `0x${word.toString(16).toUpperCase().padStart(4, "0")}`, high_byte: (word >>> 8) & 0xff, low_byte: word & 0xff })),
       },

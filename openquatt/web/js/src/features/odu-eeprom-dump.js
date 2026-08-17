@@ -35,7 +35,7 @@ export function normalizeOduEepromDumpStatus(payload = {}, hp = 1) {
     crc: {
       calculated: String(payload.crc?.calculated || "0x0000"),
       stored: String(payload.crc?.stored || "0x0000"),
-      valid: payload.crc?.valid === true,
+      matchesStoredEeprom: payload.crc?.matches_stored_eeprom === true,
       retryCount: Math.max(0, Number(payload.crc?.retry_count || 0)),
     },
     identity: {
@@ -51,6 +51,13 @@ export function normalizeOduEepromDumpStatus(payload = {}, hp = 1) {
 
 export function getOduEepromDumpHpIndexes() {
   return getInstallationTopology() === "duo" || hasEntity("hp2ExcludedA") ? [1, 2] : [1];
+}
+
+export function getOduEepromCrcLabel(status) {
+  if (!status?.dumpReady) return "";
+  return status.crc.matchesStoredEeprom
+    ? `Runtimewaarden gelijk aan opgeslagen EEPROM (CRC ${status.crc.calculated})`
+    : `Runtimewaarden wijken af van opgeslagen EEPROM (runtime ${status.crc.calculated}, EEPROM ${status.crc.stored})`;
 }
 
 function clearPollTimer() {
@@ -197,7 +204,7 @@ function translatePhase(phase) {
   if (normalized.includes("waiting")) return "Wachten op Modbus-bus";
   if (normalized.includes("extended")) return "ODU-identiteit uitlezen";
   if (normalized.includes("core")) return "Firmwaregegevens uitlezen";
-  if (normalized.includes("reread") || normalized.includes("crc mismatch")) return "EEPROM opnieuw uitlezen";
+  if (normalized.includes("reread") || normalized.includes("runtime crc differs")) return "EEPROM opnieuw uitlezen";
   if (normalized.includes("eeprom")) return "EEPROM uitlezen";
   if (normalized.includes("verifying")) return "CRC controleren";
   return normalized === "idle" ? "Gereed" : phase;
@@ -218,13 +225,11 @@ function renderHpPanel(hp) {
       : status?.error
         ? `Mislukt: ${status.error}`
         : status
-          ? translatePhase(status.phase)
+          ? ready && status.warningFlags === 4
+            ? "Klaar; runtimewaarden gewijzigd"
+            : translatePhase(status.phase)
           : "Status nog niet opgehaald";
-  const crcLabel = ready
-    ? status.crc.valid
-      ? `CRC geldig (${status.crc.calculated})`
-      : `CRC wijkt af: ${status.crc.calculated} berekend, ${status.crc.stored} opgeslagen`
-    : "";
+  const crcLabel = getOduEepromCrcLabel(status);
   const identityParts = [];
   if (status?.identity?.model) identityParts.push(status.identity.model);
   if (status?.identity?.pcbProgram) identityParts.push(`PCB ${status.identity.pcbProgram}`);
@@ -245,7 +250,7 @@ function renderHpPanel(hp) {
       </div>
       <div class="oq-odu-eeprom-meta">
         <span>${active ? `${status.registersRead}/${status.registerCount} EEPROM-registers` : ready ? "512/512 EEPROM-registers" : "Registerbereik 3000..3511"}</span>
-        ${crcLabel ? `<strong class="${status.crc.valid ? "" : "is-warning"}">${escapeHtml(crcLabel)}</strong>` : ""}
+        ${crcLabel ? `<strong class="${status.crc.matchesStoredEeprom ? "" : "is-warning"}">${escapeHtml(crcLabel)}</strong>` : ""}
       </div>
       <div class="oq-odu-eeprom-actions">
         <button class="oq-helper-button oq-helper-button--primary" type="button" data-oq-action="start-odu-eeprom-dump" data-hp="${hp}" ${busy || active || unavailable ? "disabled" : ""}>${active ? "Bezig met uitlezen" : ready ? "Opnieuw uitlezen" : "EEPROM uitlezen"}</button>

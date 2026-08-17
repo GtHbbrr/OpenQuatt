@@ -302,7 +302,7 @@ void OpenQuattOduEepromDump::reset_job_() {
   this->progress_.store(0U, std::memory_order_relaxed);
   this->registers_read_.store(0U, std::memory_order_relaxed);
   this->warning_flags_.store(WARNING_NONE, std::memory_order_relaxed);
-  this->crc_valid_.store(false, std::memory_order_relaxed);
+  this->crc_matches_stored_eeprom_.store(false, std::memory_order_relaxed);
   this->calculated_crc_.store(0U, std::memory_order_relaxed);
   this->stored_crc_.store(0U, std::memory_order_relaxed);
   this->crc_retry_count_.store(0U, std::memory_order_relaxed);
@@ -607,13 +607,13 @@ void OpenQuattOduEepromDump::finish_job_() {
     this->progress_.store(10U, std::memory_order_release);
     this->step_ = Step::EEPROM;
     this->next_request_ms_ = millis() + FAILURE_COOLDOWN_MS;
-    this->set_phase_("CRC mismatch; rereading EEPROM shadow");
+    this->set_phase_("runtime CRC differs; rereading EEPROM shadow");
     return;
   }
 
-  const bool crc_valid = calculated == stored;
-  this->crc_valid_.store(crc_valid, std::memory_order_release);
-  if (!crc_valid) this->add_warning_(WARNING_CRC_MISMATCH);
+  const bool crc_matches_stored_eeprom = calculated == stored;
+  this->crc_matches_stored_eeprom_.store(crc_matches_stored_eeprom, std::memory_order_release);
+  if (!crc_matches_stored_eeprom) this->add_warning_(WARNING_RUNTIME_DIFFERS);
   this->step_ = Step::COMPLETE;
   this->progress_.store(100U, std::memory_order_release);
   this->registers_read_.store(EEPROM_REGISTER_COUNT, std::memory_order_release);
@@ -626,8 +626,8 @@ void OpenQuattOduEepromDump::finish_job_() {
   }
   this->dump_ready_.store(true, std::memory_order_release);
   this->active_.store(false, std::memory_order_release);
-  ESP_LOGI(TAG, "HP%u ODU EEPROM snapshot complete; CRC calculated=0x%04X stored=0x%04X valid=%s", this->hp_index_,
-           calculated, stored, YESNO(crc_valid));
+  ESP_LOGI(TAG, "HP%u ODU EEPROM snapshot complete; CRC calculated=0x%04X stored=0x%04X matches stored EEPROM=%s",
+           this->hp_index_, calculated, stored, YESNO(crc_matches_stored_eeprom));
 }
 
 void OpenQuattOduEepromDump::fail_job_(const char* error) {
@@ -737,8 +737,8 @@ void OpenQuattOduEepromDump::write_status(httpd_req_t* req) const {
   writer.write_hex16(this->calculated_crc_.load(std::memory_order_acquire));
   writer.write_literal(R"(,"stored":)");
   writer.write_hex16(this->stored_crc_.load(std::memory_order_acquire));
-  writer.write_literal(R"(,"valid":)");
-  writer.write_bool(this->crc_valid_.load(std::memory_order_acquire));
+  writer.write_literal(R"(,"matches_stored_eeprom":)");
+  writer.write_bool(this->crc_matches_stored_eeprom_.load(std::memory_order_acquire));
   writer.write_literal(R"(,"retry_count":)");
   writer.write_uint(this->crc_retry_count_.load(std::memory_order_acquire));
   writer.write_literal(R"(},"identity":{"extended_supported":)");
@@ -811,7 +811,7 @@ void OpenQuattOduEepromDump::write_download(httpd_req_t* req) const {
   };
   if ((warning_flags & WARNING_EXTENDED_UNAVAILABLE) != 0U) write_warning("extended_metadata_unavailable");
   if ((warning_flags & WARNING_CORE_UNAVAILABLE) != 0U) write_warning("core_metadata_unavailable");
-  if ((warning_flags & WARNING_CRC_MISMATCH) != 0U) write_warning("crc_mismatch");
+  if ((warning_flags & WARNING_RUNTIME_DIFFERS) != 0U) write_warning("runtime_shadow_differs_from_stored_eeprom");
   writer.write_literal(R"(]},"identity":{"core_available":)");
   writer.write_bool(this->core_available_.load(std::memory_order_acquire));
   writer.write_literal(R"(,"compressor_code":)");
@@ -877,8 +877,8 @@ void OpenQuattOduEepromDump::write_download(httpd_req_t* req) const {
   writer.write_hex16(this->calculated_crc_.load(std::memory_order_acquire));
   writer.write_literal(R"(,"stored":)");
   writer.write_hex16(this->stored_crc_.load(std::memory_order_acquire));
-  writer.write_literal(R"(,"valid":)");
-  writer.write_bool(this->crc_valid_.load(std::memory_order_acquire));
+  writer.write_literal(R"(,"matches_stored_eeprom":)");
+  writer.write_bool(this->crc_matches_stored_eeprom_.load(std::memory_order_acquire));
   writer.write_literal(R"(,"retry_count":)");
   writer.write_uint(this->crc_retry_count_.load(std::memory_order_acquire));
   writer.write_literal(R"(},"fingerprints":{"fan_count":)");
