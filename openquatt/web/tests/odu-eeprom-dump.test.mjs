@@ -126,3 +126,11 @@ test("mock exporteert 512 woorden en bewaart de bekende fabrieksfrequenties", as
   assert.match(mockSource, /frequency\.cooling\.forEach/);
   assert.match(mockSource, /format: "openquatt-odu-eeprom-v1"/);
 });
+
+test("Openen-hover start niet opnieuw bij een Service-render", async () => {
+  const serviceStyles = await readFile(new URL("../css/src/12-settings-service.css", import.meta.url), "utf8");
+  assert.match(
+    serviceStyles,
+    /\.oq-settings-odu-eeprom-row \[data-oq-action="open-odu-eeprom-dump-modal"\] \{\s*transition: none;\s*\}/,
+  );
+});

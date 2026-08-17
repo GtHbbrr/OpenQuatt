@@ -1040,6 +1040,10 @@
   white-space: nowrap;
 }
 
+.oq-settings-odu-eeprom-row [data-oq-action="open-odu-eeprom-dump-modal"] {
+  transition: none;
+}
+
 .oq-settings-service-task-modal-body {
   display: grid;
   gap: 14px;
