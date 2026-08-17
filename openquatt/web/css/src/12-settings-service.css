@@ -3,6 +3,174 @@
   gap: 16px;
 }
 
+.oq-odu-eeprom-shell {
+  display: grid;
+  gap: 16px;
+}
+
+.oq-odu-eeprom-callout {
+  display: grid;
+  gap: 4px;
+  padding: 14px 16px;
+  border: 1px solid rgba(234, 88, 12, 0.28);
+  border-left: 4px solid #ea580c;
+  border-radius: 6px;
+  background: var(--oq-theme-surface-1s04, rgba(255, 247, 237, 0.72));
+}
+
+.oq-odu-eeprom-callout strong,
+.oq-odu-eeprom-callout p {
+  margin: 0;
+}
+
+.oq-odu-eeprom-callout p {
+  color: var(--oq-helper-muted);
+  line-height: 1.5;
+}
+
+.oq-odu-eeprom-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr));
+  gap: 14px;
+}
+
+.oq-odu-eeprom-device {
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--oq-helper-line);
+  border-radius: 8px;
+  background: var(--oq-helper-card);
+}
+
+.oq-odu-eeprom-device.is-active {
+  border-color: rgba(2, 132, 199, 0.44);
+}
+
+.oq-odu-eeprom-device.is-ready {
+  border-color: rgba(22, 163, 74, 0.35);
+}
+
+.oq-odu-eeprom-device-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.oq-odu-eeprom-device-head > div {
+  min-width: 0;
+}
+
+.oq-odu-eeprom-device-head h4,
+.oq-odu-eeprom-device-head p {
+  margin: 0;
+}
+
+.oq-odu-eeprom-device-head h4 {
+  margin-top: 3px;
+  font-size: 1rem;
+}
+
+.oq-odu-eeprom-device-head p {
+  margin-top: 5px;
+  color: var(--oq-helper-muted);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.oq-odu-eeprom-state {
+  flex: 0 1 190px;
+  color: var(--oq-helper-muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+  line-height: 1.35;
+  text-align: right;
+}
+
+.oq-odu-eeprom-state.is-warning,
+.oq-odu-eeprom-meta .is-warning {
+  color: #b45309;
+}
+
+.oq-odu-eeprom-progress {
+  width: 100%;
+  height: 7px;
+  overflow: hidden;
+  border-radius: 4px;
+  background: var(--oq-helper-modal-progress-track);
+}
+
+.oq-odu-eeprom-progress > span {
+  display: block;
+  width: 0;
+  height: 100%;
+  border-radius: inherit;
+  background: #0284c7;
+  transition: width 180ms ease;
+}
+
+.oq-odu-eeprom-device.is-ready .oq-odu-eeprom-progress > span {
+  background: #16a34a;
+}
+
+.oq-odu-eeprom-meta {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 20px;
+  color: var(--oq-helper-muted);
+  font-size: 0.82rem;
+}
+
+.oq-odu-eeprom-meta strong {
+  color: #15803d;
+  text-align: right;
+}
+
+.oq-odu-eeprom-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.oq-odu-eeprom-actions .oq-helper-button {
+  flex: 1 1 160px;
+}
+
+.oq-odu-eeprom-feedback {
+  margin: 0;
+  padding: 10px 12px;
+  border-left: 3px solid #16a34a;
+  color: var(--oq-helper-ink);
+  background: rgba(240, 253, 244, 0.7);
+}
+
+.oq-odu-eeprom-feedback.is-error {
+  border-left-color: #dc2626;
+  background: rgba(254, 242, 242, 0.76);
+}
+
+@media (max-width: 640px) {
+  .oq-odu-eeprom-device-head,
+  .oq-odu-eeprom-meta {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .oq-odu-eeprom-state {
+    flex-basis: auto;
+    text-align: left;
+  }
+
+  .oq-odu-eeprom-meta strong {
+    text-align: left;
+  }
+}
+
 .oq-settings-service-toolbar {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -870,6 +1038,10 @@
 .oq-settings-service-row .oq-helper-button {
   min-width: 154px;
   white-space: nowrap;
+}
+
+.oq-settings-odu-eeprom-row [data-oq-action="open-odu-eeprom-dump-modal"] {
+  transition: none;
 }
 
 .oq-settings-service-task-modal-body {

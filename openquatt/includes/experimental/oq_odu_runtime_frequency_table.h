@@ -11,6 +11,7 @@
 
 #include "esphome/components/modbus_controller/modbus_controller.h"
 #include "esphome/components/number/number.h"
+#include "esphome/components/openquatt_odu_eeprom_dump/OpenQuattOduEepromDump.h"
 #include "esphome/components/switch/switch.h"
 #include "esphome/components/text_sensor/text_sensor.h"
 #include "esphome/core/log.h"
@@ -29,6 +30,7 @@ static constexpr float MAX_FREQUENCY_HZ = 120.0f;
 
 struct RuntimeFrequencyTableRefs {
   esphome::modbus_controller::ModbusController* controller;
+  esphome::openquatt_odu_eeprom_dump::OpenQuattOduEepromDump* eeprom_dump;
   esphome::switch_::Switch* enable_switch;
   esphome::text_sensor::TextSensor* status;
   const char* prefix;
@@ -185,6 +187,10 @@ inline void queue_apply_readback(RuntimeFrequencyTableRefs refs, std::array<floa
 }
 
 inline void load_runtime_table(RuntimeFrequencyTableRefs refs) {
+  if (refs.eeprom_dump != nullptr && refs.eeprom_dump->is_active()) {
+    publish_status(refs, "BLOCKED: EEPROM dump active");
+    return;
+  }
   publish_status(refs, "LOAD_REQUESTED");
   auto cmd = esphome::modbus_controller::ModbusCommandItem::create_read_command(
       refs.controller, esphome::modbus::ModbusRegisterType::HOLDING, RUNTIME_TABLE_START_ADDRESS,
@@ -216,6 +222,10 @@ inline bool read_desired_values(const std::array<esphome::number::Number*, 11>& 
 }
 
 inline void apply_runtime_table(RuntimeFrequencyTableRefs refs, bool enabled) {
+  if (refs.eeprom_dump != nullptr && refs.eeprom_dump->is_active()) {
+    publish_status(refs, "BLOCKED: EEPROM dump active");
+    return;
+  }
   if (!enabled) {
     publish_status(refs, "BLOCKED: enable switch is off");
     return;

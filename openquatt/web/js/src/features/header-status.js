@@ -10,6 +10,7 @@ import { getDebugRecordingHubStatusLabel, renderDebugRecordingHeaderStatus, rend
 import { formatDeviceClock, formatUptimeFromMeta, getDeviceIpAddress, getInstallationLabel } from "./device-context.js";
 import { getFirmwareUpdateEntity, getUpdateStatus, isFirmwareUpdateAvailable } from "./firmware-update.js";
 import { renderMqttModal, renderMqttSensorsModal } from "./mqtt.js";
+import { renderOduEepromDumpModal } from "./odu-eeprom-dump.js";
 import { renderApiSecurityModal, renderLoginModal } from "./security-access.js";
 import { getWebServerLogStatusLabel, renderWebServerLogsModal } from "./webserver-logs.js";
 import { getControlModeOverrideLabel, renderSettingsServiceTaskModal } from "../settings/service.js";
@@ -472,6 +473,10 @@ import { render } from "../core/render-scheduler.js";
 
     if (state.systemModal === "water-sensor-corrections") {
       return renderHpWaterSensorOffsetsModal();
+    }
+
+    if (state.systemModal === "odu-eeprom-dump") {
+      return renderOduEepromDumpModal();
     }
 
     if (String(state.systemModal || "").startsWith("service-task-")) {
