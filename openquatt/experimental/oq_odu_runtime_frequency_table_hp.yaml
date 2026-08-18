@@ -353,6 +353,7 @@ button:
       - lambda: |-
           oq_odu_runtime_frequency::RuntimeFrequencyTableRefs refs = {
               id(${hp_id}),
+              id(${hp_id}_odu_eeprom_dump),
               id(${hp_id}_odu_runtime_frequency_table_enable),
               id(${hp_id}_odu_runtime_frequency_table_status),
               "${prefix}",
@@ -395,6 +396,7 @@ button:
       - lambda: |-
           oq_odu_runtime_frequency::RuntimeFrequencyTableRefs refs = {
               id(${hp_id}),
+              id(${hp_id}_odu_eeprom_dump),
               id(${hp_id}_odu_runtime_frequency_table_enable),
               id(${hp_id}_odu_runtime_frequency_table_status),
               "${prefix}",

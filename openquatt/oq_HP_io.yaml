@@ -52,6 +52,14 @@ modbus_controller:
             id(oq_incident_manager).observe_transport(${hp_index}, true, millis());
             ESP_LOGI("quatt", "%sModbus ONLINE", "${prefix}");
 
+openquatt_odu_eeprom_dump:
+  - id: ${hp_id}_odu_eeprom_dump
+    controller: ${hp_id}
+    clock: oq_time
+    web_auth: oq_web_auth_store
+    hp_index: ${hp_index}
+    device_address: ${device_address}
+
 # ----------------------------
 # GLOBALS
 # ----------------------------
@@ -1271,6 +1279,9 @@ interval:
     startup_delay: ${oq_modbus_startup_delay_ms}ms
     then:
       - lambda: |-
+          if (id(${hp_id}_odu_eeprom_dump).is_active()) {
+            return;
+          }
           if (id(oq_runtime_polling_paused).state) {
             return;
           }

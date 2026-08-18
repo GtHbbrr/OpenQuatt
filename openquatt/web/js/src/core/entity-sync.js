@@ -19,6 +19,7 @@ import { patchControlReplayDom, patchDiagnosisDom, patchEnergyDom, patchOverview
 import { clearWebServerLogOutput, closeWebServerLogStream, resetWebServerLogRecoveryState } from "./webserver-log-controls.js";
 import { getMqttSensorsModalRenderSignature, refreshMqttStatus, shouldRefreshMqttStatusForCurrentSurface } from "../features/mqtt-actions.js";
 import { getApiSecurityStatusSignature, refreshApiSecurityStatus, refreshAuthStatus, shouldRefreshApiSecurityStatusForCurrentSurface, shouldRefreshAuthStatusForCurrentSurface } from "../features/security-actions.js";
+import { refreshOduEepromDumpStatuses, shouldRefreshOduEepromDumpSurface } from "../features/odu-eeprom-dump.js";
 import { render } from "./render-scheduler.js";
 import { fetchWithTimeout } from "./browser-utils.js";
 
@@ -1249,6 +1250,9 @@ import { fetchWithTimeout } from "./browser-utils.js";
       const mqttChanged = shouldDeferSupplementary || !shouldRefreshMqttStatusForCurrentSurface()
         ? false
         : await refreshMqttStatus({ force: state.systemModal === "mqtt-sensors" });
+      if (!shouldDeferSupplementary && shouldRefreshOduEepromDumpSurface()) {
+        await refreshOduEepromDumpStatuses();
+      }
       const nextHeaderSignature = getHeaderRenderSignature();
       if (shouldDeferSupplementary && !state.nativeOpen) {
         schedulePrimeSupplementaryData(getSupplementaryPrimeDelayMs(syncView));

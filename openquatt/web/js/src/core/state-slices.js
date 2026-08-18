@@ -111,6 +111,13 @@ export function createDiagnosticsState(debugRecordingAcknowledgedId) {
     debugRecordingAcknowledgedId,
     debugRecordingDeviceBundle: null,
     debugRecordingDevicePollTimer: null,
+    oduEepromDumpStatuses: {},
+    oduEepromDumpBusyHp: 0,
+    oduEepromDumpError: "",
+    oduEepromDumpNotice: "",
+    oduEepromDumpLastFetchAt: 0,
+    oduEepromDumpFetchPromise: null,
+    oduEepromDumpPollTimer: null,
   };
 }
 

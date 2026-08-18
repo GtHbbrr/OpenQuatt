@@ -219,6 +219,8 @@ export function renderSettingsView() {
 
     const focusedSettingsField = captureFocusedSettingsField();
     const modalContinuity = captureModalContinuity(state.root);
+    const oduEepromLauncher = state.root.querySelector('[data-oq-action="open-odu-eeprom-dump-modal"]');
+    const oduEepromLauncherFocused = oduEepromLauncher === document.activeElement;
 
     const webServerLogScrollState = state.systemModal === "webserver-logs"
       ? captureWebServerLogScrollState()
@@ -301,6 +303,11 @@ export function renderSettingsView() {
       ${renderSystemModal()}
       ${renderDeviceReconnectModal()}
     `;
+    const replacementOduEepromLauncher = state.root.querySelector('[data-oq-action="open-odu-eeprom-dump-modal"]');
+    if (oduEepromLauncher && replacementOduEepromLauncher) {
+      replacementOduEepromLauncher.replaceWith(oduEepromLauncher);
+      if (oduEepromLauncherFocused) oduEepromLauncher.focus({ preventScroll: true });
+    }
     syncModalFocus(state.root);
     restoreModalContinuity(state.root, modalContinuity);
     restoreFocusedSettingsField(focusedSettingsField);
