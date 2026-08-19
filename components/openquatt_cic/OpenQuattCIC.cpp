@@ -9,7 +9,7 @@
 namespace esphome {
 namespace openquatt_cic {
 
-static const char *const TAG = "openquatt.cic";
+static const char* const TAG = "openquatt.cic";
 
 static bool deadline_reached(uint32_t now_ms, uint32_t deadline_ms) {
   return static_cast<int32_t>(now_ms - deadline_ms) >= 0;
@@ -18,6 +18,7 @@ static bool deadline_reached(uint32_t now_ms, uint32_t deadline_ms) {
 void OpenQuattCIC::setup() {
   this->backoff_ms_ = this->backoff_start_ms_;
   this->next_ms_ = millis() + this->backoff_start_ms_;
+  if (this->url_text_ != nullptr) this->notify_url_changed(this->url_text_->state);
   if (this->fetch_mutex_ == nullptr) {
     this->fetch_mutex_ = xSemaphoreCreateMutex();
   }
@@ -34,6 +35,11 @@ void OpenQuattCIC::setup() {
 
 void OpenQuattCIC::update() {
   const uint32_t now_ms = millis();
+  if (this->url_text_ == nullptr) {
+    this->notify_url_changed(nullptr, 0);
+  } else {
+    this->notify_url_changed(this->url_text_->state);
+  }
 
   if (this->pause_sensor_ != nullptr && this->pause_sensor_->state) {
     return;
@@ -57,13 +63,22 @@ void OpenQuattCIC::update() {
     return;
   }
 
-  if (this->fetch_in_progress_) {
-    this->publish_diagnostics_if_due_(now_ms, false);
-    return;
-  }
-
-  (void) this->start_fetch_(this->url_text_->state);
+  (void)this->start_fetch_(this->url_text_->state);
   this->publish_diagnostics_if_due_(now_ms, false);
+}
+
+void OpenQuattCIC::notify_url_changed(const char* url, size_t length) {
+  if (!this->url_state_.update(url, length)) return;
+
+  this->last_success_ms_ = 0;
+  this->consecutive_errors_ = 0;
+  this->backoff_ms_ = this->backoff_start_ms_;
+  this->next_ms_ = millis();
+  this->publish_binary_if_changed_(this->data_stale_, true);
+  this->publish_float_if_changed_(this->last_success_age_sensor_, NAN);
+  this->invalidate_feed_signals_();
+  this->publish_float_if_changed_(this->backoff_sensor_, this->backoff_start_ms_ / 1000.0f);
+  this->publish_diagnostics_if_due_(millis(), true);
 }
 
 void OpenQuattCIC::loop() {
@@ -71,9 +86,7 @@ void OpenQuattCIC::loop() {
     return;
   }
 
-  if (this->fetch_result_.ready) {
-    this->finalize_fetch_();
-  }
+  if (this->fetch_result_ready_.load(std::memory_order_acquire)) this->finalize_fetch_();
 }
 
 void OpenQuattCIC::dump_config() {
@@ -89,34 +102,41 @@ void OpenQuattCIC::dump_config() {
   ESP_LOGCONFIG(TAG, "  Feed error trip: %u", static_cast<unsigned>(this->feed_error_trip_n_));
 }
 
-bool OpenQuattCIC::start_fetch_(const std::string &url) {
-  if (this->fetch_in_progress_ || this->fetch_mutex_ == nullptr) {
-    return false;
-  }
+bool OpenQuattCIC::start_fetch_(const std::string& url) {
+  if (this->fetch_mutex_ == nullptr) return false;
 
   if (xSemaphoreTake(this->fetch_mutex_, 0) != pdTRUE) {
     return false;
   }
 
+  if (this->fetch_in_progress_ || this->fetch_result_ready_.load(std::memory_order_relaxed)) {
+    xSemaphoreGive(this->fetch_mutex_);
+    return false;
+  }
+
   this->fetch_in_progress_ = true;
   this->fetch_result_ = FetchResult{};
+  this->fetch_result_ready_.store(false, std::memory_order_relaxed);
   this->fetch_url_ = url;
+  this->fetch_url_generation_ = this->url_state_.generation();
   xSemaphoreGive(this->fetch_mutex_);
 
-  const BaseType_t created = xTaskCreate(
-      &OpenQuattCIC::fetch_task_trampoline_, "openquatt_cic", 6144, this, tskIDLE_PRIORITY + 1, &this->fetch_task_handle_);
+  const BaseType_t created = xTaskCreate(&OpenQuattCIC::fetch_task_trampoline_, "openquatt_cic", 6144, this,
+                                         tskIDLE_PRIORITY + 1, &this->fetch_task_handle_);
   if (created != pdPASS) {
     if (xSemaphoreTake(this->fetch_mutex_, portMAX_DELAY) == pdTRUE) {
       this->fetch_in_progress_ = false;
       this->fetch_result_ = FetchResult{
           .ready = true,
           .ok = false,
+          .url_generation = this->fetch_url_generation_,
           .completed_at_ms = millis(),
           .duration_ms = 0,
           .status_code = -1,
           .stack_high_water_mark = 0,
           .error_status = "task_create",
       };
+      this->fetch_result_ready_.store(true, std::memory_order_release);
       xSemaphoreGive(this->fetch_mutex_);
     }
     return false;
@@ -125,8 +145,8 @@ bool OpenQuattCIC::start_fetch_(const std::string &url) {
   return true;
 }
 
-void OpenQuattCIC::fetch_task_trampoline_(void *arg) {
-  auto *self = static_cast<OpenQuattCIC *>(arg);
+void OpenQuattCIC::fetch_task_trampoline_(void* arg) {
+  auto* self = static_cast<OpenQuattCIC*>(arg);
   self->fetch_task_();
   vTaskDelete(nullptr);
 }
@@ -137,10 +157,11 @@ void OpenQuattCIC::fetch_task_() {
 
   if (this->fetch_mutex_ != nullptr && xSemaphoreTake(this->fetch_mutex_, portMAX_DELAY) == pdTRUE) {
     url = this->fetch_url_;
+    result.url_generation = this->fetch_url_generation_;
     xSemaphoreGive(this->fetch_mutex_);
   }
 
-  (void) this->fetch_and_parse_(url, &result);
+  (void)this->fetch_and_parse_(url, &result);
   result.stack_high_water_mark = static_cast<uint32_t>(uxTaskGetStackHighWaterMark(nullptr));
   result.ready = true;
   result.completed_at_ms = millis();
@@ -149,6 +170,7 @@ void OpenQuattCIC::fetch_task_() {
     this->fetch_result_ = result;
     this->fetch_in_progress_ = false;
     this->fetch_task_handle_ = nullptr;
+    this->fetch_result_ready_.store(true, std::memory_order_release);
     xSemaphoreGive(this->fetch_mutex_);
   }
 }
@@ -170,6 +192,7 @@ void OpenQuattCIC::finalize_fetch_() {
 
   result = this->fetch_result_;
   this->fetch_result_ = FetchResult{};
+  this->fetch_result_ready_.store(false, std::memory_order_release);
   xSemaphoreGive(this->fetch_mutex_);
 
   if (this->enabled_switch_ == nullptr || !this->enabled_switch_->state) {
@@ -182,14 +205,21 @@ void OpenQuattCIC::finalize_fetch_() {
   if (result.stack_high_water_mark > 0 &&
       (this->fetch_stack_min_free_ == 0 || result.stack_high_water_mark < this->fetch_stack_min_free_)) {
     this->fetch_stack_min_free_ = result.stack_high_water_mark;
-    ESP_LOGI(TAG, "CIC fetch task stack high-watermark: %u B free",
-             static_cast<unsigned>(this->fetch_stack_min_free_));
+    ESP_LOGI(TAG, "CIC fetch task stack high-watermark: %u B free", static_cast<unsigned>(this->fetch_stack_min_free_));
   }
   if (this->last_duration_ms_ > this->max_duration_ms_) {
     this->max_duration_ms_ = this->last_duration_ms_;
   }
 
+  if (!this->url_state_.accepts(result.url_generation)) {
+    ESP_LOGI(TAG, "Discarding CIC response for an outdated feed URL");
+    this->update_runtime_state_(millis());
+    this->publish_diagnostics_if_due_(millis(), true);
+    return;
+  }
+
   if (result.ok) {
+    if (!this->url_state_.mark_success(result.url_generation)) return;
     this->apply_payload_(result.payload);
     this->mark_success_(result.completed_at_ms);
   } else {
@@ -203,7 +233,7 @@ void OpenQuattCIC::finalize_fetch_() {
   this->publish_diagnostics_if_due_(millis(), true);
 }
 
-bool OpenQuattCIC::fetch_and_parse_(const std::string &url, FetchResult *result) {
+bool OpenQuattCIC::fetch_and_parse_(const std::string& url, FetchResult* result) {
   if (result == nullptr) {
     return false;
   }
@@ -241,7 +271,7 @@ bool OpenQuattCIC::fetch_and_parse_(const std::string &url, FetchResult *result)
 
   bool ok = false;
   bool client_open = false;
-  uint8_t *response_data = this->response_buffer_.data();
+  uint8_t* response_data = this->response_buffer_.data();
   const size_t response_size = this->response_buffer_.size();
 
   do {
@@ -272,7 +302,7 @@ bool OpenQuattCIC::fetch_and_parse_(const std::string &url, FetchResult *result)
     size_t total = 0;
     while (total < response_size) {
       const int read_len =
-          esp_http_client_read(client, reinterpret_cast<char *>(response_data + total), response_size - total);
+          esp_http_client_read(client, reinterpret_cast<char*>(response_data + total), response_size - total);
 
       if (read_len < 0) {
         ESP_LOGW(TAG, "CIC HTTP read failed");
@@ -315,7 +345,7 @@ bool OpenQuattCIC::fetch_and_parse_(const std::string &url, FetchResult *result)
   return ok;
 }
 
-bool OpenQuattCIC::parse_payload_(const uint8_t *data, size_t len, ParsedPayload *payload) {
+bool OpenQuattCIC::parse_payload_(const uint8_t* data, size_t len, ParsedPayload* payload) {
   if (payload == nullptr) {
     return false;
   }
@@ -327,7 +357,7 @@ bool OpenQuattCIC::parse_payload_(const uint8_t *data, size_t len, ParsedPayload
 
   JsonObject root = doc.as<JsonObject>();
 
-  auto maybe_store_float = [&](JsonVariantConst value, float lo, float hi, MaybeFloat *target) {
+  auto maybe_store_float = [&](JsonVariantConst value, float lo, float hi, MaybeFloat* target) {
     if (value.isNull()) {
       return;
     }
@@ -341,7 +371,7 @@ bool OpenQuattCIC::parse_payload_(const uint8_t *data, size_t len, ParsedPayload
     target->present = true;
     target->value = x;
   };
-  auto maybe_store_bool = [&](JsonVariantConst value, MaybeBool *target) {
+  auto maybe_store_bool = [&](JsonVariantConst value, MaybeBool* target) {
     if (value.isNull() || !value.is<bool>()) {
       return;
     }
@@ -371,9 +401,13 @@ bool OpenQuattCIC::parse_payload_(const uint8_t *data, size_t len, ParsedPayload
   return true;
 }
 
-void OpenQuattCIC::apply_payload_(const ParsedPayload &payload) {
+void OpenQuattCIC::apply_payload_(const ParsedPayload& payload) {
   if (payload.water_supply_temp.present) {
     this->publish_float_if_changed_(this->water_supply_temp_, payload.water_supply_temp.value);
+  } else {
+    // A successful payload without this optional field must not keep exposing
+    // the previous value as a fresh CIC supply-temperature sample.
+    this->publish_float_if_changed_(this->water_supply_temp_, NAN);
   }
   if (payload.flow_rate.present) {
     this->publish_float_if_changed_(this->flow_rate_, payload.flow_rate.value);
@@ -426,7 +460,8 @@ void OpenQuattCIC::mark_failure_(uint32_t now_ms) {
 
 void OpenQuattCIC::update_runtime_state_(uint32_t now_ms) {
   const bool has_success = this->last_success_ms_ != 0;
-  const bool stale = !has_success || static_cast<int32_t>(now_ms - this->last_success_ms_) >= static_cast<int32_t>(this->stale_after_ms_);
+  const bool stale = !has_success || static_cast<int32_t>(now_ms - this->last_success_ms_) >=
+                                         static_cast<int32_t>(this->stale_after_ms_);
 
   if (has_success) {
     this->publish_float_if_changed_(this->last_success_age_sensor_, (now_ms - this->last_success_ms_) / 1000.0f);
@@ -472,7 +507,7 @@ void OpenQuattCIC::publish_diagnostics_if_due_(uint32_t now_ms, bool force) {
   this->publish_float_if_changed_(this->last_status_code_sensor_, static_cast<float>(this->last_status_code_));
 }
 
-void OpenQuattCIC::publish_float_if_changed_(sensor::Sensor *sensor, float value) {
+void OpenQuattCIC::publish_float_if_changed_(sensor::Sensor* sensor, float value) {
   if (sensor == nullptr) {
     return;
   }
@@ -484,7 +519,7 @@ void OpenQuattCIC::publish_float_if_changed_(sensor::Sensor *sensor, float value
   }
 }
 
-void OpenQuattCIC::publish_binary_if_changed_(binary_sensor::BinarySensor *binary_sensor, bool value) {
+void OpenQuattCIC::publish_binary_if_changed_(binary_sensor::BinarySensor* binary_sensor, bool value) {
   if (binary_sensor == nullptr) {
     return;
   }

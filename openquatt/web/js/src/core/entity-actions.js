@@ -14,6 +14,7 @@ import { handleFirmwareAction } from "../features/firmware-actions.js";
 import { updateFirmwareState, updateEnergyHistoryState } from "./feature-state.js";
 import { getFirmwareTestAssetUrls, getFirmwareTestPrNumber, getFirmwareTestTargetModel, resetFirmwareManualUploadSelection, resetFirmwareTestSelection } from "../features/firmware-update.js";
 import { handleMqttAction, syncMqttDraftFromInput } from "../features/mqtt-actions.js";
+import { handleOduEepromDumpAction } from "../features/odu-eeprom-dump.js";
 import { handleQuickStartAction } from "../features/quickstart-ui-actions.js";
 import { handleSecurityAction, stopLoginAuthStatusPolling } from "../features/security-actions.js";
 import { clearSettingsBackupDraft, handleSettingsBackupFileSelection, handleStorageHistoryAction, normalizeEnergyHistoryExportMode } from "../features/storage-history.js";
@@ -31,6 +32,7 @@ const actionDelegates = [
   handleControlReplayAction,
   handleQuickStartAction,
   handleDebugRecordingAction,
+  handleOduEepromDumpAction,
   handleSecurityAction,
   handleMqttAction,
   (action) => handleStorageHistoryAction(action, { triggerNamedButton }),
@@ -47,6 +49,13 @@ const actionDelegates = [
       const active = document.activeElement;
       state.focusedField = active && active.dataset ? active.dataset.oqField || "" : "";
       state.settingsInteractionLock = Boolean(active && active.closest && active.closest(".oq-ph-concept-hotspot"));
+      if (!state.focusedField
+          && state.incidentMonitoringRenderPending
+          && state.appView === "settings"
+          && state.settingsGroup === "service") {
+        state.incidentMonitoringRenderPending = false;
+        render();
+      }
     }, 0);
   }
 

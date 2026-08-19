@@ -43,8 +43,7 @@ class ManualFlowRuntime {
       oq_service_status::set_commissioning("REFUSED: CM100 required");
       return;
     }
-    if (id(oq_commissioning_task_code) != oq_commissioning::TASK_NONE ||
-        id(oq_commissioning_request_pending)) {
+    if (id(oq_commissioning_task_code) != oq_commissioning::TASK_NONE || id(oq_commissioning_request_pending)) {
       id(oq_quick_flow_test_switch).publish_state(false);
       oq_service_status::set_commissioning("REFUSED: BUSY");
       return;
@@ -103,18 +102,14 @@ class ManualFlowRuntime {
     if (!id(oq_manual_flow_active)) return;
 
     if (id(oq_quick_flow_test_active)) {
-      const bool owns_task =
-          id(oq_commissioning_task_code) == oq_commissioning::TASK_MANUAL_FLOW;
-      if (!owns_task || id(oq_control_mode_code) != 100 ||
-          id(oq_commissioning_abort_requested)) {
+      const bool owns_task = id(oq_commissioning_task_code) == oq_commissioning::TASK_MANUAL_FLOW;
+      if (!owns_task || id(oq_control_mode_code) != 100 || id(oq_commissioning_abort_requested)) {
         finish_quick_test("ABORTED", oq_commissioning::TASK_STATE_ABORT);
         return;
       }
 
       const uint32_t started_ms = id(oq_quick_flow_test_started_ms);
-      const int elapsed_s = started_ms == 0
-          ? 30
-          : (int) ((uint32_t) (now_ms - started_ms) / 1000UL);
+      const int elapsed_s = started_ms == 0 ? 30 : (int)((uint32_t)(now_ms - started_ms) / 1000UL);
       if (elapsed_s >= 30) {
         finish_quick_test("DONE", oq_commissioning::TASK_STATE_DONE);
         return;
@@ -123,8 +118,7 @@ class ManualFlowRuntime {
       return;
     }
 
-    const bool owns_task =
-        id(oq_commissioning_task_code) == oq_commissioning::TASK_MANUAL_FLOW;
+    const bool owns_task = id(oq_commissioning_task_code) == oq_commissioning::TASK_MANUAL_FLOW;
     const bool cm100_exited = id(oq_control_mode_code) != 100;
     if (owns_task && !cm100_exited && !id(oq_commissioning_abort_requested)) return;
 
@@ -153,33 +147,33 @@ class ManualFlowRuntime {
     if (hp1) {
       if (id(hp1_compressor_level).has_state()) {
         auto idx = id(hp1_compressor_level).active_index();
-        level = idx.has_value() ? (int) idx.value() : 0;
+        level = idx.has_value() ? (int)idx.value() : 0;
       }
       last_applied = id(hp1_last_applied_level);
       working_mode = id(hp1_working_mode).state;
     } else {
-      #if OQ_TOPOLOGY_DUO
+#if OQ_TOPOLOGY_DUO
       if (id(hp2_compressor_level).has_state()) {
         auto idx = id(hp2_compressor_level).active_index();
-        level = idx.has_value() ? (int) idx.value() : 0;
+        level = idx.has_value() ? (int)idx.value() : 0;
       }
       last_applied = id(hp2_last_applied_level);
       working_mode = id(hp2_working_mode).state;
-      #endif
+#endif
     }
-    const int mode = isnan(working_mode) ? 0 : (int) roundf(working_mode);
+    const int mode = isnan(working_mode) ? 0 : (int)roundf(working_mode);
     return level > 0 || last_applied > 0 || mode == 1 || mode == 2;
   }
 
   bool heat_pumps_idle() {
     if (hp_active(true)) return false;
-    #if OQ_TOPOLOGY_DUO
+#if OQ_TOPOLOGY_DUO
     if (hp_active(false)) return false;
-    #endif
+#endif
     return true;
   }
 
-  void finish_quick_test(const char *status, int next_state) {
+  void finish_quick_test(const char* status, int next_state) {
     id(oq_quick_flow_test_active) = false;
     id(oq_quick_flow_test_started_ms) = 0;
     id(oq_quick_flow_test_remaining_s) = 0;
@@ -190,19 +184,16 @@ class ManualFlowRuntime {
   }
 
   template <typename NumberEntity>
-  void set_number_value(NumberEntity &number_entity, float value) {
+  void set_number_value(NumberEntity& number_entity, float value) {
     auto call = number_entity.make_call();
     call.set_value(value);
     call.perform();
   }
 
-  void publish(const char *status) {
-    oq_service_status::set_manual_flow(status);
-  }
-
+  void publish(const char* status) { oq_service_status::set_manual_flow(status); }
 };
 
-inline ManualFlowRuntime &runtime() {
+inline ManualFlowRuntime& runtime() {
   static ManualFlowRuntime instance;
   return instance;
 }

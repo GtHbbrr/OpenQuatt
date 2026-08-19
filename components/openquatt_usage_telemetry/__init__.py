@@ -3,6 +3,7 @@ import esphome.config_validation as cv
 from esphome.components import (
     binary_sensor,
     openquatt_mqtt_config,
+    psram,
     select,
     sensor,
     socket,
@@ -13,11 +14,15 @@ from esphome.components import (
 from esphome.components.esp32 import (
     add_idf_sdkconfig_option,
     add_idf_component,
+    get_esp32_variant,
     idf_version,
     include_builtin_idf_component,
 )
+from esphome.components.esp32.const import VARIANT_ESP32S3
 from esphome.const import ENTITY_CATEGORY_CONFIG
 from esphome.core import CORE
+
+DEPENDENCIES = ["psram"]
 
 
 CONF_BROKER = "broker"
@@ -36,6 +41,16 @@ CONF_RELEASE_CHANNEL = "release_channel"
 CONF_HARDWARE_PROFILE = "hardware_profile"
 CONF_TOPOLOGY = "topology"
 CONF_CONNECTION = "connection"
+CONF_QUATT_HYBRID_GENERATION_SELECT = "quatt_hybrid_generation_select"
+CONF_FLOW_SOURCE_SELECT = "flow_source_select"
+CONF_Q_FLOW_SOURCE_SELECT = "q_flow_source_select"
+CONF_HEATING_STRATEGY_SELECT = "heating_strategy_select"
+CONF_ROOM_TEMPERATURE_SOURCE_SELECT = "room_temperature_source_select"
+CONF_ROOM_SETPOINT_SOURCE_SELECT = "room_setpoint_source_select"
+CONF_OUTSIDE_TEMPERATURE_SOURCE_SELECT = "outside_temperature_source_select"
+CONF_HEATING_ENABLE_SOURCE_SELECT = "heating_enable_source_select"
+CONF_COOLING_ENABLE_SOURCE_SELECT = "cooling_enable_source_select"
+CONF_COOLING_DEW_POINT_SOURCE_SELECT = "cooling_dew_point_source_select"
 CONF_LOOP_TIME_SENSOR = "loop_time_sensor"
 CONF_INTERNAL_TEMPERATURE_SENSOR = "internal_temperature_sensor"
 CONF_WIFI_SIGNAL_SENSOR = "wifi_signal_sensor"
@@ -90,6 +105,16 @@ CONFIG_SCHEMA = cv.All(
             cv.Required(CONF_HARDWARE_PROFILE): cv.All(cv.string_strict, cv.Length(max=32)),
             cv.Required(CONF_TOPOLOGY): cv.All(cv.string_strict, cv.Length(max=16)),
             cv.Required(CONF_CONNECTION): cv.All(cv.string_strict, cv.Length(max=16)),
+            cv.Required(CONF_QUATT_HYBRID_GENERATION_SELECT): cv.use_id(select.Select),
+            cv.Required(CONF_FLOW_SOURCE_SELECT): cv.use_id(select.Select),
+            cv.Optional(CONF_Q_FLOW_SOURCE_SELECT): cv.use_id(select.Select),
+            cv.Required(CONF_HEATING_STRATEGY_SELECT): cv.use_id(select.Select),
+            cv.Required(CONF_ROOM_TEMPERATURE_SOURCE_SELECT): cv.use_id(select.Select),
+            cv.Required(CONF_ROOM_SETPOINT_SOURCE_SELECT): cv.use_id(select.Select),
+            cv.Required(CONF_OUTSIDE_TEMPERATURE_SOURCE_SELECT): cv.use_id(select.Select),
+            cv.Required(CONF_HEATING_ENABLE_SOURCE_SELECT): cv.use_id(select.Select),
+            cv.Required(CONF_COOLING_ENABLE_SOURCE_SELECT): cv.use_id(select.Select),
+            cv.Required(CONF_COOLING_DEW_POINT_SOURCE_SELECT): cv.use_id(select.Select),
             cv.Required(CONF_LOOP_TIME_SENSOR): cv.use_id(sensor.Sensor),
             cv.Required(CONF_INTERNAL_TEMPERATURE_SENSOR): cv.use_id(sensor.Sensor),
             cv.Optional(CONF_WIFI_SIGNAL_SENSOR): cv.use_id(sensor.Sensor),
@@ -114,6 +139,8 @@ CONFIG_SCHEMA = cv.All(
 
 async def to_code(config):
     if CORE.is_esp32:
+        if get_esp32_variant() == VARIANT_ESP32S3:
+            psram.request_external_task_stack()
         if idf_version() >= cv.Version(6, 0, 0):
             add_idf_component(name="espressif/mqtt", ref="1.0.0")
         else:
@@ -145,6 +172,41 @@ async def to_code(config):
     cg.add(var.set_hardware_profile(config[CONF_HARDWARE_PROFILE]))
     cg.add(var.set_topology(config[CONF_TOPOLOGY]))
     cg.add(var.set_connection(config[CONF_CONNECTION]))
+    quatt_hybrid_generation_select = await cg.get_variable(
+        config[CONF_QUATT_HYBRID_GENERATION_SELECT]
+    )
+    cg.add(var.set_quatt_hybrid_generation_select(quatt_hybrid_generation_select))
+    flow_source_select = await cg.get_variable(config[CONF_FLOW_SOURCE_SELECT])
+    cg.add(var.set_flow_source_select(flow_source_select))
+    if q_flow_source_select_id := config.get(CONF_Q_FLOW_SOURCE_SELECT):
+        q_flow_source_select = await cg.get_variable(q_flow_source_select_id)
+        cg.add(var.set_q_flow_source_select(q_flow_source_select))
+    heating_strategy_select = await cg.get_variable(config[CONF_HEATING_STRATEGY_SELECT])
+    cg.add(var.set_heating_strategy_select(heating_strategy_select))
+    room_temperature_source_select = await cg.get_variable(
+        config[CONF_ROOM_TEMPERATURE_SOURCE_SELECT]
+    )
+    cg.add(var.set_room_temperature_source_select(room_temperature_source_select))
+    room_setpoint_source_select = await cg.get_variable(
+        config[CONF_ROOM_SETPOINT_SOURCE_SELECT]
+    )
+    cg.add(var.set_room_setpoint_source_select(room_setpoint_source_select))
+    outside_temperature_source_select = await cg.get_variable(
+        config[CONF_OUTSIDE_TEMPERATURE_SOURCE_SELECT]
+    )
+    cg.add(var.set_outside_temperature_source_select(outside_temperature_source_select))
+    heating_enable_source_select = await cg.get_variable(
+        config[CONF_HEATING_ENABLE_SOURCE_SELECT]
+    )
+    cg.add(var.set_heating_enable_source_select(heating_enable_source_select))
+    cooling_enable_source_select = await cg.get_variable(
+        config[CONF_COOLING_ENABLE_SOURCE_SELECT]
+    )
+    cg.add(var.set_cooling_enable_source_select(cooling_enable_source_select))
+    cooling_dew_point_source_select = await cg.get_variable(
+        config[CONF_COOLING_DEW_POINT_SOURCE_SELECT]
+    )
+    cg.add(var.set_cooling_dew_point_source_select(cooling_dew_point_source_select))
     loop_time_sensor = await cg.get_variable(config[CONF_LOOP_TIME_SENSOR])
     cg.add(var.set_loop_time_sensor(loop_time_sensor))
     internal_temperature_sensor = await cg.get_variable(config[CONF_INTERNAL_TEMPERATURE_SENSOR])

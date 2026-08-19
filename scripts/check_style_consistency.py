@@ -47,6 +47,15 @@ PACKAGE_ORDER_PATTERNS = (
     "openquatt/*.yaml",
 )
 
+BUILTIN_YAML_PATTERNS = (
+    "configs/**/*.yaml",
+    "docs/templates/**/*.yaml",
+    "openquatt/**/*.yaml",
+)
+BUILTIN_WEB_SORTING_KEY_RE = re.compile(
+    r"""(?:^|[,{]\s*)["']?(?:sorting_groups|sorting_group_id|sorting_weight)["']?\s*:"""
+)
+
 STRICT_TOP_LEVEL_ORDER_RULES = {
     "configs/waveshare/single_wifi.yaml": (
         "substitutions",
@@ -164,7 +173,6 @@ STRICT_TOP_LEVEL_ORDER_RULES = {
         "uart",
         "modbus",
         "packages",
-        "web_server",
     ),
     "openquatt/profiles/heatpump_controller_q_cic_compatibility_duo.yaml": (
         "packages",
@@ -296,6 +304,7 @@ NESTED_KEY_ORDER_RULES = {
         "oq_boiler_test",
     ),
     ("openquatt/packages/50_integrations.yaml", "packages"): (
+        "oq_boiler_dispatch",
         "oq_boiler_control",
         "oq_energy",
         "oq_cic",
@@ -318,8 +327,10 @@ NESTED_KEY_ORDER_RULES = {
         "oq_hardware_revision",
         "oq_status_leds",
         "oq_cic_compatibility",
+        "oq_aux_relay_control",
         "oq_sensor_source_selects_opentherm",
         "oq_ot_slave",
+        "oq_boiler_opentherm",
     ),
 }
 
@@ -415,6 +426,21 @@ def check_whitespace(path: Path, findings: list[Finding]) -> None:
             add(findings, rel, idx, "Tab character found; use spaces only.")
         if line.rstrip(" ") != line:
             add(findings, rel, idx, "Trailing whitespace found.")
+
+
+def check_no_builtin_web_sorting(path: Path, findings: list[Finding]) -> None:
+    rel = path.relative_to(REPO_ROOT).as_posix()
+    for idx, line in enumerate(read_lines(path), start=1):
+        stripped = line.strip()
+        if stripped.startswith("#"):
+            continue
+        if BUILTIN_WEB_SORTING_KEY_RE.search(stripped):
+            add(
+                findings,
+                rel,
+                idx,
+                "ESPHome web sorting metadata allocates internal heap; keep layout in the OpenQuatt SPA.",
+            )
 
 
 def check_yaml_banner(path: Path, findings: list[Finding]) -> None:
@@ -689,6 +715,9 @@ def main() -> int:
 
     for path in expand_patterns(TEXT_PATTERNS):
         check_whitespace(path, findings)
+
+    for path in expand_patterns(BUILTIN_YAML_PATTERNS):
+        check_no_builtin_web_sorting(path, findings)
 
     for path in expand_patterns(YAML_BANNER_PATTERNS):
         check_yaml_banner(path, findings)

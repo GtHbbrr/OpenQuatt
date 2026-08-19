@@ -23,7 +23,7 @@
 #   - Pump output is correctly configured for PWM
 #
 # Interaction with Control Modes:
-#   - Active in CM1/CM2/CM3/CM5/CM100 (AUTO=PI, MANUAL=fixed iPWM)
+#   - Active in CM1/CM2/CM3/CM4/CM5/CM100 (AUTO=PI, MANUAL=fixed iPWM)
 #   - CM0: early return (supervisory owns pump state in idle)
 #   - CM98: fixed frost PWM path
 #
@@ -89,8 +89,6 @@ number:
     entity_category: config
     unit_of_measurement: "L/h"
     mode: slider
-    web_server:
-      sorting_group_id: oq_control
     min_value: 0
     max_value: 1500
     step: 10
@@ -105,8 +103,6 @@ number:
     entity_category: config
     unit_of_measurement: "L/h"
     mode: slider
-    web_server:
-      sorting_group_id: oq_control
     min_value: 0
     max_value: 1500
     step: 10
@@ -127,8 +123,6 @@ number:
     initial_value: 400
     restore_value: true
     optimistic: true
-    web_server:
-      sorting_group_id: oq_control
 
   - platform: template
     id: oq_flow_frost_pwm
@@ -138,8 +132,6 @@ number:
     icon: mdi:snowflake
     unit_of_measurement: "iPWM"
     mode: slider
-    web_server:
-      sorting_group_id: oq_tuning_flow
     min_value: 50
     max_value: 850
     step: 10
@@ -155,8 +147,6 @@ number:
     icon: mdi:rocket-launch-outline
     unit_of_measurement: "iPWM"
     mode: slider
-    web_server:
-      sorting_group_id: oq_tuning_flow
     min_value: 50
     max_value: 850
     step: 1
@@ -171,8 +161,6 @@ number:
     icon: mdi:alpha-k-circle-outline
     entity_category: config
     mode: slider
-    web_server:
-      sorting_group_id: oq_tuning_flow
     min_value: ${oq_flow_kp_min}
     max_value: ${oq_flow_kp_max}
     step: 0.001
@@ -187,8 +175,6 @@ number:
     icon: mdi:alpha-i-circle-outline
     entity_category: config
     mode: slider
-    web_server:
-      sorting_group_id: oq_tuning_flow
     min_value: ${oq_flow_ki_min}
     max_value: ${oq_flow_ki_max}
     step: 0.0001
@@ -213,13 +199,21 @@ select:
     initial_option: Flow Setpoint
     restore_value: true
     optimistic: true
-    web_server:
-      sorting_group_id: oq_control
 
 # ----------------------------
 # SENSORS
 # ----------------------------
 sensor:
+  - platform: template
+    id: oq_flow_output_ipwm
+    name: "Flow Output iPWM"
+    internal: true
+    icon: mdi:fan-speed-3
+    unit_of_measurement: "iPWM"
+    entity_category: diagnostic
+    accuracy_decimals: 0
+    update_interval: never
+
   # Average flow HP1/HP2
   - platform: template
     id: flow_rate_hp_avg
@@ -228,8 +222,6 @@ sensor:
     unit_of_measurement: "L/h"
     device_class: volume_flow_rate
     state_class: measurement
-    web_server:
-      sorting_group_id: oq_hydraulics
     accuracy_decimals: 0
     update_interval: 1s
     lambda: |-
@@ -282,8 +274,6 @@ binary_sensor:
     icon: mdi:alert-circle-outline
     device_class: problem
     entity_category: diagnostic
-    web_server:
-      sorting_group_id: oq_hydraulics
     lambda: |-
       static bool state = false;
       static bool mismatch_timer_running = false;
@@ -291,6 +281,20 @@ binary_sensor:
 
       const bool secondary_enabled = (${flow_secondary_enabled} != 0);
       if (!secondary_enabled) {
+        state = false;
+        mismatch_timer_running = false;
+        mismatch_start_ms = 0;
+        return false;
+      }
+
+      const oq_flow::PumpRelayState hp1_pump{
+        id(hp1_is_online) && id(hp1_pump_relay).has_state(), id(hp1_pump_relay).state
+      };
+      const oq_flow::PumpRelayState hp2_pump{
+        id(${secondary_hp_id}_is_online) && id(${secondary_hp_id}_pump_relay).has_state(),
+        id(${secondary_hp_id}_pump_relay).state
+      };
+      if (oq_flow::all_relevant_pumps_stopped(secondary_enabled, hp1_pump, hp2_pump)) {
         state = false;
         mismatch_timer_running = false;
         mismatch_start_ms = 0;
@@ -343,8 +347,6 @@ text_sensor:
     id: oq_flow_mode
     name: "Flow Mode"
     icon: mdi:state-machine
-    web_server:
-      sorting_group_id: oq_hydraulics
 
 # ----------------------------
 # CONTROL LOOPS
@@ -387,12 +389,21 @@ interval:
               c.perform();
             }
           };
+          auto set_flow_output_pwm = [](int value) {
+            const bool changed =
+                !id(oq_flow_output_ipwm).has_state() ||
+                id(oq_flow_last_pwm) != value;
+            id(oq_flow_last_pwm) = value;
+            if (changed) {
+              id(oq_flow_output_ipwm).publish_state((float) value);
+            }
+          };
 
           const int service_pwm = clamp_iPWM(
               air_purge_output
                   ? (int) id(oq_air_purge_target_ipwm)
                   : (int) id(oq_quick_flow_test_target_ipwm));
-          id(oq_flow_last_pwm) = service_pwm;
+          set_flow_output_pwm(service_pwm);
           write_pump_pwm_if_changed(id(hp1_pump_speed), service_pwm);
           if (${flow_secondary_enabled} != 0) {
             write_pump_pwm_if_changed(id(${secondary_pump_speed_id}), service_pwm);
@@ -471,6 +482,15 @@ interval:
               c.perform();
             }
           };
+          auto set_flow_output_pwm = [](int value) {
+            const bool changed =
+                !id(oq_flow_output_ipwm).has_state() ||
+                id(oq_flow_last_pwm) != value;
+            id(oq_flow_last_pwm) = value;
+            if (changed) {
+              id(oq_flow_output_ipwm).publish_state((float) value);
+            }
+          };
           if (!id(oq_flow_cooling_settings_migrated) && !isnan(id(oq_flow_setpoint_lph).state)) {
             const float current_flow_setpoint = id(oq_flow_setpoint_lph).state;
             if (!isnan(current_flow_setpoint)) {
@@ -505,7 +525,7 @@ interval:
                      tag, start_pwm, last_good_pwm, cooling_target ? "cooling" : "normal",
                      fallback, commissioning_start ? "yes" : "no", STARTUP_HOLD_S);
 
-            id(oq_flow_last_pwm) = start_pwm;
+            set_flow_output_pwm(start_pwm);
             id(oq_flow_i) = 0.0f;
             startup_hold = STARTUP_HOLD_TICKS;
             sp_f = NAN;
@@ -651,7 +671,7 @@ interval:
           const bool is_cm0 = (cm_code == 0);
           const int commissioning_task_code = id(oq_commissioning_task_code);
 
-          // Flow submode select (within CM1/CM2/CM3): AUTO vs MANUAL PWM
+          // Flow submode select (within CM1/CM2/CM3/CM4): AUTO vs MANUAL PWM
           const int flow_mode_code = (id(oq_flow_control_mode).active_index().value_or(0) == 1) ? 1 : 0;
           id(oq_flow_control_mode_code) = flow_mode_code;
           const bool want_manual = (flow_mode_code == 1);
@@ -712,7 +732,7 @@ interval:
           // Autotune temporarily overrides PWM (flow_control remains output owner).
           if (id(oq_flow_autotune_active) && (cm_code == 100) && (id(oq_commissioning_task_code) == oq_commissioning::TASK_FLOW_AUTOTUNE) && !is_frost) {
             int at_pwm = clamp_iPWM((int) id(oq_flow_autotune_pwm));
-            id(oq_flow_last_pwm) = at_pwm;
+            set_flow_output_pwm(at_pwm);
             stable_cnt = 0;
             pi_failsafe = false;
             write_pump_pwm_if_changed(id(hp1_pump_speed), at_pwm);
@@ -732,7 +752,7 @@ interval:
               (id(oq_commissioning_task_code) == oq_commissioning::TASK_AIR_PURGE) &&
               !is_frost) {
             int purge_pwm = clamp_iPWM((int) id(oq_air_purge_target_ipwm));
-            id(oq_flow_last_pwm) = purge_pwm;
+            set_flow_output_pwm(purge_pwm);
             stable_cnt = 0;
             pi_failsafe = false;
             // The dedicated 5s service-output loop applies this target.
@@ -749,7 +769,7 @@ interval:
               (id(oq_commissioning_task_code) == oq_commissioning::TASK_MANUAL_FLOW) &&
               !is_frost) {
             int test_pwm = clamp_iPWM((int) id(oq_quick_flow_test_target_ipwm));
-            id(oq_flow_last_pwm) = test_pwm;
+            set_flow_output_pwm(test_pwm);
             stable_cnt = 0;
             pi_failsafe = false;
             // The dedicated 5s service-output loop applies this target.
@@ -802,7 +822,7 @@ interval:
           }
 
           pwm = clamp_iPWM(pwm);
-          id(oq_flow_last_pwm) = pwm;
+          set_flow_output_pwm(pwm);
 
           write_pump_pwm_if_changed(id(hp1_pump_speed), pwm);
           if (${flow_secondary_enabled} != 0) {

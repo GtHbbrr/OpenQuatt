@@ -140,6 +140,30 @@
     align-items: stretch;
   }
 
+  .oq-settings-section--maintenance .oq-settings-section-head {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto;
+    gap: 6px;
+  }
+
+  .oq-settings-section--maintenance .oq-settings-section-head-meta,
+  .oq-settings-section--maintenance .oq-settings-section-head h3,
+  .oq-settings-section--maintenance .oq-settings-section-head > p:last-child {
+    grid-column: 1;
+    grid-row: auto;
+    padding-bottom: 0;
+  }
+
+  .oq-settings-runtime-balance-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px 18px;
+  }
+
+  .oq-settings-runtime-comparison {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
   .oq-settings-backup-summary,
   .oq-settings-backup-actions {
     grid-template-columns: 1fr;
@@ -177,6 +201,7 @@
     width: 100%;
   }
 
+  .oq-webserver-log-control-card > .oq-helper-button,
   .oq-webserver-log-level-control {
     flex-basis: auto;
     width: 100%;
@@ -470,6 +495,16 @@
     margin: 4px auto 0;
   }
 
+  .oq-start-editor {
+    grid-template-columns: 1fr auto;
+    gap: 10px;
+  }
+
+  .oq-start-fields {
+    grid-column: 1 / -1;
+    justify-content: start;
+  }
+
   .oq-settings-generation-grid {
     grid-template-columns: 1fr;
   }
@@ -487,6 +522,33 @@
   .oq-helper-head {
     padding-bottom: 8px;
     padding-right: 68px;
+  }
+
+  .oq-control-mode-override-banner,
+  .oq-settings-service-override {
+    grid-template-columns: 1fr;
+  }
+
+  .oq-settings-section--maintenance {
+    padding: 14px;
+  }
+
+  .oq-settings-runtime-balance {
+    padding: 12px;
+  }
+
+  .oq-settings-runtime-balance-head {
+    align-items: flex-start;
+  }
+
+  .oq-settings-runtime-metric strong {
+    font-size: 1.55rem;
+  }
+
+  .oq-control-mode-override-banner .oq-helper-button,
+  .oq-settings-service-override-actions,
+  .oq-settings-service-override-actions .oq-helper-button {
+    width: 100%;
   }
 
   .oq-helper-logo-lockup {

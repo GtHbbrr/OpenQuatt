@@ -13,8 +13,6 @@ button:
     icon: mdi:restart
     entity_category: config
     disabled_by_default: true
-    web_server:
-      sorting_group_id: oq_performance
     on_press:
       - lambda: |-
           id(oq_electrical_energy_cumulative).reset();
@@ -40,8 +38,6 @@ sensor:
     filters:
       - multiply: 0.001
     restore: true
-    web_server:
-      sorting_group_id: oq_performance
 
   # Heating electrical input energy (daily, kWh). Keeps COP heating-only when cooling is active.
   - platform: total_daily_energy
@@ -56,8 +52,6 @@ sensor:
     filters:
       - multiply: 0.001
     restore: true
-    web_server:
-      sorting_group_id: oq_performance
 
   # Cooling electrical input energy (daily, kWh). Used for cooling-only EER.
   - platform: total_daily_energy
@@ -72,8 +66,6 @@ sensor:
     filters:
       - multiply: 0.001
     restore: true
-    web_server:
-      sorting_group_id: oq_performance
 
   # Electrical input energy (cumulative, kWh).
   - platform: integration
@@ -88,8 +80,6 @@ sensor:
     filters:
       - multiply: 0.001
     restore: true
-    web_server:
-      sorting_group_id: oq_performance
 
   # Heating electrical input energy (cumulative, kWh).
   - platform: integration
@@ -104,8 +94,6 @@ sensor:
     filters:
       - multiply: 0.001
     restore: true
-    web_server:
-      sorting_group_id: oq_performance
 
   # Cooling electrical input energy (cumulative, kWh).
   - platform: integration
@@ -120,8 +108,6 @@ sensor:
     filters:
       - multiply: 0.001
     restore: true
-    web_server:
-      sorting_group_id: oq_performance
 
   # Thermal power including HP + boiler contribution (W).
   - platform: template
@@ -133,8 +119,6 @@ sensor:
     state_class: measurement
     accuracy_decimals: 0
     update_interval: 10s
-    web_server:
-      sorting_group_id: oq_performance
     lambda: |-
       auto nz = [](float value) -> float { return isnan(value) ? 0.0f : value; };
       const float hp_heat_w = nz(id(oq_total_heat_power).state);
@@ -149,8 +133,6 @@ sensor:
     state_class: measurement
     accuracy_decimals: 2
     update_interval: 10s
-    web_server:
-      sorting_group_id: oq_performance
     lambda: |-
       const float heat_kwh = id(oq_heatpump_thermal_energy_daily).state;
       const float elec_kwh = id(oq_heating_electrical_energy_daily).state;
@@ -173,8 +155,6 @@ sensor:
     filters:
       - multiply: 0.001
     restore: true
-    web_server:
-      sorting_group_id: oq_performance
 
   # HeatPump thermal energy (cumulative, kWh).
   - platform: integration
@@ -189,8 +169,6 @@ sensor:
     filters:
       - multiply: 0.001
     restore: true
-    web_server:
-      sorting_group_id: oq_performance
 
   # HeatPump cooling energy (daily, kWh).
   - platform: total_daily_energy
@@ -205,8 +183,6 @@ sensor:
     filters:
       - multiply: 0.001
     restore: true
-    web_server:
-      sorting_group_id: oq_performance
 
   # HeatPump cooling energy (cumulative, kWh).
   - platform: integration
@@ -221,8 +197,6 @@ sensor:
     filters:
       - multiply: 0.001
     restore: true
-    web_server:
-      sorting_group_id: oq_performance
 
   # HeatPump COP based on cumulative thermal/electrical energy (kWh/kWh).
   - platform: template
@@ -232,8 +206,6 @@ sensor:
     state_class: measurement
     accuracy_decimals: 2
     update_interval: 10s
-    web_server:
-      sorting_group_id: oq_performance
     lambda: |-
       const float heat_kwh = id(oq_heatpump_thermal_energy_cumulative).state;
       const float elec_kwh = id(oq_heating_electrical_energy_cumulative).state;
@@ -251,8 +223,6 @@ sensor:
     state_class: measurement
     accuracy_decimals: 2
     update_interval: 10s
-    web_server:
-      sorting_group_id: oq_performance
     lambda: |-
       const float cooling_kwh = id(oq_heatpump_cooling_energy_daily).state;
       const float elec_kwh = id(oq_cooling_electrical_energy_daily).state;
@@ -270,8 +240,6 @@ sensor:
     state_class: measurement
     accuracy_decimals: 2
     update_interval: 10s
-    web_server:
-      sorting_group_id: oq_performance
     lambda: |-
       const float cooling_kwh = id(oq_heatpump_cooling_energy_cumulative).state;
       const float elec_kwh = id(oq_cooling_electrical_energy_cumulative).state;
@@ -294,8 +262,6 @@ sensor:
     filters:
       - multiply: 0.001
     restore: true
-    web_server:
-      sorting_group_id: oq_boiler
 
   # Boiler thermal energy (cumulative, kWh).
   - platform: integration
@@ -310,8 +276,6 @@ sensor:
     filters:
       - multiply: 0.001
     restore: true
-    web_server:
-      sorting_group_id: oq_boiler
 
   # System thermal energy (daily, kWh): HeatPump + Boiler.
   - platform: total_daily_energy
@@ -326,8 +290,6 @@ sensor:
     filters:
       - multiply: 0.001
     restore: true
-    web_server:
-      sorting_group_id: oq_performance
 
   # System thermal energy (cumulative, kWh): HeatPump + Boiler.
   - platform: integration
@@ -342,5 +304,3 @@ sensor:
     filters:
       - multiply: 0.001
     restore: true
-    web_server:
-      sorting_group_id: oq_performance

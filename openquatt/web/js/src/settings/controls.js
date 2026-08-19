@@ -1,18 +1,18 @@
 import { hasEntity, isEntityActive } from "../core/app-shared.js";
 import { STRATEGY_OPTION_CURVE, STRATEGY_OPTION_POWER_HOUSE } from "../core/config.js";
 import { getInputDraftValue } from "../core/control-drafts.js";
-import { formatValue, getEntityValue, getNumberMeta, normalizeNumber, toTimeInputValue } from "../core/entity-store.js";
+import { formatValue, getEntityValue, getNumberMeta, normalizeNumber, parseLooseNumber, toTimeInputValue } from "../core/entity-store.js";
 import { escapeHtml } from "../core/html.js";
 import { renderNumberInputControl } from "../core/number-controls.js";
 import { state } from "../core/state.js";
 
-export function renderSettingsInfoToggle(infoId, title, copy) {
+export function renderSettingsInfoToggle(infoId, title, copy, buttonLabel = "i", className = "") {
   if (!copy) {
     return "";
   }
 
   return `
-    <div class="oq-settings-info${state.settingsInfoOpen === infoId ? " is-open" : ""}" data-oq-settings-info="${escapeHtml(infoId)}">
+    <div class="oq-settings-info${className ? ` ${escapeHtml(className)}` : ""}${state.settingsInfoOpen === infoId ? " is-open" : ""}" data-oq-settings-info="${escapeHtml(infoId)}">
       <button
         class="oq-settings-info-button"
         type="button"
@@ -20,7 +20,7 @@ export function renderSettingsInfoToggle(infoId, title, copy) {
         data-info-id="${escapeHtml(infoId)}"
         aria-label="${escapeHtml(`Uitleg bij ${title}`)}"
         aria-expanded="${state.settingsInfoOpen === infoId ? "true" : "false"}"
-      >i</button>
+      >${escapeHtml(buttonLabel)}</button>
       <div class="oq-settings-info-popover" ${state.settingsInfoOpen === infoId ? "" : "hidden"}>
         <p>${escapeHtml(copy)}</p>
       </div>
@@ -62,8 +62,8 @@ export function getSettingsStatValue(key, options = {}) {
     return "—";
   }
 
-  const numeric = Number(entity.value);
-  if (!Number.isNaN(numeric)) {
+  const numeric = parseLooseNumber(entity.value ?? entity.state);
+  if (Number.isFinite(numeric)) {
     const decimals = Number.isInteger(numeric)
       ? 0
       : Number.isFinite(config.decimals) ? config.decimals : 1;
@@ -164,6 +164,10 @@ export function formatSettingsOptionLabel(option) {
     Custom: "Aangepast",
     [STRATEGY_OPTION_CURVE]: "Stooklijn",
     [STRATEGY_OPTION_POWER_HOUSE]: "Power House",
+    "Heating demand": "Warmtevraag",
+    "Cooling demand": "Koelvraag",
+    "Heating or cooling demand": "Warmte- of koelvraag",
+    "External control": "Externe bediening",
     "Dew point required": "Dauwpuntmeting vereist",
     "Dew point": "Dauwpunt",
     "Dew point (MQTT)": "Dauwpunt (MQTT)",
@@ -181,6 +185,11 @@ export function formatSettingsOptionLabel(option) {
     "CIC + HA input": "CIC + HA-invoer",
     "OT thermostat": "OT-thermostaat",
     "Outdoor unit": "Buitenunit",
+    "Local - PT1000": "Lokaal - PT1000",
+    "Local - DS18B20": "Lokaal - DS18B20",
+    "HP1 water out (fallback)": "HP1 uitgaand water (fallback)",
+    "HP2 water out (fallback)": "HP2 uitgaand water (fallback)",
+    Unavailable: "Niet beschikbaar",
     Auto: "Auto",
     "CIC or HA input": "CIC of HA-invoer",
     "Flowmeter HP1": "Flowmeter HP1",
@@ -243,6 +252,23 @@ export function renderSettingsSelectField(key, title, copy, className = "") {
   const value = String(getEntityValue(key) || "");
   const options = getSelectEntityOptions(entity);
   return renderSettingsFieldCard(key, title, copy, `<label class="oq-settings-control oq-settings-control--select"><select class="oq-helper-select" data-oq-field="${escapeHtml(key)}" ${state.loadingEntities ? "disabled" : ""}>${options.map((option) => `<option value="${escapeHtml(option)}" ${option === value ? "selected" : ""}>${escapeHtml(formatSettingsOptionLabel(option))}</option>`).join("")}</select><span class="oq-settings-select-caret" aria-hidden="true"></span></label>`, className);
+}
+
+export function renderSettingsAdvancedDisclosure(id, title, copy, bodyMarkup) {
+  const body = String(bodyMarkup || "").trim();
+  if (!body) {
+    return "";
+  }
+  const open = Boolean(state.settingsAdvancedOpen?.[id]);
+  return `
+    <details class="oq-settings-advanced" data-oq-settings-advanced="${escapeHtml(id)}"${open ? " open" : ""}>
+      <summary data-oq-action="toggle-settings-advanced" data-settings-advanced="${escapeHtml(id)}">${escapeHtml(title)}</summary>
+      <div class="oq-settings-advanced-body">
+        ${copy ? `<p class="oq-settings-advanced-copy">${escapeHtml(copy)}</p>` : ""}
+        ${body}
+      </div>
+    </details>
+  `;
 }
 
 export function renderSettingsSwitchPill(key, enabled, onLabel = "Aan", offLabel = "Uit") {
@@ -435,7 +461,7 @@ export function renderSettingsSliderField(key, title, copy, className = "", opti
   const minLabel = options.minLabel || `${meta.min}${meta.uom || ""}`;
   const maxLabel = options.maxLabel || `${meta.max}${meta.uom || ""}`;
   const valueLabel = options.valueLabel || formatValue(key, value);
-  return renderSettingsFieldCard(key, title, copy, `<label class="oq-helper-slider-field"><div class="oq-helper-slider-meta"><span>${escapeHtml(minLabel)}</span><strong>${escapeHtml(valueLabel)}</strong><span>${escapeHtml(maxLabel)}</span></div><input class="oq-helper-range" type="range" data-oq-field="${escapeHtml(key)}" min="${meta.min}" max="${meta.max}" step="${meta.step}" value="${value}" ${state.loadingEntities ? "disabled" : ""}></label>`, className);
+  return renderSettingsFieldCard(key, title, copy, `<label class="oq-helper-slider-field"><div class="oq-helper-slider-meta"><span>${escapeHtml(minLabel)}</span><strong>${escapeHtml(valueLabel)}</strong><span>${escapeHtml(maxLabel)}</span></div><input class="oq-helper-range" type="range" data-oq-field="${escapeHtml(key)}" min="${meta.min}" max="${meta.max}" step="${meta.step}" value="${value}" ${state.loadingEntities ? "disabled" : ""}></label>`, className, options.footerMarkup || "");
 }
 
 export function renderSettingsMiniNumberField(key, title, copy, options = {}) {
@@ -478,6 +504,6 @@ export function renderSettingsTimeField(key, title, copy, className = "") {
   return renderSettingsFieldCard(key, title, copy, `<label class="oq-settings-control oq-settings-control--time"><input class="oq-helper-input oq-helper-input--time" type="time" step="60" lang="nl-NL" inputmode="numeric" data-oq-field="${escapeHtml(key)}" value="${escapeHtml(value)}" ${state.loadingEntities ? "disabled" : ""}><span class="oq-settings-time-icon" aria-hidden="true"><svg viewBox="0 0 20 20" focusable="false"><circle cx="10" cy="10" r="6.5" fill="none" stroke="currentColor" stroke-width="1.6" /><path d="M10 6.2 V10 L12.9 11.8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" /></svg></span></label>`, className || "oq-settings-field--time");
 }
 
-export function renderSettingsSection(kicker, title, copy, body, badgeMarkup = "") {
-  return `<section class="oq-settings-section"><div class="oq-settings-section-head"><div class="oq-settings-section-head-meta"><p class="oq-helper-label">${escapeHtml(kicker)}</p>${badgeMarkup ? `<div class="oq-settings-section-head-meta-badge">${badgeMarkup}</div>` : ""}</div><h3>${escapeHtml(title)}</h3><p>${escapeHtml(copy)}</p></div>${body}</section>`;
+export function renderSettingsSection(kicker, title, copy, body, badgeMarkup = "", className = "") {
+  return `<section class="oq-settings-section${className ? ` ${escapeHtml(className)}` : ""}"><div class="oq-settings-section-head"><div class="oq-settings-section-head-meta"><p class="oq-helper-label">${escapeHtml(kicker)}</p>${badgeMarkup ? `<div class="oq-settings-section-head-meta-badge">${badgeMarkup}</div>` : ""}</div><h3>${escapeHtml(title)}</h3><p>${escapeHtml(copy)}</p></div>${body}</section>`;
 }

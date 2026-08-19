@@ -67,8 +67,6 @@ switch:
     restore_mode: RESTORE_DEFAULT_ON
     optimistic: true
     entity_category: config
-    web_server:
-      sorting_group_id: oq_control
 
 number:
   - platform: template
@@ -84,8 +82,6 @@ number:
     restore_value: true
     initial_value: 1.0
     entity_category: config
-    web_server:
-      sorting_group_id: oq_control
 
   - platform: template
     id: cooling_request_on_delta
@@ -100,8 +96,6 @@ number:
     restore_value: true
     initial_value: 0.4
     entity_category: config
-    web_server:
-      sorting_group_id: oq_control
 
   - platform: template
     id: cooling_request_off_delta
@@ -116,8 +110,6 @@ number:
     restore_value: true
     initial_value: 0.1
     entity_category: config
-    web_server:
-      sorting_group_id: oq_control
 
 select:
   - platform: template
@@ -132,8 +124,6 @@ select:
       - "Home Assistant"
       - "MQTT"
     initial_option: Auto
-    web_server:
-      sorting_group_id: oq_cooling
 
   - platform: template
     id: cooling_without_dew_point_mode
@@ -147,8 +137,6 @@ select:
       - "Allow without dew point, use dew point approximation"
       - "Allow without dew point, user responsibility"
     initial_option: Dew point required
-    web_server:
-      sorting_group_id: oq_cooling
 
 binary_sensor:
   - platform: template
@@ -173,8 +161,6 @@ binary_sensor:
     device_class: running
     lambda: |-
       return oq_cooling_safety::runtime().fallback_active();
-    web_server:
-      sorting_group_id: oq_cooling
 
   - platform: template
     id: cooling_permitted_core
@@ -191,8 +177,6 @@ binary_sensor:
     device_class: running
     lambda: |-
       return oq_cooling_safety::runtime().request_active();
-    web_server:
-      sorting_group_id: oq_cooling
 
   - platform: template
     id: cooling_permitted
@@ -202,8 +186,6 @@ binary_sensor:
     lambda: |-
       // User-facing permission includes both the core cooling prerequisites and the live flow guard.
       return oq_cooling_safety::runtime().permitted((float) ${oq_cm_min_flow_lph});
-    web_server:
-      sorting_group_id: oq_cooling
 
   - platform: template
     id: cooling_dew_point_available
@@ -212,8 +194,6 @@ binary_sensor:
     device_class: connectivity
     lambda: |-
       return id(cooling_dew_point_selected).has_state() && !isnan(id(cooling_dew_point_selected).state);
-    web_server:
-      sorting_group_id: oq_cooling
 
 text_sensor:
   - platform: template
@@ -225,8 +205,6 @@ text_sensor:
     lambda: |-
       // Summarize which cooling safety route is currently active.
       return {oq_cooling_safety::runtime().guard_mode()};
-    web_server:
-      sorting_group_id: oq_cooling
 
   - platform: template
     id: cooling_block_reason
@@ -237,8 +215,6 @@ text_sensor:
     lambda: |-
       // Report the first blocking condition in operator-friendly terms.
       return {oq_cooling_safety::runtime().block_reason((float) ${oq_cm_min_flow_lph})};
-    web_server:
-      sorting_group_id: oq_cooling
 
 sensor:
   - platform: template
@@ -250,8 +226,6 @@ sensor:
     update_interval: 10s
     lambda: |-
       return oq_cooling_safety::runtime().safety_margin_selected();
-    web_server:
-      sorting_group_id: oq_cooling
 
   - platform: template
     id: cooling_dew_point_selected
@@ -275,8 +249,6 @@ sensor:
           alpha: 0.3
           send_every: 1
           send_first_at: 1
-    web_server:
-      sorting_group_id: oq_cooling
 
   - platform: template
     id: minimum_safe_supply_temp
@@ -290,8 +262,6 @@ sensor:
     lambda: |-
       // This is the central cooling guardrail: never target water below dew point + margin.
       return oq_cooling_safety::runtime().minimum_safe_supply();
-    web_server:
-      sorting_group_id: oq_cooling
 
   - platform: template
     id: cooling_fallback_night_min_outdoor_temp
@@ -306,8 +276,6 @@ sensor:
     update_interval: 60s
     lambda: |-
       return oq_cooling_safety::runtime().fallback_night_min_outdoor_temp();
-    web_server:
-      sorting_group_id: oq_cooling
 
   - platform: template
     id: cooling_fallback_min_supply_temp
@@ -323,8 +291,6 @@ sensor:
     lambda: |-
       // Conservative fallback floor for systems without a dew-point source.
       return oq_cooling_safety::runtime().fallback_min_supply_temp();
-    web_server:
-      sorting_group_id: oq_cooling
 
   - platform: template
     id: cooling_effective_min_supply_temp
@@ -338,8 +304,6 @@ sensor:
     lambda: |-
       // Publish the active floor that raises the configured cooling target.
       return oq_cooling_safety::runtime().effective_min_supply_temp();
-    web_server:
-      sorting_group_id: oq_cooling
 
 interval:
   - interval: 60s

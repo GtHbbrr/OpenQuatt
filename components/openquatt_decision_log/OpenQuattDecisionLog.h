@@ -5,6 +5,7 @@
 
 #include <esp_http_server.h>
 #include "OpenQuattFlashLayout.h"
+#include "OpenQuattUrgentFlushPolicy.h"
 #include "esp_partition.h"
 #include <freertos/FreeRTOS.h>
 #include <freertos/portmacro.h>
@@ -43,6 +44,15 @@ enum EventType : uint8_t {
   EVENT_STARTUP_INHIBIT_START = 20,
   EVENT_STARTUP_INHIBIT_CLEAR = 21,
   EVENT_STARTUP_INHIBIT_REFRESH = 22,
+  EVENT_INCIDENT_START = 23,
+  EVENT_INCIDENT_CLEAR = 24,
+  EVENT_INCIDENT_ACKNOWLEDGED = 25,
+  EVENT_HP_AVAILABILITY_CHANGE = 26,
+  EVENT_CONTROL_MODE_CHANGE = 27,
+  EVENT_BOILER_FALLBACK_START = 28,
+  EVENT_BOILER_FALLBACK_STOP = 29,
+  EVENT_HP_START_CONFIRMED = 30,
+  EVENT_HP_STOP_CONFIRMED = 31,
 };
 
 enum Subject : uint8_t {
@@ -96,6 +106,21 @@ enum ReasonCode : uint8_t {
   REASON_OIL_RETURN_RECOVERY = 53,
   REASON_CAPACITY_CAP = 54,
   REASON_STARTUP_INHIBIT = 55,
+  REASON_HP_FAULT = 56,
+  REASON_HP_PROTECTION = 57,
+  REASON_HP_PREHEAT = 58,
+  REASON_HP_LINK_LOSS = 59,
+  REASON_HP_START_FAILED = 60,
+  REASON_HP_STOP_UNCONFIRMED = 61,
+  REASON_HP_RECOVERY_WAIT = 62,
+  REASON_BOILER_FALLBACK = 64,
+  REASON_FALLBACK_BLOCKED = 65,
+  REASON_HEATING_REQUEST = 66,
+  REASON_COOLING_REQUEST = 67,
+  REASON_COMMISSIONING = 68,
+  REASON_SUPERVISORY_OVERRIDE = 69,
+  REASON_HP_PERSISTENCE_FAILURE = 70,
+  REASON_HP_RECOVERED = 71,
 };
 
 enum Severity : uint8_t {
@@ -115,6 +140,26 @@ enum DecisionState : uint8_t {
   STATE_DUO = 5,
   STATE_BLOCKED = 6,
   STATE_LIMITED = 7,
+  STATE_AVAILABLE = 8,
+  STATE_SUSPECT = 9,
+  STATE_OFFLINE = 10,
+  STATE_FAULTED = 11,
+  STATE_RECOVERING = 12,
+  STATE_STARTING = 13,
+  STATE_PREHEAT = 14,
+  STATE_FALLBACK = 15,
+};
+
+enum EventFlags : uint8_t {
+  FLAG_NONE = 0x00,
+  FLAG_LATCHED = 0x01,
+  FLAG_AUTO_CLEARABLE = 0x02,
+  FLAG_STOP_UNCONFIRMED = 0x04,
+  FLAG_FALLBACK_REQUESTED = 0x08,
+  FLAG_FALLBACK_BLOCKED = 0x10,
+  FLAG_RAW_VALUE_VALID = 0x20,
+  FLAG_MANUAL_RESET_REQUIRED = 0x40,
+  FLAG_RESTORED_AFTER_BOOT = 0x80,
 };
 
 struct DecisionEvent {
@@ -167,8 +212,8 @@ class OpenQuattDecisionLog : public Component {
  public:
   ~OpenQuattDecisionLog();
 
-  void set_clock(time::RealTimeClock *clock) { this->clock_ = clock; }
-  void set_flash_switch(switch_::Switch *flash_switch) { this->flash_switch_ = flash_switch; }
+  void set_clock(time::RealTimeClock* clock) { this->clock_ = clock; }
+  void set_flash_switch(switch_::Switch* flash_switch) { this->flash_switch_ = flash_switch; }
   void set_event_capacity(size_t capacity) { this->event_capacity_requested_ = capacity; }
   void set_event_fallback_capacity(size_t capacity) { this->event_capacity_fallback_ = capacity; }
   void set_hour_bucket_capacity(size_t capacity) { this->bucket_capacity_requested_ = capacity; }
@@ -180,21 +225,12 @@ class OpenQuattDecisionLog : public Component {
   void dump_config() override;
   float get_setup_priority() const override;
 
-  void emit(uint8_t event_type,
-            uint8_t subject,
-            uint8_t reason_code,
-            uint8_t severity,
-            uint8_t control_mode_code,
-            uint8_t from_state,
-            uint8_t to_state,
-            int16_t value_a = 0,
-            int16_t value_b = 0,
-            int16_t threshold_a = 0,
-            uint16_t duration_s = 0,
-            uint8_t flags = 0);
+  void emit(uint8_t event_type, uint8_t subject, uint8_t reason_code, uint8_t severity, uint8_t control_mode_code,
+            uint8_t from_state, uint8_t to_state, int16_t value_a = 0, int16_t value_b = 0, int16_t threshold_a = 0,
+            uint16_t duration_s = 0, uint8_t flags = 0);
 
-  void write_decision_log(httpd_req_t *req) const;
-  void write_metadata(httpd_req_t *req) const;
+  void write_decision_log(httpd_req_t* req) const;
+  void write_metadata(httpd_req_t* req) const;
   void set_flash_enabled(bool enabled);
   bool force_flush();
   bool clear_flash_history();
@@ -212,6 +248,10 @@ class OpenQuattDecisionLog : public Component {
   static constexpr size_t FLASH_EVENTS_PER_SLOT = 20;
   static constexpr size_t FLASH_EVENT_CAPACITY = FLASH_SLOT_COUNT * FLASH_EVENTS_PER_SLOT;
   static constexpr uint32_t RETENTION_SECONDS = 7UL * 24UL * 60UL * 60UL;
+  static constexpr uint64_t URGENT_FLUSH_COALESCE_US = 2ULL * 1000ULL * 1000ULL;
+  static constexpr uint64_t URGENT_FLUSH_MIN_INTERVAL_US = 15ULL * 1000ULL * 1000ULL;
+  static constexpr uint64_t URGENT_FLUSH_RETRY_US = 30ULL * 1000ULL * 1000ULL;
+  static constexpr size_t URGENT_FLUSH_MAX_BATCHES = 4U;
 
   static_assert(FLASH_EVENT_CAPACITY == 5120, "Decision-log flash ring capacity changed unexpectedly");
   static_assert(FLASH_PARTITION_OFFSET % FLASH_SECTOR_SIZE == 0,
@@ -263,12 +303,12 @@ class OpenQuattDecisionLog : public Component {
   static_assert(sizeof(FlashBlockHeader) + (sizeof(FlashEventRecord) * FLASH_EVENTS_PER_SLOT) == FLASH_SLOT_SIZE,
                 "Decision-log event block must fill one flash slot");
 
-  time::RealTimeClock *clock_{nullptr};
-  switch_::Switch *flash_switch_{nullptr};
-  const esp_partition_t *flash_partition_{nullptr};
-  DecisionEvent *events_{nullptr};
-  HourBucket *buckets_{nullptr};
-  FlashBlockInfo *flash_index_{nullptr};
+  time::RealTimeClock* clock_{nullptr};
+  switch_::Switch* flash_switch_{nullptr};
+  const esp_partition_t* flash_partition_{nullptr};
+  DecisionEvent* events_{nullptr};
+  HourBucket* buckets_{nullptr};
+  FlashBlockInfo* flash_index_{nullptr};
   size_t event_capacity_requested_{FLASH_EVENT_CAPACITY};
   size_t event_capacity_fallback_{128};
   size_t bucket_capacity_requested_{168};
@@ -291,6 +331,7 @@ class OpenQuattDecisionLog : public Component {
   uint32_t flash_last_flush_epoch_s_{0};
   uint32_t flash_stored_event_count_{0};
   uint32_t tracked_hour_start_epoch_s_{0};
+  UrgentFlushPolicy urgent_flush_{};
   mutable portMUX_TYPE mux_ = portMUX_INITIALIZER_UNLOCKED;
 
   bool time_is_valid_() const;
@@ -299,33 +340,40 @@ class OpenQuattDecisionLog : public Component {
   uint64_t boot_epoch_s_() const;
   void release_buffers_();
   void allocate_buffers_();
-  void push_event_locked_(const DecisionEvent &event);
-  void update_bucket_locked_(const DecisionEvent &event);
-  HourBucket *current_bucket_locked_(uint64_t uptime_s, uint32_t epoch_s, bool *created = nullptr);
-  bool copy_event_(size_t index, DecisionEvent *out) const;
-  bool copy_bucket_(size_t index, HourBucket *out) const;
-  bool copy_flash_info_(size_t index, FlashBlockInfo *out) const;
+  bool push_event_locked_(const DecisionEvent& event);
+  void update_bucket_locked_(const DecisionEvent& event);
+  HourBucket* current_bucket_locked_(uint64_t uptime_s, uint32_t epoch_s, bool* created = nullptr);
+  bool copy_event_(size_t index, DecisionEvent* out) const;
+  bool copy_bucket_(size_t index, HourBucket* out) const;
+  bool copy_flash_info_(size_t index, FlashBlockInfo* out) const;
   bool flash_switch_enabled_() const;
   bool flash_partition_available_() const;
   bool flash_archive_available_() const;
+  static bool urgent_event_(const DecisionEvent& event);
+  void request_urgent_flush_(uint32_t event_seq);
+  void clear_urgent_flush_(uint64_t now_us);
+  void complete_urgent_flush_(uint64_t now_us, uint32_t persisted_target_seq);
+  void process_urgent_flush_();
   bool scan_flash_archive_();
-  bool read_flash_block_(uint32_t slot_index, uint32_t expected_sequence, FlashBlockInfo *info,
-                         FlashEventRecord *events) const;
-  bool write_flash_events_(const DecisionEvent *events, size_t event_count);
-  bool flush_pending_events_();
+  bool read_flash_block_(uint32_t slot_index, uint32_t expected_sequence, FlashBlockInfo* info,
+                         FlashEventRecord* events) const;
+  bool write_flash_events_(const DecisionEvent* events, size_t event_count);
+  bool flush_pending_events_(size_t max_batches = SIZE_MAX, bool urgent_target_active = false,
+                             uint32_t urgent_target_seq = 0U, bool* urgent_target_persisted = nullptr);
+  void record_flash_block_(const FlashBlockInfo& info);
   void restore_flash_events_();
   void initialize_current_hour_();
   void reset_flash_metadata_();
   void rebuild_flash_metadata_();
-  static FlashEventRecord pack_flash_event_(const DecisionEvent &event);
-  static DecisionEvent unpack_flash_event_(const FlashEventRecord &event);
-  static uint32_t fnv1a_hash_(const uint8_t *data, size_t len);
+  static FlashEventRecord pack_flash_event_(const DecisionEvent& event);
+  static DecisionEvent unpack_flash_event_(const FlashEventRecord& event);
+  static uint32_t fnv1a_hash_(const uint8_t* data, size_t len);
 
-  static const char *event_type_to_string_(uint8_t value);
-  static const char *subject_to_string_(uint8_t value);
-  static const char *reason_to_string_(uint8_t value);
-  static const char *severity_to_string_(uint8_t value);
-  static const char *state_to_string_(uint8_t value);
+  static const char* event_type_to_string_(uint8_t value);
+  static const char* subject_to_string_(uint8_t value);
+  static const char* reason_to_string_(uint8_t value);
+  static const char* severity_to_string_(uint8_t value);
+  static const char* state_to_string_(uint8_t value);
   static uint16_t increment_u16_(uint16_t value);
 };
 

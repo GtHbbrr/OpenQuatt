@@ -153,6 +153,24 @@ Kies je expliciet `MQTT`, houd er dan rekening mee dat de MQTT-buitentemperatuur
 
 Voor `Cooling Dew Point Source` is `Auto` meestal ook de veiligste keuze. OpenQuatt gebruikt dan de hoogste geldige dauwpuntwaarde van Home Assistant en MQTT. Kies `Home Assistant` of `MQTT` alleen als je die bron expliciet wilt vereisen.
 
+De temperatuurkalibratie neemt ook de actieve aanvoertemperatuurbron mee. OpenQuatt bewaart daarvoor vier afzonderlijke offsets: voor de lokale PT1000, lokale DS18B20, CIC-feed en Home Assistant-invoer. Bij een bronwissel activeert OpenQuatt automatisch de eerder opgeslagen correctie voor die bron. De CIC-correctie blijft geldig na een gewijzigde feed-URL; na een andere Home Assistant-entiteit blijft die correctie uitgeschakeld totdat je de HA-invoer opnieuw kalibreert. Een tijdelijke automatische fallback naar de water-uitmeting van de warmtepomp gebruikt geen aanvoercorrectie en wist geen opgeslagen kalibratie.
+
+De instellingenbackup bevat de vier warmtepompoffsets en iedere geldige brongebonden aanvoercorrectie. Voor Home Assistant bewaart de backup ook een anonieme bronfingerprint, zodat een offset niet aan een andere HA-entiteit wordt gekoppeld; de firmware reconstrueert de checksum zelf. Kalibreer opnieuw wanneer de controller of temperatuursensor fysiek is vervangen of wanneer je een andere Home Assistant-invoer gebruikt.
+
+### 6. Hulprelais R2 (alleen Heatpump Controller Q-edition)
+
+Deze groep bestaat alleen op hardware met een tweede relais (R2) en staat standaard uit.
+
+Belangrijke instellingen:
+
+- `Aux Relay Function`
+- `Aux Relay Wait For Supply Temp`
+- `Aux Relay Heating Start Temp`
+- `Aux Relay Cooling Start Temp`
+- `Aux Relay Temp Hysteresis`
+
+Met `Aux Relay Function` volgt R2 de effectieve warmte- of koelvraag van OpenQuatt, bijvoorbeeld om een fancoil, pomp of klep mee te schakelen. Met de schakelaar `Aux Relay Wait For Supply Temp` wacht R2 daarnaast tot het aanvoerwater warm of koud genoeg is; de hysterese voorkomt snel aan/uit schakelen rond de grens. Kies `Externe bediening` om R2 zelf te schakelen via bijvoorbeeld Home Assistant of de REST-API; in de automatische functies worden externe schakelcommando's genegeerd. Zonder vraag, met de functie op `Niet gebruiken`, of zonder geldige aanvoertemperatuur (als de schakelaar aan staat) blijft R2 uit. De actuele toestand en reden zie je onder **Instellingen → Installatie → Hulprelais (R2)**.
+
 ## Welke meetwaarden wil je meestal zien?
 
 ### Voor comfort en strategie
@@ -169,6 +187,7 @@ Begin bijna altijd met:
 Controleer daarna:
 
 - `Water Supply Temp (Selected)`
+- `Water Supply Temperature Calibration Status`
 - `Maximum water temperature`
 - `Heating Curve Supply Target` als je stooklijn gebruikt
 
@@ -187,6 +206,22 @@ Alleen als het probleem daar lijkt te zitten:
 - opgenomen vermogen;
 - power cap;
 - gedrag rond stille uren of begrenzing.
+
+### Voor compressorpendelen
+
+De diagnostische pendelwaarschuwingen zijn in Home Assistant standaard
+uitgeschakeld. Schakel `Compressor cycling warning` in om één samengesteld
+signaal te krijgen zodra minimaal één actuele pendelwaarschuwing actief is. De
+oorzaak blijft na inschakelen van de bijbehorende detailentiteiten afzonderlijk
+zichtbaar via:
+
+- `Compressor cycling warning 2h`;
+- `Compressor cycling warning 72h`;
+- `Alternating compressor starts warning` bij een duo-installatie.
+
+De signalen kunnen gelijktijdig actief zijn en worden weer inactief zodra de
+bijbehorende actuele conditie is hersteld. Een eerder gedetecteerde maar alleen
+nog gelatchte melding houdt `Compressor cycling warning` niet actief.
 
 ## Wanneer zit je waarschijnlijk in de verkeerde laag?
 

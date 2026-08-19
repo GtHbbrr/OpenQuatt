@@ -13,12 +13,13 @@
 device_name: "openquatt"                              # Internal ESPHome device ID / hostname base.
 friendly_name: OpenQuatt                              # Display name in Home Assistant / UI.
 project_name: "openquatt.openquatt"                   # ESPHome project identifier shown in firmware metadata.
-project_version: "v0.45.2"                            # ESPHome project version shown in firmware metadata.
+project_version: "v0.47.0"                            # ESPHome project version shown in firmware metadata.
 release_channel: "main"                               # Firmware release channel shown in diagnostics (`main` or `dev`).
 oq_firmware_initial_check_delay_s: "300"              # Stable-network delay before the first automatic manifest check [s].
 oq_firmware_periodic_check_interval: "4h"              # Automatic manifest-check cadence after the initial boot window.
 oq_hardware_profile: "unknown"                        # Compile-time hardware profile id.
 oq_hardware_build_flag: "-DOQ_HARDWARE_HEATPUMP_CONTROLLER_Q=0" # Hardware capability flag for C++ lambdas.
+oq_boiler_transport_shutdown_extra: ""                 # Optional profile-specific synchronous actuator shutdown statements.
 oq_local_supply_temp_sensor_id: "water_supply_temp_ds18b20" # Profile-safe local supply-temperature sensor used by shared lambdas.
 oq_local_supply_temp_selector_id: "water_supply_source"     # Validation-safe placeholder outside Q profiles.
 oq_controller_flow_sensor_id: "hp1_flow"              # Profile-safe controller-flow source used by shared lambdas.
@@ -107,6 +108,7 @@ secondary_outside_temp_id: "${secondary_hp_id}_outside_temp"
 secondary_outside_last_change_ms_id: "${secondary_hp_id}_outside_temp_last_change_ms"
 secondary_outside_activity_ms_id: "${secondary_hp_id}_outside_temp_activity_ms"
 secondary_water_out_temp_id: "${secondary_hp_id}_water_out_temp"
+secondary_water_out_last_update_ms_id: "${secondary_hp_id}_water_out_temp_last_update_ms"
 secondary_fault_binary_sensor_id: "${secondary_hp_id}_ot_fault_active"
 
 # ----------------------------
@@ -138,6 +140,8 @@ oq_cm3_promote_s: "300"                               # Required deficit duratio
 oq_cm3_demote_s: "120"                                # Required low-deficit duration for CM3 -> CM2 demotion [s].
 oq_cm3_min_run_s: "300"                               # Minimum dwell time in CM3 before demotion [s].
 oq_cm2_min_run_s: "120"                               # Minimum dwell time in CM2 before promotion [s].
+oq_cm3_curve_on_delta_c: "3.0"                        # Heating Curve target-minus-supply margin for CM2 -> CM3 [°C].
+oq_cm3_curve_off_delta_c: "1.0"                       # Heating Curve target-minus-supply margin for CM3 -> CM2 [°C].
 oq_cm0_sticky_wait_s: "86400"                         # Wait time in CM0 before sticky-pump run starts [s].
 oq_cm0_sticky_run_s: "60"                             # Duration of sticky-pump run in CM0 [s].
 oq_cm0_pump_stop_ipwm: "1000.0"                       # iPWM setpoint that forces pump off in CM0.
@@ -150,6 +154,8 @@ oq_strategy_loop_s: "5"                               # Interval for strategy ca
 oq_diagnostic_update_interval_s: "30"                # Shared cadence for slower operator-facing diagnostics [s].
 oq_strategy_demand_max_f: "20.0"                      # Upper bound of demand scale for mapping PID/power -> f.
 oq_selected_input_stale_hold_s: "300"                 # Hold selected HA-backed inputs this long when they briefly disappear during reloads [s].
+oq_water_supply_temp_local_cic_hold_s: "15"            # Hold Local/CIC supply temperature through brief sensor dropouts [s].
+oq_hp_water_temp_stale_s: "60"                        # Maximum age for a heat-pump water temperature used as supply fallback [s].
 oq_temp_guard_delta_c: "0.5"                          # Minimum valid margin between T0 and Tc in the house model [°C].
 oq_outside_temp_stale_s: "1200"                       # Ignore a local outdoor reading when it stays frozen while the same HP still shows fresh activity [s].
 
@@ -208,12 +214,29 @@ oq_water_cp_j_per_kgk: "4186.0"                       # Specific heat capacity o
 # BOILER CONTROL
 # ----------------------------
 oq_boiler_loop_s: "5"                                 # Main interval for boiler gating/safety loop [s].
+oq_boiler_command_max_age_s: "75"                     # Fail-safe command age; covers the 60s Power House cadence plus scheduler margin [s].
+oq_boiler_transport_settle_s: "2"                     # Break-before-make hold after changing R1/OpenTherm transport [s].
+oq_boiler_relay_min_on_s: "0"                         # R1 minimum on-time [s]; zero preserves existing relay behavior in foundation phase.
+oq_boiler_relay_min_off_s: "0"                        # R1 minimum off-time [s]; zero preserves existing relay behavior in foundation phase.
+oq_boiler_otb_min_on_s: "30"                          # OpenTherm minimum requested on-time [s]; safety trips override it.
+oq_boiler_otb_min_off_s: "120"                        # OpenTherm minimum requested off-time [s].
+oq_otb_supported: "false"                             # Compile-time availability of the boiler OpenTherm master transport.
+oq_otb_command_apply_s: "1"                           # Apply validated CH/TSet state to the OpenTherm master [s].
+oq_otb_startup_probe_timeout_s: "8"                   # R1 boot verification window for detecting a physically connected OpenTherm boiler [s].
+oq_boiler_transport_selection_extra: ""               # Hardware-specific start/stop hook after changing the boiler transport.
 
 # ----------------------------
 # OPEN THERM SLAVE
 # ----------------------------
 oq_ot_enabled_default: "false"                        # Default runtime state of the OT slave bus handler.
 oq_ot_response_enabled_default: "true"                # Allow the OT slave to answer thermostat requests by default.
+
+# ----------------------------
+# OPEN THERM BOILER MASTER
+# ----------------------------
+oq_otb_link_watch_s: "1"                              # OTB link/freshness evaluation interval [s].
+oq_otb_link_timeout_s: "10"                           # Maximum age of the last valid boiler response [s].
+oq_otb_field_timeout_s: "10"                          # Maximum age of one repeating boiler telemetry field [s].
 
 # ----------------------------
 # CIC FEED

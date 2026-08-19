@@ -32,3 +32,30 @@ export function isUsageTelemetryChoiceConfirmed({
     && telemetryEnabled !== null
     && telemetryEnabled === expectedEnabled;
 }
+
+export async function waitForUsageTelemetryChoiceConfirmation({
+  refresh,
+  expectedEnabled,
+  wait = (ms) => new Promise((done) => setTimeout(done, ms)),
+  now = Date.now,
+}) {
+  const deadline = now() + 2000;
+
+  for (let attempt = 0; attempt < 10 && now() < deadline; attempt += 1) {
+    await wait(Math.min(200, deadline - now()));
+    let values;
+    try {
+      values = await refresh();
+    } catch {
+      continue;
+    }
+    if (isUsageTelemetryChoiceConfirmed({
+      telemetryValue: values[0],
+      choiceValue: values[1],
+      expectedEnabled,
+    })) {
+      return true;
+    }
+  }
+  return false;
+}

@@ -6,6 +6,7 @@ import { getRenderSignature } from "../core/render-signatures.js";
 import { state } from "../core/state.js";
 import { setViewPatchControls } from "../core/view-patch-controls.js";
 import { getInstallationTopology } from "./device-context.js";
+import { getControlReplayIncidentDisplaySeverity, getControlReplayIncidentEventCopy, getControlReplayIncidentModeAfterEvent, getControlReplayIncidentModeTransition, getControlReplayIncidentReasonMeta } from "./control-replay-incidents.js";
 import { formatWorkingMode, getHeatPumpPanels } from "../views/heatpump.js";
 import { isCoolingOverviewActive } from "../views/overview.js";
 import { replaceOuterHtmlIfSignatureChanged } from "../views/view-utils.js";
@@ -146,6 +147,7 @@ import { replaceOuterHtmlIfSignatureChanged } from "../views/view-utils.js";
     if (normalized.includes("cm100")) return "cm100";
     if (normalized.includes("cm98")) return "cm98";
     if (normalized.includes("cm5")) return "cm5";
+    if (normalized.includes("cm4")) return "cm4";
     if (normalized.includes("cm3")) return "cm3";
     if (normalized.includes("cm2")) return "cm2";
     if (normalized.includes("cm1")) return "cm1";
@@ -569,7 +571,9 @@ import { replaceOuterHtmlIfSignatureChanged } from "../views/view-utils.js";
   });
 
   function getControlWorkingReasonMeta(reasonCode) {
-    return CONTROL_WORKING_REASON_METAS[reasonCode] || CONTROL_WORKING_REASON_FALLBACK;
+    return CONTROL_WORKING_REASON_METAS[reasonCode]
+      || getControlReplayIncidentReasonMeta(reasonCode)
+      || CONTROL_WORKING_REASON_FALLBACK;
   }
 
   function getControlWorkingReasonLabel(reasonCode) {
@@ -603,6 +607,10 @@ import { replaceOuterHtmlIfSignatureChanged } from "../views/view-utils.js";
     if (eventType === "flow_hold_clear" && cm === 1 && Number.isFinite(valueA)) {
       return formatControlWorkingModeTransition(1, valueA);
     }
+    const incidentTransition = getControlReplayIncidentModeTransition(event, previousCm);
+    if (incidentTransition) {
+      return formatControlWorkingModeTransition(incidentTransition.from, incidentTransition.to);
+    }
     return "";
   }
 
@@ -615,6 +623,10 @@ import { replaceOuterHtmlIfSignatureChanged } from "../views/view-utils.js";
     }
     if (eventType === "frost_protection_clear") {
       return 0;
+    }
+    const incidentMode = getControlReplayIncidentModeAfterEvent(event);
+    if (incidentMode !== null) {
+      return incidentMode;
     }
     return cm;
   }
@@ -961,6 +973,17 @@ import { replaceOuterHtmlIfSignatureChanged } from "../views/view-utils.js";
       expectation = "Koeling blijft actief tot de kamertemperatuur richting setpoint zakt of bescherming ingrijpt.";
       primaryReason = "keep_current";
       sinceLabel = "Koelen";
+    } else if (currentModeId === "cm4") {
+      title = boilerActive ? "Ketelfallback actief" : "Ketelfallbackrol niet actief";
+      copy = boilerActive
+        ? "Geen warmtepomp is inzetbaar; de CV-ketel krijgt in CM4 de verwarmingsopdracht."
+        : "CM4 is als regelrol gekozen, maar de keteluitvoer is op dit moment niet actief.";
+      expectation = boilerActive
+        ? "OpenQuatt blijft warmtepompherstel en alle veiligheidsvoorwaarden bewaken."
+        : "De uitvoer blijft uit totdat de benodigde veiligheidsvoorwaarden geldig zijn.";
+      severity = "fault";
+      primaryReason = boilerActive ? "boiler_fallback" : "fallback_blocked";
+      sinceLabel = boilerActive ? "Fallback actief" : "Uitvoer geblokkeerd";
     } else if (boilerActive) {
       title = "CV-ketel ondersteunt";
       copy = "De CV-ketel helpt tijdelijk omdat de warmtevraag meer vermogen vraagt dan de warmtepompen nu leveren.";
@@ -1006,7 +1029,7 @@ import { replaceOuterHtmlIfSignatureChanged } from "../views/view-utils.js";
       hp2Available: Boolean(hp2Panel),
       hp1Status: hp1Running ? "Actief" : hp1Waiting ? "Wacht" : "Beschikbaar",
       hp2Status: hp2Panel ? (hp2Running ? "Actief" : hp2Waiting ? "Wacht" : "Beschikbaar") : "Niet aanwezig",
-      cvStatus: boilerActive ? "Actief" : "Uit",
+      cvStatus: boilerActive ? (currentModeId === "cm4" ? "Fallback" : "Actief") : "Uit",
       outsideTemp: formatControlReplayNumber("outsideTempSelected", 1, "°C", "—"),
       supplyTemp: formatControlReplayNumber("supplyTemp", 1, "°C", "—"),
       flow: formatControlReplayNumber("flowSelected", 0, "L/h", "—"),
@@ -1229,6 +1252,10 @@ import { replaceOuterHtmlIfSignatureChanged } from "../views/view-utils.js";
     const reason = getControlWorkingReasonMeta(reasonCode);
     const isFlowPreStart = reasonCode === "flow_preflow";
     const isFlowFault = reasonCode === "flow_too_low";
+    const incidentCopy = getControlReplayIncidentEventCopy(event, subject);
+    if (incidentCopy) {
+      return incidentCopy;
+    }
     const fallback = {
       title: "Keuze van het systeem",
       summary: "De regelaar heeft een keuze vastgelegd.",
@@ -1646,6 +1673,10 @@ import { replaceOuterHtmlIfSignatureChanged } from "../views/view-utils.js";
   function getDecisionEventDisplaySeverity(event) {
     const eventType = String(event?.event_type || "");
     const reason = String(event?.reason || "");
+    const incidentSeverity = getControlReplayIncidentDisplaySeverity(event);
+    if (incidentSeverity) {
+      return incidentSeverity;
+    }
     if (isDecisionCoolingAdjustmentEvent(event)) {
       return "normal";
     }
@@ -1854,9 +1885,11 @@ import { replaceOuterHtmlIfSignatureChanged } from "../views/view-utils.js";
             closeInterval("HP2", event);
             closeInterval("cooling", event);
           }
-        } else if (eventType === "boiler_assist_start") {
+        } else if (eventType === "boiler_assist_start"
+          || eventType === "boiler_fallback_start") {
           openInterval("boiler", event);
-        } else if (eventType === "boiler_assist_stop") {
+        } else if (eventType === "boiler_assist_stop"
+          || eventType === "boiler_fallback_stop") {
           closeInterval("boiler", event);
         } else if (eventType === "frost_protection_start") {
           openInterval("frost", event);
@@ -1938,21 +1971,28 @@ import { replaceOuterHtmlIfSignatureChanged } from "../views/view-utils.js";
     });
 
     intervals.boiler.forEach((interval, index) => {
+      const isFallback = String(interval.startEvent?.event_type || "") === "boiler_fallback_start";
       addItem(createControlWorkingDerivedSpan({
         id: `fw-span-boiler-${index}-${interval.startEvent?.seq || interval.startEpochMs}`,
         startEpochMs: interval.startEpochMs,
         endEpochMs: interval.endEpochMs,
         isOpen: Boolean(interval.isOpen),
         startEvent: interval.startEvent,
-        severity: "normal",
-        title: "CV-ketel ondersteunde tijdelijk",
-        summary: "De CV-ketel hielp tijdelijk mee toen extra vermogen nuttig was.",
-        detail: "De warmtepompen blijven de basis leveren. De CV-ketel vult alleen aan zolang de vraag daar om vraagt.",
-        next: "De CV-ketel stopt zodra de warmtepompen de vraag weer rustig zelf kunnen dragen.",
+        severity: isFallback ? "limited" : "normal",
+        title: isFallback ? "CV-ketel nam verwarming tijdelijk over" : "CV-ketel ondersteunde tijdelijk",
+        summary: isFallback
+          ? "Geen warmtepomp was veilig inzetbaar; de CV-ketel verwarmde tijdelijk in CM4."
+          : "De CV-ketel hielp tijdelijk mee toen extra vermogen nuttig was.",
+        detail: isFallback
+          ? "De foutfallback start pas na bevestigde HP-uitval, verse stopbevestiging en geldige installatiebeveiligingen."
+          : "De warmtepompen blijven de basis leveren. De CV-ketel vult alleen aan zolang de vraag daar om vraagt.",
+        next: isFallback
+          ? "OpenQuatt stopt CM4 zodra een warmtepomp stabiel is hersteld of een veiligheidsvoorwaarde de fallback blokkeert."
+          : "De CV-ketel stopt zodra de warmtepompen de vraag weer rustig zelf kunnen dragen.",
         source: "CV-ketel",
-        reasonCode: "boiler_assist",
-        modeLabel: "CM3",
-        minDurationS: 120,
+        reasonCode: isFallback ? "boiler_fallback" : "boiler_assist",
+        modeLabel: isFallback ? "CM4" : "CM3",
+        minDurationS: isFallback ? 1 : 120,
       }, selectedWindow, nowMs));
     });
 
@@ -2462,9 +2502,11 @@ import { replaceOuterHtmlIfSignatureChanged } from "../views/view-utils.js";
           closeInterval("HP2", range.start);
           closeInterval("Koeling", range.start);
         }
-      } else if (eventType === "boiler_assist_start") {
+      } else if (eventType === "boiler_assist_start"
+        || eventType === "boiler_fallback_start") {
         openInterval("CV-ketel", item, range.start);
-      } else if (eventType === "boiler_assist_stop") {
+      } else if (eventType === "boiler_assist_stop"
+        || eventType === "boiler_fallback_stop") {
         closeInterval("CV-ketel", range.start);
       } else if (eventType === "flow_hold_clear" && event.reason === "flow_postflow") {
         closeInterval("Koeling", range.start);
@@ -3067,9 +3109,11 @@ import { replaceOuterHtmlIfSignatureChanged } from "../views/view-utils.js";
           active[key] = false;
           sourceModes[key] = 0;
         });
-      } else if (eventType === "boiler_assist_start") {
+      } else if (eventType === "boiler_assist_start"
+        || eventType === "boiler_fallback_start") {
         active.boiler = true;
-      } else if (eventType === "boiler_assist_stop") {
+      } else if (eventType === "boiler_assist_stop"
+        || eventType === "boiler_fallback_stop") {
         active.boiler = false;
       }
     });
@@ -3187,9 +3231,11 @@ import { replaceOuterHtmlIfSignatureChanged } from "../views/view-utils.js";
           closeLane("HP2", range.start, "running", 0.8);
           closeLane("Koeling", range.start, "cooling", 0.8);
         }
-      } else if (eventType === "boiler_assist_start") {
+      } else if (eventType === "boiler_assist_start"
+        || eventType === "boiler_fallback_start") {
         openLane("CV-ketel", range.start);
-      } else if (eventType === "boiler_assist_stop") {
+      } else if (eventType === "boiler_assist_stop"
+        || eventType === "boiler_fallback_stop") {
         if (!closeLane("CV-ketel", range.start, "assist", 0.65)) {
           addEventSegment("CV-ketel", item, "standby", 0.65);
         }

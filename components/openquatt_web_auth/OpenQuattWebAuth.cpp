@@ -12,9 +12,9 @@
 namespace esphome {
 namespace openquatt_web_auth {
 
-static const char *const TAG = "openquatt.web_auth";
+static const char* const TAG = "openquatt.web_auth";
 static const uint32_t STORAGE_KEY = fnv1_hash("openquatt_web_auth_store");
-static std::string json_escape_string_(const std::string &value) {
+static std::string json_escape_string_(const std::string& value) {
   std::string out;
   out.reserve(value.size());
   for (char c : value) {
@@ -54,7 +54,7 @@ static std::string json_escape_string_(const std::string &value) {
   return out;
 }
 
-static bool header_matches_host_(const std::string &header_value, const std::string &host) {
+static bool header_matches_host_(const std::string& header_value, const std::string& host) {
   if (host.empty() || header_value.empty()) {
     return false;
   }
@@ -72,9 +72,9 @@ static bool header_matches_host_(const std::string &header_value, const std::str
 
 class OpenQuattWebAuthRequestHandler : public AsyncWebHandler {
  public:
-  explicit OpenQuattWebAuthRequestHandler(OpenQuattWebAuth *parent) : parent_(parent) {}
+  explicit OpenQuattWebAuthRequestHandler(OpenQuattWebAuth* parent) : parent_(parent) {}
 
-  bool passes_same_origin_(AsyncWebServerRequest *request) const {
+  bool passes_same_origin_(AsyncWebServerRequest* request) const {
     const auto host = request->get_header("Host");
     if (!host.has_value() || host->empty()) {
       return false;
@@ -93,12 +93,12 @@ class OpenQuattWebAuthRequestHandler : public AsyncWebHandler {
     return true;
   }
 
-  bool passes_csrf_(AsyncWebServerRequest *request) const {
+  bool passes_csrf_(AsyncWebServerRequest* request) const {
     const std::string csrf_token = request->arg("csrf_token");
     return !csrf_token.empty() && csrf_token == this->parent_->get_csrf_token();
   }
 
-  bool canHandle(AsyncWebServerRequest *request) const override {
+  bool canHandle(AsyncWebServerRequest* request) const override {
     char url_buf[AsyncWebServerRequest::URL_BUF_SIZE];
     StringRef url = request->url_to(url_buf);
     if (url == "/auth/status" && request->method() == HTTP_GET) {
@@ -116,7 +116,7 @@ class OpenQuattWebAuthRequestHandler : public AsyncWebHandler {
     return false;
   }
 
-  void handleRequest(AsyncWebServerRequest *request) override {
+  void handleRequest(AsyncWebServerRequest* request) override {
     char url_buf[AsyncWebServerRequest::URL_BUF_SIZE];
     StringRef url = request->url_to(url_buf);
 
@@ -124,12 +124,10 @@ class OpenQuattWebAuthRequestHandler : public AsyncWebHandler {
       const std::string username = json_escape_string_(this->parent_->get_active_username());
       const std::string source = json_escape_string_(this->parent_->get_credential_source());
       const std::string csrf_token = json_escape_string_(this->parent_->get_csrf_token());
-      auto *stream = request->beginResponseStream("application/json");
+      auto* stream = request->beginResponseStream("application/json");
       stream->printf(R"({"enabled":%s,"setup_window_active":%s,"username":"%s","source":"%s","csrf_token":"%s"})",
                      this->parent_->is_auth_enabled() ? "true" : "false",
-                     this->parent_->is_setup_window_active() ? "true" : "false",
-                     username.c_str(),
-                     source.c_str(),
+                     this->parent_->is_setup_window_active() ? "true" : "false", username.c_str(), source.c_str(),
                      csrf_token.c_str());
       request->send(stream);
       return;
@@ -165,7 +163,7 @@ class OpenQuattWebAuthRequestHandler : public AsyncWebHandler {
 
       const std::string username = json_escape_string_(this->parent_->get_active_username());
       const std::string source = json_escape_string_(this->parent_->get_credential_source());
-      auto *stream = request->beginResponseStream("application/json");
+      auto* stream = request->beginResponseStream("application/json");
       stream->printf(R"({"ok":true,"username":"%s","source":"%s"})", username.c_str(), source.c_str());
       request->send(stream);
       return;
@@ -198,7 +196,7 @@ class OpenQuattWebAuthRequestHandler : public AsyncWebHandler {
 
     if (url == "/api-security/status" && request->method() == HTTP_GET) {
       const bool transport_active = this->parent_->is_api_security_transport_active();
-      auto *stream = request->beginResponseStream("application/json");
+      auto* stream = request->beginResponseStream("application/json");
       stream->printf(R"({"transport_active":%s,"key_present":%s,"provisioning_pending":%s,"provisioning_closed":%s})",
                      transport_active ? "true" : "false",
                      this->parent_->is_api_security_key_present() ? "true" : "false",
@@ -212,7 +210,7 @@ class OpenQuattWebAuthRequestHandler : public AsyncWebHandler {
   }
 
  protected:
-  OpenQuattWebAuth *parent_;
+  OpenQuattWebAuth* parent_;
 };
 
 void OpenQuattWebAuth::setup() {
@@ -263,7 +261,8 @@ void OpenQuattWebAuth::loop() {
 
 void OpenQuattWebAuth::dump_config() {
   ESP_LOGCONFIG(TAG, "OpenQuatt Web Auth");
-  ESP_LOGCONFIG(TAG, "  Active username: %s", this->active_username_.empty() ? "<none>" : this->active_username_.c_str());
+  ESP_LOGCONFIG(TAG, "  Active username: %s",
+                this->active_username_.empty() ? "<none>" : this->active_username_.c_str());
   ESP_LOGCONFIG(TAG, "  Credential source: %s",
                 this->credential_source_.empty() ? "<unknown>" : this->credential_source_.c_str());
   ESP_LOGCONFIG(TAG, "  Setup window active: %s", YESNO(this->is_setup_window_active()));
@@ -272,7 +271,7 @@ void OpenQuattWebAuth::dump_config() {
 
 float OpenQuattWebAuth::get_setup_priority() const { return setup_priority::WIFI; }
 
-bool OpenQuattWebAuth::set_runtime_credentials(const std::string &username, const std::string &password) {
+bool OpenQuattWebAuth::set_runtime_credentials(const std::string& username, const std::string& password) {
   AuthStorage storage{};
   if (!this->build_storage_(username, password, &storage)) {
     return false;
@@ -285,7 +284,7 @@ bool OpenQuattWebAuth::set_runtime_credentials(const std::string &username, cons
   return this->apply_storage_(storage, "runtime");
 }
 
-bool OpenQuattWebAuth::set_open_access(const char *source) {
+bool OpenQuattWebAuth::set_open_access(const char* source) {
   AuthStorage storage{};
   if (!this->build_storage_("", "", &storage)) {
     return false;
@@ -320,7 +319,7 @@ bool OpenQuattWebAuth::start_recovery_window(uint32_t duration_ms) {
   return this->suspend_auth_runtime_("recovery-open");
 }
 
-bool OpenQuattWebAuth::load_storage_(AuthStorage *storage) {
+bool OpenQuattWebAuth::load_storage_(AuthStorage* storage) {
   if (storage == nullptr) {
     return false;
   }
@@ -330,7 +329,7 @@ bool OpenQuattWebAuth::load_storage_(AuthStorage *storage) {
   return this->is_valid_storage_(*storage);
 }
 
-bool OpenQuattWebAuth::save_storage_(const AuthStorage &storage) {
+bool OpenQuattWebAuth::save_storage_(const AuthStorage& storage) {
   if (!this->pref_.save(&storage)) {
     ESP_LOGE(TAG, "Failed to save credentials to preferences");
     return false;
@@ -342,7 +341,7 @@ bool OpenQuattWebAuth::save_storage_(const AuthStorage &storage) {
   return true;
 }
 
-bool OpenQuattWebAuth::apply_storage_(const AuthStorage &storage, const char *source) {
+bool OpenQuattWebAuth::apply_storage_(const AuthStorage& storage, const char* source) {
   if (web_server_base::global_web_server_base == nullptr) {
     return false;
   }
@@ -358,7 +357,7 @@ bool OpenQuattWebAuth::apply_storage_(const AuthStorage &storage, const char *so
   return true;
 }
 
-bool OpenQuattWebAuth::suspend_auth_runtime_(const char *source) {
+bool OpenQuattWebAuth::suspend_auth_runtime_(const char* source) {
   if (web_server_base::global_web_server_base == nullptr) {
     return false;
   }
@@ -373,7 +372,7 @@ bool OpenQuattWebAuth::suspend_auth_runtime_(const char *source) {
   return true;
 }
 
-bool OpenQuattWebAuth::build_storage_(const std::string &username, const std::string &password, AuthStorage *storage) {
+bool OpenQuattWebAuth::build_storage_(const std::string& username, const std::string& password, AuthStorage* storage) {
   if (storage == nullptr) {
     return false;
   }
@@ -406,9 +405,7 @@ bool OpenQuattWebAuth::is_api_security_transport_active() const {
   return api::global_api_server != nullptr && api::global_api_server->get_noise_ctx().has_psk();
 }
 
-bool OpenQuattWebAuth::is_api_security_key_present() const {
-  return this->is_api_security_transport_active();
-}
+bool OpenQuattWebAuth::is_api_security_key_present() const { return this->is_api_security_transport_active(); }
 
 bool OpenQuattWebAuth::is_api_provisioning_pending() const {
   return provisioning::global_provisioning_manager != nullptr &&
@@ -416,11 +413,10 @@ bool OpenQuattWebAuth::is_api_provisioning_pending() const {
 }
 
 bool OpenQuattWebAuth::is_api_provisioning_closed() const {
-  return provisioning::global_provisioning_manager != nullptr &&
-         provisioning::global_provisioning_manager->closed();
+  return provisioning::global_provisioning_manager != nullptr && provisioning::global_provisioning_manager->closed();
 }
 
-bool OpenQuattWebAuth::is_valid_storage_(const AuthStorage &storage) const {
+bool OpenQuattWebAuth::is_valid_storage_(const AuthStorage& storage) const {
   if (storage.magic != STORAGE_MAGIC || storage.version != STORAGE_VERSION) {
     return false;
   }
@@ -453,8 +449,8 @@ void OpenQuattWebAuth::rotate_csrf_token_() {
   const uint32_t part_b = esp_random();
   const uint32_t part_c = esp_random();
   const uint32_t part_d = esp_random();
-  std::snprintf(token, sizeof(token), "%08x%08x%08x%08x", static_cast<unsigned>(part_a),
-                static_cast<unsigned>(part_b), static_cast<unsigned>(part_c), static_cast<unsigned>(part_d));
+  std::snprintf(token, sizeof(token), "%08x%08x%08x%08x", static_cast<unsigned>(part_a), static_cast<unsigned>(part_b),
+                static_cast<unsigned>(part_c), static_cast<unsigned>(part_d));
   this->csrf_token_ = token;
 }
 

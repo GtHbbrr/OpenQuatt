@@ -170,21 +170,21 @@ import { render } from "../core/render-scheduler.js";
       available: true,
       artifactName,
       otaFileName: `${artifactName}.firmware.ota.bin`,
-      md5FileName: `${artifactName}.firmware.ota.bin.md5`,
       label: `${profile.label} ${topologyLabel} ${getFirmwareConnectionLabel(connection)}`,
     };
   }
 
   export function getFirmwareTestAssetUrls(prNumber = getFirmwareTestPrNumber(), target = getFirmwareTestTargetModel()) {
-    if (!prNumber || !target.available) {
+    const normalizedPrNumber = getFirmwareTestPrNumber(prNumber);
+    if (!normalizedPrNumber || !target.available) {
       return null;
     }
-    const baseUrl = `https://github.com/OpenQuatt/OpenQuatt/releases/download/pr-${prNumber}`;
+    const baseUrl = `https://github.com/OpenQuatt/OpenQuatt/releases/download/pr-${normalizedPrNumber}`;
     const otaUrl = `${baseUrl}/${target.otaFileName}`;
     return {
       otaUrl,
       md5Url: `${otaUrl}.md5`,
-      releaseApiUrl: `https://api.github.com/repos/OpenQuatt/OpenQuatt/releases/tags/pr-${prNumber}`,
+      label: `PR ${normalizedPrNumber} · ${target.label}`,
     };
   }
 

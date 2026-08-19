@@ -73,8 +73,6 @@ button:
     internal: true
     icon: mdi:play-circle-outline
     entity_category: config
-    web_server:
-      sorting_group_id: oq_boiler
     on_press:
       - lambda: |-
           // Request CM100 as a neutral service state with no task yet.
@@ -103,8 +101,6 @@ button:
     internal: true
     icon: mdi:stop-circle-outline
     entity_category: config
-    web_server:
-      sorting_group_id: oq_boiler
     on_press:
       - lambda: |-
           // Stop CM100 immediately when no task is active; otherwise abort the running task.

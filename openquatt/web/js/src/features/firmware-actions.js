@@ -393,43 +393,6 @@ import { render } from "../core/render-scheduler.js";
     }
   }
 
-  export async function fetchFirmwareTestReleaseAsset(prNumber, target) {
-    const urls = getFirmwareTestAssetUrls(prNumber, target);
-    if (!urls) {
-      throw new Error("Geen geldig PR-target gevonden.");
-    }
-
-    const response = await fetch(urls.releaseApiUrl, {
-      cache: "no-store",
-      headers: { Accept: "application/vnd.github+json" },
-    });
-    if (response.status === 404) {
-      throw new Error(`Geen testfirmware gevonden voor PR ${prNumber}. Controleer of het label de build al heeft gepubliceerd.`);
-    }
-    if (!response.ok) {
-      throw new Error(`GitHub API gaf HTTP ${response.status}`);
-    }
-
-    const release = await response.json();
-    const assets = Array.isArray(release.assets) ? release.assets : [];
-    const otaAsset = assets.find((asset) => asset && asset.name === target.otaFileName);
-    const md5Asset = assets.find((asset) => asset && asset.name === target.md5FileName);
-    if (!otaAsset || !otaAsset.browser_download_url) {
-      throw new Error(`PR ${prNumber} bevat geen OTA-build voor ${target.label}.`);
-    }
-    if (!md5Asset || !md5Asset.browser_download_url) {
-      throw new Error(`PR ${prNumber} mist de md5-controle voor ${target.label}.`);
-    }
-
-    const releaseName = String(release.name || release.tag_name || `PR ${prNumber}`).trim();
-    const updatedAt = String(otaAsset.updated_at || release.published_at || "").trim();
-    return {
-      otaUrl: otaAsset.browser_download_url,
-      md5Url: md5Asset.browser_download_url,
-      label: updatedAt ? `${releaseName} · ${updatedAt.replace("T", " ").replace("Z", " UTC")}` : releaseName,
-    };
-  }
-
   export async function setFirmwareTestTextEntity(key, value) {
     if (!hasEntity(key)) {
       throw new Error(`${ENTITY_DEFS[key]?.name || key} is niet beschikbaar op deze firmware.`);
@@ -489,12 +452,17 @@ import { render } from "../core/render-scheduler.js";
 
     let flashRequested = false;
     try {
-      const releaseAsset = await fetchFirmwareTestReleaseAsset(prNumber, target);
-      state.updateTestFirmwareBuild = releaseAsset.label;
+      // PR release asset URLs are deterministic. The device reports download
+      // and checksum failures, so the webapp does not need GitHub's rate-limited API.
+      const testAsset = getFirmwareTestAssetUrls(prNumber, target);
+      if (!testAsset) {
+        throw new Error("Geen geldig PR-target gevonden.");
+      }
+      state.updateTestFirmwareBuild = testAsset.label;
       render();
 
-      await setFirmwareTestTextEntity("firmwareTestOtaUrl", releaseAsset.otaUrl);
-      await setFirmwareTestTextEntity("firmwareTestOtaMd5Url", releaseAsset.md5Url);
+      await setFirmwareTestTextEntity("firmwareTestOtaUrl", testAsset.otaUrl);
+      await setFirmwareTestTextEntity("firmwareTestOtaMd5Url", testAsset.md5Url);
 
       flashRequested = true;
       beginFirmwareOtaQuietWindow();

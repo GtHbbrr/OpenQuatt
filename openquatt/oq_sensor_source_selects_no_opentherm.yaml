@@ -19,8 +19,6 @@ select:
       - HA input
       - MQTT
     initial_option: CIC
-    web_server:
-      sorting_group_id: oq_sensor_selection
 
   - platform: template
     name: "Room Setpoint Source"
@@ -34,8 +32,6 @@ select:
       - HA input
       - MQTT
     initial_option: CIC
-    web_server:
-      sorting_group_id: oq_sensor_selection
 
   - platform: template
     name: "Heating Enable Source"
@@ -50,8 +46,6 @@ select:
       - HA input
       - MQTT
     initial_option: Disabled
-    web_server:
-      sorting_group_id: oq_sensor_selection
 
   - platform: template
     name: "Cooling Enable Source"
@@ -67,8 +61,6 @@ select:
       - CIC or HA input
       - Disabled
     initial_option: Disabled
-    web_server:
-      sorting_group_id: oq_sensor_selection
 
 binary_sensor:
   - platform: template

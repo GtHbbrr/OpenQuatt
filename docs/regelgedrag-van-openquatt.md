@@ -22,6 +22,7 @@ Daardoor kun je vreemd gedrag bijna nooit verklaren vanuit alleen een pompstand 
 | `CM1` | korte tussenstap voor of na verwarmen |
 | `CM2` | normaal verwarmen met warmtepomp |
 | `CM3` | warmtepomp met ketelhulp |
+| `CM4` | alleen de CV-ketel na een bevestigde warmtepompstoring |
 | `CM98` | vorstbeveiliging |
 | `CM100` | commissioning / servicedoel |
 
@@ -52,6 +53,26 @@ In gewone taal:
 - pas dan mag ketelhulp actief worden.
 
 De ketel springt dus normaal niet op elk kort dipje direct bij.
+
+`CM4` heeft een andere betekenis. Deze stand is alleen voor foutfallback.
+OpenQuatt gaat pas naar `CM4` wanneer:
+
+- geen warmtepomp meer veilig beschikbaar is;
+- de fout of verbindingsuitval voldoende lang en meermaals is bevestigd;
+- een eventueel draaiende compressor aantoonbaar is gestopt;
+- de normale flow-, temperatuur- en ketelbeveiligingen akkoord zijn;
+- foutfallback door de gebruiker is ingeschakeld.
+
+Die laatste opt-in staat los van de schakelaar voor normale `CM3`-ketelondersteuning.
+
+Een kort wegvallend communicatiebericht leidt daarom niet direct tot stoppen of
+ketelfallback. Bij een Duo-installatie blijft een gezonde warmtepomp eerst
+beschikbaar; `CM4` is pas toegestaan als geen van beide warmtepompen veilig kan
+verwarmen.
+
+De overgang tussen `CM3` en `CM4` verandert alleen de rol van de al actieve
+CV-ketel. Zolang dezelfde beveiligingen geldig blijven, schakelt OpenQuatt de
+keteluitgang daarbij niet kort uit en weer aan.
 
 `CM100` is iets anders: dat is een expliciete service- of commissioningstand voor metingen zoals het boilervermogentestje of flow-autotune. Daar hoort geen normale warmtevraaglogica bij.
 
@@ -128,6 +149,7 @@ Als deze bronnen niet kloppen, gaat OpenQuatt logisch reageren op verkeerde info
 
 - Een tussenstand betekent niet automatisch een fout.
 - `CM3` betekent niet automatisch dat de warmtepomp faalt.
+- `CM4` is ketel-only foutfallback en geen normale ketelondersteuning.
 - Een andere verwarmingsstrategie verandert niet alle beveiligingen eromheen.
 - Een handmatige pompstand verklaart niet het hele systeemgedrag.
 

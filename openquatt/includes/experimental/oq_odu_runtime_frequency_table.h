@@ -11,13 +11,14 @@
 
 #include "esphome/components/modbus_controller/modbus_controller.h"
 #include "esphome/components/number/number.h"
+#include "esphome/components/openquatt_odu_eeprom_dump/OpenQuattOduEepromDump.h"
 #include "esphome/components/switch/switch.h"
 #include "esphome/components/text_sensor/text_sensor.h"
 #include "esphome/core/log.h"
 
 namespace oq_odu_runtime_frequency {
 
-static const char *const TAG = "oq_odu_eeprom";
+static const char* const TAG = "oq_odu_eeprom";
 static constexpr uint16_t RUNTIME_TABLE_START_ADDRESS = 3000;
 static constexpr uint16_t RUNTIME_TABLE_REGISTER_COUNT = 22;
 static constexpr uint16_t GUARD_START_ADDRESS = 2099;
@@ -28,15 +29,16 @@ static constexpr float MIN_FREQUENCY_HZ = 0.0f;
 static constexpr float MAX_FREQUENCY_HZ = 120.0f;
 
 struct RuntimeFrequencyTableRefs {
-  esphome::modbus_controller::ModbusController *controller;
-  esphome::switch_::Switch *enable_switch;
-  esphome::text_sensor::TextSensor *status;
-  const char *prefix;
-  std::array<esphome::number::Number *, 11> cooling_desired;
-  std::array<esphome::number::Number *, 11> heating_desired;
+  esphome::modbus_controller::ModbusController* controller;
+  esphome::openquatt_odu_eeprom_dump::OpenQuattOduEepromDump* eeprom_dump;
+  esphome::switch_::Switch* enable_switch;
+  esphome::text_sensor::TextSensor* status;
+  const char* prefix;
+  std::array<esphome::number::Number*, 11> cooling_desired;
+  std::array<esphome::number::Number*, 11> heating_desired;
 };
 
-inline void publish_status(const RuntimeFrequencyTableRefs &refs, const char *message) {
+inline void publish_status(const RuntimeFrequencyTableRefs& refs, const char* message) {
   refs.status->publish_state(message);
   ESP_LOGW(TAG, "%s%s", refs.prefix, message);
 }
@@ -45,7 +47,7 @@ inline bool valid_frequency(float value) {
   return !std::isnan(value) && value >= MIN_FREQUENCY_HZ && value <= MAX_FREQUENCY_HZ;
 }
 
-inline bool validate_monotonic_table(const std::array<float, 11> &values) {
+inline bool validate_monotonic_table(const std::array<float, 11>& values) {
   for (size_t i = 0; i < values.size(); i++) {
     if (!valid_frequency(values[i])) return false;
     if (i > 0 && values[i] < values[i - 1]) return false;
@@ -53,24 +55,24 @@ inline bool validate_monotonic_table(const std::array<float, 11> &values) {
   return true;
 }
 
-inline bool read_u16_word(const std::vector<uint8_t> &data, size_t index, uint16_t &value) {
+inline bool read_u16_word(const std::vector<uint8_t>& data, size_t index, uint16_t& value) {
   const size_t offset = index * 2U;
   if (data.size() < offset + 2U) return false;
   value = (uint16_t(data[offset]) << 8) | uint16_t(data[offset + 1U]);
   return true;
 }
 
-inline bool read_word_as_frequency(const std::vector<uint8_t> &data, size_t index, float &value) {
+inline bool read_word_as_frequency(const std::vector<uint8_t>& data, size_t index, float& value) {
   uint16_t raw = 0;
   if (!read_u16_word(data, index, raw)) return false;
   value = float(raw);
   return valid_frequency(value);
 }
 
-inline void publish_loaded_value(esphome::number::Number *target, float value) { target->publish_state(value); }
+inline void publish_loaded_value(esphome::number::Number* target, float value) { target->publish_state(value); }
 
-inline bool parse_runtime_table(const std::vector<uint8_t> &data, std::array<float, 11> &cooling,
-                                std::array<float, 11> &heating, int &loaded) {
+inline bool parse_runtime_table(const std::vector<uint8_t>& data, std::array<float, 11>& cooling,
+                                std::array<float, 11>& heating, int& loaded) {
   loaded = 0;
   float value = NAN;
   for (size_t i = 0; i < cooling.size(); i++) {
@@ -86,13 +88,13 @@ inline bool parse_runtime_table(const std::vector<uint8_t> &data, std::array<flo
   return true;
 }
 
-inline void publish_runtime_table(const RuntimeFrequencyTableRefs &refs, const std::array<float, 11> &cooling,
-                                  const std::array<float, 11> &heating) {
+inline void publish_runtime_table(const RuntimeFrequencyTableRefs& refs, const std::array<float, 11>& cooling,
+                                  const std::array<float, 11>& heating) {
   for (size_t i = 0; i < cooling.size(); i++) publish_loaded_value(refs.cooling_desired[i], cooling[i]);
   for (size_t i = 0; i < heating.size(); i++) publish_loaded_value(refs.heating_desired[i], heating[i]);
 }
 
-inline bool tables_match(const std::array<float, 11> &actual, const std::array<float, 11> &expected) {
+inline bool tables_match(const std::array<float, 11>& actual, const std::array<float, 11>& expected) {
   for (size_t i = 0; i < actual.size(); i++) {
     if (lroundf(actual[i]) != lroundf(expected[i])) return false;
   }
@@ -101,8 +103,8 @@ inline bool tables_match(const std::array<float, 11> &actual, const std::array<f
 
 inline uint16_t frequency_to_register(float value) { return static_cast<uint16_t>(lroundf(value)); }
 
-inline std::vector<uint16_t> build_runtime_write_values(const std::array<float, 11> &cooling,
-                                                        const std::array<float, 11> &heating) {
+inline std::vector<uint16_t> build_runtime_write_values(const std::array<float, 11>& cooling,
+                                                        const std::array<float, 11>& heating) {
   std::vector<uint16_t> values;
   values.reserve(RUNTIME_TABLE_REGISTER_COUNT);
   for (float value : cooling) values.push_back(frequency_to_register(value));
@@ -120,8 +122,8 @@ inline void queue_runtime_write(RuntimeFrequencyTableRefs refs, std::array<float
   auto cmd = esphome::modbus_controller::ModbusCommandItem::create_write_multiple_command(
       refs.controller, RUNTIME_TABLE_START_ADDRESS, RUNTIME_TABLE_REGISTER_COUNT,
       build_runtime_write_values(cooling, heating));
-  cmd.on_data_func = [refs, cooling, heating](esphome::modbus::ModbusRegisterType register_type,
-                                              uint16_t start_address, const std::vector<uint8_t> &data) {
+  cmd.on_data_func = [refs, cooling, heating](esphome::modbus::ModbusRegisterType register_type, uint16_t start_address,
+                                              const std::vector<uint8_t>& data) {
     publish_status(refs, "WRITE_CONFIRMED: runtime write acknowledged");
     queue_apply_readback(refs, cooling, heating);
   };
@@ -134,7 +136,7 @@ inline void queue_guarded_runtime_write(RuntimeFrequencyTableRefs refs, std::arr
   auto cmd = esphome::modbus_controller::ModbusCommandItem::create_read_command(
       refs.controller, esphome::modbus::ModbusRegisterType::HOLDING, GUARD_START_ADDRESS, GUARD_REGISTER_COUNT,
       [refs, cooling, heating](esphome::modbus::ModbusRegisterType register_type, uint16_t start_address,
-                               const std::vector<uint8_t> &data) {
+                               const std::vector<uint8_t>& data) {
         uint16_t working_mode = 0;
         uint16_t compressor_hz = 0;
         if (!read_u16_word(data, GUARD_WORKING_MODE_INDEX, working_mode)) {
@@ -164,7 +166,7 @@ inline void queue_apply_readback(RuntimeFrequencyTableRefs refs, std::array<floa
       refs.controller, esphome::modbus::ModbusRegisterType::HOLDING, RUNTIME_TABLE_START_ADDRESS,
       RUNTIME_TABLE_REGISTER_COUNT,
       [refs, expected_cooling, expected_heating](esphome::modbus::ModbusRegisterType register_type,
-                                                 uint16_t start_address, const std::vector<uint8_t> &data) {
+                                                 uint16_t start_address, const std::vector<uint8_t>& data) {
         std::array<float, 11> cooling{};
         std::array<float, 11> heating{};
         int loaded = 0;
@@ -185,12 +187,16 @@ inline void queue_apply_readback(RuntimeFrequencyTableRefs refs, std::array<floa
 }
 
 inline void load_runtime_table(RuntimeFrequencyTableRefs refs) {
+  if (refs.eeprom_dump != nullptr && refs.eeprom_dump->is_active()) {
+    publish_status(refs, "BLOCKED: EEPROM dump active");
+    return;
+  }
   publish_status(refs, "LOAD_REQUESTED");
   auto cmd = esphome::modbus_controller::ModbusCommandItem::create_read_command(
       refs.controller, esphome::modbus::ModbusRegisterType::HOLDING, RUNTIME_TABLE_START_ADDRESS,
       RUNTIME_TABLE_REGISTER_COUNT,
       [refs](esphome::modbus::ModbusRegisterType register_type, uint16_t start_address,
-             const std::vector<uint8_t> &data) {
+             const std::vector<uint8_t>& data) {
         std::array<float, 11> cooling{};
         std::array<float, 11> heating{};
         int loaded = 0;
@@ -209,13 +215,17 @@ inline void load_runtime_table(RuntimeFrequencyTableRefs refs) {
   refs.controller->queue_command(cmd);
 }
 
-inline bool read_desired_values(const std::array<esphome::number::Number *, 11> &entities,
-                                std::array<float, 11> &values) {
+inline bool read_desired_values(const std::array<esphome::number::Number*, 11>& entities,
+                                std::array<float, 11>& values) {
   for (size_t i = 0; i < entities.size(); i++) values[i] = entities[i]->state;
   return validate_monotonic_table(values);
 }
 
 inline void apply_runtime_table(RuntimeFrequencyTableRefs refs, bool enabled) {
+  if (refs.eeprom_dump != nullptr && refs.eeprom_dump->is_active()) {
+    publish_status(refs, "BLOCKED: EEPROM dump active");
+    return;
+  }
   if (!enabled) {
     publish_status(refs, "BLOCKED: enable switch is off");
     return;

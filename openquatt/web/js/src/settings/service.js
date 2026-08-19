@@ -218,7 +218,7 @@ import { renderModalShell } from "../core/modal-shell.js";
     const mixing = running && (phaseCode === 1 || normalizedStatus.includes("MIXING"));
     const measuring = running && !mixing;
     const maxDurationS = 300;
-    const minMixingS = 60;
+    const minMixingS = 180;
     const elapsed = Number.isFinite(remaining) ? Math.max(0, maxDurationS - remaining) : NaN;
     const mixingRemaining = Number.isFinite(elapsed) ? Math.max(0, minMixingS - elapsed) : NaN;
     const progressValue = mixing && Number.isFinite(elapsed)
@@ -253,7 +253,7 @@ import { renderModalShell } from "../core/modal-shell.js";
           ? "Meting niet voltooid"
           : "Voorbereiding";
     const statusCopy = applied
-      ? "De voorgestelde offsets zijn opgeslagen."
+      ? "De voorgestelde offsets zijn opgeslagen. De aanvoercorrectie blijft alleen actief voor deze bron."
       : resultReady
       ? "Controleer de voorgestelde offsets en pas ze toe."
       : running
@@ -263,13 +263,18 @@ import { renderModalShell } from "../core/modal-shell.js";
         : failed
           ? getSettingsTextStatValue("hpWaterCalibrationStatus", "Controleer de voorwaarden en start opnieuw.")
           : (hasHp2
-            ? "Start alleen wanneer compressor en boiler uit zijn. HP1 en HP2 water in/out worden samen naar een relatieve referentie gebracht."
-            : "Start alleen wanneer compressor en boiler uit zijn. Bij single setup wordt HP1 water in/out onderling gelijkgetrokken; supply blijft diagnose.");
+            ? "Start alleen wanneer compressor en boiler uit zijn. HP1, HP2 en de actieve aanvoerbron worden samen naar een relatieve referentie gebracht."
+            : "Start alleen wanneer compressor en boiler uit zijn. HP1 water in/out en de actieve aanvoerbron worden samen gekalibreerd.");
+    const supplySource = getSettingsTextStatValue(
+      "hpWaterCalibrationResultSupplySource",
+      getSettingsTextStatValue("waterSupplyTempEffectiveSource", "Actieve bron"),
+    );
     const sensorRows = [
       { label: "HP1 water in", rawKey: "hp1WaterInRaw", liveKey: "hp1WaterIn", resultRawKey: "hpWaterCalibrationResultHp1InRawAvg", offsetKey: "hp1WaterInOffset", suggestedKey: "hp1WaterInOffsetSuggested" },
       { label: "HP1 water uit", rawKey: "hp1WaterOutRaw", liveKey: "hp1WaterOut", resultRawKey: "hpWaterCalibrationResultHp1OutRawAvg", offsetKey: "hp1WaterOutOffset", suggestedKey: "hp1WaterOutOffsetSuggested" },
       { label: "HP2 water in", rawKey: "hp2WaterInRaw", liveKey: "hp2WaterIn", resultRawKey: "hpWaterCalibrationResultHp2InRawAvg", offsetKey: "hp2WaterInOffset", suggestedKey: "hp2WaterInOffsetSuggested" },
       { label: "HP2 water uit", rawKey: "hp2WaterOutRaw", liveKey: "hp2WaterOut", resultRawKey: "hpWaterCalibrationResultHp2OutRawAvg", offsetKey: "hp2WaterOutOffset", suggestedKey: "hp2WaterOutOffsetSuggested" },
+      { label: `Aanvoer (${supplySource})`, rawKey: "supplyTemp", liveKey: "supplyTemp", resultRawKey: "hpWaterCalibrationResultSupplyRawAvg", offsetKey: "waterSupplyCalibrationOffset", suggestedKey: "waterSupplyCalibrationOffsetSuggested" },
     ].filter((row) => hasEntity(row.liveKey) || hasEntity(row.rawKey) || hasEntity(row.offsetKey));
 
     const renderStep = (index, label) => {
@@ -337,19 +342,15 @@ import { renderModalShell } from "../core/modal-shell.js";
               <span>Spreiding</span>
               <strong>${escapeHtml(getSettingsTemperatureValue("hpWaterCalibrationSpread", 2))}</strong>
             </article>
-            <article class="oq-settings-hp-calibration-live-card">
-              <span>Supply verschil</span>
-              <strong>${escapeHtml(getSettingsTemperatureValue("hpWaterCalibrationSupplyDelta", 2))}</strong>
-            </article>
           </div>
-          <p class="oq-settings-hp-calibration-note">Supply wordt alleen als diagnose getoond en niet automatisch gecorrigeerd.</p>
+          <p class="oq-settings-hp-calibration-note">De actieve aanvoerbron wordt raw gemeten. Een bestaande aanvoercorrectie telt niet mee in het nieuwe voorstel.</p>
         ` : ""}
 
         ${resultReady ? `
           <div class="oq-settings-hp-calibration-results">
             <div class="oq-settings-hp-calibration-result-summary">
               <span>Referentie ${escapeHtml(getSettingsTemperatureValue("hpWaterCalibrationResultReference", 2))}</span>
-              <span>Supply verschil ${escapeHtml(getSettingsTemperatureValue("hpWaterCalibrationSupplyDelta", 2))}</span>
+              <span>Aanvoerbron ${escapeHtml(supplySource)}</span>
             </div>
             <div class="oq-settings-hp-calibration-table-wrap">
               <table class="oq-settings-hp-calibration-table">
@@ -588,15 +589,15 @@ import { renderModalShell } from "../core/modal-shell.js";
         key: "hp-water-calibration",
         title: "Temperatuursensoren kalibreren",
         label: "Sensor kalibratie",
-        summary: "Laat de waterpomp draaien zonder compressor en bepaal offsets voor HP1/HP2 water in/out.",
+        summary: "Laat de waterpomp draaien zonder compressor en bepaal offsets voor HP1/HP2 water in/out en de actieve aanvoerbron.",
         status: hpWaterCalibrationStatusDisplay,
         available: Boolean(hpWaterCalibrationControls || state.entities.hpWaterCalibrationStatus),
         openDisabled: !cm100Ready,
         cardMarkup: renderCommissioningTaskCard({
           taskKey: "hp-water-calibration",
           title: "Temperatuursensoren kalibreren",
-          copy: "Doorloop voorbereiding, meting en toepassen in vaste volgorde. De meting stopt eerder zodra de sensoren stabiel genoeg zijn.",
-          subcopy: "De voorgestelde waarden worden pas actief wanneer je ze toepast; supply blijft een diagnosewaarde.",
+          copy: "Reken op ongeveer 3 tot 5 minuten. Eerst mengt het water 3 minuten; daarna stopt de meting zodra de sensoren stabiel genoeg zijn.",
+          subcopy: "De voorgestelde waarden worden pas actief wanneer je ze toepast. De aanvoer-offset wordt per bron opgeslagen en bij een latere bronwissel automatisch teruggezet; een CIC-URL-wijziging verwijdert hem niet.",
           status: hpWaterCalibrationStatusDisplay,
           statusCopy: hpWaterCalibrationTaskRunning
             ? "De pomp draait en de firmware wacht op een stabiel temperatuurbeeld."
@@ -871,6 +872,135 @@ import { renderModalShell } from "../core/modal-shell.js";
     });
   }
 
+  export function getControlModeOverrideLabel(value) {
+    const labels = {
+      Auto: "Automatische regeling",
+      "Force CM0": "CM0 · stand-by",
+      "Force CM1": "CM1 · alleen circulatie",
+      "Force CM98": "CM98 · vorstcirculatie",
+    };
+    return labels[String(value || "")] || String(value || "Onbekend");
+  }
+
+  export function renderSettingsControlModeOverridePanel() {
+    if (!hasEntity("controlModeOverride")) {
+      return "";
+    }
+
+    const currentValue = String(getEntityValue("controlModeOverride") || "Auto");
+    const active = currentValue !== "Auto";
+    const busy = state.loadingEntities || state.busyAction === "save-controlModeOverride";
+    const entity = state.entities.controlModeOverride || {};
+    const options = (Array.isArray(entity.option) ? entity.option : entity.options || [])
+      .filter((option) => ["Auto", "Force CM0", "Force CM1", "Force CM98"].includes(option));
+
+    return `
+      <div class="oq-settings-service-override${active ? " is-active" : ""}">
+        <div class="oq-settings-service-override-copy">
+          <p class="oq-helper-label">${active ? "Testmodus actief" : "Tijdelijke testmodus"}</p>
+          <h4>${escapeHtml(active ? getControlModeOverrideLabel(currentValue) : "Regelmodus tijdelijk forceren")}</h4>
+          <p>${escapeHtml(active
+            ? "De normale moduskeuze is overruled. De controller keert uiterlijk 30 minuten na activering automatisch terug naar de normale regeling."
+            : "Alleen voor een gerichte test. Een geforceerde modus omzeilt tijdelijk de normale moduskeuze en verloopt automatisch na maximaal 30 minuten.")}</p>
+        </div>
+        <div class="oq-settings-service-override-actions">
+          ${options.map((option) => {
+            if (option === "Auto") {
+              return active ? `<button class="oq-helper-button oq-helper-button--primary" type="button" data-oq-action="clear-control-mode-override" ${busy ? "disabled" : ""}>Terug naar automatisch</button>` : "";
+            }
+            if (option === currentValue) {
+              return "";
+            }
+            return `<button class="oq-helper-button oq-helper-button--ghost" type="button" data-oq-action="open-control-mode-override-confirm" data-control-mode-option="${escapeHtml(option)}" ${busy ? "disabled" : ""}>${escapeHtml(getControlModeOverrideLabel(option))}</button>`;
+          }).join("")}
+        </div>
+      </div>
+    `;
+  }
+
+  export function renderSettingsCounterServiceSection() {
+    const runtimeResetKey = hasEntity("resetRuntimeCountersHp1Hp2")
+      ? "resetRuntimeCountersHp1Hp2"
+      : hasEntity("resetRuntimeCountersHp1") ? "resetRuntimeCountersHp1" : "";
+    const hasHp1Runtime = hasEntity("hp1RuntimeHours");
+    const hasHp2Runtime = hasEntity("hp2RuntimeHours");
+    const hp1Hours = getEntityNumericValue("hp1RuntimeHours");
+    const hp2Hours = getEntityNumericValue("hp2RuntimeHours");
+    const hasRuntimeDifference = Number.isFinite(hp1Hours) && Number.isFinite(hp2Hours);
+    const runtimeDifference = hasRuntimeDifference ? Math.abs(hp1Hours - hp2Hours) : Number.NaN;
+    const runtimeDifferenceLabel = hasRuntimeDifference
+      ? `${Number.isInteger(runtimeDifference) ? runtimeDifference.toFixed(0) : runtimeDifference.toFixed(1).replace(".", ",")} h verschil`
+      : "Verschil onbekend";
+    const runtimeDifferenceDetail = hasRuntimeDifference
+      ? hp1Hours === hp2Hours
+        ? "Beide warmtepompen hebben evenveel gedraaid."
+        : `${hp1Hours > hp2Hours ? "HP1" : "HP2"} heeft meer gedraaid.`
+      : "De runtimebalans wordt geladen.";
+    const runtimeDifferenceClass = !hasRuntimeDifference || hp1Hours === hp2Hours
+      ? "is-even"
+      : hp1Hours > hp2Hours ? "is-hp1-higher" : "is-hp2-higher";
+    const runtimeDifferenceSpan = hasRuntimeDifference && Math.max(Math.abs(hp1Hours), Math.abs(hp2Hours)) > 0
+      ? Math.min(28, Math.max(8, (runtimeDifference / Math.max(Math.abs(hp1Hours), Math.abs(hp2Hours))) * 500))
+      : 0;
+    const runtimeLeadValue = hasEntity("runtimeLeadHp") ? getSettingsTextStatValue("runtimeLeadHp", "") : "";
+    const runtimeLead = ["HP1", "HP2"].includes(runtimeLeadValue) ? runtimeLeadValue : "";
+    const runtimeLeadMarkup = runtimeLead
+      ? `<span class="oq-settings-runtime-lead"><span aria-hidden="true"></span>${escapeHtml(`${runtimeLead} leidend`)}</span>`
+      : "";
+    const runtimeResetMarkup = runtimeResetKey
+      ? `<button class="oq-settings-runtime-reset" type="button" data-oq-action="open-runtime-reset-confirm" aria-label="Draaiurentellers resetten" ${state.busyAction === runtimeResetKey ? "disabled" : ""}>${state.busyAction === runtimeResetKey ? "Resetten…" : "Balans resetten"}</button>`
+      : "";
+    const runtimeMarkup = hasHp1Runtime || hasHp2Runtime
+      ? `
+        <div class="oq-settings-runtime-balance${hasHp2Runtime ? "" : " is-single"}">
+          <div class="oq-settings-runtime-balance-head">
+            <p>Runtimebalans</p>
+            <div class="oq-settings-runtime-balance-head-actions">
+              ${runtimeLeadMarkup}
+              ${runtimeResetMarkup}
+            </div>
+          </div>
+          <div class="oq-settings-runtime-balance-grid">
+            ${hasHp1Runtime ? `
+              <div class="oq-settings-runtime-metric oq-settings-runtime-metric--hp1">
+                <span>HP1</span>
+                <strong>${escapeHtml(getSettingsStatValue("hp1RuntimeHours"))}</strong>
+              </div>
+            ` : ""}
+            ${hasHp2Runtime ? `
+              <div class="oq-settings-runtime-comparison" aria-label="${escapeHtml(`${runtimeDifferenceLabel}. ${runtimeDifferenceDetail}`)}">
+                <span class="oq-settings-runtime-track ${runtimeDifferenceClass}" style="--oq-runtime-delta-span: ${runtimeDifferenceSpan.toFixed(1)}%;" aria-hidden="true"></span>
+                <strong>${escapeHtml(runtimeDifferenceLabel)}</strong>
+                <small>${escapeHtml(runtimeDifferenceDetail)}</small>
+              </div>
+              <div class="oq-settings-runtime-metric oq-settings-runtime-metric--hp2">
+                <span>HP2</span>
+                <strong>${escapeHtml(getSettingsStatValue("hp2RuntimeHours"))}</strong>
+              </div>
+            ` : `<p class="oq-settings-runtime-single-copy">Opgetelde compressorlooptijd.</p>`}
+          </div>
+        </div>
+      `
+      : "";
+
+    if (!runtimeMarkup) {
+      return "";
+    }
+
+    return renderSettingsSection(
+      "Onderhoud",
+      "Draaiuren",
+      "Bekijk de runtimebalans. Begin de interne balans alleen opnieuw na onderhoud.",
+      `
+        <div class="oq-settings-maintenance-shell" id="oq-settings-maintenance">
+          ${runtimeMarkup}
+        </div>
+      `,
+      "",
+      "oq-settings-section--maintenance",
+    );
+  }
+
   export function renderSettingsServiceSection() {
     const service = getSettingsServiceModel();
 
@@ -880,6 +1010,7 @@ import { renderModalShell } from "../core/modal-shell.js";
       "Gebruik de service-stand (controlmode CM100) voor testen, afstelling en onderhoudstaken.",
       `
         <div class="oq-settings-service-shell">
+          ${renderSettingsControlModeOverridePanel()}
           <div class="oq-settings-service-toolbar">
             <div class="oq-settings-commissioning-teaser-status">
               <span class="oq-settings-commissioning-teaser-status-label">Huidige status</span>
@@ -894,10 +1025,21 @@ import { renderModalShell } from "../core/modal-shell.js";
 
           <div class="oq-settings-system-summary oq-settings-service-task-list">
             ${service.tasks.map((task) => renderSettingsServiceTaskRow(task)).join("")}
+            ${renderSettingsOduEepromDumpRow()}
           </div>
         </div>
       `,
     );
+  }
+
+  export function renderSettingsOduEepromDumpRow() {
+    return renderSettingsSystemRow({
+      className: "oq-settings-service-row oq-settings-odu-eeprom-row",
+      label: "ODU EEPROM-export",
+      value: "Alleen-lezen diagnose",
+      note: "Lees de volledige EEPROM-shadow uit en download deze als JSON voor hardware- en firmwarevergelijking.",
+      action: '<button class="oq-helper-button oq-helper-button--ghost" type="button" data-oq-action="open-odu-eeprom-dump-modal">Openen</button>',
+    });
   }
 
   export function renderSettingsServiceTaskModal() {

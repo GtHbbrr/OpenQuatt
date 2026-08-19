@@ -7,8 +7,7 @@
 
 namespace oq_commissioning {
 
-inline void clear_container(bool keep_cm100,
-                            int next_state = TASK_STATE_IDLE) {
+inline void clear_container(bool keep_cm100, int next_state = TASK_STATE_IDLE) {
   id(oq_commissioning_request_pending) = false;
   id(oq_commissioning_active) = keep_cm100;
   id(oq_commissioning_abort_requested) = false;
@@ -49,6 +48,11 @@ inline void reset_task_runtime_state() {
   id(oq_hp_water_calibration_result_hp1_out_raw_avg_c) = NAN;
   id(oq_hp_water_calibration_result_hp2_in_raw_avg_c) = NAN;
   id(oq_hp_water_calibration_result_hp2_out_raw_avg_c) = NAN;
+  id(oq_hp_water_calibration_result_supply_raw_avg_c) = NAN;
+  id(oq_hp_water_calibration_result_supply_offset_c) = NAN;
+  id(oq_hp_water_calibration_result_supply_source_code) = 0;
+  id(oq_hp_water_calibration_result_supply_source_fingerprint) = 0;
+  id(oq_hp_water_calibration_result_supply_source).clear();
   id(oq_manual_flow_active) = false;
   id(oq_quick_flow_test_active) = false;
   id(oq_quick_flow_test_started_ms) = 0;
@@ -71,12 +75,9 @@ inline bool request_running_task_abort() {
   const int task_code = id(oq_commissioning_task_code);
   if (task_active(id(oq_commissioning_active), task_code, TASK_FLOW_AUTOTUNE)) {
     id(oq_flow_autotune_abort) = true;
-  } else if (stop_routes_to_commissioning_abort(id(oq_commissioning_active),
-                                                task_code)) {
+  } else if (stop_routes_to_commissioning_abort(id(oq_commissioning_active), task_code)) {
     id(oq_commissioning_abort_requested) = true;
-  } else if (stop_routes_to_autotune_abort(id(oq_commissioning_active),
-                                           task_code,
-                                           id(oq_flow_autotune_req))) {
+  } else if (stop_routes_to_autotune_abort(id(oq_commissioning_active), task_code, id(oq_flow_autotune_req))) {
     id(oq_flow_autotune_abort) = true;
     id(oq_commissioning_abort_requested) = true;
   } else {

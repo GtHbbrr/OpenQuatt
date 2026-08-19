@@ -9,6 +9,7 @@ globalThis.window = {
 };
 
 const { state } = await import("../js/src/core/state.js");
+const { SETTINGS_GROUP_KEY_MAP } = await import("../js/src/core/entity-sync.js");
 const { renderSettingsSensorSelectionSection } = await import("../js/src/settings/integrations.js");
 
 const MQTT_SOURCE_SELECT_KEYS = [
@@ -62,13 +63,19 @@ function setSourceSelectionState(mqttEnabled) {
   };
 }
 
+test("integraties laden de aanvoerkalibratiestatus direct", () => {
+  assert.ok(SETTINGS_GROUP_KEY_MAP.integrations.includes("waterSupplyCalibrationOffset"));
+  assert.ok(SETTINGS_GROUP_KEY_MAP.integrations.includes("waterSupplyCalibrationRequired"));
+  assert.ok(SETTINGS_GROUP_KEY_MAP.integrations.includes("waterSupplyCalibrationStatus"));
+});
+
 test("MQTT verdwijnt uit alle bronselecties en metingen wanneer de integratie uitstaat", () => {
   setSourceSelectionState(true);
   const enabledMarkup = renderSettingsSensorSelectionSection();
   MQTT_SOURCE_SELECT_KEYS.forEach((key) => {
     assert.match(getSelectMarkup(enabledMarkup, key), /<option value="MQTT"/);
   });
-  assert.match(enabledMarkup, /<div class="oq-settings-source-row has-status">\s*<span>MQTT/);
+  assert.match(enabledMarkup, /<div class="oq-settings-source-row has-status">\s*<div class="oq-settings-source-row-label">MQTT/);
 
   setSourceSelectionState(false);
   const disabledMarkup = renderSettingsSensorSelectionSection();
@@ -103,4 +110,74 @@ test("MQTT als buitentemperatuurbron waarschuwt voor ontbrekende opstartwaarde e
   state.entities.outsideTempSource.value = "Outdoor unit";
   const outdoorUnitMarkup = renderSettingsSensorSelectionSection();
   assert.doesNotMatch(outdoorUnitMarkup, /kan OpenQuatt naar CM98 \(antivriescirculatie\) gaan/);
+});
+
+test("bronstatusbadges openen hun uitleg op aanraken", () => {
+  setSourceSelectionState(true);
+  const markup = renderSettingsSensorSelectionSection();
+  assert.match(markup, /data-info-id="mqttRoomTemperature-info"[^>]*aria-expanded="false"[^>]*>Geldig<\/button>/s);
+
+  state.settingsInfoOpen = "mqttRoomTemperature-info";
+  const openMarkup = renderSettingsSensorSelectionSection();
+  assert.match(openMarkup, /data-info-id="mqttRoomTemperature-info"[^>]*aria-expanded="true"[^>]*>Geldig<\/button>/s);
+  assert.match(openMarkup, /MQTT heeft een geldige, recente waarde ontvangen\./);
+  state.settingsInfoOpen = "";
+});
+
+test("ongeldige PT1000 toont geen misleidende nulwaarde", () => {
+  setSourceSelectionState(false);
+  Object.assign(state.entities, {
+    waterSupplySource: { value: "Local", option: ["Local"] },
+    localWaterSupplyTempSource: { value: "PT1000", option: ["PT1000", "DS18B20"] },
+    supplyTemp: { value: 31.4, state: "31.4", uom: "°C" },
+    waterSupplyTempEffectiveSource: { value: "HP2 water out (fallback)", state: "HP2 water out (fallback)" },
+    waterSupplyTempEsp: { value: null, state: "nan", uom: "°C" },
+    waterSupplyTempPt1000: { value: null, state: "nan", uom: "°C" },
+    waterSupplyTempDs18b20: { value: 0, state: "0.0", uom: "°C" },
+    pt1000ReadProblem: { value: true, state: "ON" },
+  });
+
+  const markup = renderSettingsSensorSelectionSection();
+
+  assert.match(markup, /<div class="oq-settings-source-row-label">PT1000<\/div>\s*<strong>—<\/strong>/);
+  assert.doesNotMatch(markup, /<div class="oq-settings-source-row-label">PT1000<\/div>\s*<strong>0 °C<\/strong>/);
+  assert.match(markup, /<div class="oq-settings-source-row-label">DS18B20<\/div>\s*<strong>0 °C<\/strong>/);
+  assert.match(markup, /<div class="oq-settings-source-row-label">Bron<\/div>\s*<strong>HP2 uitgaand water \(fallback\)<\/strong>/);
+});
+
+test("gewijzigde bronconfiguratie toont dat de aanvoerkalibratie opnieuw moet", () => {
+  setSourceSelectionState(false);
+  Object.assign(state.entities, {
+    waterSupplySource: { value: "CIC", option: ["Local", "CIC", "HA input"] },
+    supplyTemp: { value: 31.2, uom: "°C" },
+    waterSupplyTempEffectiveSource: { value: "CIC", state: "CIC" },
+    waterSupplyCalibrationStatus: { value: "Recalibration required: CIC", state: "Recalibration required: CIC" },
+    waterSupplyCalibrationRequired: { value: true, state: "ON" },
+  });
+
+  const markup = renderSettingsSensorSelectionSection();
+
+  assert.match(markup, /Gebruikte waarde\s*<div class="oq-settings-info oq-settings-source-info oq-settings-source-info--error oq-settings-source-info--circle"/);
+  assert.match(markup, /<button[^>]*data-oq-action="toggle-settings-info"[^>]*data-info-id="supplyTemp-info"[^>]*aria-expanded="false"[^>]*>i<\/button>/s);
+  assert.match(markup, /Ruwe waarde; kalibreer via Service\./);
+  assert.match(markup, /Ruwe metingen/);
+  assert.doesNotMatch(markup, /<span>Kalibratie<\/span>/);
+  assert.match(markup, /De aanvoerbron of bronconfiguratie is gewijzigd\./);
+  assert.match(markup, /voer de temperatuurkalibratie opnieuw uit/);
+
+  state.entities.waterSupplyCalibrationStatus = { value: "Calibrated: CIC", state: "Calibrated: CIC" };
+  state.entities.waterSupplyCalibrationRequired = { value: false, state: "OFF" };
+  state.entities.waterSupplyCalibrationOffset = { value: -0.6, uom: "°C" };
+  const calibratedMarkup = renderSettingsSensorSelectionSection();
+
+  assert.match(calibratedMarkup, /Gebruikte waarde\s*<div class="oq-settings-info oq-settings-source-info oq-settings-source-info--valid oq-settings-source-info--circle"/);
+  assert.match(calibratedMarkup, /aria-label="Uitleg bij Gebruikte waarde"/);
+  assert.match(calibratedMarkup, /Gekalibreerd; ruwe metingen hieronder\./);
+  assert.doesNotMatch(calibratedMarkup, /<span>Kalibratie<\/span>|voer de temperatuurkalibratie opnieuw uit/);
+
+  state.settingsInfoOpen = "supplyTemp-info";
+  const openInfoMarkup = renderSettingsSensorSelectionSection();
+  assert.match(openInfoMarkup, /data-info-id="supplyTemp-info"[^>]*aria-expanded="true"/s);
+  assert.match(openInfoMarkup, /class="oq-settings-info-popover"\s*>/);
+  state.settingsInfoOpen = "";
 });

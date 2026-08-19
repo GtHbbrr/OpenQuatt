@@ -245,7 +245,7 @@ import { render } from "./render-scheduler.js";
     if (!__OQ_PREVIEW__ || !state.mounted) {
       return;
     }
-    void syncEntities({ forceDecisionLog: true });
+    void syncEntities({ forceDecisionLog: true, forceIncidentMonitoring: true });
   }
 
   export function handleDevControlsChanged() {

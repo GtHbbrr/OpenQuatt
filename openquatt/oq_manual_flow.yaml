@@ -54,8 +54,6 @@ number:
     optimistic: true
     initial_value: 800
     entity_category: config
-    web_server:
-      sorting_group_id: oq_hydraulics
 
 button:
   - platform: template
@@ -64,8 +62,6 @@ button:
     internal: true
     icon: mdi:water-pump
     entity_category: config
-    web_server:
-      sorting_group_id: oq_hydraulics
     on_press:
       - lambda: |-
           oq_manual_flow::runtime().start();
@@ -76,8 +72,6 @@ button:
     internal: true
     icon: mdi:stop-circle-outline
     entity_category: config
-    web_server:
-      sorting_group_id: oq_hydraulics
     on_press:
       - lambda: |-
           oq_manual_flow::runtime().abort_or_clear();
@@ -88,8 +82,6 @@ button:
     internal: true
     icon: mdi:radiator
     entity_category: config
-    web_server:
-      sorting_group_id: oq_hydraulics
     on_press:
       - lambda: |-
           oq_manual_flow::runtime().apply_to_heating();
@@ -100,8 +92,6 @@ button:
     internal: true
     icon: mdi:snowflake
     entity_category: config
-    web_server:
-      sorting_group_id: oq_hydraulics
     on_press:
       - lambda: |-
           oq_manual_flow::runtime().apply_to_cooling();
@@ -121,8 +111,6 @@ switch:
     turn_off_action:
       - lambda: |-
           oq_manual_flow::runtime().abort_quick_test();
-    web_server:
-      sorting_group_id: oq_hydraulics
 
 interval:
   - interval: 1s

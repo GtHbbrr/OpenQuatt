@@ -30,8 +30,6 @@ switch:
     optimistic: true
     restore_mode: ALWAYS_OFF
     entity_category: config
-    web_server:
-      sorting_group_id: oq_advanced_hp_levels
 
 number:
   # Editable desired runtime table. Defaults mirror the known ODU factory table;
@@ -49,8 +47,6 @@ number:
     optimistic: true
     initial_value: 0
     entity_category: config
-    web_server:
-      sorting_group_id: oq_advanced_hp_levels
 
   - platform: template
     id: ${hp_id}_odu_runtime_cooling_f1
@@ -65,8 +61,6 @@ number:
     optimistic: true
     initial_value: 30
     entity_category: config
-    web_server:
-      sorting_group_id: oq_advanced_hp_levels
 
   - platform: template
     id: ${hp_id}_odu_runtime_cooling_f2
@@ -81,8 +75,6 @@ number:
     optimistic: true
     initial_value: 36
     entity_category: config
-    web_server:
-      sorting_group_id: oq_advanced_hp_levels
 
   - platform: template
     id: ${hp_id}_odu_runtime_cooling_f3
@@ -97,8 +89,6 @@ number:
     optimistic: true
     initial_value: 42
     entity_category: config
-    web_server:
-      sorting_group_id: oq_advanced_hp_levels
 
   - platform: template
     id: ${hp_id}_odu_runtime_cooling_f4
@@ -113,8 +103,6 @@ number:
     optimistic: true
     initial_value: 47
     entity_category: config
-    web_server:
-      sorting_group_id: oq_advanced_hp_levels
 
   - platform: template
     id: ${hp_id}_odu_runtime_cooling_f5
@@ -129,8 +117,6 @@ number:
     optimistic: true
     initial_value: 52
     entity_category: config
-    web_server:
-      sorting_group_id: oq_advanced_hp_levels
 
   - platform: template
     id: ${hp_id}_odu_runtime_cooling_f6
@@ -145,8 +131,6 @@ number:
     optimistic: true
     initial_value: 56
     entity_category: config
-    web_server:
-      sorting_group_id: oq_advanced_hp_levels
 
   - platform: template
     id: ${hp_id}_odu_runtime_cooling_f7
@@ -161,8 +145,6 @@ number:
     optimistic: true
     initial_value: 61
     entity_category: config
-    web_server:
-      sorting_group_id: oq_advanced_hp_levels
 
   - platform: template
     id: ${hp_id}_odu_runtime_cooling_f8
@@ -177,8 +159,6 @@ number:
     optimistic: true
     initial_value: 66
     entity_category: config
-    web_server:
-      sorting_group_id: oq_advanced_hp_levels
 
   - platform: template
     id: ${hp_id}_odu_runtime_cooling_f9
@@ -193,8 +173,6 @@ number:
     optimistic: true
     initial_value: 71
     entity_category: config
-    web_server:
-      sorting_group_id: oq_advanced_hp_levels
 
   - platform: template
     id: ${hp_id}_odu_runtime_cooling_f10
@@ -209,8 +187,6 @@ number:
     optimistic: true
     initial_value: 74
     entity_category: config
-    web_server:
-      sorting_group_id: oq_advanced_hp_levels
 
   - platform: template
     id: ${hp_id}_odu_runtime_heating_f0
@@ -225,8 +201,6 @@ number:
     optimistic: true
     initial_value: 0
     entity_category: config
-    web_server:
-      sorting_group_id: oq_advanced_hp_levels
 
   - platform: template
     id: ${hp_id}_odu_runtime_heating_f1
@@ -241,8 +215,6 @@ number:
     optimistic: true
     initial_value: 30
     entity_category: config
-    web_server:
-      sorting_group_id: oq_advanced_hp_levels
 
   - platform: template
     id: ${hp_id}_odu_runtime_heating_f2
@@ -257,8 +229,6 @@ number:
     optimistic: true
     initial_value: 39
     entity_category: config
-    web_server:
-      sorting_group_id: oq_advanced_hp_levels
 
   - platform: template
     id: ${hp_id}_odu_runtime_heating_f3
@@ -273,8 +243,6 @@ number:
     optimistic: true
     initial_value: 49
     entity_category: config
-    web_server:
-      sorting_group_id: oq_advanced_hp_levels
 
   - platform: template
     id: ${hp_id}_odu_runtime_heating_f4
@@ -289,8 +257,6 @@ number:
     optimistic: true
     initial_value: 55
     entity_category: config
-    web_server:
-      sorting_group_id: oq_advanced_hp_levels
 
   - platform: template
     id: ${hp_id}_odu_runtime_heating_f5
@@ -305,8 +271,6 @@ number:
     optimistic: true
     initial_value: 61
     entity_category: config
-    web_server:
-      sorting_group_id: oq_advanced_hp_levels
 
   - platform: template
     id: ${hp_id}_odu_runtime_heating_f6
@@ -321,8 +285,6 @@ number:
     optimistic: true
     initial_value: 67
     entity_category: config
-    web_server:
-      sorting_group_id: oq_advanced_hp_levels
 
   - platform: template
     id: ${hp_id}_odu_runtime_heating_f7
@@ -337,8 +299,6 @@ number:
     optimistic: true
     initial_value: 72
     entity_category: config
-    web_server:
-      sorting_group_id: oq_advanced_hp_levels
 
   - platform: template
     id: ${hp_id}_odu_runtime_heating_f8
@@ -353,8 +313,6 @@ number:
     optimistic: true
     initial_value: 79
     entity_category: config
-    web_server:
-      sorting_group_id: oq_advanced_hp_levels
 
   - platform: template
     id: ${hp_id}_odu_runtime_heating_f9
@@ -369,8 +327,6 @@ number:
     optimistic: true
     initial_value: 85
     entity_category: config
-    web_server:
-      sorting_group_id: oq_advanced_hp_levels
 
   - platform: template
     id: ${hp_id}_odu_runtime_heating_f10
@@ -385,8 +341,6 @@ number:
     optimistic: true
     initial_value: 90
     entity_category: config
-    web_server:
-      sorting_group_id: oq_advanced_hp_levels
 
 button:
   - platform: template
@@ -395,12 +349,11 @@ button:
     internal: true
     icon: mdi:download-alert-outline
     entity_category: config
-    web_server:
-      sorting_group_id: oq_advanced_hp_levels
     on_press:
       - lambda: |-
           oq_odu_runtime_frequency::RuntimeFrequencyTableRefs refs = {
               id(${hp_id}),
+              id(${hp_id}_odu_eeprom_dump),
               id(${hp_id}_odu_runtime_frequency_table_enable),
               id(${hp_id}_odu_runtime_frequency_table_status),
               "${prefix}",
@@ -439,12 +392,11 @@ button:
     internal: true
     icon: mdi:alert-circle-check-outline
     entity_category: config
-    web_server:
-      sorting_group_id: oq_advanced_hp_levels
     on_press:
       - lambda: |-
           oq_odu_runtime_frequency::RuntimeFrequencyTableRefs refs = {
               id(${hp_id}),
+              id(${hp_id}_odu_eeprom_dump),
               id(${hp_id}_odu_runtime_frequency_table_enable),
               id(${hp_id}_odu_runtime_frequency_table_status),
               "${prefix}",
@@ -487,5 +439,3 @@ text_sensor:
     icon: mdi:alert-decagram-outline
     entity_category: diagnostic
     update_interval: never
-    web_server:
-      sorting_group_id: oq_advanced_hp_levels

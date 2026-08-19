@@ -248,20 +248,59 @@
 .oq-webserver-log-history-shell {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr));
-  align-items: stretch;
+  align-items: start;
   gap: 12px;
 }
 
+.oq-webserver-log-control-card {
+  align-items: center;
+  min-height: 0;
+  padding: 8px 12px;
+}
+
+.oq-webserver-log-control-card .oq-settings-system-row-copy {
+  gap: 2px;
+}
+
+.oq-webserver-log-control-card-value {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.oq-webserver-log-control-card .oq-settings-info-button {
+  width: 20px;
+  height: 20px;
+  font-size: 0.76rem;
+}
+
+.oq-webserver-log-control-card:first-child .oq-settings-info-popover {
+  right: auto;
+  left: 0;
+}
+
+.oq-webserver-log-control-card > .oq-helper-button,
 .oq-webserver-log-level-control {
   position: relative;
   display: block;
-  flex: 0 0 220px;
-  width: min(220px, 100%);
+  flex: 0 0 190px;
+  width: min(190px, 100%);
+}
+
+.oq-webserver-log-control-card > .oq-helper-button {
+  min-height: 40px;
 }
 
 .oq-webserver-log-level-control .oq-helper-select {
-  min-height: 46px;
+  min-height: 40px;
   padding-right: 40px;
+}
+
+.oq-webserver-log-control-card--warning .oq-settings-system-row-note {
+  color: var(--oq-helper-accent-deep);
+  font-size: 0.78rem;
+  font-weight: 650;
+  line-height: 1.3;
 }
 
 .oq-webserver-log-modal .oq-helper-modal-copy code,

@@ -1,5 +1,5 @@
 import { getOduRuntimeFrequencyButtonHp, getOduRuntimeFrequencyHpKeys, INSTALLATION_MONITORING_STATE_KEYS, ODU_RUNTIME_FREQUENCY_BUTTON_KEYS } from "./config.js";
-import { triggerNamedButton } from "./entity-write-actions.js";
+import { triggerIncidentAction, triggerNamedButton } from "./entity-write-actions.js";
 import { state } from "./state.js";
 
 const commissioningRefreshGroups = [
@@ -39,11 +39,15 @@ const commissioningRefreshGroups = [
       "hpWaterCalibrationResultReference", "hpWaterCalibrationResultSpreadBefore",
       "hpWaterCalibrationResultExpectedSpread", "hpWaterCalibrationResultHp1InRawAvg",
       "hpWaterCalibrationResultHp1OutRawAvg", "hpWaterCalibrationResultHp2InRawAvg",
-      "hpWaterCalibrationResultHp2OutRawAvg", "hp1WaterInRaw", "hp1WaterOutRaw", "hp2WaterInRaw",
+      "hpWaterCalibrationResultHp2OutRawAvg", "hpWaterCalibrationResultSupplyRawAvg",
+      "hpWaterCalibrationResultSupplyOffset", "hpWaterCalibrationResultSupplySource",
+      "hp1WaterInRaw", "hp1WaterOutRaw", "hp2WaterInRaw",
       "hp2WaterOutRaw", "hp1WaterIn", "hp1WaterOut", "hp2WaterIn", "hp2WaterOut",
       "hp1WaterInOffset", "hp1WaterOutOffset", "hp2WaterInOffset", "hp2WaterOutOffset",
       "hp1WaterInOffsetSuggested", "hp1WaterOutOffsetSuggested", "hp2WaterInOffsetSuggested",
-      "hp2WaterOutOffsetSuggested", "flowMode",
+      "hp2WaterOutOffsetSuggested", "waterSupplyCalibrationOffset",
+      "waterSupplyCalibrationOffsetSuggested", "waterSupplyCalibrationRequired",
+      "waterSupplyCalibrationStatus", "supplyTemp", "flowMode",
     ],
   },
   {
@@ -147,6 +151,9 @@ function getRefreshOptions(buttonKey) {
   if (buttonKey === "acknowledgeCompressorCyclingAlert") {
     return { refreshKeys: [...INSTALLATION_MONITORING_STATE_KEYS] };
   }
+  if (buttonKey === "acknowledgeHpIncidents") {
+    return { refreshIncidentMonitoring: true };
+  }
 
   const group = commissioningRefreshGroups.find(({ actions }) => actions.includes(buttonKey));
   if (group) {
@@ -172,6 +179,21 @@ function getRefreshOptions(buttonKey) {
 }
 
 export function handleNamedButtonAction(action, button) {
+  if (action === "retry-hp-start" || action === "confirm-hp-power-cycle") {
+    const hpIndex = Number(button.dataset.oqHpIndex || 0);
+    if (hpIndex !== 1 && hpIndex !== 2) return true;
+    const kind = action === "retry-hp-start"
+      ? "start_failure_retry"
+      : "confirm_odu_power_cycle";
+    if (kind === "confirm_odu_power_cycle") {
+      const confirmed = window.confirm(
+        `HP${hpIndex} ODU-powercycle bevestigen?\n\nBevestig alleen als deze buitenunit werkelijk spanningsloos is geweest. Hiermee geef je uitsluitend de herstelde safety-latch van HP${hpIndex} vrij; een actieve fout blijft staan.`,
+      );
+      if (!confirmed) return true;
+    }
+    void triggerIncidentAction(hpIndex, kind);
+    return true;
+  }
   if (action !== "press-named-button") {
     return false;
   }

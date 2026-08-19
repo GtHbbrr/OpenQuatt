@@ -2,8 +2,12 @@ import { hasEntity } from "./app-shared.js";
 import { CURVE_POINTS, ENTITY_DEFS, FIRMWARE_ENTITY_KEYS, FLOW_SETTING_KEYS, getOduRuntimeFrequencyButtonHp, getOduRuntimeFrequencyHpKeys, HEADER_ENTITY_KEYS, LIMIT_KEYS, ODU_RUNTIME_FREQUENCY_BUTTON_KEYS, OPENQUATT_RESUME_CLEAR_VALUE, OVERVIEW_KEYS, POWER_HOUSE_KEYS, QUICK_STEPS } from "./config.js";
 import { beginDeviceReconnect } from "./device-reconnect.js";
 import { buildEntityPath, isCurveMode } from "./domain-helpers.js";
-import { formatOpenQuattResumeDateTime, getEntityValue, normalizeDateTimeValue, normalizeNumber, normalizeTimeValue, toDateTimeInputValue } from "./entity-store.js";
-import { getSettingsRefreshKeys, refreshEntities, syncEntities } from "./entity-sync.js";
+import { formatOpenQuattResumeDateTime, getEntityValue, normalizeDateTimeValue, normalizeNumber, normalizeTimeValue, parseLooseNumber, toDateTimeInputValue } from "./entity-store.js";
+import { getSettingsRefreshKeys, refreshEntities, refreshIncidentMonitoringData, syncEntities } from "./entity-sync.js";
+import {
+  createIncidentActionRequestId,
+  postIncidentActionRequest,
+} from "./incident-monitoring.js";
 import { setAppView } from "./navigation.js";
 import { render } from "./render-scheduler.js";
 import { state } from "./state.js";
@@ -12,10 +16,17 @@ import { updateFirmwareState } from "./feature-state.js";
 import { stopLoginAuthStatusPolling } from "../features/security-actions.js";
 import { refreshSettingsStorageStateSoon, SETTINGS_STORAGE_KEYS } from "../features/storage-history.js";
 import { clearWebServerLogOutput, refreshWebServerLogHistory } from "../features/webserver-logs.js";
-import { isUsageTelemetryChoiceConfirmed } from "./usage-telemetry-domain.js";
+import { waitForUsageTelemetryChoiceConfirmation } from "./usage-telemetry-domain.js";
 
 async function commitUsageTelemetrySwitch(entity, enabled) {
   const key = "usageTelemetryEnabled";
+  const confirmChoice = (expectedEnabled) => waitForUsageTelemetryChoiceConfirmation({
+    refresh: async () => {
+      await refreshEntities([key, "usageTelemetryChoiceConfigured", "usageTelemetryInstallationId"], "all");
+      return [getEntityValue(key), getEntityValue("usageTelemetryChoiceConfigured")];
+    },
+    expectedEnabled,
+  });
   const previousEntity = state.entities[key] ? { ...state.entities[key] } : null;
   state.busyAction = `switch-${key}`;
   state.controlNotice = "";
@@ -28,14 +39,10 @@ async function commitUsageTelemetrySwitch(entity, enabled) {
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}`);
     }
-    await refreshEntities([key, "usageTelemetryChoiceConfigured", "usageTelemetryInstallationId"], "all");
-    if (!isUsageTelemetryChoiceConfirmed({
-      telemetryValue: getEntityValue(key),
-      choiceValue: getEntityValue("usageTelemetryChoiceConfigured"),
-      expectedEnabled: enabled,
-    })) {
+    if (!await confirmChoice(enabled)) {
       throw new Error("de controller heeft de opgeslagen keuze niet bevestigd");
     }
+    state.controlError = "";
     state.controlNotice = `${entity.name} ${enabled ? "ingeschakeld" : "uitgeschakeld"}.`;
   } catch (error) {
     let disabledConfirmed = false;
@@ -44,16 +51,12 @@ async function commitUsageTelemetrySwitch(entity, enabled) {
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);
       }
-      await refreshEntities([key, "usageTelemetryChoiceConfigured", "usageTelemetryInstallationId"], "all");
-      disabledConfirmed = isUsageTelemetryChoiceConfirmed({
-        telemetryValue: getEntityValue(key),
-        choiceValue: getEntityValue("usageTelemetryChoiceConfigured"),
-        expectedEnabled: false,
-      });
+      disabledConfirmed = await confirmChoice(false);
     } catch (_disableError) {
       // Report an unknown state instead of presenting an unverified privacy choice.
     }
     if (disabledConfirmed) {
+      state.controlError = "";
       state.controlNotice = enabled
         ? "Inschakelen kon niet worden bevestigd. Delen is veilig uitgeschakeld."
         : "Delen is uitgeschakeld.";
@@ -73,14 +76,18 @@ async function commitUsageTelemetrySwitch(entity, enabled) {
 
 export async function commitSelect(key, option) {
   const entity = ENTITY_DEFS[key];
+  const previousEntity = state.entities[key] ? { ...state.entities[key] } : null;
+  const verifyControlModeOverride = key === "controlModeOverride";
   state.busyAction = `save-${key}`;
   state.controlNotice = "";
   state.controlError = "";
-  state.entities[key] = {
-    ...(state.entities[key] || {}),
-    state: option,
-    value: option,
-  };
+  if (!verifyControlModeOverride) {
+    state.entities[key] = {
+      ...(state.entities[key] || {}),
+      state: option,
+      value: option,
+    };
+  }
   render();
 
   try {
@@ -91,9 +98,43 @@ export async function commitSelect(key, option) {
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}`);
     }
+    if (verifyControlModeOverride) {
+      let confirmationPayload = null;
+      try {
+        const confirmationResponse = await fetch(buildEntityPath(entity.domain, entity.name), {
+          cache: "no-store",
+        });
+        if (!confirmationResponse.ok) {
+          throw new Error(`HTTP ${confirmationResponse.status}`);
+        }
+        confirmationPayload = await confirmationResponse.json();
+      } catch (error) {
+        const uncertainValue = option === "Auto"
+          ? String(previousEntity?.value ?? previousEntity?.state ?? "Force CM0")
+          : option;
+        state.entities[key] = {
+          ...(previousEntity || {}),
+          state: uncertainValue,
+          value: uncertainValue,
+        };
+        throw new Error(`de controllerstatus kon niet worden bevestigd (${error.message})`);
+      }
+      const confirmedValue = String(confirmationPayload?.value ?? confirmationPayload?.state ?? "");
+      state.entities[key] = {
+        ...(previousEntity || {}),
+        ...(confirmationPayload || {}),
+      };
+      if (confirmedValue !== option) {
+        throw new Error(`de controller meldt nog "${confirmedValue || "onbekend"}"`);
+      }
+    }
     delete state.drafts[key];
     delete state.inputDrafts[key];
-    state.controlNotice = `${entity.name} bijgewerkt.`;
+    state.controlNotice = verifyControlModeOverride
+      ? option === "Auto"
+        ? "De normale moduskeuze is weer actief."
+        : `${option} is tijdelijk actief en verloopt automatisch na maximaal 30 minuten.`
+      : `${entity.name} bijgewerkt.`;
     if (key === "firmwareUpdateChannel") {
       updateFirmwareState({ updateInstallCompleted: false, updateInstallCompletedVersion: "" });
       state.entities.firmwareUpdateChannel = {
@@ -130,11 +171,34 @@ export async function commitSelect(key, option) {
       await refreshEntities(isCurveMode(option) ? CURVE_POINTS.map((point) => point.key) : POWER_HOUSE_KEYS, "state");
     }
   } catch (error) {
+    if (!verifyControlModeOverride && previousEntity) {
+      state.entities[key] = previousEntity;
+    }
     state.controlError = `${entity.name} kon niet worden bijgewerkt. ${error.message}`;
   } finally {
     state.busyAction = "";
     render();
   }
+}
+
+export function getNumberSettingValidationError(key, value, entities = state.entities) {
+  const normalized = parseLooseNumber(value);
+  if (!Number.isFinite(normalized)) {
+    return "";
+  }
+  if (key === "boilerSupportStartThreshold") {
+    const stopThreshold = parseLooseNumber(entities.boilerSupportStopThreshold?.value ?? entities.boilerSupportStopThreshold?.state);
+    if (Number.isFinite(stopThreshold) && normalized <= stopThreshold) {
+      return `De startgrens moet hoger zijn dan de stopgrens (${stopThreshold} W).`;
+    }
+  }
+  if (key === "boilerSupportStopThreshold") {
+    const startThreshold = parseLooseNumber(entities.boilerSupportStartThreshold?.value ?? entities.boilerSupportStartThreshold?.state);
+    if (Number.isFinite(startThreshold) && normalized >= startThreshold) {
+      return `De stopgrens moet lager zijn dan de startgrens (${startThreshold} W).`;
+    }
+  }
+  return "";
 }
 
 export async function commitSwitch(key, enabled) {
@@ -199,6 +263,15 @@ export async function commitSwitch(key, enabled) {
 export async function commitNumber(key, value, successNotice = "") {
   const entity = ENTITY_DEFS[key];
   const normalized = normalizeNumber(key, value);
+  const validationError = getNumberSettingValidationError(key, normalized);
+  if (validationError) {
+    state.controlNotice = "";
+    state.controlError = validationError;
+    state.inputDrafts[key] = String(value ?? "");
+    state.drafts[key] = normalized;
+    render();
+    return;
+  }
   state.busyAction = `save-${key}`;
   state.controlNotice = "";
   state.controlError = "";
@@ -489,6 +562,101 @@ export function queueHpWaterCalibrationApplyAnchor() {
   });
 }
 
+export async function triggerIncidentAction(hpIndex, kind) {
+  const endpoint = kind === "start_failure_retry"
+    ? "/openquatt/incidents/retry-start"
+    : kind === "confirm_odu_power_cycle"
+      ? "/openquatt/incidents/confirm-odu-power-cycle"
+      : "";
+  if (!endpoint || (hpIndex !== 1 && hpIndex !== 2)) return;
+  const matchingPendingAction = state.incidentAction?.pending
+      && state.incidentAction.hp === hpIndex
+      && state.incidentAction.kind === kind;
+  if (matchingPendingAction &&
+      !state.incidentAction.outcomeUnknown) {
+    await refreshIncidentMonitoringData({ force: true });
+    return;
+  }
+
+  const requestId = matchingPendingAction
+    ? state.incidentAction.requestId
+    : createIncidentActionRequestId();
+  state.busyAction = `incident-${kind}-hp${hpIndex}`;
+  state.controlError = "";
+  state.controlNotice = "";
+  state.incidentAction = {
+    hp: hpIndex,
+    kind,
+    requestId,
+    pending: true,
+    ok: null,
+    result: "",
+  };
+  render();
+
+  try {
+    const accepted = await postIncidentActionRequest(
+      fetch,
+      endpoint,
+      hpIndex,
+      requestId,
+      state.incidentMonitoringSnapshot?.actionCsrfToken || "",
+      async () => {
+        await refreshIncidentMonitoringData({ force: true });
+        return state.incidentMonitoringSnapshot?.actionCsrfToken || "";
+      },
+    );
+    state.incidentAction = {
+      hp: hpIndex,
+      kind,
+      requestId,
+      pending: true,
+      ok: null,
+      result: "",
+    };
+    state.controlNotice = `Actie voor HP${hpIndex} geaccepteerd; resultaat wordt gecontroleerd.`;
+    render();
+
+  } catch (error) {
+    const definitive = error.incidentActionDefinitive === true;
+    state.incidentAction = definitive
+      ? {
+          hp: hpIndex,
+          kind,
+          requestId,
+          pending: false,
+          ok: false,
+          result: "",
+          message: error.message || String(error),
+        }
+      : {
+          hp: hpIndex,
+          kind,
+          requestId,
+          pending: true,
+          outcomeUnknown: true,
+          ok: null,
+          result: "",
+          message: error.message || String(error),
+        };
+    if (definitive) {
+      state.controlError = `Actie voor HP${hpIndex} niet uitgevoerd. ${error.message || error}`;
+    } else {
+      state.controlNotice = `Antwoord voor HP${hpIndex} ging verloren; resultaat wordt met hetzelfde actienummer gecontroleerd.`;
+    }
+  } finally {
+    for (const delayMs of [0, 500, 1500]) {
+      if (!state.incidentAction.pending) break;
+      if (delayMs) {
+        await new Promise((resolve) => window.setTimeout(resolve, delayMs));
+      }
+      await refreshIncidentMonitoringData({ force: true });
+    }
+    state.busyAction = "";
+    render();
+  }
+}
+
 export async function triggerNamedButton(key, options = {}) {
   const entity = ENTITY_DEFS[key];
   if (!entity) {
@@ -546,6 +714,9 @@ export async function triggerNamedButton(key, options = {}) {
         await new Promise((resolve) => window.setTimeout(resolve, refreshDelayMs));
       }
       await refreshEntities(options.refreshKeys, "state");
+    }
+    if (options.refreshIncidentMonitoring === true) {
+      await refreshIncidentMonitoringData({ force: true });
     }
   } catch (error) {
     if (key === "commissioningCm100Start") {

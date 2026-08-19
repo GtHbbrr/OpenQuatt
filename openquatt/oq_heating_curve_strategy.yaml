@@ -125,8 +125,6 @@ select:
       - Stable
     initial_option: Balanced
     entity_category: config
-    web_server:
-      sorting_group_id: oq_heating_curve
     on_value:
       then:
         - climate.pid.reset_integral_term: oq_heating_curve_pid
@@ -175,8 +173,6 @@ number:
     restore_value: true
     optimistic: true
     initial_value: 55
-    web_server:
-      sorting_group_id: oq_heating_curve
 
   - platform: template
     id: curve_tsupply_m10
@@ -190,8 +186,6 @@ number:
     restore_value: true
     optimistic: true
     initial_value: 50
-    web_server:
-      sorting_group_id: oq_heating_curve
 
   - platform: template
     id: curve_tsupply_0
@@ -205,8 +199,6 @@ number:
     restore_value: true
     optimistic: true
     initial_value: 45
-    web_server:
-      sorting_group_id: oq_heating_curve
 
   - platform: template
     id: curve_tsupply_5
@@ -220,8 +212,6 @@ number:
     restore_value: true
     optimistic: true
     initial_value: 40
-    web_server:
-      sorting_group_id: oq_heating_curve
 
   - platform: template
     id: curve_tsupply_10
@@ -235,8 +225,6 @@ number:
     restore_value: true
     optimistic: true
     initial_value: 35
-    web_server:
-      sorting_group_id: oq_heating_curve
 
   - platform: template
     id: curve_tsupply_15
@@ -250,8 +238,6 @@ number:
     restore_value: true
     optimistic: true
     initial_value: 30
-    web_server:
-      sorting_group_id: oq_heating_curve
 
   - platform: template
     id: heating_curve_pid_kp
@@ -265,8 +251,6 @@ number:
     restore_value: true
     optimistic: true
     initial_value: 0.280
-    web_server:
-      sorting_group_id: oq_heating_curve
     on_value:
       then:
         - climate.pid.set_control_parameters:
@@ -288,8 +272,6 @@ number:
     restore_value: true
     optimistic: true
     initial_value: 0.00060
-    web_server:
-      sorting_group_id: oq_heating_curve
     on_value:
       then:
         - climate.pid.set_control_parameters:
@@ -311,8 +293,6 @@ number:
     restore_value: true
     optimistic: true
     initial_value: 0.200
-    web_server:
-      sorting_group_id: oq_heating_curve
     on_value:
       then:
         - climate.pid.set_control_parameters:
@@ -334,8 +314,6 @@ number:
     restore_value: true
     optimistic: true
     initial_value: 40
-    web_server:
-      sorting_group_id: oq_heating_curve
 
 button:
   - platform: template
@@ -345,8 +323,6 @@ button:
     disabled_by_default: true
     icon: mdi:restart
     entity_category: config
-    web_server:
-      sorting_group_id: oq_heating_curve
     on_press:
       then:
         - climate.pid.reset_integral_term: oq_heating_curve_pid
@@ -373,8 +349,6 @@ climate:
     visual:
       min_temperature: 20
       max_temperature: 70
-    web_server:
-      sorting_group_id: oq_heating_curve
 
 output:
   - platform: template
@@ -689,8 +663,6 @@ sensor:
     state_class: measurement
     accuracy_decimals: 1
     update_interval: 10s
-    web_server:
-      sorting_group_id: oq_heating_curve
     lambda: |-
       // Generate the curve-mode supply target from outside temperature and room trim.
       const float outside_c = id(oq_curve_outside_temp_filtered).state;
@@ -761,8 +733,6 @@ sensor:
     accuracy_decimals: 2
     update_interval: 5s
     entity_category: diagnostic
-    web_server:
-      sorting_group_id: oq_heating_curve
     lambda: |-
       return id(oq_curve_demand_continuous);
 
@@ -777,8 +747,6 @@ sensor:
     accuracy_decimals: 0
     update_interval: 5s
     entity_category: diagnostic
-    web_server:
-      sorting_group_id: oq_heating_curve
     lambda: |-
       return (float) id(oq_demand_curve);
 
@@ -793,8 +761,6 @@ sensor:
     accuracy_decimals: 0
     update_interval: 5s
     entity_category: diagnostic
-    web_server:
-      sorting_group_id: oq_heating_curve
     lambda: |-
       return (float) id(oq_curve_request_total_level);
 
@@ -809,8 +775,6 @@ sensor:
     accuracy_decimals: 0
     update_interval: 5s
     entity_category: diagnostic
-    web_server:
-      sorting_group_id: oq_heating_curve
     lambda: |-
       return (float) id(oq_curve_dispatch_hp1_level);
 
@@ -825,8 +789,6 @@ sensor:
     accuracy_decimals: 0
     update_interval: 5s
     entity_category: diagnostic
-    web_server:
-      sorting_group_id: oq_heating_curve
     lambda: |-
       return (float) id(oq_curve_dispatch_hp2_level);
 
@@ -839,8 +801,6 @@ sensor:
     accuracy_decimals: 0
     update_interval: 5s
     entity_category: diagnostic
-    web_server:
-      sorting_group_id: oq_heating_curve
     lambda: |-
       return id(oq_curve_restart_inhibit_active) ? 1.0f : 0.0f;
 
@@ -853,8 +813,6 @@ text_sensor:
     update_interval: ${oq_diagnostic_update_interval_s}s
     entity_category: diagnostic
     disabled_by_default: true
-    web_server:
-      sorting_group_id: oq_heating_curve
     lambda: |-
       if (!id(oq_curve_heat_request_active)) return std::string("OFF");
       return (id(oq_curve_regime_code) == 1) ? std::string("HEAT") : std::string("COAST");
@@ -867,8 +825,6 @@ text_sensor:
     update_interval: ${oq_diagnostic_update_interval_s}s
     entity_category: diagnostic
     disabled_by_default: true
-    web_server:
-      sorting_group_id: oq_heating_curve
     lambda: |-
       switch (id(oq_curve_regime_code)) {
         case 1: return std::string("RECOVERY");
@@ -884,8 +840,6 @@ text_sensor:
     update_interval: ${oq_diagnostic_update_interval_s}s
     entity_category: diagnostic
     disabled_by_default: true
-    web_server:
-      sorting_group_id: oq_heating_curve
     lambda: |-
       const char *mode_name = oq_curve::capacity_mode_name(id(oq_curve_capacity_mode_code));
       return std::string(mode_name);
@@ -899,6 +853,7 @@ interval:
           // CM5 owns the thermal strategy interface while cooling is active, so the
           // curve path must go fully inactive there even when curve mode remains selected.
           const bool active = (id(oq_control_mode_code) != 5) && (id(oq_heat_mode_code) == 1);
+          const uint32_t now_ms = millis();
           const int demand_max = (int) ${oq_strategy_demand_max_f};
           auto clamp_demand = [&](int demand)->int {
             if (demand < 0) return 0;
@@ -940,6 +895,13 @@ interval:
             id(oq_strategy_requested_power_w) = NAN;
             id(oq_strategy_supply_target_temp) = id(oq_supply_target_temp).state;
             id(oq_strategy_heat_request_active) = id(oq_curve_heat_request_active);
+            id(oq_strategy_hp_expected_power_w) = NAN;
+            id(oq_strategy_hp_max_power_w) = NAN;
+            id(oq_strategy_hp_saturated) =
+                id(oq_curve_heat_request_active) && d_out >= demand_max;
+            id(oq_strategy_output_valid) = !isnan(spw) && !isnan(pv);
+            id(oq_strategy_output_source_code) = 2;
+            id(oq_strategy_output_updated_ms) = now_ms;
 
             const int regime_code = id(oq_curve_regime_code);
             const char *phase_text =
@@ -979,7 +941,8 @@ interval:
               // Reset curve integral whenever curve mode is not in an active, heat-delivering state.
               if (id(oq_heat_mode_code) != 1) return false;
               if (id(oq_water_temp_hard_trip_active)) return true;
-              if (id(oq_control_mode_code) != 2) return true;
+              const int cm_code = id(oq_control_mode_code);
+              if (cm_code != 2 && cm_code != 3) return true;
               if (!id(oq_curve_heat_request_active)) return true;
               const float spw = id(oq_supply_target_temp).state;
               const float pv  = id(oq_system_supply_temp).state;
@@ -1106,6 +1069,31 @@ interval:
           #endif
           id(oq_P_hp_cap_w) = 0.0f;
           id(oq_P_deficit_w) = 0.0f;
+          const auto hp1_incident_outputs =
+              id(oq_incident_manager).get_outputs(1);
+          const int hp1_previous_applied_level =
+              id(hp1_last_applied_level);
+          const auto hp1_candidate_state =
+              oq_hp_candidate::candidate_state(
+                  hp1_incident_outputs,
+                  hp1_previous_applied_level);
+          const bool hp1_candidate_available =
+              oq_hp_candidate::may_serve_candidate(hp1_candidate_state);
+          #if OQ_TOPOLOGY_DUO
+          const auto hp2_incident_outputs =
+              id(oq_incident_manager).get_outputs(2);
+          const int hp2_previous_applied_level =
+              id(${secondary_last_applied_level_id});
+          const auto hp2_candidate_state =
+              oq_hp_candidate::candidate_state(
+                  hp2_incident_outputs,
+                  hp2_previous_applied_level);
+          const bool hp2_candidate_available =
+              oq_hp_candidate::may_serve_candidate(hp2_candidate_state);
+          #else
+          const oq_hp_candidate::HpCandidateState hp2_candidate_state;
+          const bool hp2_candidate_available = false;
+          #endif
 
           int owner = 0;
           int dispatch_hp1 = 0;
@@ -1129,6 +1117,10 @@ interval:
           const int prev_curve_post = id(oq_demand_filtered_prev);
 
           auto max_allowed_level_for_hp = [&](bool is_hp1)->int {
+            if ((is_hp1 && !hp1_candidate_available) ||
+                (!is_hp1 && !hp2_candidate_available)) {
+              return 0;
+            }
             int lvl_max = 0;
             for (int lvl = level_cap; lvl >= 1; lvl--) {
               if (level_allowed(is_hp1, lvl)) {
@@ -1151,6 +1143,10 @@ interval:
           const int prev2 = id(${secondary_last_applied_level_id});
 
           auto build_candidate = [&](int hp1_level, int hp2_level, float target_power_w)->oq_curve::DispatchCandidate {
+            if ((hp1_level > 0 && !hp1_candidate_available) ||
+                (hp2_level > 0 && !hp2_candidate_available)) {
+              return oq_curve::invalid_dispatch_candidate();
+            }
             float p1 = level_power_w(true, hp1_level);
             float p2 = level_power_w(false, hp2_level);
             if (isnan(p1) || isnan(p2)) return oq_curve::invalid_dispatch_candidate();
@@ -1168,8 +1164,13 @@ interval:
 
           const bool prev_hp1_on = (prev1 > 0);
           const bool prev_hp2_on = (prev2 > 0);
-          const int single_owner = oq_curve::pick_single_owner(
+          int single_owner = oq_curve::pick_single_owner(
               demand_active, id(oq_curve_single_owner_hp), prev_hp1_on, prev_hp2_on, lead_is_hp1);
+          if (single_owner == 1 && !hp1_candidate_available) {
+            single_owner = hp2_candidate_available ? 2 : 0;
+          } else if (single_owner == 2 && !hp2_candidate_available) {
+            single_owner = hp1_candidate_available ? 1 : 0;
+          }
           const int owner_max_single = (single_owner == 2)
               ? max_allowed_level_for_hp(false)
               : max_allowed_level_for_hp(true);
@@ -1334,11 +1335,31 @@ interval:
               id(oq_curve_single_owner_hp),
               id(oq_duo_request_hold_until_ms),
               1);
-          owner = (demand_u > 0.0f) ? 1 : 0;
-          dispatch_hp1 = std::max(0, std::min(max_level, (int) lroundf(demand_u * (float) max_level)));
+          owner = (demand_u > 0.0f && hp1_candidate_available) ? 1 : 0;
+          dispatch_hp1 = hp1_candidate_available
+              ? std::max(0, std::min(max_level, (int) lroundf(demand_u * (float) max_level)))
+              : 0;
           dispatch_hp2 = 0;
           id(oq_curve_capacity_mode_code) = (dispatch_hp1 > 0) ? 1 : 0;
           #endif
+
+          const auto suspect_topology_hold =
+              oq_hp_candidate::preserve_active_topology_during_suspect(
+                  {
+                      dispatch_hp1,
+                      dispatch_hp2,
+                      hp1_candidate_state,
+                      hp2_candidate_state,
+                      f > 0,
+                  });
+          if (suspect_topology_hold.active) {
+            dispatch_hp1 = suspect_topology_hold.hp1_level;
+            dispatch_hp2 = suspect_topology_hold.hp2_level;
+            owner = suspect_topology_hold.owner_hp;
+            id(oq_curve_capacity_mode_code) =
+                suspect_topology_hold.capacity_mode;
+            id(oq_curve_single_owner_hp) = owner;
+          }
 
           id(oq_curve_request_total_level) = dispatch_hp1 + dispatch_hp2;
           id(oq_curve_request_owner_hp) = owner;

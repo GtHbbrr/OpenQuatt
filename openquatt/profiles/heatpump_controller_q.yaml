@@ -4,6 +4,35 @@
 substitutions:
   oq_hardware_profile: "heatpump_controller_q"         # Compile-time hardware profile id.
   oq_hardware_build_flag: "-DOQ_HARDWARE_HEATPUMP_CONTROLLER_Q=1" # Enable Q-only local sensor paths.
+  oq_otb_supported: "true"                             # GPIO47/GPIO48 provide the boiler OpenTherm master transport.
+  oq_boiler_transport_selection_extra: |-
+    // Preserve the old session until a leaving-OpenTherm off flush has had
+    // its bounded acknowledgement opportunity.
+    if (id(oq_otb_hub_ready)) {
+      if (x == "OpenTherm") {
+        oq_otb::startup_probe_state.end();
+        id(oq_otb_startup_probe_active) = false;
+        id(oq_boiler_connection_mismatch_state) = false;
+        id(oq_boiler_connection_mismatch).publish_state(false);
+        id(oq_otb_hub).resume_polling();
+      } else {
+        id(oq_otb_withdraw_and_flush).execute();
+        oq_otb::startup_probe_state.begin(millis());
+        id(oq_otb_startup_probe_active) = true;
+        id(oq_boiler_connection_mismatch_state) = false;
+        id(oq_boiler_connection_mismatch).publish_state(false);
+        id(boiler_relay).turn_off();
+        id(oq_otb_hub).start_priority_polling(
+            esphome::opentherm::MessageId::STATUS,
+            esphome::opentherm::MessageId::CH_SETPOINT);
+      }
+    }
+    oq_otb::telemetry_state.reset_link_session();
+    id(oq_otb_link_initialized) = true;
+    id(oq_otb_link_available_state) = false;
+    id(otb_link_available).publish_state(false);
+    id(oq_otb_invalidate_telemetry).execute();
+  oq_boiler_transport_shutdown_extra: "id(oq_otb_ch_enable).turn_off(); { auto call = id(oq_otb_t_set_command).make_call(); call.set_value(0.0f); call.perform(); }" # Withdraw OTB synchronously on every transport edge.
   oq_local_supply_temp_sensor_id: "water_supply_temp_pt1000" # Q-edition local PT1000 source.
   oq_local_supply_temp_selector_id: "oq_local_supply_temp_source" # Explicit local physical-sensor selection.
   oq_controller_flow_sensor_id: "flow_rate_controller" # Use the controller pulse meter for V1 flow.
@@ -17,6 +46,8 @@ substitutions:
   uart_rts_pin: "GPIO41"                                # Modbus 1 mode / DE/RE; primary heat-pump bus.
   oq_ot_thermostat_in_pin: "GPIO21"                     # OpenTherm slave input.
   oq_ot_thermostat_out_pin: "GPIO14"                    # OpenTherm slave output.
+  oq_ot_boiler_in_pin: "GPIO47"                         # OpenTherm boiler master input.
+  oq_ot_boiler_out_pin: "GPIO48"                        # OpenTherm boiler master output.
   ds18b20_pin: "GPIO18"                                 # Dallas DS18B20 1-Wire input.
   oq_boiler_relay_pin: "GPIO16"                         # Relay 1 output.
   controller_aux_relay_pin: "GPIO3"                     # Relay 2 output reserved for controller logic.
@@ -44,15 +75,19 @@ packages:
   oq_hardware_revision: !include heatpump_controller_q_hardware_revision.yaml
   oq_status_leds: !include heatpump_controller_q_status_leds.yaml
   oq_cic_compatibility: !include heatpump_controller_q_cic_compatibility.yaml
+  oq_aux_relay_control: !include ../oq_aux_relay_control.yaml
   oq_sensor_source_selects_opentherm: !include ../oq_sensor_source_selects_opentherm.yaml
   oq_ot_slave: !include
     file: ../oq_ot_slave.yaml
     vars:
       ot_secondary_present: "${ot_secondary_present}"
+  oq_boiler_opentherm: !include ../oq_boiler_opentherm.yaml
 
 openquatt_usage_telemetry:
   cic_compatibility_switch: cic_compatibility_enable
   ot_thermostat_switch: oq_ot_slave_enabled
+  boiler_connection_select: oq_boiler_connection
+  q_flow_source_select: oq_q_flow_source
 
 psram:
   mode: octal
@@ -71,8 +106,24 @@ select:
       - PT1000
       - DS18B20
     initial_option: PT1000
-    web_server:
-      sorting_group_id: oq_sensor_selection
+    on_value:
+      - lambda: |-
+          // PT1000 and DS18B20 are separate calibration identities.
+          if (!id(oq_water_supply_temp_current_source_ready) ||
+              !id(water_supply_source).has_state() ||
+              id(water_supply_source).current_option() != "Local") {
+            return;
+          }
+          const int32_t selected = x == "PT1000"
+              ? oq_supply_calibration::SOURCE_LOCAL_PT1000
+              : oq_supply_calibration::SOURCE_LOCAL_DS18B20;
+          if (id(oq_water_supply_temp_current_source_code) == selected) return;
+
+          id(oq_water_supply_temp_current_source_ready) = false;
+          if (id(oq_hp_water_calibration_active)) id(oq_hp_water_calibration_abort) = true;
+          // Refresh the local proxy first so the old physical source cannot be cached under the new identity.
+          id(water_supply_temp_esp).update();
+          id(water_supply_temp_selected).update();
 
   - platform: template
     id: oq_q_flow_source
@@ -86,8 +137,6 @@ select:
       - Local
       - Outdoor unit
     initial_option: Auto
-    web_server:
-      sorting_group_id: oq_sensor_selection
 
 spi:
   - id: oq_hpcq_pt1000_spi
@@ -105,7 +154,7 @@ sensor:
     device_class: temperature
     state_class: measurement
     accuracy_decimals: 2
-    # Poll explicitly below so an unused or disconnected probe cannot flood logs.
+    # Poll explicitly below so a disconnected probe cannot flood logs.
     update_interval: never
     spi_id: oq_hpcq_pt1000_spi
     cs_pin: ${hpcq_pt1000_cs_pin}
@@ -118,8 +167,6 @@ sensor:
           if (isnan(x)) return x;
           if (x < -10.0f || x > 100.0f) return NAN;
           return x;
-    web_server:
-      sorting_group_id: oq_temperatures
 
   - platform: pulse_meter
     id: flow_rate_controller
@@ -148,8 +195,6 @@ sensor:
           const float lph = lpm * 60.0f;
           return lph > 0.0f ? lph : 0.0f;
       - throttle_average: 10s
-    web_server:
-      sorting_group_id: oq_hydraulics
 
 interval:
   - interval: 5s
@@ -159,30 +204,7 @@ interval:
           static bool read_attempted = false;
           static bool repeated_fault_logs_suppressed = false;
           static bool max31865_log_level_managed = false;
-          // Only touch the MAX31865 while its PT1000 is the active source.
-          const bool pt1000_selected =
-              id(water_supply_source).has_state() &&
-              id(oq_local_supply_temp_source).has_state() &&
-              id(water_supply_source).current_option() == "Local" &&
-              id(oq_local_supply_temp_source).current_option() == "PT1000";
-
-          if (!pt1000_selected) {
-            read_attempted = false;
-            if (id(water_supply_temp_pt1000).has_state() &&
-                !isnan(id(water_supply_temp_pt1000).state)) {
-              id(water_supply_temp_pt1000).publish_state(NAN);
-            }
-            id(water_supply_temp_pt1000).status_clear_warning();
-            id(water_supply_temp_pt1000).status_clear_error();
-            if (max31865_log_level_managed &&
-                esphome::logger::global_logger != nullptr) {
-              esphome::logger::global_logger->set_log_level(
-                  "max31865", esphome::logger::global_logger->get_log_level());
-              repeated_fault_logs_suppressed = false;
-            }
-            return;
-          }
-
+          // Keep the PT1000 live for diagnostics when DS18B20 is selected.
           const bool reading_valid =
               id(water_supply_temp_pt1000).has_state() &&
               !isnan(id(water_supply_temp_pt1000).state);

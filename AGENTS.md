@@ -27,11 +27,23 @@
 ## Tests And Builds
 
 - Run the smallest check that matches the change.
+- C/C++ code must conform to the repository `.clang-format` configuration. For C/C++ changes, run `npm run check:cpp-format`; if required, run `npm run fix:cpp-format` and verify that no unrelated files changed.
 - For firmware/YAML changes, prefer `python3 scripts/dev.py validate --config-only --config <target.yaml>`.
 - Run ESPHome compile or full `scripts/dev.py validate` only when explicitly requested or clearly necessary.
 - For web source changes, run `npm run build:web`.
 - For docs/tooling changes, prefer the specific script touched by the task.
 - Summarize build/test output by command, pass/fail, and the few relevant error lines.
+
+## Embedded Memory Safety
+
+- Treat internal DRAM as a constrained runtime resource required by Wi-Fi, lwIP, TLS, DMA and FreeRTOS task stacks; total free memory or free PSRAM alone is not evidence of safety.
+- Distinguish current free heap from the cumulative minimum-since-boot watermark. Also inspect the largest internal free block, fragmentation and relevant task-stack high-watermarks.
+- Put large, long-lived state, history and request scratch buffers in PSRAM with an explicit failure policy. Do not silently fall back to internal RAM when preserving internal heap is part of the safety budget.
+- Remember that globals, `new`, `std::string` and `std::vector` do not automatically use PSRAM; objects stored in PSRAM may still own internal allocations.
+- Keep ISR/DMA data, cache-disabled paths and low-level Wi-Fi/TLS/ESP-MQTT stacks in compatible internal memory unless the platform contract and HIL prove external-stack use is safe.
+- Prefer a persistent worker task over repeated task create/delete cycles. Avoid globally changing malloc-placement thresholds as a substitute for targeted ownership.
+- For memory-affecting changes, compare identical baseline and candidate firmware through cold boot and realistic HA/web/API/MQTT/Modbus/OpenTherm/OTA load. A compile-time RAM report is not sufficient.
+- Treat unexplained regressions, allocation failures or a minimum/largest-block result without demonstrated margin for the worst simultaneous allocation as release-blocking. Maintain profile-specific budgets once healthy HIL baselines are established.
 
 ## GitHub And PRs
 

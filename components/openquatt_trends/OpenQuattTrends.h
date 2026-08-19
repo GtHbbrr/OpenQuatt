@@ -6,6 +6,7 @@
 
 #include <esp_http_server.h>
 #include "OpenQuattFlashLayout.h"
+#include "OpenQuattTrendsStoragePolicy.h"
 #include "esp_partition.h"
 #include "PsramBuffer.h"
 #include "esphome/components/switch/switch.h"
@@ -16,16 +17,16 @@
 namespace esphome {
 namespace openquatt_trends {
 
-using openquatt_common::PsramBuffer;
 using openquatt_common::OpenQuattFlashLayout;
+using openquatt_common::PsramBuffer;
 
 class ChunkedTextWriter;
 
 class OpenQuattTrends : public Component {
  public:
-  void set_capture_switch(switch_::Switch *capture_switch) { this->capture_switch_ = capture_switch; }
-  void set_flash_switch(switch_::Switch *flash_switch) { this->flash_switch_ = flash_switch; }
-  void set_clock(time::RealTimeClock *clock) { this->clock_ = clock; }
+  void set_capture_switch(switch_::Switch* capture_switch) { this->capture_switch_ = capture_switch; }
+  void set_flash_switch(switch_::Switch* flash_switch) { this->flash_switch_ = flash_switch; }
+  void set_clock(time::RealTimeClock* clock) { this->clock_ = clock; }
 
   void setup() override;
   void loop() override;
@@ -33,13 +34,13 @@ class OpenQuattTrends : public Component {
   void dump_config() override;
   float get_setup_priority() const override;
 
-  void capture_sample(float outside_c, float supply_c, float room_c, float room_setpoint_c, float flow_lph, float input_w,
-                      float output_w, bool force = false);
+  void capture_sample(float outside_c, float supply_c, float room_c, float room_setpoint_c, float flow_lph,
+                      float input_w, float output_w, bool force = false);
   void set_flash_enabled(bool enabled);
   bool force_flush();
   void clear_history();
-  void write_history(httpd_req_t *req, uint32_t window_hours);
-  void write_metadata(httpd_req_t *req);
+  void write_history(httpd_req_t* req, uint32_t window_hours);
+  void write_metadata(httpd_req_t* req);
   std::string get_flash_available_label() const;
   std::string get_flash_oldest_point_label() const;
   std::string get_flash_newest_point_label() const;
@@ -125,6 +126,8 @@ class OpenQuattTrends : public Component {
 
   bool capture_enabled_() const;
   bool flash_switch_enabled_() const;
+  TrendStorageCapabilities storage_capabilities_() const;
+  bool flash_archive_available_() const;
   bool time_is_valid_() const;
   uint64_t current_time_ms_() const;
   uint64_t current_epoch_offset_ms_() const;
@@ -133,39 +136,39 @@ class OpenQuattTrends : public Component {
   static uint16_t encode_unsigned_(float value);
   static float decode_temp_(int16_t value);
   static float decode_unsigned_(uint16_t value);
-  static uint32_t fnv1a_hash_(const uint8_t *data, size_t len);
+  static uint32_t fnv1a_hash_(const uint8_t* data, size_t len);
   static bool valid_unsigned_metric_(float value);
-  static void reset_interval_metric_samples_(IntervalMetricState &state);
-  static void update_interval_metric_(IntervalMetricState &state, float value);
-  static float select_interval_metric_value_(const IntervalMetricState &state, float fallback);
-  static void update_last_saved_metric_(IntervalMetricState &state, float value);
+  static void reset_interval_metric_samples_(IntervalMetricState& state);
+  static void update_interval_metric_(IntervalMetricState& state, float value);
+  static float select_interval_metric_value_(const IntervalMetricState& state, float fallback);
+  static void update_last_saved_metric_(IntervalMetricState& state, float value);
 
   TrendValues pack_values_(float outside_c, float supply_c, float room_c, float room_setpoint_c, float flow_lph,
                            float input_w, float output_w) const;
-  TrendSample make_sample_(uint64_t timestamp_ms, const TrendValues &values) const;
+  TrendSample make_sample_(uint64_t timestamp_ms, const TrendValues& values) const;
 
   void sync_time_state_();
   void load_archive_if_needed_();
   void rebase_ram_history_(uint64_t offset_ms);
 
-  void push_ram_sample_(const TrendSample &sample);
-  bool get_ram_sample_at_(size_t ordered_index, TrendSample *sample) const;
+  void push_ram_sample_(const TrendSample& sample);
+  bool get_ram_sample_at_(size_t ordered_index, TrendSample* sample) const;
 
   bool scan_flash_archive_();
   bool clear_flash_archive_();
   bool merge_flash_history_into_ram_();
-  bool append_sample_to_flash_(const TrendSample &sample);
+  bool append_sample_to_flash_(const TrendSample& sample);
   bool flush_flash_builder_(bool force);
-  bool write_flash_block_(const FlashBlockBuilder &builder);
-  bool read_flash_block_(uint32_t slot_index, uint32_t expected_sequence, FlashBlockInfo *info,
-                         std::array<TrendSample, FLASH_SAMPLES_PER_BLOCK> *samples) const;
-  bool update_flash_index_after_write_(const FlashBlockInfo &info, bool erased_sector);
+  bool write_flash_block_(const FlashBlockBuilder& builder);
+  bool read_flash_block_(uint32_t slot_index, uint32_t expected_sequence, FlashBlockInfo* info,
+                         std::array<TrendSample, FLASH_SAMPLES_PER_BLOCK>* samples) const;
+  bool update_flash_index_after_write_(const FlashBlockInfo& info, bool erased_sector);
   void rebuild_flash_metadata_from_index_();
   void invalidate_flash_index_();
   void reset_flash_builder_();
 
-  bool write_sample_line_(ChunkedTextWriter *writer, const TrendSample &sample) const;
-  void write_samples_for_history_(ChunkedTextWriter *writer, uint32_t window_hours);
+  bool write_sample_line_(ChunkedTextWriter* writer, const TrendSample& sample) const;
+  void write_samples_for_history_(ChunkedTextWriter* writer, uint32_t window_hours);
   uint64_t get_window_cutoff_ms_(uint32_t window_hours) const;
   uint32_t get_window_stride_(uint32_t window_hours) const;
   uint64_t get_ram_oldest_timestamp_ms_() const;
@@ -181,10 +184,10 @@ class OpenQuattTrends : public Component {
   std::string format_flash_relative_age_(uint64_t timestamp_ms) const;
   std::string format_flash_available_span_(uint64_t oldest_timestamp_ms, uint64_t newest_timestamp_ms) const;
 
-  switch_::Switch *capture_switch_{nullptr};
-  switch_::Switch *flash_switch_{nullptr};
-  time::RealTimeClock *clock_{nullptr};
-  const esp_partition_t *flash_partition_{nullptr};
+  switch_::Switch* capture_switch_{nullptr};
+  switch_::Switch* flash_switch_{nullptr};
+  time::RealTimeClock* clock_{nullptr};
+  const esp_partition_t* flash_partition_{nullptr};
 
   bool time_rebased_{false};
   bool flash_enabled_{false};

@@ -24,7 +24,7 @@
 #   - Has no dedicated temperature PID loop (strategy owns temperature-loop behavior)
 #   - Does not implement flow interlock (flow-control + supervisory are leading)
 #   - Does not determine Control Mode
-#   - Does not control boiler directly (boiler follows CM3)
+#   - Does not control boiler directly (boiler follows CM3/CM4)
 #   - Does not write HP working mode or compressor levels directly
 #
 # Key assumptions:
@@ -33,7 +33,7 @@
 #
 # Interaction with Control Modes:
 #   - Active in CM2/CM3 (heating)
-#   - In CM0/CM1/CM98/CM100, compressor levels are forced to 0
+#   - In CM0/CM1/CM4/CM98/CM100, compressor levels are forced to 0
 #
 # Safety / fail-safe:
 #   - With inactive CM: compressor levels 0 (no heat production)
@@ -257,8 +257,6 @@ number:
     restore_value: true
     optimistic: true
     initial_value: 300
-    web_server:
-      sorting_group_id: oq_heating_strategy
 
   # Hold time before enabling dual-HP in curve mode.
   - platform: template
@@ -276,8 +274,6 @@ number:
     restore_value: true
     optimistic: true
     initial_value: 3
-    web_server:
-      sorting_group_id: oq_heating_strategy
 
   # Hold time before disabling dual-HP in curve mode.
   - platform: template
@@ -295,8 +291,6 @@ number:
     restore_value: true
     optimistic: true
     initial_value: 5
-    web_server:
-      sorting_group_id: oq_heating_strategy
 
 # ----------------------------
 # BUTTON
@@ -308,8 +302,6 @@ button:
     icon: mdi:restart
     entity_category: config
     disabled_by_default: true
-    web_server:
-      sorting_group_id: oq_heating_strategy
     on_press:
       - lambda: |-
           // Reset accumulated runtime counters and measured-start latches together,
@@ -345,8 +337,6 @@ sensor:
     state_class: measurement
     accuracy_decimals: 2
     update_interval: 10s
-    web_server:
-      sorting_group_id: oq_performance
     lambda: |-
       auto nz = [](float value) -> float { return isnan(value) ? 0.0f : value; };
       const float hp1_power_w = nz(id(hp1_power_input).state);
@@ -368,8 +358,6 @@ sensor:
     state_class: measurement
     accuracy_decimals: 2
     update_interval: 10s
-    web_server:
-      sorting_group_id: oq_performance
     lambda: |-
       auto nz = [](float value) -> float { return isnan(value) ? 0.0f : value; };
       if (id(oq_cooling_energy_session_active)) return 0.0f;
@@ -392,8 +380,6 @@ sensor:
     state_class: measurement
     accuracy_decimals: 2
     update_interval: 10s
-    web_server:
-      sorting_group_id: oq_performance
     lambda: |-
       auto nz = [](float value) -> float { return isnan(value) ? 0.0f : value; };
       if (!id(oq_cooling_energy_session_active)) return 0.0f;
@@ -414,8 +400,6 @@ sensor:
     state_class: measurement
     accuracy_decimals: 0
     update_interval: 10s
-    web_server:
-      sorting_group_id: oq_performance
     lambda: |-
       const float hp1_heat_w = id(hp1_heat_power).state;
       #if OQ_TOPOLOGY_DUO
@@ -440,8 +424,6 @@ sensor:
     state_class: measurement
     accuracy_decimals: 0
     update_interval: 10s
-    web_server:
-      sorting_group_id: oq_performance
     lambda: |-
       const float hp1_cooling_w = id(hp1_cooling_power).state;
       #if OQ_TOPOLOGY_DUO
@@ -464,8 +446,6 @@ sensor:
     state_class: measurement
     accuracy_decimals: 2
     update_interval: 10s
-    web_server:
-      sorting_group_id: oq_performance
     lambda: |-
       const float total_input_w = id(oq_total_power_input).state;
       const float total_heat_w = id(oq_total_heat_power).state;
@@ -482,8 +462,6 @@ sensor:
     state_class: measurement
     accuracy_decimals: 2
     update_interval: 10s
-    web_server:
-      sorting_group_id: oq_performance
     lambda: |-
       const float total_input_w = id(oq_cooling_power_input).state;
       const float total_cooling_w = id(oq_total_cooling_power).state;
@@ -501,8 +479,6 @@ sensor:
     state_class: measurement
     accuracy_decimals: 0
     update_interval: ${oq_diagnostic_update_interval_s}s
-    web_server:
-      sorting_group_id: oq_heating_strategy
     lambda: |-
       return (float) id(oq_demand_raw);
 
@@ -514,8 +490,6 @@ sensor:
     state_class: measurement
     accuracy_decimals: 0
     update_interval: ${oq_diagnostic_update_interval_s}s
-    web_server:
-      sorting_group_id: oq_heating_strategy
     lambda: |-
       return (float) id(oq_demand_filtered);
 
@@ -527,8 +501,6 @@ sensor:
     state_class: measurement
     accuracy_decimals: 0
     update_interval: 5s
-    web_server:
-      sorting_group_id: oq_heating_strategy
     lambda: |-
       if (!id(hp1_compressor_level).has_state()) return NAN;
       auto idx = id(hp1_compressor_level).active_index();
@@ -544,8 +516,6 @@ sensor:
     state_class: measurement
     accuracy_decimals: 0
     update_interval: 5s
-    web_server:
-      sorting_group_id: oq_heating_strategy
     lambda: |-
       #if OQ_TOPOLOGY_DUO
       if (!id(${secondary_compressor_level_id}).has_state()) return NAN;
@@ -569,8 +539,6 @@ sensor:
     state_class: measurement
     accuracy_decimals: 0
     update_interval: ${oq_diagnostic_update_interval_s}s
-    web_server:
-      sorting_group_id: oq_heating_strategy
     lambda: |-
       return id(oq_P_hp_cap_w);
 
@@ -583,8 +551,6 @@ sensor:
     state_class: measurement
     accuracy_decimals: 0
     update_interval: ${oq_diagnostic_update_interval_s}s
-    web_server:
-      sorting_group_id: oq_heating_strategy
     lambda: |-
       return id(oq_P_deficit_w);
 
@@ -597,8 +563,6 @@ text_sensor:
     entity_category: diagnostic
     disabled_by_default: true
     update_interval: never
-    web_server:
-      sorting_group_id: oq_heating_strategy
     lambda: |-
       return std::string("inactive");
 
@@ -607,8 +571,6 @@ text_sensor:
     name: "Runtime lead HP"
     icon: mdi:source-branch
     update_interval: 10s
-    web_server:
-      sorting_group_id: oq_heating_strategy
     lambda: |-
       #if OQ_TOPOLOGY_DUO
       const bool lead_is_hp1 = (id(hp1_minutes) <= id(${secondary_minutes_id}));
@@ -750,7 +712,7 @@ interval:
           // =========================
           // 1b) Control Mode gating
           // CM2/CM3/CM5 may activate HPs.
-          // In CM0/CM1/CM98: force Standby + level 0 and stop further HP control.
+          // In CM0/CM1/CM4/CM98: force Standby + level 0 and stop further HP control.
           // =========================
           const bool cm_allows_hp = (cm_code == 2 || cm_code == 3 || cm_code == 5);
 
@@ -1022,16 +984,17 @@ interval:
           if (min_rt_s > 0 && min_rt_s < 300) min_rt_s = 300;
           const uint32_t min_rt_ms = (min_rt_s > 0) ? ((uint32_t) min_rt_s * 1000UL) : 0;
           auto min_runtime_hold_level = [&](bool is_hp1)->int {
-            if (id(oq_water_temp_hard_trip_active) || min_rt_ms == 0) return 0;
             const uint32_t last_real_start_ms = is_hp1 ? id(hp1_last_real_heat_start_ms) : id(hp2_last_real_heat_start_ms);
-            if (!oq_request::min_runtime_window_active(now_ms, last_real_start_ms, min_rt_ms)) return 0;
-
+            const bool runtime_window_active =
+                oq_request::min_runtime_window_active(now_ms, last_real_start_ms, min_rt_ms);
             const int last_applied = is_hp1 ? id(hp1_last_applied_level) : id(${secondary_last_applied_level_id});
             const bool measured_thermal = is_hp1 ? hp1_measured_thermal : hp2_measured_thermal;
-            if (!(last_applied > 0 || measured_thermal)) return 0;
-
-            (void) is_hp1;
-            return 1;
+            const bool runtime_hold_blocked =
+                id(oq_water_temp_hard_trip_active) || id(oq_lowflow_fault_active) || startup_inhibit_active;
+            return oq_request::min_runtime_hold_required(
+                       0, runtime_hold_blocked, runtime_window_active, last_applied, measured_thermal)
+                       ? 1
+                       : 0;
           };
 
           // =========================
@@ -1439,11 +1402,12 @@ interval:
           }
 
           // =========================
-          // 5) Absolute water-temperature hard trip
-          // Shared with boiler-control and heating-strategy. This safety stop has
-          // higher priority than compressor minimum runtime.
+          // 5) Absolute water-temperature/low-flow hard stop
+          // These safety stops have higher priority than compressor minimum runtime.
           // =========================
-          if (id(oq_water_temp_hard_trip_active)) {
+          const bool hard_request_stop_active =
+              id(oq_water_temp_hard_trip_active) || id(oq_lowflow_fault_active);
+          if (hard_request_stop_active) {
             hp1_req = 0;
             #if OQ_TOPOLOGY_DUO
             hp2_req = 0;
@@ -1464,42 +1428,46 @@ interval:
             hp2_req = 0;
             #endif
           }
+          const bool runtime_hold_blocked =
+              hard_request_stop_active || startup_inhibit_active;
 
           // =========================
           // 6) Post-request runtime floor
-          // Prevents very short compressor runs in both curve and Power House modes.
+          // Prevents very short compressor runs in cooling, curve and Power House modes.
           // Runtime is per-compressor and user-tunable, with a hard lower bound of 300 s.
-          // Skipped during an absolute water-temperature hard trip.
+          // Normal zero requests, including cooling floor/dew-point stops, keep a
+          // running compressor at its minimum allowed level. Absolute safety stops
+          // here and in the downstream actuator retain higher priority.
           // =========================
-          if (!id(oq_water_temp_hard_trip_active) && min_rt_s > 0) {
-            const bool cooling_floor_trip =
-                is_cooling_mode &&
-                id(cooling_effective_min_supply_temp).has_state() && !isnan(id(cooling_effective_min_supply_temp).state) &&
-                id(oq_system_supply_temp).has_state() && !isnan(id(oq_system_supply_temp).state) &&
-                (id(oq_system_supply_temp).state <= (id(cooling_effective_min_supply_temp).state + 0.10f));
+          if (min_rt_s > 0) {
             // HP1/HP2: if request is 0 but measured heating start is still within
             // the minimum runtime window, keep that compressor alive at >=1.
             // This guard intentionally keys off real heating start instead of the
             // earlier apply transition, so short mode-transition delays do not
             // silently consume most of the runtime window.
             const bool hp1_min_runtime_active =
-                (id(hp1_last_real_heat_start_ms) > 0) &&
-                (now_ms > id(hp1_last_real_heat_start_ms)) &&
-                ((uint32_t)(now_ms - id(hp1_last_real_heat_start_ms)) < min_rt_ms);
+                oq_request::min_runtime_window_active(
+                    now_ms, id(hp1_last_real_heat_start_ms), min_rt_ms);
             const bool hp1_min_runtime_hold =
-                (hp1_req == 0 && !cooling_floor_trip && hp1_min_runtime_active &&
-                 (id(hp1_last_applied_level) > 0 || hp1_measured_thermal));
+                oq_request::min_runtime_hold_required(
+                    hp1_req, runtime_hold_blocked, hp1_min_runtime_active,
+                    id(hp1_last_applied_level), hp1_measured_thermal);
             if (hp1_min_runtime_hold) {
               hp1_req = pick_allowed(1, true);
             }
             static bool last_hp1_min_runtime_hold = false;
             if (hp1_min_runtime_hold != last_hp1_min_runtime_hold) {
               if (hp1_min_runtime_hold) {
-                const uint32_t elapsed_ms = (now_ms > id(hp1_last_real_heat_start_ms))
-                    ? (now_ms - id(hp1_last_real_heat_start_ms)) : 0;
+                const uint32_t elapsed_ms = now_ms - id(hp1_last_real_heat_start_ms);
                 const uint32_t remaining_s =
                     (min_rt_ms > elapsed_ms) ? ((min_rt_ms - elapsed_ms + 999UL) / 1000UL) : 0;
-                ESP_LOGI("quatt.req", "HP1 minimum runtime hold active: keeping level 1 for %u s", (unsigned int) remaining_s);
+                if (is_cooling_mode) {
+                  ESP_LOGI("quatt.req", "HP1 cooling stop deferred by minimum runtime: requesting minimum level for %u s",
+                           (unsigned int) remaining_s);
+                } else {
+                  ESP_LOGI("quatt.req", "HP1 minimum runtime hold active: keeping level 1 for %u s",
+                           (unsigned int) remaining_s);
+                }
               } else {
                 ESP_LOGI("quatt.req", "HP1 minimum runtime hold cleared");
               }
@@ -1508,23 +1476,28 @@ interval:
 
             #if OQ_TOPOLOGY_DUO
             const bool hp2_min_runtime_active =
-                (id(hp2_last_real_heat_start_ms) > 0) &&
-                (now_ms > id(hp2_last_real_heat_start_ms)) &&
-                ((uint32_t)(now_ms - id(hp2_last_real_heat_start_ms)) < min_rt_ms);
+                oq_request::min_runtime_window_active(
+                    now_ms, id(hp2_last_real_heat_start_ms), min_rt_ms);
             const bool hp2_min_runtime_hold =
-                (hp2_req == 0 && !cooling_floor_trip && hp2_min_runtime_active &&
-                 (id(${secondary_last_applied_level_id}) > 0 || hp2_measured_thermal));
+                oq_request::min_runtime_hold_required(
+                    hp2_req, runtime_hold_blocked, hp2_min_runtime_active,
+                    id(${secondary_last_applied_level_id}), hp2_measured_thermal);
             if (hp2_min_runtime_hold) {
               hp2_req = pick_allowed(1, false);
             }
             static bool last_hp2_min_runtime_hold = false;
             if (hp2_min_runtime_hold != last_hp2_min_runtime_hold) {
               if (hp2_min_runtime_hold) {
-                const uint32_t elapsed_ms = (now_ms > id(hp2_last_real_heat_start_ms))
-                    ? (now_ms - id(hp2_last_real_heat_start_ms)) : 0;
+                const uint32_t elapsed_ms = now_ms - id(hp2_last_real_heat_start_ms);
                 const uint32_t remaining_s =
                     (min_rt_ms > elapsed_ms) ? ((min_rt_ms - elapsed_ms + 999UL) / 1000UL) : 0;
-                ESP_LOGI("quatt.req", "HP2 minimum runtime hold active: keeping level 1 for %u s", (unsigned int) remaining_s);
+                if (is_cooling_mode) {
+                  ESP_LOGI("quatt.req", "HP2 cooling stop deferred by minimum runtime: requesting minimum level for %u s",
+                           (unsigned int) remaining_s);
+                } else {
+                  ESP_LOGI("quatt.req", "HP2 minimum runtime hold active: keeping level 1 for %u s",
+                           (unsigned int) remaining_s);
+                }
               } else {
                 ESP_LOGI("quatt.req", "HP2 minimum runtime hold cleared");
               }

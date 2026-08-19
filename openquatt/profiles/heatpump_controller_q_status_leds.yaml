@@ -35,14 +35,11 @@ switch:
     entity_category: config
     optimistic: true
     restore_mode: RESTORE_DEFAULT_ON
-    web_server:
-      sorting_group_id: oq_system_diagnostics
 
 binary_sensor:
   - platform: template
     id: oq_pt1000_read_problem
     name: "PT1000 read problem"
-    internal: true
     icon: mdi:thermometer-alert
     device_class: problem
     entity_category: diagnostic
@@ -92,6 +89,9 @@ interval:
               id(ot_link_problem).has_state() && id(ot_link_problem).state;
           const bool pt1000_problem =
               id(oq_pt1000_read_problem).has_state() && id(oq_pt1000_read_problem).state;
+          const bool supply_temp_fallback =
+              id(oq_water_supply_temp_fallback_active).has_state() &&
+              id(oq_water_supply_temp_fallback_active).state;
           const bool hp1_fault =
               id(hp1_ot_fault_active).has_state() && id(hp1_ot_fault_active).state;
           const bool secondary_fault =
@@ -104,6 +104,7 @@ interval:
               ota_fault ||
               ot_problem ||
               pt1000_problem ||
+              supply_temp_fallback ||
               hp_fault ||
               id(oq_lowflow_fault_active) ||
               id(oq_strategy_water_hard_trip_active);

@@ -22,12 +22,12 @@ class InstallationMonitor {
   static constexpr uint32_t kSeventyTwoHoursMs = 72U * kHourMs;
 
   bool observe_compressor_frequency(int hp_index, float frequency_hz, uint32_t now_ms) {
-    UnitState *unit_ptr = unit_for(hp_index);
+    UnitState* unit_ptr = unit_for(hp_index);
     if (unit_ptr == nullptr) {
       return false;
     }
 
-    UnitState &unit = *unit_ptr;
+    UnitState& unit = *unit_ptr;
     if (!std::isfinite(frequency_hz)) {
       unit.observation_valid = false;
       unit.stop_candidate_active = false;
@@ -37,8 +37,7 @@ class InstallationMonitor {
     const bool active = frequency_hz > 0.0f;
     advance_history(unit, now_ms);
 
-    if (!unit.observation_valid ||
-        elapsed_ms(now_ms, unit.last_observation_ms) > kMaxObservationGapMs) {
+    if (!unit.observation_valid || elapsed_ms(now_ms, unit.last_observation_ms) > kMaxObservationGapMs) {
       unit.observation_valid = true;
       unit.last_observation_ms = now_ms;
       // After startup or a communications gap, require a fully observed stop
@@ -82,7 +81,7 @@ class InstallationMonitor {
   }
 
   size_t start_count(int hp_index, uint32_t now_ms, uint32_t window_ms) {
-    UnitState *unit = unit_for(hp_index);
+    UnitState* unit = unit_for(hp_index);
     if (unit == nullptr) {
       return 0;
     }
@@ -91,7 +90,7 @@ class InstallationMonitor {
   }
 
   float last_start_age_minutes(int hp_index, uint32_t now_ms) const {
-    const UnitState *unit = unit_for(hp_index);
+    const UnitState* unit = unit_for(hp_index);
     if (unit == nullptr || !unit->has_last_start) {
       return -1.0f;
     }
@@ -99,8 +98,7 @@ class InstallationMonitor {
   }
 
   bool compressor_cycling_warning_2h(uint32_t now_ms, size_t warning_limit) {
-    return start_count(1, now_ms, kTwoHoursMs) > warning_limit ||
-           start_count(2, now_ms, kTwoHoursMs) > warning_limit;
+    return start_count(1, now_ms, kTwoHoursMs) > warning_limit || start_count(2, now_ms, kTwoHoursMs) > warning_limit;
   }
 
   bool compressor_cycling_warning_72h(uint32_t now_ms, size_t warning_limit) {
@@ -122,7 +120,7 @@ class InstallationMonitor {
 
     uint8_t previous_hp = 0;
     for (size_t offset = 0; offset < required_events; ++offset) {
-      const StartEvent &event = events_[reverse_event_index(offset)];
+      const StartEvent& event = events_[reverse_event_index(offset)];
       if (elapsed_ms(now_ms, event.at_ms) > kTwoHoursMs) {
         return false;
       }
@@ -134,7 +132,7 @@ class InstallationMonitor {
     return true;
   }
 
-  private:
+ private:
   static constexpr uint32_t kStopConfirmMs = 20U * 1000U;
   static constexpr uint32_t kMaxObservationGapMs = 30U * 1000U;
   static constexpr uint32_t kMinuteMs = 60U * 1000U;
@@ -174,17 +172,15 @@ class InstallationMonitor {
     uint8_t hp_index = 0;
   };
 
-  static uint32_t elapsed_ms(uint32_t now_ms, uint32_t then_ms) {
-    return static_cast<uint32_t>(now_ms - then_ms);
-  }
+  static uint32_t elapsed_ms(uint32_t now_ms, uint32_t then_ms) { return static_cast<uint32_t>(now_ms - then_ms); }
 
-  static uint8_t bucket_at(const StartHistory &history, size_t minute) {
+  static uint8_t bucket_at(const StartHistory& history, size_t minute) {
     const uint8_t packed = history.packed_buckets[minute / 2U];
     return minute % 2U == 0U ? packed & kBucketMax : packed >> 4U;
   }
 
-  static void set_bucket(StartHistory &history, size_t minute, uint8_t value) {
-    uint8_t &packed = history.packed_buckets[minute / 2U];
+  static void set_bucket(StartHistory& history, size_t minute, uint8_t value) {
+    uint8_t& packed = history.packed_buckets[minute / 2U];
     if (minute % 2U == 0U) {
       packed = static_cast<uint8_t>((packed & 0xF0U) | (value & kBucketMax));
     } else {
@@ -193,11 +189,10 @@ class InstallationMonitor {
   }
 
   static size_t history_index(size_t current_minute, size_t minutes_ago) {
-    return (current_minute + kHistoryMinutes - (minutes_ago % kHistoryMinutes)) %
-           kHistoryMinutes;
+    return (current_minute + kHistoryMinutes - (minutes_ago % kHistoryMinutes)) % kHistoryMinutes;
   }
 
-  static void clear_history(StartHistory &history, uint32_t now_ms) {
+  static void clear_history(StartHistory& history, uint32_t now_ms) {
     history.packed_buckets.fill(0U);
     history.current_minute = 0;
     history.starts_2h = 0;
@@ -207,7 +202,7 @@ class InstallationMonitor {
     history.last_minute_tick_ms = now_ms;
   }
 
-  static void advance_one_minute(StartHistory &history) {
+  static void advance_one_minute(StartHistory& history) {
     const size_t next_minute = (history.current_minute + 1U) % kHistoryMinutes;
     const uint8_t leaving_2h = bucket_at(history, history_index(next_minute, 2U * 60U));
     const uint8_t leaving_6h = bucket_at(history, history_index(next_minute, 6U * 60U));
@@ -222,16 +217,15 @@ class InstallationMonitor {
     history.current_minute = next_minute;
   }
 
-  static void advance_history(UnitState &unit, uint32_t now_ms) {
-    StartHistory &history = unit.history;
+  static void advance_history(UnitState& unit, uint32_t now_ms) {
+    StartHistory& history = unit.history;
     if (!history.initialized) {
       history.initialized = true;
       history.last_minute_tick_ms = now_ms;
       return;
     }
 
-    const uint32_t minutes_elapsed =
-        elapsed_ms(now_ms, history.last_minute_tick_ms) / kMinuteMs;
+    const uint32_t minutes_elapsed = elapsed_ms(now_ms, history.last_minute_tick_ms) / kMinuteMs;
     if (minutes_elapsed == 0U) {
       return;
     }
@@ -246,7 +240,7 @@ class InstallationMonitor {
     history.last_minute_tick_ms += minutes_elapsed * kMinuteMs;
   }
 
-  static size_t summed_buckets(const StartHistory &history, size_t minutes) {
+  static size_t summed_buckets(const StartHistory& history, size_t minutes) {
     size_t count = 0;
     const size_t bounded_minutes = std::min(minutes, kHistoryMinutes);
     for (size_t minute = 0; minute < bounded_minutes; ++minute) {
@@ -255,7 +249,7 @@ class InstallationMonitor {
     return count;
   }
 
-  static size_t window_count(const StartHistory &history, uint32_t window_ms) {
+  static size_t window_count(const StartHistory& history, uint32_t window_ms) {
     switch (window_ms) {
       case kTwoHoursMs:
         return history.starts_2h;
@@ -270,7 +264,7 @@ class InstallationMonitor {
     }
   }
 
-  UnitState *unit_for(int hp_index) {
+  UnitState* unit_for(int hp_index) {
     if (hp_index == 1) {
       return &hp1_;
     }
@@ -282,7 +276,7 @@ class InstallationMonitor {
     return nullptr;
   }
 
-  const UnitState *unit_for(int hp_index) const {
+  const UnitState* unit_for(int hp_index) const {
     if (hp_index == 1) {
       return &hp1_;
     }
@@ -300,8 +294,7 @@ class InstallationMonitor {
 
   void prune_expired_events(uint32_t now_ms) {
     while (events_count_ > 0U) {
-      const size_t oldest_index =
-          (events_next_ + kEventsCapacity - events_count_) % kEventsCapacity;
+      const size_t oldest_index = (events_next_ + kEventsCapacity - events_count_) % kEventsCapacity;
       if (elapsed_ms(now_ms, events_[oldest_index].at_ms) <= kTwoHoursMs) {
         return;
       }
@@ -309,10 +302,10 @@ class InstallationMonitor {
     }
   }
 
-  void record_start(int hp_index, UnitState &unit, uint32_t now_ms) {
+  void record_start(int hp_index, UnitState& unit, uint32_t now_ms) {
     advance_history(unit, now_ms);
     prune_expired_events(now_ms);
-    StartHistory &history = unit.history;
+    StartHistory& history = unit.history;
     const uint8_t bucket = bucket_at(history, history.current_minute);
     if (bucket < kBucketMax) {
       set_bucket(history, history.current_minute, bucket + 1U);
@@ -340,7 +333,7 @@ class InstallationMonitor {
   std::array<StartEvent, kEventsCapacity> events_{};
 };
 
-inline InstallationMonitor &installation_monitor() {
+inline InstallationMonitor& installation_monitor() {
   static InstallationMonitor monitor;
   return monitor;
 }

@@ -65,8 +65,16 @@ button:
     on_press:
       - lambda: |-
           oq_diagnostics::acknowledge_compressor_cycling_alert();
-    web_server:
-      sorting_group_id: oq_installation_monitoring
+
+  - platform: template
+    id: oq_acknowledge_recovered_hp_incidents
+    name: "Acknowledge recovered HP incidents"
+    internal: true
+    icon: mdi:check-circle-outline
+    entity_category: config
+    on_press:
+      - lambda: |-
+          id(oq_incident_manager).acknowledge_all_cleared();
 
 number:
   - platform: template
@@ -82,8 +90,6 @@ number:
     max_value: 20
     step: 1
     mode: slider
-    web_server:
-      sorting_group_id: oq_installation_monitoring
 
   - platform: template
     id: oq_compressor_starts_warning_limit_72h
@@ -98,8 +104,6 @@ number:
     max_value: 120
     step: 1
     mode: slider
-    web_server:
-      sorting_group_id: oq_installation_monitoring
 
 sensor:
   - platform: template
@@ -113,8 +117,6 @@ sensor:
     lambda: |-
       return oq_diagnostics::installation_monitor().start_count(
           1, millis(), oq_diagnostics::InstallationMonitor::kTwoHoursMs);
-    web_server:
-      sorting_group_id: oq_installation_monitoring
 
   - platform: template
     id: oq_hp1_compressor_starts_6h
@@ -127,8 +129,6 @@ sensor:
     lambda: |-
       return oq_diagnostics::installation_monitor().start_count(
           1, millis(), oq_diagnostics::InstallationMonitor::kSixHoursMs);
-    web_server:
-      sorting_group_id: oq_installation_monitoring
 
   - platform: template
     id: oq_hp1_compressor_starts_24h
@@ -141,8 +141,6 @@ sensor:
     lambda: |-
       return oq_diagnostics::installation_monitor().start_count(
           1, millis(), oq_diagnostics::InstallationMonitor::kDayMs);
-    web_server:
-      sorting_group_id: oq_installation_monitoring
 
   - platform: template
     id: oq_hp1_compressor_starts_72h
@@ -155,8 +153,6 @@ sensor:
     lambda: |-
       return oq_diagnostics::installation_monitor().start_count(
           1, millis(), oq_diagnostics::InstallationMonitor::kSeventyTwoHoursMs);
-    web_server:
-      sorting_group_id: oq_installation_monitoring
 
   - platform: template
     id: oq_hp1_compressor_last_start_age
@@ -170,8 +166,6 @@ sensor:
     lambda: |-
       const float age = oq_diagnostics::installation_monitor().last_start_age_minutes(1, millis());
       return age < 0.0f ? NAN : age;
-    web_server:
-      sorting_group_id: oq_installation_monitoring
 
   - platform: template
     id: oq_hp2_compressor_starts_2h
@@ -184,8 +178,6 @@ sensor:
     lambda: |-
       return oq_diagnostics::installation_monitor().start_count(
           2, millis(), oq_diagnostics::InstallationMonitor::kTwoHoursMs);
-    web_server:
-      sorting_group_id: oq_installation_monitoring
 
   - platform: template
     id: oq_hp2_compressor_starts_6h
@@ -198,8 +190,6 @@ sensor:
     lambda: |-
       return oq_diagnostics::installation_monitor().start_count(
           2, millis(), oq_diagnostics::InstallationMonitor::kSixHoursMs);
-    web_server:
-      sorting_group_id: oq_installation_monitoring
 
   - platform: template
     id: oq_hp2_compressor_starts_24h
@@ -212,8 +202,6 @@ sensor:
     lambda: |-
       return oq_diagnostics::installation_monitor().start_count(
           2, millis(), oq_diagnostics::InstallationMonitor::kDayMs);
-    web_server:
-      sorting_group_id: oq_installation_monitoring
 
   - platform: template
     id: oq_hp2_compressor_starts_72h
@@ -226,8 +214,6 @@ sensor:
     lambda: |-
       return oq_diagnostics::installation_monitor().start_count(
           2, millis(), oq_diagnostics::InstallationMonitor::kSeventyTwoHoursMs);
-    web_server:
-      sorting_group_id: oq_installation_monitoring
 
   - platform: template
     id: oq_hp2_compressor_last_start_age
@@ -241,8 +227,6 @@ sensor:
     lambda: |-
       const float age = oq_diagnostics::installation_monitor().last_start_age_minutes(2, millis());
       return age < 0.0f ? NAN : age;
-    web_server:
-      sorting_group_id: oq_installation_monitoring
 
   - platform: template
     id: oq_compressor_cycling_alert_first_seen
@@ -257,8 +241,6 @@ sensor:
       return id(oq_compressor_cycling_alert_first_seen_epoch) > 0U
           ? id(oq_compressor_cycling_alert_first_seen_epoch)
           : NAN;
-    web_server:
-      sorting_group_id: oq_installation_monitoring
 
   - platform: template
     id: oq_compressor_cycling_alert_last_seen
@@ -273,8 +255,6 @@ sensor:
       return id(oq_compressor_cycling_alert_last_seen_epoch) > 0U
           ? id(oq_compressor_cycling_alert_last_seen_epoch)
           : NAN;
-    web_server:
-      sorting_group_id: oq_installation_monitoring
 
   - platform: template
     id: oq_compressor_cycling_alert_hp1_peak_2h
@@ -286,8 +266,6 @@ sensor:
     update_interval: 60s
     lambda: |-
       return id(oq_compressor_cycling_alert_hp1_peak_2h_value);
-    web_server:
-      sorting_group_id: oq_installation_monitoring
 
   - platform: template
     id: oq_compressor_cycling_alert_hp1_peak_72h
@@ -299,8 +277,6 @@ sensor:
     update_interval: 60s
     lambda: |-
       return id(oq_compressor_cycling_alert_hp1_peak_72h_value);
-    web_server:
-      sorting_group_id: oq_installation_monitoring
 
   - platform: template
     id: oq_compressor_cycling_alert_hp2_peak_2h
@@ -312,8 +288,6 @@ sensor:
     update_interval: 60s
     lambda: |-
       return id(oq_compressor_cycling_alert_hp2_peak_2h_value);
-    web_server:
-      sorting_group_id: oq_installation_monitoring
 
   - platform: template
     id: oq_compressor_cycling_alert_hp2_peak_72h
@@ -325,8 +299,6 @@ sensor:
     update_interval: 60s
     lambda: |-
       return id(oq_compressor_cycling_alert_hp2_peak_72h_value);
-    web_server:
-      sorting_group_id: oq_installation_monitoring
 
 binary_sensor:
   - platform: template
@@ -338,8 +310,6 @@ binary_sensor:
     entity_category: diagnostic
     lambda: |-
       return id(oq_compressor_cycling_alert_latched);
-    web_server:
-      sorting_group_id: oq_installation_monitoring
 
   - platform: template
     id: oq_compressor_cycling_alert_alternating_sensor
@@ -349,41 +319,46 @@ binary_sensor:
     entity_category: diagnostic
     lambda: |-
       return id(oq_compressor_cycling_alert_alternating);
-    web_server:
-      sorting_group_id: oq_installation_monitoring
 
   - platform: template
     id: oq_compressor_cycling_warning_2h
     name: "Compressor cycling warning 2h"
-    internal: true
     icon: mdi:alert-decagram-outline
     device_class: problem
     entity_category: diagnostic
+    disabled_by_default: true
     lambda: |-
       return oq_diagnostics::logged_compressor_cycling_warning_2h(millis());
-    web_server:
-      sorting_group_id: oq_installation_monitoring
 
   - platform: template
     id: oq_compressor_cycling_warning_72h
     name: "Compressor cycling warning 72h"
-    internal: true
     icon: mdi:calendar-alert-outline
     device_class: problem
     entity_category: diagnostic
+    disabled_by_default: true
     lambda: |-
       return oq_diagnostics::logged_compressor_cycling_warning_72h(millis());
-    web_server:
-      sorting_group_id: oq_installation_monitoring
 
   - platform: template
     id: oq_compressor_alternating_warning
     name: "Alternating compressor starts warning"
     icon: mdi:swap-horizontal-bold
-    internal: true
+    internal: ${monitoring_hp2_internal}
     device_class: problem
     entity_category: diagnostic
+    disabled_by_default: true
     lambda: |-
       return oq_diagnostics::logged_alternating_cycling_warning(millis());
-    web_server:
-      sorting_group_id: oq_installation_monitoring
+
+  - platform: template
+    id: oq_compressor_cycling_warning
+    name: "Compressor cycling warning"
+    icon: mdi:alert-decagram
+    device_class: problem
+    entity_category: diagnostic
+    disabled_by_default: true
+    lambda: |-
+      return id(oq_compressor_cycling_warning_2h).state ||
+             id(oq_compressor_cycling_warning_72h).state ||
+             id(oq_compressor_alternating_warning).state;

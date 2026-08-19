@@ -22,8 +22,8 @@ using openquatt_common::PsramBuffer;
 
 class OpenQuattLogHistory : public Component {
  public:
-  void set_enabled_switch(switch_::Switch *enabled_switch) { this->enabled_switch_ = enabled_switch; }
-  void set_clock(time::RealTimeClock *clock) { this->clock_ = clock; }
+  void set_enabled_switch(switch_::Switch* enabled_switch) { this->enabled_switch_ = enabled_switch; }
+  void set_clock(time::RealTimeClock* clock) { this->clock_ = clock; }
 
   void setup() override;
   void loop() override;
@@ -32,8 +32,9 @@ class OpenQuattLogHistory : public Component {
 
   void set_enabled(bool enabled);
   void clear_history();
-  const std::string &get_csrf_token() const { return this->csrf_token_; }
-  void write_recent_logs(httpd_req_t *req) const;
+  const std::string& get_csrf_token() const { return this->csrf_token_; }
+  bool storage_available() const { return static_cast<bool>(this->entries_); }
+  void write_recent_logs(httpd_req_t* req) const;
 
  protected:
   static constexpr size_t ENTRY_CAPACITY = 250;
@@ -49,8 +50,8 @@ class OpenQuattLogHistory : public Component {
 
   bool enabled_{true};
   bool time_rebased_{false};
-  switch_::Switch *enabled_switch_{nullptr};
-  time::RealTimeClock *clock_{nullptr};
+  switch_::Switch* enabled_switch_{nullptr};
+  time::RealTimeClock* clock_{nullptr};
   PsramBuffer<LogEntry> entries_{};
   size_t head_{0};
   size_t count_{0};
@@ -82,16 +83,16 @@ class OpenQuattLogHistory : public Component {
   void load_crash_time_breadcrumb_();
   void update_crash_time_breadcrumb_();
   void maybe_log_pending_crash_report_();
-  static void format_epoch_(uint32_t epoch_s, char *out, size_t out_size);
+  static void format_epoch_(uint32_t epoch_s, char* out, size_t out_size);
 #endif
 
-  void on_log_(uint8_t level, const char *tag, const char *message, size_t message_len);
-  void push_entry_locked_(const LogEntry &entry);
+  void on_log_(uint8_t level, const char* tag, const char* message, size_t message_len);
+  void push_entry_locked_(const LogEntry& entry);
   static uint8_t normalize_level_(uint8_t level);
-  static const char *level_to_string_(uint8_t level);
-  static void copy_sanitized_log_line_(const char *message, size_t message_len, char *out, size_t out_size);
-  static void split_log_fields_(const char *raw, const char **tag_start, size_t *tag_len, const char **message_start,
-                                size_t *message_len);
+  static const char* level_to_string_(uint8_t level);
+  static void copy_sanitized_log_line_(const char* message, size_t message_len, char* out, size_t out_size);
+  static void split_log_fields_(const char* raw, const char** tag_start, size_t* tag_len, const char** message_start,
+                                size_t* message_len);
 };
 
 }  // namespace openquatt_log_history

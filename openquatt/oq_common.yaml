@@ -19,6 +19,7 @@ esphome:
       - lambda: |-
           // Always start from a clean paused state after reboot or OTA.
           id(oq_runtime_polling_paused).publish_state(false);
+          id(oq_http_ota_begin_observed) = false;
           id(oq_ota_phase_code) = 0;
           id(oq_ota_progress_pct) = 0.0f;
           id(oq_firmware_update_status).publish_state("Idle");
@@ -121,8 +122,9 @@ ota:
       then:
         - lambda: |-
             id(oq_firmware_target_install_active) = false;
-            id(oq_runtime_polling_paused).publish_state(false);
-            ESP_LOGI("oq_fw", "Runtime polling resumed after OTA.");
+            // ESPHome reboots immediately after this success callback. Keep all
+            // runtime polling paused until on_boot initializes the new image.
+            ESP_LOGI("oq_fw", "OTA complete; runtime polling remains paused until reboot.");
             id(oq_ota_phase_code) = 3;
             id(oq_ota_progress_pct) = 100.0f;
             id(oq_firmware_update_status).publish_state("Rebooting");
@@ -147,6 +149,7 @@ ota:
     on_begin:
       then:
         - lambda: |-
+            id(oq_http_ota_begin_observed) = true;
             id(oq_runtime_polling_paused).publish_state(true);
             ESP_LOGI("oq_fw", "Runtime polling paused for OTA.");
             id(oq_ota_phase_code) = 1;
@@ -164,17 +167,15 @@ ota:
       then:
         - lambda: |-
             id(oq_firmware_target_install_active) = false;
-            id(oq_runtime_polling_paused).publish_state(false);
-            ESP_LOGI("oq_fw", "Runtime polling resumed after OTA.");
+            // http_request OTA also reboots immediately after this success
+            // callback. Only error and abort paths may resume the old image.
+            ESP_LOGI("oq_fw", "OTA complete; runtime polling remains paused until reboot.");
             id(oq_ota_phase_code) = 3;
             id(oq_ota_progress_pct) = 100.0f;
             id(oq_firmware_update_status).publish_state("Rebooting");
             id(oq_firmware_update_progress).publish_state(100.0f);
     on_error:
       then:
-        - lambda: |-
-            id(oq_runtime_polling_paused).publish_state(false);
-            ESP_LOGI("oq_fw", "Runtime polling resumed after OTA error.");
         - if:
             condition:
               lambda: |-
@@ -183,6 +184,8 @@ ota:
                     && id(oq_ota_progress_pct) <= 0.0f;
             then:
               - lambda: |-
+                  id(oq_http_ota_begin_observed) = false;
+                  id(oq_runtime_polling_paused).publish_state(true);
                   id(oq_firmware_target_install_attempt) += 1;
                   id(oq_ota_phase_code) = 7;
                   id(oq_ota_progress_pct) = 0.0f;
@@ -190,13 +193,21 @@ ota:
                   id(oq_firmware_update_progress).publish_state(0.0f);
                   ESP_LOGW("oq_fw", "Firmware download connection failed; retrying attempt %u/2 in 5 seconds.",
                            id(oq_firmware_target_install_attempt));
+              - script.execute: oq_watch_http_ota_start
               - delay: 5s
-              - update.perform:
-                  id: oq_firmware_update
-                  force_update: true
+              - if:
+                  condition:
+                    lambda: |-
+                      return id(oq_firmware_target_install_active);
+                  then:
+                    - update.perform:
+                        id: oq_firmware_update
+                        force_update: true
             else:
               - lambda: |-
                   id(oq_firmware_target_install_active) = false;
+                  id(oq_runtime_polling_paused).publish_state(false);
+                  ESP_LOGI("oq_fw", "Runtime polling resumed after OTA error.");
                   id(oq_ota_phase_code) = 5;
                   id(oq_firmware_update_status).publish_state("Error");
     on_abort:
@@ -297,6 +308,10 @@ globals:
     type: int
     restore_value: false
     initial_value: '0'
+  - id: oq_http_ota_begin_observed
+    type: bool
+    restore_value: false
+    initial_value: 'false'
   - id: oq_trend_capture_force_once
     type: bool
     restore_value: false
@@ -419,13 +434,37 @@ script:
                   - lambda: |-
                       ESP_LOGI("oq_fw", "Periodic firmware manifest check skipped: network unavailable or OTA active.");
 
-  - id: oq_install_firmware_update_target_deferred
+  - id: oq_watch_http_ota_start
     mode: restart
     then:
+      # The retry arms this before its 5 s delay. Seventeen seconds covers that
+      # delay, the shared 10 s HTTP timeout and scheduling margin.
+      - wait_until:
+          condition:
+            lambda: |-
+              return id(oq_http_ota_begin_observed)
+                  || !id(oq_firmware_target_install_active);
+          timeout: 17s
+      - if:
+          condition:
+            lambda: |-
+              return !id(oq_http_ota_begin_observed)
+                  && id(oq_firmware_target_install_active);
+          then:
+            - lambda: |-
+                id(oq_firmware_target_install_active) = false;
+                id(oq_runtime_polling_paused).publish_state(false);
+                id(oq_ota_phase_code) = 5;
+                id(oq_firmware_update_status).publish_state("Error");
+                ESP_LOGE("oq_fw", "Firmware install did not reach the OTA start callback; polling resumed.");
+
+  - id: oq_install_firmware_update_target_deferred
+    mode: single
+    then:
       - lambda: |-
-          // A manual install supersedes the deferred boot check.
+          // Clear terminal state before starting a new install attempt.
           id(oq_fw_boot_check_pending) = false;
-          // Clear a terminal phase from an earlier attempt before the web UI starts polling this install.
+          id(oq_http_ota_begin_observed) = false;
           id(oq_ota_phase_code) = 1;
           id(oq_firmware_update_status).publish_state("Starting");
           id(oq_firmware_update_progress).publish_state(0.0f);
@@ -473,25 +512,35 @@ script:
           condition:
             lambda: |-
               return id(oq_fw_check_completed_generation) == id(oq_fw_check_request_generation)
-                  && id(oq_fw_check_target_ready);
+                  && id(oq_fw_check_target_ready)
+                  && !id(oq_runtime_polling_paused).state
+                  && !id(oq_firmware_target_install_active);
           then:
             - lambda: |-
                 id(oq_firmware_target_install_active) = true;
                 id(oq_firmware_target_install_attempt) = 1;
+                id(oq_http_ota_begin_observed) = false;
                 id(oq_runtime_polling_paused).publish_state(true);
                 ESP_LOGI("oq_fw", "Runtime polling paused before deferred OTA.");
                 id(oq_firmware_update_status).publish_state("Starting");
                 id(oq_firmware_update_progress).publish_state(0.0f);
             - delay: 1500ms
+            - script.execute: oq_watch_http_ota_start
             - update.perform:
                 id: oq_firmware_update
                 force_update: true
           else:
             - lambda: |-
-                id(oq_firmware_target_install_active) = false;
-                id(oq_ota_phase_code) = 5;
-                id(oq_firmware_update_status).publish_state("Error");
-                ESP_LOGE("oq_fw", "Firmware install blocked: target manifest check failed twice.");
+                // This script has not acquired the polling pause yet. Preserve
+                // any pause and status owned by an OTA that started while the
+                // manifest checks were running.
+                if (id(oq_runtime_polling_paused).state) {
+                  ESP_LOGW("oq_fw", "Firmware install request cancelled because another OTA became active.");
+                } else {
+                  id(oq_ota_phase_code) = 5;
+                  id(oq_firmware_update_status).publish_state("Error");
+                  ESP_LOGE("oq_fw", "Firmware install blocked: target manifest check failed twice.");
+                }
 
   - id: oq_capture_overview_trend_sample
     mode: single
@@ -588,8 +637,6 @@ text:
     max_length: 255
     disabled_by_default: true
     entity_category: config
-    web_server:
-      sorting_group_id: oq_system_diagnostics
 
   - platform: template
     name: "Firmware Test OTA MD5 URL"
@@ -602,8 +649,6 @@ text:
     max_length: 255
     disabled_by_default: true
     entity_category: config
-    web_server:
-      sorting_group_id: oq_system_diagnostics
 
 # ==============================================================================
 # DIAGNOSTIC ENTITIES
@@ -613,8 +658,6 @@ select:
     name: "Firmware Update Channel"
     id: oq_firmware_update_channel
     icon: mdi:source-branch
-    web_server:
-      sorting_group_id: oq_system_diagnostics
     entity_category: config
     optimistic: true
     restore_value: true
@@ -686,8 +729,6 @@ select:
     icon: mdi:swap-horizontal
     internal: true
     disabled_by_default: true
-    web_server:
-      sorting_group_id: oq_system_diagnostics
     entity_category: config
     optimistic: true
     restore_value: false
@@ -754,8 +795,6 @@ select:
     name: "Quatt Hybrid version"
     id: hp_generation
     icon: mdi:factory
-    web_server:
-      sorting_group_id: oq_heating_strategy
     entity_category: config
     optimistic: true
     restore_value: true
@@ -768,8 +807,6 @@ select:
     internal: true
     disabled_by_default: true
     icon: mdi:lan
-    web_server:
-      sorting_group_id: oq_system_diagnostics
     entity_category: diagnostic
     optimistic: true
     # Always recover to INFO after a reboot; DEBUG can overwhelm busy Duo installations.
@@ -794,8 +831,6 @@ select:
     name: "Uurdetail bewaren"
     id: oq_lifetime_energy_hour_retention
     icon: mdi:chart-bar
-    web_server:
-      sorting_group_id: oq_system_diagnostics
     entity_category: config
     optimistic: true
     restore_value: true
@@ -814,8 +849,6 @@ button:
     icon: mdi:test-tube
     disabled_by_default: true
     entity_category: config
-    web_server:
-      sorting_group_id: oq_system_diagnostics
     on_press:
       then:
         - if:
@@ -867,15 +900,11 @@ button:
     name: Restart
     icon: mdi:restart
     id: restart_switch
-    web_server:
-      sorting_group_id: oq_system_diagnostics
 
   - platform: safe_mode
     name: Safe mode
     icon: mdi:shield-alert
     id: safe_mode_button
-    web_server:
-      sorting_group_id: oq_system_diagnostics
 
   - platform: template
     id: oq_trend_history_flush_button
@@ -884,8 +913,6 @@ button:
     disabled_by_default: true
     icon: mdi:content-save
     entity_category: config
-    web_server:
-      sorting_group_id: oq_system_diagnostics
     on_press:
       - lambda: |-
           id(oq_trend_capture_force_once) = true;
@@ -901,8 +928,6 @@ button:
     disabled_by_default: true
     icon: mdi:content-save
     entity_category: config
-    web_server:
-      sorting_group_id: oq_system_diagnostics
     on_press:
       - lambda: |-
           id(oq_decision_log).force_flush();
@@ -914,8 +939,6 @@ button:
     disabled_by_default: true
     icon: mdi:delete-clock
     entity_category: config
-    web_server:
-      sorting_group_id: oq_system_diagnostics
     on_press:
       - lambda: |-
           id(oq_decision_log).clear_flash_history();
@@ -927,8 +950,6 @@ button:
     disabled_by_default: true
     icon: mdi:delete-clock
     entity_category: config
-    web_server:
-      sorting_group_id: oq_system_diagnostics
     on_press:
       - lambda: |-
           id(oq_energy_history_endpoint).clear_history();
@@ -940,8 +961,6 @@ button:
     disabled_by_default: true
     icon: mdi:content-save
     entity_category: config
-    web_server:
-      sorting_group_id: oq_system_diagnostics
     on_press:
       - script.execute: oq_capture_energy_history_sample
       - script.wait: oq_capture_energy_history_sample
@@ -953,8 +972,6 @@ button:
     name: Check Firmware Updates
     icon: mdi:update
     entity_category: diagnostic
-    web_server:
-      sorting_group_id: oq_system_diagnostics
     on_press:
       - script.execute: oq_apply_firmware_update_source
       - script.wait: oq_apply_firmware_update_source
@@ -985,10 +1002,17 @@ button:
     disabled_by_default: true
     icon: mdi:swap-horizontal-bold
     entity_category: diagnostic
-    web_server:
-      sorting_group_id: oq_system_diagnostics
     on_press:
-      - script.execute: oq_install_firmware_update_target_deferred
+      - if:
+          condition:
+            lambda: |-
+              return !id(oq_runtime_polling_paused).state
+                  && !id(oq_firmware_target_install_active);
+          then:
+            - script.execute: oq_install_firmware_update_target_deferred
+          else:
+            - lambda: |-
+                ESP_LOGW("oq_fw", "Firmware install request ignored because an OTA operation is already active.");
 
 switch:
   - platform: template
@@ -1005,8 +1029,6 @@ switch:
     turn_off_action:
       - lambda: |-
           id(oq_trends_endpoint).clear_history();
-    web_server:
-      sorting_group_id: oq_system_diagnostics
 
   - platform: template
     id: oq_trend_history_flash_switch
@@ -1022,8 +1044,6 @@ switch:
     turn_off_action:
       - lambda: |-
           id(oq_trends_endpoint).set_flash_enabled(false);
-    web_server:
-      sorting_group_id: oq_system_diagnostics
 
   - platform: template
     id: oq_decision_log_flash_switch
@@ -1039,8 +1059,6 @@ switch:
     turn_off_action:
       - lambda: |-
           id(oq_decision_log).set_flash_enabled(false);
-    web_server:
-      sorting_group_id: oq_system_diagnostics
 
   - platform: template
     id: oq_lifetime_energy_history_switch
@@ -1052,23 +1070,44 @@ switch:
     restore_mode: RESTORE_DEFAULT_OFF
     turn_on_action:
       - script.execute: oq_capture_energy_history_sample
-    web_server:
-      sorting_group_id: oq_system_diagnostics
 
 binary_sensor:
   - platform: status
     name: Status
     icon: mdi:check-circle-outline
     entity_category: diagnostic
-    web_server:
-      sorting_group_id: oq_system_diagnostics
   - platform: template
     id: oq_runtime_polling_paused
     name: Runtime polling paused
     internal: true
     entity_category: diagnostic
-    lambda: |-
-      return false;
+    on_state:
+      then:
+        - lambda: |-
+            // This lifecycle edge owns actuator withdrawal; waiting for a
+            // periodic controller pass would leave an active boiler requested.
+            const bool paused = x;
+            if (paused == id(oq_boiler_runtime_pause_state)) return;
+
+            const uint32_t now_ms = millis();
+            id(oq_boiler_runtime_pause_state) = paused;
+            id(oq_boiler_rearm_required) = true;
+            id(oq_boiler_rearm_after_command_ms) = now_ms;
+            if (id(oq_boiler_output_request)) {
+              id(oq_boiler_output_request) = false;
+              id(oq_boiler_output_last_change_ms) = now_ms;
+            }
+            id(oq_boiler_output_target_temperature_c) = NAN;
+            id(oq_boiler_transport_active) = false;
+            id(oq_boiler_block_reason_code) = paused
+                ? oq_boiler::BLOCK_TRANSPORT_UNAVAILABLE
+                : oq_boiler::BLOCK_AWAITING_FRESH_COMMAND;
+            id(boiler_relay).turn_off();
+            ${oq_boiler_transport_shutdown_extra}
+            ESP_LOGI(
+                "quatt.boiler",
+                "Runtime polling %s; boiler outputs withdrawn until a fresh command",
+                paused ? "paused" : "resumed");
 
 sensor:
   - platform: debug
@@ -1116,8 +1155,6 @@ sensor:
     entity_category: diagnostic
     lambda: |-
       return id(oq_ota_progress_pct);
-    web_server:
-      sorting_group_id: oq_system_diagnostics
 
   - platform: uptime
     name: Uptime raw
@@ -1128,8 +1165,6 @@ sensor:
     device_class: duration
     unit_of_measurement: s
     entity_category: diagnostic
-    web_server:
-      sorting_group_id: oq_system_diagnostics
 
   - platform: template
     name: Uptime
@@ -1146,8 +1181,6 @@ sensor:
         return NAN;
       }
       return id(uptime_sensor).state / 3600.0f;
-    web_server:
-      sorting_group_id: oq_system_diagnostics
 
   - platform: internal_temperature
     id: oq_esp_internal_temperature
@@ -1155,8 +1188,6 @@ sensor:
     icon: mdi:thermometer
     update_interval: 60s
     entity_category: diagnostic
-    web_server:
-      sorting_group_id: oq_system_diagnostics
 
 text_sensor:
   - platform: template
@@ -1186,8 +1217,6 @@ text_sensor:
         default:
           return {"Idle"};
       }
-    web_server:
-      sorting_group_id: oq_system_diagnostics
 
   - platform: template
     id: oq_project_version_text
@@ -1197,8 +1226,6 @@ text_sensor:
     update_interval: never
     lambda: |-
       return {"${project_version}"};
-    web_server:
-      sorting_group_id: oq_system_diagnostics
   - platform: template
     id: oq_installation_topology_text
     name: OpenQuatt Installation Topology
@@ -1212,8 +1239,6 @@ text_sensor:
       #else
       return {"single"};
       #endif
-    web_server:
-      sorting_group_id: oq_system_diagnostics
   - platform: template
     id: oq_hardware_profile_text
     name: OpenQuatt Hardware Profile
@@ -1223,8 +1248,6 @@ text_sensor:
     update_interval: never
     lambda: |-
       return {"${oq_hardware_profile}"};
-    web_server:
-      sorting_group_id: oq_system_diagnostics
   - platform: template
     id: oq_connection_text
     name: OpenQuatt Connection
@@ -1234,8 +1257,6 @@ text_sensor:
     update_interval: never
     lambda: |-
       return {"${oq_connection}"};
-    web_server:
-      sorting_group_id: oq_system_diagnostics
   - platform: template
     id: oq_release_channel_text
     name: OpenQuatt Release Channel
@@ -1244,15 +1265,11 @@ text_sensor:
     update_interval: never
     lambda: |-
       return {"${release_channel}"};
-    web_server:
-      sorting_group_id: oq_system_diagnostics
   - platform: version
     name: ESPHome Version
     icon: mdi:information-outline
     hide_timestamp: true
     entity_category: diagnostic
-    web_server:
-      sorting_group_id: oq_system_diagnostics
 
   - platform: template
     id: uptime_readable_text
@@ -1287,8 +1304,6 @@ text_sensor:
         snprintf(buffer, sizeof(buffer), "%us", static_cast<unsigned>(seconds));
       }
       return {buffer};
-    web_server:
-      sorting_group_id: oq_system_diagnostics
 
 update:
   - platform: http_request
@@ -1300,8 +1315,6 @@ update:
     update_interval: never
     icon: mdi:update
     entity_category: diagnostic
-    web_server:
-      sorting_group_id: oq_system_diagnostics
 
 # ==============================================================================
 # OVERVIEW TRENDS

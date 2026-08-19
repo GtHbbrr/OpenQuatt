@@ -10,11 +10,13 @@ import { getDebugRecordingHubStatusLabel, renderDebugRecordingHeaderStatus, rend
 import { formatDeviceClock, formatUptimeFromMeta, getDeviceIpAddress, getInstallationLabel } from "./device-context.js";
 import { getFirmwareUpdateEntity, getUpdateStatus, isFirmwareUpdateAvailable } from "./firmware-update.js";
 import { renderMqttModal, renderMqttSensorsModal } from "./mqtt.js";
+import { renderOduEepromDumpModal } from "./odu-eeprom-dump.js";
 import { renderApiSecurityModal, renderLoginModal } from "./security-access.js";
 import { getWebServerLogStatusLabel, renderWebServerLogsModal } from "./webserver-logs.js";
-import { renderSettingsServiceTaskModal } from "../settings/service.js";
+import { getControlModeOverrideLabel, renderSettingsServiceTaskModal } from "../settings/service.js";
 import { renderSilentSettingsFields } from "../settings/silent.js";
 import { renderSettingsBackupImportModal, renderSettingsBackupRestoreModal, renderSettingsHistoryStorageModal } from "../settings/storage.js";
+import { renderHpWaterSensorOffsetsModal } from "../settings/water.js";
 import { formatNumericState } from "../core/formatting.js";
 import { escapeHtml } from "../core/html.js";
 import { render } from "../core/render-scheduler.js";
@@ -39,8 +41,36 @@ import { render } from "../core/render-scheduler.js";
       getEntitySignatureFragment("hpGeneration"),
       getEntitySignatureFragment("projectVersionText"),
       getEntitySignatureFragment("releaseChannelText"),
+      getEntitySignatureFragment("controlModeOverride"),
       getConnectivityStatus(),
     ].join("|");
+  }
+
+  export function renderControlModeOverrideBanner() {
+    if (!hasEntity("controlModeOverride")) {
+      return "";
+    }
+    const value = String(getEntityValue("controlModeOverride") || "Auto");
+    if (value === "Auto") {
+      return "";
+    }
+    const busy = state.busyAction === "save-controlModeOverride";
+    const feedbackMarkup = String(state.controlError || "").startsWith("CM Override")
+      ? `<p class="oq-helper-error" role="alert">${escapeHtml(state.controlError)}</p>`
+      : "";
+    return `
+      <aside class="oq-control-mode-override-banner" role="status" aria-live="polite">
+        <div>
+          <span>Testmodus actief</span>
+          <strong>${escapeHtml(getControlModeOverrideLabel(value))}</strong>
+          <p>De normale moduskeuze is tijdelijk overruled. De controller keert uiterlijk 30 minuten na activering automatisch terug naar automatisch.</p>
+          ${feedbackMarkup}
+        </div>
+        <button class="oq-helper-button oq-helper-button--primary" type="button" data-oq-action="clear-control-mode-override" ${busy ? "disabled" : ""}>
+          ${busy ? "Bezig..." : "Terug naar automatisch"}
+        </button>
+      </aside>
+    `;
   }
 
   export function getConnectivityStatus() {
@@ -441,6 +471,14 @@ import { render } from "../core/render-scheduler.js";
       return renderSettingsHistoryStorageModal();
     }
 
+    if (state.systemModal === "water-sensor-corrections") {
+      return renderHpWaterSensorOffsetsModal();
+    }
+
+    if (state.systemModal === "odu-eeprom-dump") {
+      return renderOduEepromDumpModal();
+    }
+
     if (String(state.systemModal || "").startsWith("service-task-")) {
       return renderSettingsServiceTaskModal();
     }
@@ -492,6 +530,71 @@ import { render } from "../core/render-scheduler.js";
           ${result.mqttIncluded ? "" : `<p class="oq-settings-action-note oq-settings-action-note--warning">Deze backup bevatte geen MQTT-configuratie. Bestaande MQTT-instellingen en MQTT-afhankelijke bronselecties zijn behouden.</p>`}
           <div class="oq-helper-modal-actions">
             <button class="oq-helper-button oq-helper-button--primary" type="button" data-oq-action="close-system-modal">Gereed</button>
+          </div>
+        `,
+      });
+    }
+
+    if (state.systemModal === "control-mode-override-confirm") {
+      const option = String(state.pendingControlModeOverride || "");
+      const busy = state.busyAction === "save-controlModeOverride";
+      return renderModalShell({
+        modalId: "system",
+        titleId: "oq-control-mode-override-modal-title",
+        kicker: "Service · tijdelijke testmodus",
+        title: `${getControlModeOverrideLabel(option)} activeren?`,
+        closeAction: "close-system-modal",
+        closeLabel: "Sluit testmodus-popup",
+        bodyMarkup: `
+          <p class="oq-helper-modal-copy">Deze keuze omzeilt tijdelijk de normale regelmodus. Gebruik dit alleen voor een gerichte test en houd de installatie tijdens de test in de gaten.</p>
+          <p class="oq-settings-action-note oq-settings-action-note--warning">De override stopt automatisch na maximaal 30 minuten. Je kunt hem eerder beëindigen via de waarschuwing bovenaan de web-app.</p>
+          <div class="oq-helper-modal-actions">
+            <button class="oq-helper-button oq-helper-button--ghost" type="button" data-oq-action="close-system-modal" ${busy ? "disabled" : ""}>Annuleren</button>
+            <button class="oq-helper-button oq-helper-button--warning" type="button" data-oq-action="confirm-control-mode-override" ${busy ? "disabled" : ""}>${busy ? "Activeren..." : "Tijdelijk activeren"}</button>
+          </div>
+        `,
+      });
+    }
+
+    if (state.systemModal === "runtime-reset-confirm") {
+      const duo = hasEntity("resetRuntimeCountersHp1Hp2");
+      const key = duo ? "resetRuntimeCountersHp1Hp2" : "resetRuntimeCountersHp1";
+      const busy = state.busyAction === key;
+      return renderModalShell({
+        modalId: "system",
+        titleId: "oq-runtime-reset-modal-title",
+        kicker: "Onderhoud",
+        title: `${duo ? "Beide draaitijdbalansen" : "Draaitijdbalans"} resetten?`,
+        closeAction: "close-system-modal",
+        closeLabel: "Sluit draaitijd-resetpopup",
+        bodyMarkup: `
+          <p class="oq-helper-modal-copy">De in OpenQuatt bijgehouden compressorlooptijd wordt op nul gezet${duo ? " voor beide warmtepompen" : ""}. Gebruik dit alleen na vervanging of wanneer de runtimebalans bewust opnieuw moet beginnen.</p>
+          <p class="oq-settings-action-note oq-settings-action-note--warning">Dit wijzigt geen fysieke teller in de warmtepomp zelf. De nieuwe waarden kunnen binnen ongeveer één minuut zichtbaar worden.</p>
+          ${state.controlError ? `<p class="oq-helper-error" role="alert">${escapeHtml(state.controlError)}</p>` : ""}
+          <div class="oq-helper-modal-actions">
+            <button class="oq-helper-button oq-helper-button--ghost" type="button" data-oq-action="close-system-modal" ${busy ? "disabled" : ""}>Annuleren</button>
+            <button class="oq-helper-button oq-helper-button--warning" type="button" data-oq-action="confirm-runtime-reset" ${busy ? "disabled" : ""}>${busy ? "Resetten..." : "Tellers resetten"}</button>
+          </div>
+        `,
+      });
+    }
+
+    if (state.systemModal === "energy-counter-reset-confirm") {
+      const busy = state.busyAction === "resetCumulativeEnergyCounters";
+      return renderModalShell({
+        modalId: "system",
+        titleId: "oq-energy-counter-reset-modal-title",
+        kicker: "Onderhoud",
+        title: "Cumulatieve energietellers resetten?",
+        closeAction: "close-system-modal",
+        closeLabel: "Sluit energieteller-resetpopup",
+        bodyMarkup: `
+          <p class="oq-helper-modal-copy">De cumulatieve elektriciteits-, warmte- en koelenergiemeters van OpenQuatt beginnen opnieuw bij nul.</p>
+          <p class="oq-settings-action-note oq-settings-action-note--warning">Eerder opgebouwde totalen blijven niet beschikbaar in deze tellers. Externe historie in Home Assistant wordt hiermee niet verwijderd.</p>
+          ${state.controlError ? `<p class="oq-helper-error" role="alert">${escapeHtml(state.controlError)}</p>` : ""}
+          <div class="oq-helper-modal-actions">
+            <button class="oq-helper-button oq-helper-button--ghost" type="button" data-oq-action="close-system-modal" ${busy ? "disabled" : ""}>Annuleren</button>
+            <button class="oq-helper-button oq-helper-button--warning" type="button" data-oq-action="confirm-energy-counter-reset" ${busy ? "disabled" : ""}>${busy ? "Resetten..." : "Energietellers resetten"}</button>
           </div>
         `,
       });

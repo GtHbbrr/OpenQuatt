@@ -364,6 +364,7 @@ def build_pages_site(site_dir: Path, factory_dir: Path, helper_python: Sequence[
     for relative_path in (
         "css/openquatt-preview.css",
         "js/mock-scenarios.js",
+        "js/mock-incident-scenarios.js",
         "js/mock-entity-defs.js",
         "js/mock-fixtures.js",
         "js/mock-device.js",
@@ -486,6 +487,13 @@ def validate_command(args: argparse.Namespace) -> int:
         env=env,
         log_path=log_dir / "web-docs-sync.log",
         label="web/docs contract",
+    )
+    run_logged(
+        ["npm", "run", "build:web"],
+        cwd=command_root,
+        env=env,
+        log_path=log_dir / "web-bundles.log",
+        label="web bundles",
     )
 
     for config in args.configs:

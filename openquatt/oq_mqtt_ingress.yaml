@@ -68,8 +68,6 @@ sensor:
     state_class: measurement
     accuracy_decimals: 2
     update_interval: never
-    web_server:
-      sorting_group_id: oq_ha_inputs
 
   - platform: template
     id: mqtt_cooling_dew_point_age
@@ -79,8 +77,6 @@ sensor:
     unit_of_measurement: "s"
     accuracy_decimals: 0
     update_interval: never
-    web_server:
-      sorting_group_id: oq_ha_inputs
 
   - platform: template
     id: mqtt_outside_temperature
@@ -92,8 +88,6 @@ sensor:
     state_class: measurement
     accuracy_decimals: 2
     update_interval: never
-    web_server:
-      sorting_group_id: oq_ha_inputs
 
   - platform: template
     id: mqtt_outside_temperature_age
@@ -103,8 +97,6 @@ sensor:
     unit_of_measurement: "s"
     accuracy_decimals: 0
     update_interval: never
-    web_server:
-      sorting_group_id: oq_ha_inputs
 
   - platform: template
     id: mqtt_room_temperature
@@ -116,8 +108,6 @@ sensor:
     state_class: measurement
     accuracy_decimals: 2
     update_interval: never
-    web_server:
-      sorting_group_id: oq_ha_inputs
 
   - platform: template
     id: mqtt_room_temperature_age
@@ -127,8 +117,6 @@ sensor:
     unit_of_measurement: "s"
     accuracy_decimals: 0
     update_interval: never
-    web_server:
-      sorting_group_id: oq_ha_inputs
 
   - platform: template
     id: mqtt_room_setpoint
@@ -140,8 +128,6 @@ sensor:
     state_class: measurement
     accuracy_decimals: 2
     update_interval: never
-    web_server:
-      sorting_group_id: oq_ha_inputs
 
   - platform: template
     id: mqtt_room_setpoint_age
@@ -151,8 +137,6 @@ sensor:
     unit_of_measurement: "s"
     accuracy_decimals: 0
     update_interval: never
-    web_server:
-      sorting_group_id: oq_ha_inputs
 
   - platform: template
     id: mqtt_heating_enable_age
@@ -162,8 +146,6 @@ sensor:
     unit_of_measurement: "s"
     accuracy_decimals: 0
     update_interval: never
-    web_server:
-      sorting_group_id: oq_ha_inputs
 
   - platform: template
     id: mqtt_cooling_enable_age
@@ -173,8 +155,6 @@ sensor:
     unit_of_measurement: "s"
     accuracy_decimals: 0
     update_interval: never
-    web_server:
-      sorting_group_id: oq_ha_inputs
 
 binary_sensor:
   - platform: template
@@ -183,8 +163,6 @@ binary_sensor:
     icon: mdi:water-check
     internal: true
     device_class: connectivity
-    web_server:
-      sorting_group_id: oq_ha_inputs
 
   - platform: template
     id: mqtt_outside_temperature_valid
@@ -192,8 +170,6 @@ binary_sensor:
     icon: mdi:check-decagram
     internal: true
     device_class: connectivity
-    web_server:
-      sorting_group_id: oq_ha_inputs
 
   - platform: template
     id: mqtt_room_temperature_valid
@@ -201,8 +177,6 @@ binary_sensor:
     icon: mdi:check-decagram
     internal: true
     device_class: connectivity
-    web_server:
-      sorting_group_id: oq_ha_inputs
 
   - platform: template
     id: mqtt_room_setpoint_valid
@@ -210,8 +184,6 @@ binary_sensor:
     icon: mdi:check-decagram
     internal: true
     device_class: connectivity
-    web_server:
-      sorting_group_id: oq_ha_inputs
 
   - platform: template
     id: mqtt_heating_enable
@@ -219,8 +191,6 @@ binary_sensor:
     icon: mdi:radiator
     disabled_by_default: true
     device_class: heat
-    web_server:
-      sorting_group_id: oq_ha_inputs
 
   - platform: template
     id: mqtt_heating_enable_valid
@@ -228,8 +198,6 @@ binary_sensor:
     icon: mdi:check-decagram
     internal: true
     device_class: connectivity
-    web_server:
-      sorting_group_id: oq_ha_inputs
 
   - platform: template
     id: mqtt_cooling_enable
@@ -237,8 +205,6 @@ binary_sensor:
     icon: mdi:snowflake-check
     disabled_by_default: true
     device_class: cold
-    web_server:
-      sorting_group_id: oq_ha_inputs
 
   - platform: template
     id: mqtt_cooling_enable_valid
@@ -246,5 +212,3 @@ binary_sensor:
     icon: mdi:check-decagram
     internal: true
     device_class: connectivity
-    web_server:
-      sorting_group_id: oq_ha_inputs

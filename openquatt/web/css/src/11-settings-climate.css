@@ -35,6 +35,35 @@
   overflow-wrap: anywhere;
 }
 
+.oq-settings-cooling-limit-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  padding: 9px 10px;
+  border: 1px solid var(--oq-settings-warning-border, rgba(234, 88, 12, 0.24));
+  border-radius: 10px;
+  background: var(--oq-theme-surface-1vxv, rgba(255, 247, 237, 0.86));
+  color: var(--oq-helper-soft);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.oq-settings-cooling-limit-warning-icon {
+  display: inline-grid;
+  flex: 0 0 18px;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
+  border-radius: 50%;
+  background: rgba(234, 88, 12, 0.14);
+  color: var(--oq-helper-accent-deep);
+  font-size: 0.72rem;
+  font-weight: 850;
+  line-height: 1;
+}
+
 .oq-settings-field--cooling-guard-choice .oq-settings-choice-card {
   gap: 8px;
   padding: 14px;
@@ -51,6 +80,10 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
   margin-top: 16px;
+}
+
+.oq-settings-grid--pid {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
 }
 
 .oq-settings-curve-grid {

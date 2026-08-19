@@ -10,7 +10,28 @@ const {
   getEnergyHistoryRecords,
   getEnergyHistoryRenderSignature,
   getEnergyHistorySummaryRecords,
+  renderOverviewEnergyColumn,
 } = await import("../js/src/views/energy.js");
+const { OVERVIEW_ENERGY_COLUMN_CONFIGS } = await import("../js/src/core/config.js");
+const { getEnergyViewEntityKeys } = await import("../js/src/core/entity-sync.js");
+
+test("Cumulatief bevat de energieteller-reset en hydrateert de knop", () => {
+  const previousEntities = state.entities;
+  state.entities = {
+    heatingElectricalEnergyCumulative: { value: 469.5, state: "469.5", uom: "kWh" },
+    resetCumulativeEnergyCounters: { value: "", state: "" },
+  };
+
+  try {
+    const cumulativeColumn = OVERVIEW_ENERGY_COLUMN_CONFIGS.find((column) => column.label === "Cumulatief");
+    const markup = renderOverviewEnergyColumn(cumulativeColumn);
+    assert.match(markup, /data-oq-action="open-energy-counter-reset-confirm"/);
+    assert.match(markup, /Tellers resetten/);
+    assert.ok(getEnergyViewEntityKeys().includes("resetCumulativeEnergyCounters"));
+  } finally {
+    state.entities = previousEntities;
+  }
+});
 
 test("energy history tooltip exposes the inputs used by COP and EER", () => {
   const tooltip = getEnergyHistoryBucketTooltip({

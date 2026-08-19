@@ -1,5 +1,5 @@
 import { getSetupCompleteState, isTrendHistoryEnabled, renderAppSummary } from "./app-shared.js";
-import { BULK_POLL_INTERVAL_MS, CIC_COMPATIBILITY_KEYS, CIC_POLLING_DIAGNOSTIC_KEYS, CIC_POLLING_SETTING_KEYS, COMMISSIONING_STATE_KEYS, COMPRESSOR_SETTING_KEYS, CONNECTIVITY_PROBE_SUCCESS_TTL_MS, CONNECTIVITY_PROBE_TIMEOUT_MS, CONTROL_REPLAY_STATE_KEYS, COOLING_SETTING_KEYS, CURVE_POINTS, CURVE_SETTING_KEYS, ENTITY_DEFS, ENTITY_REFRESH_CONCURRENCY, FAST_OVERVIEW_KEYS, FAST_VIEW_ENTITY_REFRESH_CONCURRENCY, FIRMWARE_ENTITY_KEYS, FIRMWARE_MODAL_KEYS, FLOW_SETTING_KEYS, FLOW_TUNING_KEYS, HEADER_ENTITY_KEYS, HIDDEN_POLL_INTERVAL_MS, INSTALLATION_MONITORING_STATE_KEYS, LIMIT_KEYS, ODU_RUNTIME_FREQUENCY_KEYS, OPENTHERM_DIAGNOSTIC_KEYS, OPENTHERM_SETTING_KEYS, OVERVIEW_ENERGY_COLUMN_CONFIGS, OVERVIEW_KEYS, OVERVIEW_METADATA_KEYS, POWER_HOUSE_KEYS, QUICK_START_FLOW_SOURCE_KEYS, QUICK_START_THERMOSTAT_SOURCE_KEYS, SENSOR_CALIBRATION_KEYS, SENSOR_CALIBRATION_STATE_KEYS, SENSOR_SELECTION_KEYS, SENSOR_SELECTION_STATE_KEYS, SERVICE_STATUS_ENTITY_KEYS, SETTINGS_GROUP_IDS, SETTINGS_GROUPS, SETTINGS_KEYS, SILENT_SETTING_KEYS, STATIC_POLL_INTERVAL_MS } from "./config.js";
+import { AUX_RELAY_SETTING_KEYS, AUX_RELAY_STATE_KEYS, BOILER_DIAGNOSTIC_KEYS, BOILER_SETTING_KEYS, BOILER_SUPPORT_SWITCHING_KEYS, BULK_POLL_INTERVAL_MS, CIC_COMPATIBILITY_KEYS, CIC_POLLING_DIAGNOSTIC_KEYS, CIC_POLLING_SETTING_KEYS, COMMISSIONING_STATE_KEYS, COMPRESSOR_SETTING_KEYS, CONNECTIVITY_PROBE_SUCCESS_TTL_MS, CONNECTIVITY_PROBE_TIMEOUT_MS, CONTROL_REPLAY_STATE_KEYS, COOLING_SETTING_KEYS, CURVE_POINTS, CURVE_SETTING_KEYS, ENTITY_DEFS, ENTITY_REFRESH_CONCURRENCY, FAST_OVERVIEW_KEYS, FAST_VIEW_ENTITY_REFRESH_CONCURRENCY, FIRMWARE_ENTITY_KEYS, FIRMWARE_MODAL_KEYS, FLOW_SETTING_KEYS, FLOW_TUNING_KEYS, HEADER_ENTITY_KEYS, HIDDEN_POLL_INTERVAL_MS, INSTALLATION_MONITORING_STATE_KEYS, LIMIT_KEYS, ODU_RUNTIME_FREQUENCY_KEYS, OPENTHERM_DIAGNOSTIC_KEYS, OPENTHERM_SETTING_KEYS, OTB_DIAGNOSTIC_KEYS, OVERVIEW_ENERGY_COLUMN_CONFIGS, OVERVIEW_KEYS, OVERVIEW_METADATA_KEYS, POWER_HOUSE_KEYS, QUICK_START_FLOW_SOURCE_KEYS, QUICK_START_THERMOSTAT_SOURCE_KEYS, SENSOR_CALIBRATION_KEYS, SENSOR_CALIBRATION_STATE_KEYS, SENSOR_SELECTION_KEYS, SENSOR_SELECTION_STATE_KEYS, SERVICE_CONTROL_KEYS, SERVICE_STATUS_ENTITY_KEYS, SETTINGS_GROUP_IDS, SETTINGS_GROUPS, SETTINGS_KEYS, SILENT_SETTING_KEYS, STATIC_POLL_INTERVAL_MS } from "./config.js";
 import { buildEntityPath, isCurveMode } from "./domain-helpers.js";
 import { getEntityValue, parseLooseNumber } from "./entity-store.js";
 import { state } from "./state.js";
@@ -7,6 +7,7 @@ import { updateWebServerLogState } from "./feature-state.js";
 import { getDefaultAppView, getUrlAppView, setAppView } from "./navigation.js";
 import { isFirmwareOtaQuietActive } from "./firmware-quiet.js";
 import { getInstallationMonitoringModel, syncInstallationMonitoringDetailsState } from "./installation-monitoring.js";
+import { getIncidentMonitoringFailureUpdate, getIncidentMonitoringSuccessUpdate, getIncidentMonitoringUnsupportedUpdate } from "./incident-monitoring.js";
 import { beginDeviceReconnect, clearDeviceReconnect, markDeviceReconnectRecovered, reconcileOtaEvidence } from "./device-reconnect.js";
 import { getSettingsRenderSignature } from "./render-signatures.js";
 import { isSystemSettingsGroupActive } from "./surface-state.js";
@@ -18,6 +19,7 @@ import { patchControlReplayDom, patchDiagnosisDom, patchEnergyDom, patchOverview
 import { clearWebServerLogOutput, closeWebServerLogStream, resetWebServerLogRecoveryState } from "./webserver-log-controls.js";
 import { getMqttSensorsModalRenderSignature, refreshMqttStatus, shouldRefreshMqttStatusForCurrentSurface } from "../features/mqtt-actions.js";
 import { getApiSecurityStatusSignature, refreshApiSecurityStatus, refreshAuthStatus, shouldRefreshApiSecurityStatusForCurrentSurface, shouldRefreshAuthStatusForCurrentSurface } from "../features/security-actions.js";
+import { refreshOduEepromDumpStatuses, shouldRefreshOduEepromDumpSurface } from "../features/odu-eeprom-dump.js";
 import { render } from "./render-scheduler.js";
 import { fetchWithTimeout } from "./browser-utils.js";
 
@@ -141,9 +143,14 @@ import { fetchWithTimeout } from "./browser-utils.js";
     const deferredKeys = getDeferredPrimeKeys(initialKeys);
     const initialDetail = state.appView === "settings" ? "all" : "state";
     try {
-      await refreshEntities(initialKeys, initialDetail, {
-        concurrency: initialDetail === "all" ? ENTITY_REFRESH_CONCURRENCY : FAST_VIEW_ENTITY_REFRESH_CONCURRENCY,
-      });
+      await Promise.all([
+        refreshEntities(initialKeys, initialDetail, {
+          concurrency: initialDetail === "all" ? ENTITY_REFRESH_CONCURRENCY : FAST_VIEW_ENTITY_REFRESH_CONCURRENCY,
+        }),
+        shouldRefreshIncidentMonitoringSurface()
+          ? refreshIncidentMonitoringData({ force: true })
+          : false,
+      ]);
       if (state.appView === "settings") {
         await waitForInitialSettingsReady();
       } else {
@@ -165,6 +172,11 @@ import { fetchWithTimeout } from "./browser-utils.js";
       "hpGeneration",
       "boilerCvAssistEnabled",
       "boilerRatedHeatPower",
+      ...BOILER_SETTING_KEYS,
+      "otbLinkAvailable",
+      "otbConnectionAutoSelected",
+      "otbConnectionMismatch",
+      "auxRelayFunction",
       "flowControlMode",
       "flowSetpoint",
       "manualIpwm",
@@ -179,12 +191,13 @@ import { fetchWithTimeout } from "./browser-utils.js";
       "compressorCyclingWarning2h",
       "compressorCyclingWarning72h",
       "alternatingCompressorStartsWarning",
+      "boilerFaultFallbackEnabled",
       "commissioningStatus",
       "cm100Active",
     ],
     heating: ["strategy"],
     cooling: ["manualCoolingEnable", "coolingWithoutDewPointMode"],
-    integrations: ["otEnabled", "cicPollingEnabled", "flowSource"],
+    integrations: ["otEnabled", "cicPollingEnabled", "flowSource", "boilerConnection", "boilerCommandValid", "otbLinkAvailable"],
     system: ["setupComplete", "projectVersionText", "releaseChannelText", "firmwareUpdateChannel", "statusLedsEnabled", "usageTelemetryEnabled", "usageTelemetryChoiceConfigured", "usageTelemetryInstallationId"],
   };
 
@@ -195,6 +208,13 @@ import { fetchWithTimeout } from "./browser-utils.js";
       "hpGeneration",
       "boilerCvAssistEnabled",
       "boilerRatedHeatPower",
+      ...BOILER_SETTING_KEYS,
+      "otbLinkAvailable",
+      "otbConnectionAutoSelected",
+      "otbConnectionMismatch",
+      ...BOILER_SUPPORT_SWITCHING_KEYS,
+      ...AUX_RELAY_SETTING_KEYS,
+      ...AUX_RELAY_STATE_KEYS,
       ...FLOW_SETTING_KEYS,
       ...FLOW_TUNING_KEYS,
       ...SILENT_SETTING_KEYS,
@@ -214,6 +234,7 @@ import { fetchWithTimeout } from "./browser-utils.js";
       "flowSelected",
       "flowKp",
       "flowKi",
+      ...SERVICE_CONTROL_KEYS,
     ],
     heating: [
       "strategy",
@@ -229,15 +250,24 @@ import { fetchWithTimeout } from "./browser-utils.js";
       "coolingMinimumSafeSupplyTemp",
       "coolingSupplyTarget",
       "coolingSupplyError",
+      "silentModeOverride",
+      "silentActive",
+      "silentMax",
       ...COOLING_SETTING_KEYS,
     ],
     integrations: [
       ...OPENTHERM_SETTING_KEYS,
       ...OPENTHERM_DIAGNOSTIC_KEYS,
+      ...BOILER_SETTING_KEYS,
+      ...BOILER_DIAGNOSTIC_KEYS,
+      ...OTB_DIAGNOSTIC_KEYS,
       ...CIC_POLLING_SETTING_KEYS,
       ...CIC_POLLING_DIAGNOSTIC_KEYS,
       ...SENSOR_SELECTION_KEYS,
       ...SENSOR_SELECTION_STATE_KEYS,
+      "waterSupplyCalibrationOffset",
+      "waterSupplyCalibrationRequired",
+      "waterSupplyCalibrationStatus",
       ...CIC_COMPATIBILITY_KEYS,
     ],
     system: [
@@ -327,6 +357,9 @@ import { fetchWithTimeout } from "./browser-utils.js";
   export function getEnergyViewEntityKeys() {
     const keys = new Set();
     OVERVIEW_ENERGY_COLUMN_CONFIGS.forEach((column) => {
+      if (column.counterResetKey) {
+        keys.add(column.counterResetKey);
+      }
       (column.categories || []).forEach((category) => {
         (category.groups || []).forEach((group) => {
           (group.rows || []).forEach((row) => {
@@ -487,7 +520,9 @@ import { fetchWithTimeout } from "./browser-utils.js";
 
   export const SERVICE_STATUS_ENDPOINT = "/openquatt/service/status";
   export const DECISION_LOG_ENDPOINT = "/openquatt/decision-log";
+  export const INCIDENT_MONITORING_ENDPOINT = "/openquatt/incidents";
   export const DECISION_LOG_REFRESH_INTERVAL_MS = 15000;
+  export const INCIDENT_MONITORING_REFRESH_INTERVAL_MS = 10000;
 
   export function getEntityRequestTimeoutMs() {
     return state.deviceReconnectMode || state.busyAction === "restartAction" || state.updateInstallBusy || state.updateInstallPhaseHint
@@ -541,6 +576,21 @@ import { fetchWithTimeout } from "./browser-utils.js";
       state.decisionLogError = "";
       state.decisionLogSignature = "";
       state.decisionLogLastFetchAt = 0;
+      state.incidentMonitoringSnapshot = null;
+      state.incidentMonitoringError = "";
+      state.incidentMonitoringUnsupported = false;
+      state.incidentMonitoringFailureCount = 0;
+      state.incidentMonitoringSignature = "";
+      state.incidentMonitoringRenderPending = false;
+      state.incidentMonitoringLastFetchAt = 0;
+      state.incidentAction = {
+        hp: 0,
+        kind: "",
+        requestId: 0,
+        pending: false,
+        ok: null,
+        result: "",
+      };
       if (typeof resetWebServerLogRecoveryState === "function") {
         resetWebServerLogRecoveryState();
       } else {
@@ -740,6 +790,69 @@ import { fetchWithTimeout } from "./browser-utils.js";
       throw new Error(`decision log HTTP ${response.status}`);
     }
     return response.json();
+  }
+
+  async function fetchIncidentMonitoringPayload() {
+    const timeoutMs = getEntityRequestTimeoutMs();
+    const response = await fetchWithTimeout(
+      INCIDENT_MONITORING_ENDPOINT,
+      { cache: "no-store", headers: { "Cache-Control": "no-store" } },
+      timeoutMs,
+      `incident monitoring request timed out after ${timeoutMs}ms`,
+    );
+    if (response.status === 404) {
+      return { unsupported: true, payload: null };
+    }
+    if (!response.ok) {
+      throw new Error(`incident monitoring HTTP ${response.status}`);
+    }
+    return { unsupported: false, payload: await response.json() };
+  }
+
+  function shouldRefreshIncidentMonitoringSurface(appView = state.appView, settingsGroup = state.settingsGroup) {
+    return appView === "overview" || (appView === "settings" && settingsGroup === "service");
+  }
+
+  export async function refreshIncidentMonitoringData(options = {}) {
+    if (!shouldRefreshIncidentMonitoringSurface() && options.prefetchOverview !== true) {
+      return false;
+    }
+    const force = options.force === true;
+    const now = Date.now();
+    if (state.incidentMonitoringFetchPromise) {
+      return state.incidentMonitoringFetchPromise;
+    }
+    if (!force && state.incidentMonitoringUnsupported) {
+      return false;
+    }
+    if (!force && (now - Number(state.incidentMonitoringLastFetchAt || 0)) < INCIDENT_MONITORING_REFRESH_INTERVAL_MS) {
+      return false;
+    }
+
+    const applyUpdate = (update) => {
+      Object.assign(state, update);
+      if (update.changed) syncInstallationMonitoringDetailsState(getInstallationMonitoringModel());
+      return update.changed;
+    };
+    const request = (async () => {
+      try {
+        const result = await fetchIncidentMonitoringPayload();
+        return applyUpdate(result.unsupported
+          ? getIncidentMonitoringUnsupportedUpdate(state)
+          : getIncidentMonitoringSuccessUpdate(state, result.payload));
+      } catch (error) {
+        return applyUpdate(getIncidentMonitoringFailureUpdate(state, error));
+      }
+    })();
+    state.incidentMonitoringFetchPromise = request;
+
+    try {
+      return await request;
+    } finally {
+      if (state.incidentMonitoringFetchPromise === request) {
+        state.incidentMonitoringFetchPromise = null;
+      }
+    }
   }
 
   export function getDecisionLogSignature(payload = {}) {
@@ -1100,12 +1213,16 @@ import { fetchWithTimeout } from "./browser-utils.js";
         state.lastStaticEntitySyncAt = state.lastFastEntitySyncAt;
       }
       if (isPrefetchOverview) {
+        await refreshIncidentMonitoringData({ prefetchOverview: true });
         return;
       }
       if (isOverviewLike && !state.overviewMetadataHydrated && !state.overviewMetadataHydrating) {
         void hydrateOverviewMetadata();
       }
       const reconnectChanged = reconnectModeBefore !== state.deviceReconnectMode;
+      const incidentMonitoringChanged = shouldRefreshIncidentMonitoringSurface(syncView, state.settingsGroup)
+        ? await refreshIncidentMonitoringData({ force: options.forceIncidentMonitoring === true })
+        : false;
       const shouldDeferSupplementary = forceFast && isOverviewLike;
       const trendChanged = shouldDeferSupplementary
         ? false
@@ -1133,12 +1250,24 @@ import { fetchWithTimeout } from "./browser-utils.js";
       const mqttChanged = shouldDeferSupplementary || !shouldRefreshMqttStatusForCurrentSurface()
         ? false
         : await refreshMqttStatus({ force: state.systemModal === "mqtt-sensors" });
+      if (!shouldDeferSupplementary && shouldRefreshOduEepromDumpSurface()) {
+        await refreshOduEepromDumpStatuses();
+      }
       const nextHeaderSignature = getHeaderRenderSignature();
       if (shouldDeferSupplementary && !state.nativeOpen) {
         schedulePrimeSupplementaryData(getSupplementaryPrimeDelayMs(syncView));
       }
       if (reconnectChanged) {
         render();
+        return;
+      }
+      if (incidentMonitoringChanged && state.appView === "settings" && state.settingsGroup === "service") {
+        if (state.focusedField) {
+          state.incidentMonitoringRenderPending = true;
+        } else {
+          state.incidentMonitoringRenderPending = false;
+          render();
+        }
         return;
       }
       if (trendChanged && state.appView === "diagnosis" && !state.root?.querySelector(".oq-overview-trends")) {
@@ -1189,7 +1318,7 @@ import { fetchWithTimeout } from "./browser-utils.js";
       } else {
         patchHeaderDom();
       }
-      if (state.appView === "settings" && String(state.systemModal || "").startsWith("service-task-")) {
+      if (state.appView === "settings" && (String(state.systemModal || "").startsWith("service-task-") || state.systemModal === "water-sensor-corrections")) {
         const nextSettingsSignature = getSettingsRenderSignature();
         if (nextSettingsSignature !== state.settingsRenderSignature) {
           render();

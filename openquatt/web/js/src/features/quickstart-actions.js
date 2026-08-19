@@ -5,7 +5,7 @@ import { setEntityBackupValue } from "../core/entity-backup.js";
 import { getEntityValue } from "../core/entity-store.js";
 import { refreshEntities } from "../core/entity-sync.js";
 import { state } from "../core/state.js";
-import { isUsageTelemetryChoiceConfirmed, shouldInitializeQuickStartUsageTelemetryChoice } from "../core/usage-telemetry-domain.js";
+import { shouldInitializeQuickStartUsageTelemetryChoice, waitForUsageTelemetryChoiceConfirmation } from "../core/usage-telemetry-domain.js";
 import { getQuickStartFlowSourceModel, getQuickStartThermostatSourceModel } from "./quickstart.js";
 import { render } from "../core/render-scheduler.js";
 
@@ -24,7 +24,14 @@ import { render } from "../core/render-scheduler.js";
       return [...new Set([...base, ...QUICK_START_THERMOSTAT_SOURCE_KEYS])];
     }
     if (stepId === "boiler") {
-      return [...new Set([...base, "boilerCvAssistEnabled", "boilerRatedHeatPower"])];
+      return [...new Set([
+        ...base,
+        "boilerCvAssistEnabled",
+        "boilerFaultFallbackEnabled",
+        "boilerConnection",
+        "boilerRatedHeatPower",
+        "otbLinkAvailable",
+      ])];
     }
     if (stepId === "strategy") {
       return [...new Set([...base, "strategy"])];
@@ -50,6 +57,8 @@ import { render } from "../core/render-scheduler.js";
         "installationTopology",
         "hpGeneration",
         "boilerCvAssistEnabled",
+        "boilerFaultFallbackEnabled",
+        "boilerConnection",
         "boilerRatedHeatPower",
         ...QUICK_START_FLOW_SOURCE_KEYS,
         ...QUICK_START_THERMOSTAT_SOURCE_KEYS,
@@ -91,30 +100,30 @@ import { render } from "../core/render-scheduler.js";
     state.controlError = "";
     render();
 
+    const confirmChoice = (expectedEnabled) => waitForUsageTelemetryChoiceConfirmation({
+      refresh: async () => {
+        await refreshEntities(["usageTelemetryEnabled", "usageTelemetryChoiceConfigured"], "all");
+        return [getEntityValue("usageTelemetryEnabled"), getEntityValue("usageTelemetryChoiceConfigured")];
+      },
+      expectedEnabled,
+    });
+
     try {
       await setQuickStartSwitch("usageTelemetryEnabled", true);
-      await refreshEntities(["usageTelemetryEnabled", "usageTelemetryChoiceConfigured"], "all");
-      if (!isUsageTelemetryChoiceConfirmed({
-        telemetryValue: getEntityValue("usageTelemetryEnabled"),
-        choiceValue: getEntityValue("usageTelemetryChoiceConfigured"),
-        expectedEnabled: true,
-      })) {
+      if (!await confirmChoice(true)) {
         throw new Error("De controller heeft de keuze niet bevestigd.");
       }
+      state.controlError = "";
     } catch (error) {
       let disabledConfirmed = false;
       try {
         await setQuickStartSwitch("usageTelemetryEnabled", false);
-        await refreshEntities(["usageTelemetryEnabled", "usageTelemetryChoiceConfigured"], "all");
-        disabledConfirmed = isUsageTelemetryChoiceConfirmed({
-          telemetryValue: getEntityValue("usageTelemetryEnabled"),
-          choiceValue: getEntityValue("usageTelemetryChoiceConfigured"),
-          expectedEnabled: false,
-        });
+        disabledConfirmed = await confirmChoice(false);
       } catch (_disableError) {
         // Keep navigation blocked when the privacy-safe fallback cannot be confirmed.
       }
       if (disabledConfirmed) {
+        state.controlError = "";
         state.controlNotice = "De standaardkeuze kon niet worden ingeschakeld. Delen is bevestigd uitgeschakeld; je kunt doorgaan of het opnieuw inschakelen.";
       } else {
         state.controlError = `De keuze kon niet veilig worden bevestigd. Controleer de verbinding en probeer opnieuw. ${error.message}`;

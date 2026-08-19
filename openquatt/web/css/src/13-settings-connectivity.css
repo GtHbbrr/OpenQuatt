@@ -720,7 +720,9 @@
 .oq-helper-shell--dark .oq-settings-hp-offset-readout strong,
 .oq-helper-modal-backdrop--dark .oq-settings-hp-offset-readout strong,
 .oq-helper-shell--dark .oq-settings-hp-offset-row,
-.oq-helper-modal-backdrop--dark .oq-settings-hp-offset-row {
+.oq-helper-modal-backdrop--dark .oq-settings-hp-offset-row,
+.oq-helper-shell--dark .oq-settings-hp-offset-supply-note,
+.oq-helper-modal-backdrop--dark .oq-settings-hp-offset-supply-note {
   background: rgba(15, 23, 42, 0.38);
 }
 

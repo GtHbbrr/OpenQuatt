@@ -237,8 +237,6 @@ number:
     restore_value: true
     initial_value: 14.0
     entity_category: config
-    web_server:
-      sorting_group_id: oq_cooling
 
   - platform: template
     id: cooling_demand_max_f
@@ -253,8 +251,6 @@ number:
     restore_value: true
     initial_value: 4
     entity_category: config
-    web_server:
-      sorting_group_id: oq_cooling
 
   - platform: template
     id: cooling_restart_delta
@@ -269,8 +265,6 @@ number:
     restore_value: true
     initial_value: 1.0
     entity_category: config
-    web_server:
-      sorting_group_id: oq_cooling
 
   - platform: template
     id: cooling_pid_kp
@@ -284,8 +278,6 @@ number:
     restore_value: true
     initial_value: 3.0
     entity_category: config
-    web_server:
-      sorting_group_id: oq_cooling
 
   - platform: template
     id: cooling_pid_ki
@@ -299,8 +291,6 @@ number:
     restore_value: true
     initial_value: 0.12
     entity_category: config
-    web_server:
-      sorting_group_id: oq_cooling
 
   - platform: template
     id: cooling_pid_kd
@@ -314,8 +304,6 @@ number:
     restore_value: true
     initial_value: 0.0
     entity_category: config
-    web_server:
-      sorting_group_id: oq_cooling
 
 sensor:
   - platform: template
@@ -335,8 +323,6 @@ sensor:
         base_floor_c = fmaxf(base_floor_c, id(cooling_effective_min_supply_temp).state);
       }
       return base_floor_c;
-    web_server:
-      sorting_group_id: oq_cooling
 
   - platform: template
     id: cooling_supply_error
@@ -351,8 +337,6 @@ sensor:
       if (!id(oq_system_supply_temp).has_state() || isnan(id(oq_system_supply_temp).state)) return NAN;
       // Positive error means the supply is warmer than target, so more cooling may be requested.
       return id(oq_system_supply_temp).state - id(cooling_supply_target).state;
-    web_server:
-      sorting_group_id: oq_cooling
 
   - platform: template
     id: oq_cooling_demand_raw_sensor
@@ -362,8 +346,6 @@ sensor:
     state_class: measurement
     accuracy_decimals: 0
     update_interval: 5s
-    web_server:
-      sorting_group_id: oq_cooling
     lambda: |-
       return (float) id(oq_cooling_demand_raw);
 
@@ -376,8 +358,6 @@ sensor:
     accuracy_decimals: 0
     update_interval: 5s
     entity_category: diagnostic
-    web_server:
-      sorting_group_id: oq_cooling
     lambda: |-
       return (float) id(oq_cooling_base_demand_raw);
 
@@ -390,8 +370,6 @@ sensor:
     accuracy_decimals: 0
     update_interval: 5s
     entity_category: diagnostic
-    web_server:
-      sorting_group_id: oq_cooling
     lambda: |-
       return (float) id(oq_cooling_limited_demand);
 
@@ -404,8 +382,6 @@ sensor:
     accuracy_decimals: 0
     update_interval: 5s
     entity_category: diagnostic
-    web_server:
-      sorting_group_id: oq_cooling
     lambda: |-
       return (float) id(oq_cooling_limiter_allowed_max);
 
@@ -418,8 +394,6 @@ sensor:
     accuracy_decimals: 2
     update_interval: 5s
     entity_category: diagnostic
-    web_server:
-      sorting_group_id: oq_cooling
     lambda: |-
       return id(oq_cooling_buffer_gap_filtered_c);
 
@@ -432,8 +406,6 @@ sensor:
     accuracy_decimals: 2
     update_interval: 5s
     entity_category: diagnostic
-    web_server:
-      sorting_group_id: oq_cooling
     lambda: |-
       return id(oq_cooling_buffer_gap_rate_c_per_min);
 
@@ -446,8 +418,6 @@ sensor:
     accuracy_decimals: 2
     update_interval: 5s
     entity_category: diagnostic
-    web_server:
-      sorting_group_id: oq_cooling
     lambda: |-
       return id(oq_cooling_projected_gap_c);
 
@@ -459,8 +429,6 @@ sensor:
     accuracy_decimals: 0
     update_interval: 5s
     entity_category: diagnostic
-    web_server:
-      sorting_group_id: oq_cooling
     lambda: |-
       return id(oq_cooling_projection_brake_active) ? 1.0f : 0.0f;
 
@@ -473,8 +441,6 @@ sensor:
     accuracy_decimals: 2
     update_interval: 5s
     entity_category: diagnostic
-    web_server:
-      sorting_group_id: oq_cooling
     lambda: |-
       return id(oq_cooling_dew_gap_c);
 
@@ -487,8 +453,6 @@ sensor:
     accuracy_decimals: 2
     update_interval: 5s
     entity_category: diagnostic
-    web_server:
-      sorting_group_id: oq_cooling
     lambda: |-
       return id(oq_cooling_stop_buffer_gap_c);
 
@@ -500,8 +464,6 @@ sensor:
     accuracy_decimals: 0
     update_interval: 5s
     entity_category: diagnostic
-    web_server:
-      sorting_group_id: oq_cooling
     lambda: |-
       return (float) id(oq_cooling_limiter_reason_code);
 
@@ -513,8 +475,6 @@ sensor:
     accuracy_decimals: 0
     update_interval: 5s
     entity_category: diagnostic
-    web_server:
-      sorting_group_id: oq_cooling
     lambda: |-
       return (float) id(oq_cooling_stop_reason_code);
 
@@ -526,8 +486,6 @@ sensor:
     accuracy_decimals: 0
     update_interval: 5s
     entity_category: diagnostic
-    web_server:
-      sorting_group_id: oq_cooling
     lambda: |-
       return (float) id(oq_cooling_request_reason_code);
 
@@ -540,8 +498,6 @@ sensor:
     accuracy_decimals: 0
     update_interval: 5s
     entity_category: diagnostic
-    web_server:
-      sorting_group_id: oq_cooling
     lambda: |-
       return (float) id(oq_cooling_request_hp1_level);
 
@@ -554,8 +510,6 @@ sensor:
     accuracy_decimals: 0
     update_interval: 5s
     entity_category: diagnostic
-    web_server:
-      sorting_group_id: oq_cooling
     lambda: |-
       return (float) id(oq_cooling_request_hp2_level);
 
@@ -567,8 +521,6 @@ sensor:
     accuracy_decimals: 0
     update_interval: 5s
     entity_category: diagnostic
-    web_server:
-      sorting_group_id: oq_cooling
     lambda: |-
       return (float) id(oq_cooling_request_owner_hp);
 
@@ -580,8 +532,6 @@ sensor:
     accuracy_decimals: 0
     update_interval: 5s
     entity_category: diagnostic
-    web_server:
-      sorting_group_id: oq_cooling
     lambda: |-
       return (float) id(oq_cooling_owner_hp);
 
@@ -593,8 +543,6 @@ sensor:
     accuracy_decimals: 0
     update_interval: 5s
     entity_category: diagnostic
-    web_server:
-      sorting_group_id: oq_cooling
     lambda: |-
       return id(oq_cooling_water_cycle_active) ? 1.0f : 0.0f;
 
@@ -1055,9 +1003,14 @@ interval:
             }
             const bool restart_after_water_stop = stop_reason_code != 0;
             const bool projected_floor_pause = stop_reason_code == 4;
-            const float restart_threshold_c = id(oq_cooling_stop_buffer_gap_c) + restart_delta_c;
+            const oq_cooling::WaterCycleState stopped_cycle{
+                false,
+                id(oq_cooling_stop_buffer_gap_c),
+                stop_reason_code,
+            };
+            const float restart_threshold_c = stopped_cycle.stop_buffer_gap_c + restart_delta_c;
             const bool restart_gap_recovered =
-                !restart_after_water_stop || projected_floor_pause || filtered_gap_c >= restart_threshold_c;
+                oq_cooling::water_restart_gap_recovered(stopped_cycle, filtered_gap_c, restart_delta_c);
             const bool dew_recovered = !dew_mode || isnan(dew_gap_c) || dew_gap_c > hard_dew_restart_gap_c;
             const bool fallback_recovered =
                 !fallback_mode || !restart_after_water_stop || projected_floor_pause ||
@@ -1192,12 +1145,28 @@ interval:
           if (demand > allowed_max) demand = allowed_max;
           if (demand < 0) demand = 0;
           if (demand != prev_limited) id(oq_cooling_last_demand_change_ms) = now_ms;
+
+          oq_cooling::WaterCycleState water_cycle_state{
+              water_cycle_active,
+              id(oq_cooling_stop_buffer_gap_c),
+              id(oq_cooling_stop_reason_code),
+          };
+          const bool pi_zero_stop =
+              oq_cooling::record_pi_zero_stop(prev_limited, demand, filtered_gap_c, water_cycle_state);
+          if (pi_zero_stop) {
+            id(oq_cooling_water_cycle_active) = water_cycle_state.active;
+            id(oq_cooling_stop_buffer_gap_c) = water_cycle_state.stop_buffer_gap_c;
+            id(oq_cooling_stop_reason_code) = water_cycle_state.stop_reason_code;
+            reason_code = oq_cooling::REASON_BUFFER_STOP;
+            integral = fminf(integral, 0.0f);
+          }
+
           id(oq_cooling_limited_demand) = demand;
           id(oq_cooling_limiter_reason_code) = reason_code;
           id(oq_cooling_pid_integral) = integral;
           id(oq_cooling_pid_last_error_c) = buffer_gap_c;
           id(oq_cooling_demand_raw) = demand;
-          publish_cooling_limiter_event(reason_code != 1, reason_code, demand, base_demand, dew_gap_c);
+          publish_cooling_limiter_event(reason_code != 1, reason_code, demand, base_demand, dew_gap_c, pi_zero_stop);
 
           static int last_reason = -1;
           if (reason_code != last_reason) {
@@ -1309,7 +1278,17 @@ interval:
           };
 
           auto hp_can_take_cooling_start = [&](bool is_hp1)->bool {
-            return hp_has_any_allowed_level(is_hp1) && !hp_restart_blocked(is_hp1);
+            const auto outputs =
+                id(oq_incident_manager).get_outputs(is_hp1 ? 1 : 2);
+            const int previous_applied =
+                is_hp1 ? id(hp1_last_applied_level)
+                       : id(${secondary_last_applied_level_id});
+            return oq_hp_candidate::may_serve_candidate(
+                       outputs.available_for_start,
+                       outputs.must_stop,
+                       previous_applied) &&
+                   hp_has_any_allowed_level(is_hp1) &&
+                   !hp_restart_blocked(is_hp1);
           };
 
           auto hp_restart_remaining_s = [&](bool is_hp1)->uint32_t {
@@ -1373,9 +1352,11 @@ interval:
           owner = id(oq_cooling_owner_hp);
           if (!demand_active) {
             owner = 0;
-          } else if (prev_hp1_on && !prev_hp2_on) {
+          } else if (prev_hp1_on && !prev_hp2_on &&
+                     hp1_can_start_cooling) {
             owner = 1;
-          } else if (prev_hp2_on && !prev_hp1_on) {
+          } else if (prev_hp2_on && !prev_hp1_on &&
+                     hp2_can_start_cooling) {
             owner = 2;
           } else {
             const bool owner_ok =
@@ -1423,7 +1404,9 @@ interval:
               id(oq_cooling_owner_hp),
               id(oq_duo_request_hold_until_ms),
               1);
-          owner = (f > 0) ? 1 : 0;
+          const bool hp1_can_start_cooling =
+              hp_can_take_cooling_start(true);
+          owner = (f > 0 && hp1_can_start_cooling) ? 1 : 0;
           static bool last_cooling_start_blocked = false;
           const bool cooling_start_blocked = demand_active && !hp_can_take_cooling_start(true);
           if (cooling_start_blocked != last_cooling_start_blocked) {
@@ -1434,9 +1417,37 @@ interval:
             }
             last_cooling_start_blocked = cooling_start_blocked;
           }
-          hp1_req = f;
+          hp1_req = (owner == 1) ? f : 0;
           hp2_req = 0;
           #endif
+
+          const auto hp1_hold_candidate =
+              oq_hp_candidate::candidate_state(
+                  id(oq_incident_manager).get_outputs(1),
+                  id(hp1_last_applied_level));
+          #if OQ_TOPOLOGY_DUO
+          const auto hp2_hold_candidate =
+              oq_hp_candidate::candidate_state(
+                  id(oq_incident_manager).get_outputs(2),
+                  id(${secondary_last_applied_level_id}));
+          #else
+          const oq_hp_candidate::HpCandidateState hp2_hold_candidate;
+          #endif
+          const auto suspect_topology_hold =
+              oq_hp_candidate::preserve_active_topology_during_suspect(
+                  {
+                      hp1_req,
+                      hp2_req,
+                      hp1_hold_candidate,
+                      hp2_hold_candidate,
+                      demand_active,
+                  });
+          if (suspect_topology_hold.active) {
+            hp1_req = suspect_topology_hold.hp1_level;
+            hp2_req = suspect_topology_hold.hp2_level;
+            owner = suspect_topology_hold.owner_hp;
+            id(oq_cooling_owner_hp) = owner;
+          }
 
           id(oq_P_hp_cap_w) = 0.0f;
           id(oq_P_deficit_w) = 0.0f;
@@ -1452,6 +1463,9 @@ interval:
           id(oq_strategy_requested_power_w) = NAN;
           id(oq_strategy_supply_target_temp) = id(cooling_supply_target).state;
           id(oq_strategy_heat_request_active) = (f > 0);
+          id(oq_strategy_output_valid) = !isnan(id(cooling_supply_target).state);
+          id(oq_strategy_output_source_code) = 1;
+          id(oq_strategy_output_updated_ms) = now_ms;
           id(oq_strategy_phase_text).publish_state((f > 0) ? "cool" : "idle");
 
           char debug_buf[240];

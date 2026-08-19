@@ -49,5 +49,3 @@ text_sensor:
     icon: mdi:developer-board
     entity_category: diagnostic
     update_interval: never
-    web_server:
-      sorting_group_id: oq_system_diagnostics

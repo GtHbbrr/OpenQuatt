@@ -6,7 +6,7 @@
 #   Determines the active Control Mode (CM) as central state machine and publishes the system decision to the other packages.
 #
 # Role in architecture:
-#   Single owner of Control Mode; coordinates subsystems by selecting CM (CM0/CM1/CM2/CM3/CM5/CM98/CM100).
+#   Single owner of Control Mode; coordinates subsystems by selecting CM (CM0/CM1/CM2/CM3/CM4/CM5/CM98/CM100).
 #
 # What this package DOES do:
 #   - Determines base mode (idle / heating / cooling / frost) based on demand and conditions
@@ -31,6 +31,7 @@
 #   - CM1: holding (heat demand but insufficient flow)
 #   - CM2: heating (HP only)
 #   - CM3: heating (HP + boiler auxiliary heating)
+#   - CM4: heating (boiler-only fallback after a confirmed HP incident)
 #   - CM5: cooling
 #   - CM98: frost
 #   - CM100: commissioning / service task container
@@ -68,8 +69,7 @@ globals:
   - id: oq_cm1_next_after
     type: int
     restore_value: false
-    initial_value: '0'  # 0=CM0, 2=CM2, 5=CM5, 98=CM98
-
+    initial_value: '0'  # 0=CM0, 2=CM2, 4=CM4, 5=CM5, 98=CM98
   # Flow interlock timers
   - id: oq_lowflow_since_ms
     type: uint32_t
@@ -143,7 +143,7 @@ globals:
   - id: oq_control_mode_code
     type: int
     restore_value: false
-    initial_value: '0'  # 0,1,2,3,5,98
+    initial_value: '0'  # 0,1,2,3,4,5,98,100
 
   # Attribute all electrical input from cooling preflow through postflow to the cooling session.
   - id: oq_cooling_energy_session_active
@@ -216,8 +216,6 @@ select:
     restore_value: false
     optimistic: true
     entity_category: config
-    web_server:
-      sorting_group_id: oq_control
 
   - platform: template
     id: oq_silent_mode_override
@@ -231,8 +229,6 @@ select:
     initial_option: "Schedule"
     restore_value: true
     optimistic: true
-    web_server:
-      sorting_group_id: oq_control
 
 switch:
   - platform: template
@@ -242,8 +238,20 @@ switch:
     restore_mode: RESTORE_DEFAULT_ON
     optimistic: true
     entity_category: config
-    web_server:
-      sorting_group_id: oq_control
+    on_turn_off:
+      # This switch is the installation-level boiler-present permission in
+      # the web app. Turning it off must also revoke the hidden CM4 opt-in.
+      - switch.turn_off: oq_boiler_fault_fallback_enabled
+
+  - platform: template
+    id: oq_boiler_fault_fallback_enabled
+    name: "Boiler fallback on heat-pump fault"
+    icon: mdi:shield-home
+    # Deliberately opt-in while the incident catalogue and hardware recovery
+    # behaviour are validated on real Single and Duo installations.
+    restore_mode: RESTORE_DEFAULT_OFF
+    optimistic: true
+    entity_category: config
 
   - platform: template
     id: oq_enabled
@@ -257,8 +265,6 @@ switch:
         - datetime.datetime.set:
             id: oq_openquatt_resume_at
             datetime: "2000-01-01 00:00:00"
-    web_server:
-      sorting_group_id: oq_control
 # ----------------------------
 # TUNING
 # ----------------------------
@@ -275,8 +281,6 @@ number:
     restore_value: true
     initial_value: 6
     entity_category: config
-    web_server:
-      sorting_group_id: oq_control
 
   - platform: template
     id: oq_day_max_level
@@ -289,8 +293,6 @@ number:
     restore_value: true
     initial_value: 10
     entity_category: config
-    web_server:
-      sorting_group_id: oq_control
 
   - platform: template
     id: oq_cm3_deficit_on_w
@@ -304,8 +306,6 @@ number:
     restore_value: true
     initial_value: 1000
     entity_category: config
-    web_server:
-      sorting_group_id: oq_control
 
   - platform: template
     id: oq_cm3_deficit_off_w
@@ -319,8 +319,6 @@ number:
     restore_value: true
     initial_value: 400
     entity_category: config
-    web_server:
-      sorting_group_id: oq_control
 
   - platform: template
     id: oq_low_load_dyn_off_factor
@@ -335,8 +333,6 @@ number:
     restore_value: true
     initial_value: 0.75
     entity_category: config
-    web_server:
-      sorting_group_id: oq_control
 
   - platform: template
     id: oq_low_load_dyn_on_factor
@@ -351,8 +347,6 @@ number:
     restore_value: true
     initial_value: 1.0
     entity_category: config
-    web_server:
-      sorting_group_id: oq_control
 
   - platform: template
     id: oq_low_load_min_hysteresis_w
@@ -368,8 +362,6 @@ number:
     restore_value: true
     initial_value: 200
     entity_category: config
-    web_server:
-      sorting_group_id: oq_control
 
   - platform: template
     id: oq_low_load_reentry_block_s
@@ -385,8 +377,6 @@ number:
     restore_value: true
     initial_value: 300
     entity_category: config
-    web_server:
-      sorting_group_id: oq_control
 # ----------------------------
 # SCHEDULE INPUTS
 # ----------------------------
@@ -399,8 +389,6 @@ datetime:
     restore_value: true
     initial_value: "19:00:00"
     entity_category: config
-    web_server:
-      sorting_group_id: oq_control
 
   - platform: template
     id: oq_silent_end_time
@@ -410,8 +398,6 @@ datetime:
     restore_value: true
     initial_value: "07:00:00"
     entity_category: config
-    web_server:
-      sorting_group_id: oq_control
 
   - platform: template
     id: oq_openquatt_resume_at
@@ -421,8 +407,6 @@ datetime:
     restore_value: true
     initial_value: "2000-01-01 00:00:00"
     entity_category: config
-    web_server:
-      sorting_group_id: oq_control
 # ----------------------------
 # DIAGNOSTICS
 # ----------------------------
@@ -433,8 +417,6 @@ binary_sensor:
     icon: mdi:weather-night
     device_class: running
     entity_category: diagnostic
-    web_server:
-      sorting_group_id: oq_overview
 
   - platform: template
     id: oq_sticky_active
@@ -442,8 +424,6 @@ binary_sensor:
     icon: mdi:timer-cog
     device_class: running
     entity_category: diagnostic
-    web_server:
-      sorting_group_id: oq_overview
 
   - platform: template
     id: oq_lowflow_fault_active_bs
@@ -451,8 +431,6 @@ binary_sensor:
     icon: mdi:water-alert
     device_class: problem
     entity_category: diagnostic
-    web_server:
-      sorting_group_id: oq_system_diagnostics
 
   - platform: template
     id: oq_time_valid
@@ -462,16 +440,12 @@ binary_sensor:
     icon: mdi:clock-check
     device_class: connectivity
     entity_category: diagnostic
-    web_server:
-      sorting_group_id: oq_system_diagnostics
 
 text_sensor:
   - platform: template
     id: oq_control_mode
     name: "Control Mode"
     icon: mdi:state-machine
-    web_server:
-      sorting_group_id: oq_system_diagnostics
 
   - platform: template
     id: oq_control_mode_label
@@ -479,8 +453,6 @@ text_sensor:
     icon: mdi:format-list-bulleted
     update_interval: never
     entity_category: diagnostic
-    web_server:
-      sorting_group_id: oq_overview
 
   - platform: template
     id: oq_time_now_hhmm
@@ -489,8 +461,6 @@ text_sensor:
     icon: mdi:clock-outline
     update_interval: never
     entity_category: diagnostic
-    web_server:
-      sorting_group_id: oq_system_diagnostics
 
   - platform: template
     id: oq_silent_window_hhmm
@@ -500,8 +470,6 @@ text_sensor:
     icon: mdi:calendar-clock
     update_interval: never
     entity_category: diagnostic
-    web_server:
-      sorting_group_id: oq_system_diagnostics
 
   - platform: template
     id: oq_silent_status
@@ -511,8 +479,6 @@ text_sensor:
     icon: mdi:information-outline
     update_interval: never
     entity_category: diagnostic
-    web_server:
-      sorting_group_id: oq_system_diagnostics
 
   # DEBUG-RUNTIME START: Power House low-load diagnostics
   - platform: template
@@ -523,8 +489,6 @@ text_sensor:
     update_interval: ${oq_diagnostic_update_interval_s}s
     entity_category: diagnostic
     disabled_by_default: true
-    web_server:
-      sorting_group_id: oq_system_diagnostics
     lambda: |-
       // Read the active threshold set from diagnostics.
       const float pmin = id(oq_low_load_pmin_dyn_w);
@@ -555,8 +519,6 @@ sensor:
     state_class: measurement
     accuracy_decimals: 0
     update_interval: ${oq_diagnostic_update_interval_s}s
-    web_server:
-      sorting_group_id: oq_overview
     lambda: |-
       #if OQ_TOPOLOGY_DUO
       return (float) id(oq_power_cap_f);
@@ -715,10 +677,21 @@ interval:
             if (cm == 100) return "CM100";
             if (cm == 98) return "CM98";
             if (cm == 5) return "CM5";
+            if (cm == 4) return "CM4";
             if (cm == 3) return "CM3";
             if (cm == 2) return "CM2";
             if (cm == 1) return "CM1";
             return "CM0";
+          };
+          auto cm_id_to_code = [](const std::string &cm) -> int {
+            if (cm == "CM100") return 100;
+            if (cm == "CM98") return 98;
+            if (cm == "CM5") return 5;
+            if (cm == "CM4") return 4;
+            if (cm == "CM3") return 3;
+            if (cm == "CM2") return 2;
+            if (cm == "CM1") return 1;
+            return 0;
           };
           auto cm_code_to_label = [&](int cm) -> std::string {
             const char* cm_id = cm_code_to_id(cm);
@@ -727,6 +700,7 @@ interval:
             if (strcmp(cm_id, "CM1") == 0) return std::string("CM1 - Preflow/Postflow");
             if (strcmp(cm_id, "CM2") == 0) return std::string("CM2 - Heating - Heat Pump Only");
             if (strcmp(cm_id, "CM3") == 0) return std::string("CM3 - Heating - Heat Pump + Boiler");
+            if (strcmp(cm_id, "CM4") == 0) return std::string("CM4 - Heating - Boiler Fallback");
             if (strcmp(cm_id, "CM5") == 0) return std::string("CM5 - Cooling");
             if (strcmp(cm_id, "CM98") == 0) return std::string("CM98 - Anti-Freeze Protection - Water Circulation");
             return std::string("Unknown");
@@ -755,6 +729,7 @@ interval:
               id(cooling_permitted_core).has_state() && id(cooling_permitted_core).state;
           const bool cooling_req = cooling_req_raw && openquatt_enabled;
           const bool power_house_active = (strategy_active_code == 3);
+          const bool heating_curve_active = (strategy_active_code == 2);
 
           const int hp1_lvl = id(hp1_last_applied_level);
           const int hp1_cmd_lvl =
@@ -1107,16 +1082,23 @@ interval:
           const char* cur_cm = id(oq_control_mode).state.c_str();
           std::string cm_transition_reason = "control decision updated";
           uint8_t cm1_event_reason = openquatt_decision_log::REASON_UNKNOWN;
+          oq_hp_fallback::FallbackDecision fallback_decision;
+          bool fallback_requested = false;
+          bool no_hp_available_confirmed = false;
+          bool cm3_fallback_handover_wait = false;
+          static oq_hp_supervisory::Cm4ResumeTracker
+              cm4_resume_tracker;
           auto resolve_desired_cm = [&]() -> int {
             // Helper: start CM1 window
             auto start_cm1 = [&](int next_after)->void {
               id(oq_cm1_until_ms) = now_ms + prepost_ms;
-              id(oq_cm1_next_after) = next_after; // 0=CM0, 2=CM2, 5=CM5, 98=CM98
+              id(oq_cm1_next_after) = next_after; // 0=CM0, 2=CM2, 4=CM4, 5=CM5, 98=CM98
               cm1_event_reason = (next_after == 0)
                   ? openquatt_decision_log::REASON_FLOW_POSTFLOW
                   : openquatt_decision_log::REASON_FLOW_PREFLOW;
               cm_transition_reason =
                   (next_after == 2) ? "pre/postflow hold for heating" :
+                  (next_after == 4) ? "preflow hold for boiler fallback" :
                   (next_after == 5) ? "pre/postflow hold for cooling" :
                   (next_after == 98) ? "pre/postflow hold for frost" :
                   "postflow hold for standby";
@@ -1168,6 +1150,83 @@ interval:
               }
             }
 
+            const bool commissioning_in_progress =
+                id(oq_commissioning_request_pending) || id(oq_commissioning_active);
+            const int current_cm_code =
+                cm_id_to_code(std::string(cur_cm));
+            const uint8_t available_hp_count =
+                id(oq_incident_manager).available_hp_count();
+            const bool raw_availability_complete =
+                id(oq_incident_manager).availability_complete();
+            const bool every_unavailable_hp_allows_fallback =
+                id(oq_incident_manager).all_unavailable_hps_allow_fallback();
+            const bool fallback_outputs_safe =
+                id(oq_incident_manager).all_fallback_outputs_safe();
+            const bool fallback_opentherm_selected =
+                id(oq_boiler_connection).has_state() &&
+                id(oq_boiler_connection).current_option() == "OpenTherm";
+            const bool fallback_transport_available =
+                oq_boiler::transport_available_for_selection(
+                    !id(oq_runtime_polling_paused).state &&
+                        !id(oq_boiler_runtime_pause_state),
+                    fallback_opentherm_selected,
+                    ${oq_otb_supported},
+                    id(oq_otb_link_available_state),
+                    id(oq_otb_startup_probe_active),
+                    id(oq_boiler_connection_mismatch_state));
+            const bool fallback_transport_settled =
+                oq_boiler::settle_period_elapsed(
+                    id(oq_boiler_transport_settle_required),
+                    now_ms,
+                    id(oq_boiler_transport_change_ms),
+                    (uint32_t) (${oq_boiler_transport_settle_s} * 1000UL));
+            oq_hp_supervisory::FallbackEvaluationInputs fallback_inputs;
+            fallback_inputs.current_mode = current_cm_code;
+            fallback_inputs.heating_demand = heating_req;
+            fallback_inputs.fallback_enabled =
+                id(oq_boiler_assist_enabled).state &&
+                id(oq_boiler_fault_fallback_enabled).state;
+            fallback_inputs.available_hp_count = available_hp_count;
+            fallback_inputs.raw_availability_complete =
+                raw_availability_complete;
+            fallback_inputs.every_unavailable_hp_has_fallback_cause =
+                every_unavailable_hp_allows_fallback;
+            fallback_inputs.all_hp_outputs_safe = fallback_outputs_safe;
+            fallback_inputs.flow_valid = flow_valid;
+            fallback_inputs.flow_sufficient =
+                flow_ok && !id(oq_lowflow_fault_active);
+            fallback_inputs.supply_temperature_valid =
+                !isnan(id(water_supply_temp_selected).state);
+            fallback_inputs.boiler_guards_clear =
+                !id(oq_water_temp_boiler_inhibit_active) &&
+                !id(oq_water_temp_hard_trip_active) &&
+                fallback_transport_available &&
+                fallback_transport_settled;
+            fallback_inputs.cooling_active = cooling_req;
+            fallback_inputs.frost_active = frost;
+            fallback_inputs.commissioning_active = commissioning_in_progress;
+            fallback_inputs.override_active = override_mode != 0;
+            const auto fallback_evaluation =
+                oq_hp_supervisory::evaluate_fallback(fallback_inputs);
+            fallback_decision = fallback_evaluation.decision;
+            no_hp_available_confirmed =
+                fallback_evaluation.no_hp_available_confirmed;
+            fallback_requested = fallback_evaluation.fallback_requested;
+            cm3_fallback_handover_wait =
+                fallback_evaluation.cm3_handover_wait;
+            cm4_resume_tracker.observe_fallback_request(
+                fallback_requested, current_cm_code);
+
+            if (!cooling_req && heating_req) {
+              if (fallback_decision.cm4_allowed) {
+                base_target = 4;
+              } else if (no_hp_available_confirmed) {
+                // Includes temporary protections without an allowed fallback
+                // cause: keep circulation but do not pretend CM2 is available.
+                base_target = 1;
+              }
+            }
+
             int desired_local = 0;
             if (override_mode != 0) {
               // Clear transition timers to avoid surprises when returning to Auto
@@ -1186,8 +1245,6 @@ interval:
                 cm_transition_reason = "supervisory override: Force CM98";
               }
             } else {
-              const bool commissioning_in_progress =
-                  id(oq_commissioning_request_pending) || id(oq_commissioning_active);
               if (commissioning_in_progress) {
                 id(oq_cm1_until_ms) = 0;
                 id(oq_cm1_next_after) = 0;
@@ -1209,10 +1266,20 @@ interval:
 
                   // 2) If we're in CM1 and timer just expired -> advance to next_after
                   } else if (cm1_timer_expired && strcmp(cur_cm, "CM1") == 0) {
-                    if (cm1_next_after == 2) {
+                    if (heating_req && base_target == 4 &&
+                        fallback_decision.cm4_allowed) {
+                      desired_local = 4;
+                    } else if (heating_req && no_hp_available_confirmed &&
+                               base_target == 1) {
+                      desired_local = 1;
+                    } else if (cm1_next_after == 2) {
                       if (heating_req && base_target == 2) desired_local = 2;
                       else if (base_target == 98)          desired_local = 98;
                       else                                 desired_local = 0;
+                    } else if (cm1_next_after == 4) {
+                      // Never advance on timer state alone: all incident,
+                      // stop-confirmation, flow and boiler guards are fresh.
+                      desired_local = 1;
                     } else if (cm1_next_after == 5) {
                       if (cooling_req && base_target == 5) desired_local = 5;
                       else if (base_target == 98)          desired_local = 98;
@@ -1235,6 +1302,7 @@ interval:
 
                     cm_transition_reason =
                         (desired_local == 2) ? "CM1 hold expired -> heating" :
+                        (desired_local == 4) ? "CM1 hold expired -> boiler fallback" :
                         (desired_local == 5) ? "CM1 hold expired -> cooling" :
                         (desired_local == 98) ? "CM1 hold expired -> frost" :
                         "CM1 hold expired -> standby";
@@ -1271,26 +1339,31 @@ interval:
                     cm_transition_reason = "cooling request held by flow interlock";
                   }
                 } else if (heating_req) {
-                  if (base_target == 2) {
-                    // Keep active heating transitions inside the heating states. CM3 -> CM2
-                    // should not force an artificial CM1 detour that drops compressor requests.
-                    if (strcmp(cur_cm, "CM2") == 0 || strcmp(cur_cm, "CM3") == 0) {
-                      desired_local = 2;
-                      cm_transition_reason = "heating already active";
-                    } else {
-                      start_cm1(2);
-                      desired_local = 1;
-                      cm_transition_reason = "heating request waiting for CM1 hold";
-                    }
-                  } else {
-                    desired_local = 1; // flow interlock holding state
+                  const auto heating_mode =
+                      oq_hp_supervisory::decide_heating_mode({
+                          current_cm_code,
+                          base_target,
+                          cm3_fallback_handover_wait,
+                          cm4_resume_tracker.resume_mode(),
+                          available_hp_count > 0,
+                          power_house_active,
+                          id(oq_boiler_assist_enabled).state,
+                      });
+                  if (heating_mode.start_cm1_for_mode >= 0) {
+                    start_cm1(heating_mode.start_cm1_for_mode);
+                  }
+                  desired_local = heating_mode.desired_mode;
+                  cm_transition_reason = heating_mode.transition_reason;
+                  if (heating_mode.flow_interlock_hold) {
                     cm1_event_reason = id(oq_lowflow_fault_active)
                         ? openquatt_decision_log::REASON_FLOW_TOO_LOW
                         : openquatt_decision_log::REASON_FLOW_PREFLOW;
-                    cm_transition_reason = "heating request held by flow interlock";
                   }
                 } else {
-                  if (strcmp(cur_cm, "CM2") == 0 || strcmp(cur_cm, "CM5") == 0) {
+                  if (strcmp(cur_cm, "CM2") == 0 ||
+                      strcmp(cur_cm, "CM3") == 0 ||
+                      strcmp(cur_cm, "CM4") == 0 ||
+                      strcmp(cur_cm, "CM5") == 0) {
                     start_cm1(0); // postflow to CM0
                     desired_local = 1;
                     cm_transition_reason = "postflow before standby";
@@ -1307,23 +1380,70 @@ interval:
                     desired_local = 1;
                   }
 
-              // CM3 (boiler assist) is a Power House-only feature and only applies
-              // when the installation has explicit boiler/CV assist enabled.
+              // CM3 is the sole boiler-assist owner for both heating strategies.
+              // Transport selection affects availability, never strategy intent.
               const int cm_now =
+                  (strcmp(cur_cm, "CM4") == 0) ? 4 :
                   (strcmp(cur_cm, "CM3") == 0) ? 3 :
                   (strcmp(cur_cm, "CM2") == 0) ? 2 :
                   (strcmp(cur_cm, "CM5") == 0) ? 5 :
                   (strcmp(cur_cm, "CM1") == 0) ? 1 :
                   (strcmp(cur_cm, "CM98") == 0) ? 98 : 0;
               const bool boiler_assist_enabled = id(oq_boiler_assist_enabled).state;
-              if (power_house_active && boiler_assist_enabled) {
-                // CM3 (boiler assist) auto-switching
-                // Promote/Demote: deficit-based (thermal deficit) + timers/hysteresis
-                const float deficit_w = id(oq_P_deficit_w);
-                const float on_th = id(oq_cm3_deficit_on_w).state;
-                const float off_th = id(oq_cm3_deficit_off_w).state;
-                const bool need_on = (!isnan(deficit_w) && deficit_w >= on_th);
-                const bool ok_off  = (isnan(deficit_w) || deficit_w <= off_th);
+              const bool opentherm_selected =
+                  id(oq_boiler_connection).has_state() &&
+                  id(oq_boiler_connection).current_option() == "OpenTherm";
+              const bool boiler_transport_available =
+                  !opentherm_selected ||
+                  (${oq_otb_supported} && id(oq_otb_link_available_state));
+              const bool strategy_output_current =
+                  oq_boiler::strategy_output_is_current(
+                      id(oq_strategy_output_valid),
+                      id(oq_strategy_output_source_code),
+                      (uint8_t) strategy_active_code,
+                      id(oq_strategy_output_updated_ms));
+              const float rated_boiler_w = id(oq_boiler_rated_heat_power).state;
+              const bool boiler_strategy_command_available =
+                  strategy_output_current &&
+                  (!power_house_active ||
+                   (!isnan(id(oq_strategy_requested_power_w)) &&
+                    !isnan(id(oq_strategy_hp_expected_power_w)) &&
+                    !isnan(rated_boiler_w) &&
+                    rated_boiler_w > 0.0f));
+              const bool boiler_assist_available =
+                  boiler_assist_enabled &&
+                  boiler_transport_available &&
+                  boiler_strategy_command_available;
+              if (heating_strategy_active && boiler_assist_available &&
+                  !fallback_requested && !no_hp_available_confirmed) {
+                bool need_on = false;
+                bool ok_off = true;
+                const char *promote_reason = "boiler assist promoted to CM3";
+                const char *demote_reason = "boiler assist cleared, demoting to CM2";
+
+                if (power_house_active) {
+                  const auto assist = oq_boiler::power_house_assist(
+                      id(oq_P_deficit_w),
+                      id(oq_cm3_deficit_on_w).state,
+                      id(oq_cm3_deficit_off_w).state);
+                  need_on = assist.need_on;
+                  ok_off = assist.okay_off;
+                  promote_reason = "power-house deficit promoted to CM3";
+                  demote_reason = "power-house deficit cleared, demoting to CM2";
+                } else if (heating_curve_active) {
+                  const auto assist = oq_boiler::heating_curve_assist(
+                      heating_req,
+                      id(oq_strategy_hp_saturated),
+                      id(oq_strategy_supply_target_temp),
+                      id(oq_system_supply_temp).state,
+                      ${oq_cm3_curve_on_delta_c},
+                      ${oq_cm3_curve_off_delta_c});
+                  need_on = assist.need_on;
+                  ok_off = assist.okay_off;
+                  promote_reason = "heating-curve saturation promoted to CM3";
+                  demote_reason = "heating-curve target recovered, demoting to CM2";
+                }
+
                 const uint32_t T_ON_MS = (uint32_t)(${oq_cm3_promote_s}UL * 1000UL);
                 const uint32_t T_OFF_MS = (uint32_t)(${oq_cm3_demote_s}UL * 1000UL);
                 const uint32_t MIN_CM3_MS = (uint32_t)(${oq_cm3_min_run_s}UL * 1000UL);
@@ -1335,23 +1455,39 @@ interval:
                       if (id(oq_cm3_need_since_ms) == 0) id(oq_cm3_need_since_ms) = now_ms;
                       if (now_ms - id(oq_cm3_need_since_ms) >= T_ON_MS) {
                         desired_local = 3;
-                        cm_transition_reason = "power-house deficit promoted to CM3";
+                        id(oq_cm3_need_since_ms) = 0;
+                        id(oq_cm3_demote_since_ms) = 0;
+                        cm_transition_reason = promote_reason;
                       }
                     } else {
                       id(oq_cm3_need_since_ms) = 0;
                     }
                   }
                 } else if (cm_now == 3) {
-                  if (now_ms - id(oq_cm_last_change_ms) >= MIN_CM3_MS) {
+                  const bool minimum_run_elapsed =
+                      now_ms - id(oq_cm_last_change_ms) >= MIN_CM3_MS;
+                  bool demote_confirmation_elapsed = false;
+                  if (minimum_run_elapsed) {
                     if (ok_off) {
                       if (id(oq_cm3_demote_since_ms) == 0) id(oq_cm3_demote_since_ms) = now_ms;
-                      if (now_ms - id(oq_cm3_demote_since_ms) >= T_OFF_MS) {
-                        desired_local = 2;
-                        cm_transition_reason = "power-house deficit cleared, demoting to CM2";
-                      }
+                      demote_confirmation_elapsed =
+                          now_ms - id(oq_cm3_demote_since_ms) >= T_OFF_MS;
                     } else {
                       id(oq_cm3_demote_since_ms) = 0;
                     }
+                  } else {
+                    id(oq_cm3_demote_since_ms) = 0;
+                  }
+                  if (oq_boiler::cm3_should_hold(
+                          minimum_run_elapsed,
+                          ok_off,
+                          demote_confirmation_elapsed)) {
+                    desired_local = 3;
+                  } else {
+                    desired_local = 2;
+                    id(oq_cm3_need_since_ms) = 0;
+                    id(oq_cm3_demote_since_ms) = 0;
+                    cm_transition_reason = demote_reason;
                   }
                 } else {
                   id(oq_cm3_need_since_ms) = 0;
@@ -1360,20 +1496,75 @@ interval:
               } else {
                 id(oq_cm3_need_since_ms) = 0;
                 id(oq_cm3_demote_since_ms) = 0;
-                if (cm_now == 3 && heating_req && base_target == 2) {
+                if (cm_now == 3 && heating_req && base_target == 2 &&
+                    !cm3_fallback_handover_wait) {
                   desired_local = 2;
-                  cm_transition_reason = boiler_assist_enabled
-                      ? "Power House assist disabled, returning to CM2"
-                      : "boiler/CV assist disabled, returning to CM2";
+                  if (!boiler_assist_enabled) {
+                    cm_transition_reason = "boiler/CV assist disabled, returning to CM2";
+                  } else if (!boiler_transport_available) {
+                    cm_transition_reason = "selected boiler transport unavailable, returning to CM2";
+                  } else {
+                    cm_transition_reason = "heating strategy unavailable for boiler assist, returning to CM2";
+                  }
                 }
               }
               }
             }
+            cm4_resume_tracker.finish_after_decision(
+                heating_req,
+                cooling_req || frost || commissioning_in_progress ||
+                    override_mode != 0,
+                fallback_requested,
+                available_hp_count > 0);
             return desired_local;
           };
           const int desired = resolve_desired_cm();
           const char* desired_cm = cm_code_to_id(desired);
+          const bool next_mode_owns_boiler =
+              desired == 3 || desired == 4 ||
+              (desired == 100 &&
+               id(oq_commissioning_active) &&
+               id(oq_commissioning_task_code) ==
+                   oq_commissioning::TASK_BOILER_POWER_TEST);
+          const bool current_mode_owns_boiler =
+              strcmp(cur_cm, "CM3") == 0 ||
+              strcmp(cur_cm, "CM4") == 0 ||
+              (strcmp(cur_cm, "CM100") == 0 &&
+               (id(oq_boiler_command_source_code) ==
+                    oq_boiler::COMMAND_SOURCE_COMMISSIONING ||
+                id(oq_boiler_output_request)));
+          if (!next_mode_owns_boiler &&
+              (current_mode_owns_boiler || id(oq_boiler_output_request))) {
+            // Withdraw at the ownership edge itself. The staggered dispatcher
+            // must not leave R1 or OpenTherm honoring the previous mode for up
+            // to another boiler-control cadence.
+            id(oq_boiler_command_valid) = false;
+            id(oq_boiler_command_demand_present) = false;
+            id(oq_boiler_command_heat_request) = false;
+            id(oq_boiler_command_requested_power_w) = NAN;
+            id(oq_boiler_command_target_temperature_c) = NAN;
+            id(oq_boiler_command_source_code) =
+                oq_boiler::COMMAND_SOURCE_NONE;
+            id(oq_boiler_command_updated_ms) = now_ms;
+            if (id(oq_boiler_output_request)) {
+              id(oq_boiler_output_last_change_ms) = now_ms;
+            }
+            id(oq_boiler_output_request) = false;
+            id(oq_boiler_output_target_temperature_c) = NAN;
+            id(oq_boiler_transport_active) = false;
+            id(oq_boiler_block_reason_code) =
+                oq_boiler::BLOCK_NO_HEAT_REQUEST;
+            id(boiler_relay).turn_off();
+            ${oq_boiler_transport_shutdown_extra}
+          }
           id(oq_control_mode_code) = desired;
+          id(oq_incident_manager).set_fallback_status(
+              fallback_requested,
+              desired == 4,
+              fallback_requested
+                  ? static_cast<uint8_t>(fallback_decision.block_reason)
+                  : static_cast<uint8_t>(
+                        oq_hp_fallback::FallbackBlockReason::NONE));
           const bool cooling_preflow =
               desired == 1 && (cooling_req || id(oq_cm1_next_after) == 5);
           if (desired == 5 || cooling_preflow) {
@@ -1387,6 +1578,7 @@ interval:
           // -------------------------------------------------
           static uint32_t cm1_hold_started_ms = 0;
           static uint8_t cm1_hold_reason = openquatt_decision_log::REASON_UNKNOWN;
+          static bool cm_event_baseline_ready = false;
           // A normal preflow can turn into a real low-flow block while CM1 remains
           // active. Preserve that promotion so the eventual clear event explains
           // that a start blockade was lifted instead of reporting a normal preflow.
@@ -1397,11 +1589,63 @@ interval:
           }
           if (id(oq_control_mode).state != desired_cm) {
             const std::string previous_cm = id(oq_control_mode).state;
+            const int previous_cm_code = cm_id_to_code(previous_cm);
             id(oq_control_mode).publish_state(desired_cm);
             ESP_LOGI("supervisory", "ControlMode transition: %s -> %s (%s)",
                      previous_cm.empty() ? "(unset)" : previous_cm.c_str(),
                      desired_cm,
                      cm_transition_reason.c_str());
+            if (cm_event_baseline_ready && !previous_cm.empty()) {
+              static const oq_hp_supervisory::ControlModeLogCodes
+                  log_codes{
+                      {
+                          openquatt_decision_log::REASON_UNKNOWN,
+                          openquatt_decision_log::REASON_BOILER_FALLBACK,
+                          openquatt_decision_log::REASON_HP_RECOVERED,
+                          openquatt_decision_log::REASON_FALLBACK_BLOCKED,
+                          openquatt_decision_log::REASON_COMMISSIONING,
+                          openquatt_decision_log::REASON_SUPERVISORY_OVERRIDE,
+                          openquatt_decision_log::REASON_FROST_PROTECTION,
+                          openquatt_decision_log::REASON_COOLING_REQUEST,
+                          openquatt_decision_log::REASON_HEATING_REQUEST,
+                          openquatt_decision_log::REASON_COOLING_REQUEST_CLEARED,
+                          openquatt_decision_log::REASON_HEATING_REQUEST_CLEARED,
+                          openquatt_decision_log::REASON_HP_RECOVERY_WAIT,
+                      },
+                      {
+                          openquatt_decision_log::SEVERITY_NORMAL,
+                          openquatt_decision_log::SEVERITY_LIMITED,
+                          openquatt_decision_log::SEVERITY_FAULT,
+                      },
+                      {
+                          openquatt_decision_log::STATE_IDLE,
+                          openquatt_decision_log::STATE_STANDBY,
+                          openquatt_decision_log::STATE_ACTIVE,
+                          openquatt_decision_log::STATE_FALLBACK,
+                      },
+                  };
+              const auto transition_log =
+                  oq_hp_supervisory::classify_control_mode_transition(
+                      {
+                          previous_cm_code,
+                          desired,
+                          fallback_requested,
+                          cm_transition_reason.rfind(
+                              "supervisory override", 0) == 0,
+                          cm1_event_reason,
+                      },
+                      log_codes);
+              id(oq_decision_log).emit(
+                  openquatt_decision_log::EVENT_CONTROL_MODE_CHANGE,
+                  openquatt_decision_log::SUBJECT_SYSTEM,
+                  transition_log.reason,
+                  transition_log.severity,
+                  (uint8_t) desired,
+                  transition_log.from_state,
+                  transition_log.to_state,
+                  (int16_t) previous_cm_code,
+                  (int16_t) desired);
+            }
             // DEBUG-RUNTIME: anchor CM dwell timers on actual mode transitions.
             id(oq_cm_last_change_ms) = now_ms;
             if (desired == 2) {
@@ -1487,6 +1731,7 @@ interval:
                 duration_s);
             }
           }
+          cm_event_baseline_ready = true;
           static std::string last_control_mode_label;
           publish_text_if_changed(id(oq_control_mode_label), cm_code_to_label(desired), last_control_mode_label);
 

@@ -9,7 +9,7 @@ import { state } from "../core/state.js";
 import { clearLegacyMotionVariables, startMotionLoop, stopMotionLoop } from "../core/motion.js";
 import { bindHeaderDevControls, syncNativeVisibility } from "../core/runtime.js";
 import { renderDeviceReconnectModal, renderUpdateModal } from "../features/firmware-update.js";
-import { getDeviceVersionLabel, getHeaderRenderSignature, renderDevPanel, renderHeaderStatus, renderNativeSurfaceShell, renderSystemModal } from "../features/header-status.js";
+import { getDeviceVersionLabel, getHeaderRenderSignature, renderControlModeOverrideBanner, renderDevPanel, renderHeaderStatus, renderNativeSurfaceShell, renderSystemModal } from "../features/header-status.js";
 import { getMqttSensorsModalRenderSignature } from "../features/mqtt-actions.js";
 import { updateMqttState } from "../core/feature-state.js";
 import { captureQuickStartScrollState, queueQuickStartScrollRestore, renderQuickStartModal } from "../features/quickstart.js";
@@ -60,6 +60,8 @@ export function renderSettingsView() {
         <p class="oq-helper-label">Instellingen</p>
         <h2 class="oq-helper-section-title">Kies een onderdeel</h2>
         <p class="oq-helper-section-copy">Werk installatie, service, regeling, koeling en systeem apart bij. Wijzigingen worden direct toegepast.</p>
+        ${state.controlError ? `<p class="oq-helper-error" role="alert">${escapeHtml(state.controlError)}</p>` : ""}
+        ${state.controlNotice ? `<p class="oq-helper-notice" role="status">${escapeHtml(state.controlNotice)}</p>` : ""}
         ${renderSettingsGroupNav()}
         ${renderSettingsGroupContent()}
       </section>
@@ -217,6 +219,8 @@ export function renderSettingsView() {
 
     const focusedSettingsField = captureFocusedSettingsField();
     const modalContinuity = captureModalContinuity(state.root);
+    const oduEepromLauncher = state.root.querySelector('[data-oq-action="open-odu-eeprom-dump-modal"]');
+    const oduEepromLauncherFocused = oduEepromLauncher === document.activeElement;
 
     const webServerLogScrollState = state.systemModal === "webserver-logs"
       ? captureWebServerLogScrollState()
@@ -289,6 +293,7 @@ export function renderSettingsView() {
             ${renderHeaderStatus()}
           </div>
       ${renderAppNav()}
+      ${renderControlModeOverrideBanner()}
       ${mainContent}
       ${renderPoweredByFooter()}
         </div>
@@ -298,6 +303,11 @@ export function renderSettingsView() {
       ${renderSystemModal()}
       ${renderDeviceReconnectModal()}
     `;
+    const replacementOduEepromLauncher = state.root.querySelector('[data-oq-action="open-odu-eeprom-dump-modal"]');
+    if (oduEepromLauncher && replacementOduEepromLauncher) {
+      replacementOduEepromLauncher.replaceWith(oduEepromLauncher);
+      if (oduEepromLauncherFocused) oduEepromLauncher.focus({ preventScroll: true });
+    }
     syncModalFocus(state.root);
     restoreModalContinuity(state.root, modalContinuity);
     restoreFocusedSettingsField(focusedSettingsField);

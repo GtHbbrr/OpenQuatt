@@ -60,8 +60,6 @@ number:
     optimistic: true
     initial_value: 60
     entity_category: config
-    web_server:
-      sorting_group_id: oq_heating_strategy
 
 sensor:
   # Shared abstractions and derived telemetry.
@@ -75,24 +73,13 @@ sensor:
     state_class: measurement
     accuracy_decimals: 1
     update_interval: 5s
-    web_server:
-      sorting_group_id: oq_temperatures
     lambda: |-
-      // Prefer: selected supply source (water_supply_temp_selected). Fallback: HP2 / HP1 water_out.
-      float supply_c = NAN;
+      // The selected supply signal owns source validity and topology fallback.
       if (id(water_supply_temp_selected).has_state()) {
         const float selected_supply_c = id(water_supply_temp_selected).state;
-        if (!isnan(selected_supply_c)) supply_c = selected_supply_c;
+        if (!isnan(selected_supply_c)) return selected_supply_c;
       }
-      if (isnan(supply_c)) {
-        const float hp2_out_c = id(${secondary_water_out_temp_id}).state;
-        if (!isnan(hp2_out_c)) supply_c = hp2_out_c;
-      }
-      if (isnan(supply_c)) {
-        const float hp1_out_c = id(hp1_water_out_temp).state;
-        if (!isnan(hp1_out_c)) supply_c = hp1_out_c;
-      }
-      return supply_c;
+      return NAN;
 
 # ----------------------------
 # INTERVAL (5s)

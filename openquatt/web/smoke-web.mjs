@@ -18,6 +18,7 @@ const boundaryAllowedEdges = new Set([
   "core/entity-actions.js -> features/firmware-actions.js",
   "core/entity-actions.js -> features/firmware-update.js",
   "core/entity-actions.js -> features/mqtt-actions.js",
+  "core/entity-actions.js -> features/odu-eeprom-dump.js",
   "core/entity-actions.js -> features/quickstart-ui-actions.js",
   "core/entity-actions.js -> features/security-actions.js",
   "core/entity-actions.js -> features/shell-actions.js",
@@ -28,6 +29,7 @@ const boundaryAllowedEdges = new Set([
   "core/entity-actions.js -> settings/installation.js",
   "core/entity-actions.js -> views/energy.js",
   "core/entity-sync.js -> features/mqtt-actions.js",
+  "core/entity-sync.js -> features/odu-eeprom-dump.js",
   "core/entity-sync.js -> features/security-actions.js",
   "core/entity-write-actions.js -> features/firmware-update.js",
   "core/entity-write-actions.js -> features/security-actions.js",
@@ -376,6 +378,7 @@ async function checkStateSliceContracts() {
 
 async function checkMockFixtureContracts() {
   const scenarioSource = await readFile(path.join(webDir, "js/mock-scenarios.js"), "utf8");
+  const incidentScenarioSource = await readFile(path.join(webDir, "js/mock-incident-scenarios.js"), "utf8");
   const fixtureSource = await readFile(path.join(webDir, "js/mock-fixtures.js"), "utf8");
   const mockSource = await readFile(path.join(webDir, "js/mock-device.js"), "utf8");
   const buildSource = await readFile(path.join(webDir, "build-assets.mjs"), "utf8");
@@ -385,13 +388,18 @@ async function checkMockFixtureContracts() {
   const entityDefinitions = Object.values(configModule.ENTITY_DEFS).map(({ domain, name }) => [domain, name]);
   const context = { window: { __OQ_MOCK_ENTITY_DEFS__: Object.freeze(entityDefinitions) } };
   vm.runInNewContext(scenarioSource, context, { filename: "mock-scenarios.js" });
+  vm.runInNewContext(incidentScenarioSource, context, { filename: "mock-incident-scenarios.js" });
   vm.runInNewContext(fixtureSource, context, { filename: "mock-fixtures.js" });
   const fixtures = context.window.__OQ_MOCK_FIXTURES__;
+  const incidentScenarios = context.window.__OQ_MOCK_INCIDENT_SCENARIOS__;
   if (!entityDefinitions || entityDefinitions.length < 300) {
     throw new Error("Generated mock entity definitions are incomplete");
   }
   if (!fixtures || fixtures.hp2Entities.length < 30 || fixtures.devControlOptions.scenario.length < 10) {
     throw new Error("Mock fixtures are incomplete");
+  }
+  if (!incidentScenarios || incidentScenarios.scenarios.length < 10) {
+    throw new Error("Heat-pump incident mock scenarios are incomplete");
   }
   assertContains(buildSource, "ENTITY_DEFS", "Canonical mock entity source");
   assertContains(mockSource, "__OQ_MOCK_ENTITY_DEFS__", "Generated mock entity definitions");
@@ -408,9 +416,12 @@ async function checkMockFixtureContracts() {
     "Usage telemetry mock persisted choice",
   );
   assertContains(mockSource, "mockFixtures.hp2Entities", "HP2 mock fixtures");
+  assertContains(mockSource, 'url.pathname.endsWith("/openquatt/incidents")', "Incident snapshot mock endpoint");
+  assertContains(mockSource, "collectEvents", "Incident decision-log synchronization");
   assertContains(mockSource, 'renderDevControlOptions("scenario")', "Scenario control fixtures");
   const scriptOrder = [
     "mock-scenarios.js",
+    "mock-incident-scenarios.js",
     "mock-entity-defs.js",
     "mock-fixtures.js",
     "mock-device.js",
@@ -424,6 +435,7 @@ async function checkMockFixtureContracts() {
 async function checkPreviewAssetsAvailable() {
   for (const relativePath of [
     "js/mock-entity-defs.js",
+    "js/mock-incident-scenarios.js",
     "js/openquatt-preview.js",
     "css/openquatt-preview.css",
   ]) {
@@ -445,6 +457,7 @@ async function checkPagesDemoContracts() {
   for (const relativePath of [
     "css/openquatt-preview.css",
     "js/mock-scenarios.js",
+    "js/mock-incident-scenarios.js",
     "js/mock-entity-defs.js",
     "js/mock-fixtures.js",
     "js/mock-device.js",

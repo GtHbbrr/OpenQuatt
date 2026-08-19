@@ -301,47 +301,34 @@ interval:
             last_reason = reason;
           };
 
-          auto set_mode = [&](bool is_hp1, bool active) {
+          auto requested_mode_code_for_hp = [&](bool is_hp1, bool active)->int {
             int mode_code = (active && request_thermal_active) ? request_mode_code : 0;
             if (manual_hp_service_active && id(oq_manual_hp_mode_allowed)) {
               const int selected_manual_mode =
                   is_hp1 ? id(oq_manual_hp1_mode_code) : id(oq_manual_hp2_mode_code);
               if (selected_manual_mode > 0) mode_code = selected_manual_mode;
             }
+            return mode_code;
+          };
+
+          auto set_mode = [&](bool is_hp1, bool active, bool force_write) {
+            const int mode_code = requested_mode_code_for_hp(is_hp1, active);
             const char* opt = oq_request::request_mode_option(mode_code);
             if (is_hp1) {
-              if (id(hp1_set_working_mode).current_option() != opt) {
+              if (force_write ||
+                  id(hp1_set_working_mode).current_option() != opt) {
                 auto c = id(hp1_set_working_mode).make_call();
                 c.set_option(opt);
                 c.perform();
               }
             } else {
-              if (id(${secondary_set_working_mode_id}).current_option() != opt) {
+              if (force_write ||
+                  id(${secondary_set_working_mode_id}).current_option() != opt) {
                 auto c = id(${secondary_set_working_mode_id}).make_call();
                 c.set_option(opt);
                 c.perform();
               }
             }
-          };
-
-          auto mode_is_active_thermal = [&](bool is_hp1)->bool {
-            const float mode_raw = is_hp1 ? id(hp1_working_mode).state : id(${secondary_working_mode_id}).state;
-            if (isnan(mode_raw)) return false;
-            return request_thermal_active && oq_request::thermal_mode_matches(mode_raw, request_mode_code);
-          };
-
-          auto mode_target_is_active_thermal = [&](bool is_hp1)->bool {
-            if (!request_thermal_active) return false;
-            if (is_hp1) {
-              return oq_request::target_option_matches_mode(
-                  id(hp1_set_working_mode).has_state(),
-                  id(hp1_set_working_mode).current_option(),
-                  request_mode_code);
-            }
-            return oq_request::target_option_matches_mode(
-                id(${secondary_set_working_mode_id}).has_state(),
-                id(${secondary_set_working_mode_id}).current_option(),
-                request_mode_code);
           };
 
           // Note: options must exactly match the options map in oq_HP_io.yaml (levels 0..10)
@@ -350,15 +337,66 @@ interval:
           std::string hp2_service_guard = "Vrijgegeven";
           static bool last_hp1_defrost_hold = false;
           static bool last_hp2_defrost_hold = false;
+          static uint32_t last_hp1_safe_stop_write_ms = 0U;
+          static uint32_t last_hp2_safe_stop_write_ms = 0U;
 
           auto apply_level = [&](bool is_hp1, int req_level)->int {
             req_level = std::max(min_level, std::min(max_level, req_level));
             const int requested_level = req_level;
             const int prev_applied = is_hp1 ? id(hp1_last_applied_level) : id(${secondary_last_applied_level_id});
-            const int retained_level = defrost_stop_hold_level(is_hp1);
+            const uint8_t hp_index = is_hp1 ? 1U : 2U;
+            const auto incident_outputs =
+                id(oq_incident_manager).get_outputs(hp_index);
+            uint32_t &last_safe_stop_write_ms =
+                is_hp1 ? last_hp1_safe_stop_write_ms
+                       : last_hp2_safe_stop_write_ms;
+            const bool stop_confirmation_pending =
+                incident_outputs.run_state ==
+                    oq_incidents::RunState::STOPPING ||
+                incident_outputs.run_state ==
+                    oq_incidents::RunState::STOP_UNCONFIRMED;
+            const bool force_safe_stop_write =
+                oq_incident_actuator::safe_stop_write_retry_due(
+                    stop_confirmation_pending,
+                    now_ms,
+                    last_safe_stop_write_ms,
+                    10000U);
+            const auto incident_guard = oq_incident_actuator::decide(
+                oq_incident_actuator::Inputs{
+                    req_level,
+                    prev_applied,
+                    incident_outputs.available_for_start,
+                    incident_outputs.must_stop,
+                });
+            req_level = incident_guard.guarded_level;
+            const int retained_level =
+                incident_guard.bypass_runtime_and_defrost_holds
+                    ? 0
+                    : defrost_stop_hold_level(is_hp1);
             std::string block_reason;
             uint8_t candidate_block_reason = openquatt_decision_log::REASON_UNKNOWN;
             uint16_t candidate_block_aux_s = 0;
+            bool incident_stop_registration_required = false;
+            if (incident_guard.action ==
+                oq_incident_actuator::Action::FORCE_STOP) {
+              block_reason = "incident manager requires compressor stop";
+              candidate_block_reason =
+                  openquatt_decision_log::REASON_HP_FAULT;
+              (is_hp1 ? hp1_service_guard : hp2_service_guard) =
+                  "incidentbewaking vereist compressorstop";
+              const auto run_state = incident_outputs.run_state;
+              incident_stop_registration_required =
+                  run_state != oq_incidents::RunState::STOPPED &&
+                  run_state != oq_incidents::RunState::STOPPING &&
+                  run_state != oq_incidents::RunState::STOP_UNCONFIRMED;
+            } else if (incident_guard.action ==
+                       oq_incident_actuator::Action::BLOCK_NEW_START) {
+              block_reason = "incident manager blocks new compressor start";
+              candidate_block_reason =
+                  openquatt_decision_log::REASON_CANDIDATE_UNAVAILABLE;
+              (is_hp1 ? hp1_service_guard : hp2_service_guard) =
+                  "incidentbewaking blokkeert een nieuwe start";
+            }
             bool &last_defrost_hold = is_hp1 ? last_hp1_defrost_hold : last_hp2_defrost_hold;
             const bool defrost_hold_active = (req_level == 0 && retained_level > 0);
             if (defrost_hold_active && !last_defrost_hold) {
@@ -413,9 +451,6 @@ interval:
               }
             }
 
-            if (req_level > 0) set_mode(is_hp1, true);
-            else set_mode(is_hp1, false);
-
             int applied = req_level;
 
             // Manual HP service deliberately bypasses policy limits so every
@@ -430,15 +465,76 @@ interval:
               applied = pick_allowed_capped(applied, is_hp1, cap);
             }
 
-            // Normative rule: compressor >0 only when the active thermal mode is measured
-            // or the command target is already on that mode. This avoids losing a full
-            // control cycle on mode-transition latency.
-            if (req_level > 0 && !mode_is_active_thermal(is_hp1) && !mode_target_is_active_thermal(is_hp1)) {
+            const int expected_mode =
+                applied > 0
+                    ? requested_mode_code_for_hp(is_hp1, true)
+                    : 0;
+            if (applied > 0 && expected_mode <= 0) {
               applied = 0;
-              block_reason = "waiting for thermal mode confirmation";
-              candidate_block_reason = openquatt_decision_log::REASON_FLOW_PREFLOW;
-              (is_hp1 ? hp1_service_guard : hp2_service_guard) = "wachten op bevestiging werkmodus";
-              log_hp_block_change(is_hp1, "waiting for thermal mode confirmation");
+              block_reason = "no valid thermal mode for compressor request";
+              candidate_block_reason =
+                  openquatt_decision_log::REASON_CANDIDATE_UNAVAILABLE;
+              (is_hp1 ? hp1_service_guard : hp2_service_guard) =
+                  "geen geldige werkmodus voor compressorstart";
+              log_hp_block_change(
+                  is_hp1,
+                  "no valid thermal mode for compressor request");
+            }
+
+            if (applied == 0 && retained_level > 0) {
+              apply_active_mode_hold(is_hp1, retained_level);
+              publish_optimizer_reason("defrost_protect_hold");
+              return retained_level;
+            }
+
+            bool safe_mode_already_written = false;
+            if (applied > 0) {
+              const bool active_mode_authorized =
+                  oq_incident_actuator::apply_start_gate_before_active_write(
+                      prev_applied == 0,
+                      [&]() {
+                        return id(oq_incident_manager).request_start(
+                            hp_index,
+                            static_cast<uint8_t>(expected_mode),
+                            now_ms);
+                      },
+                      [&]() { set_mode(is_hp1, true, false); },
+                      [&]() {
+                        set_mode(is_hp1, false, false);
+                        safe_mode_already_written = true;
+                      });
+              if (!active_mode_authorized) {
+                applied = 0;
+                block_reason =
+                    "waiting for incident-manager start release";
+                candidate_block_reason =
+                    openquatt_decision_log::REASON_CANDIDATE_UNAVAILABLE;
+                (is_hp1 ? hp1_service_guard : hp2_service_guard) =
+                    "wachten op technische startvrijgave";
+                log_hp_block_change(
+                    is_hp1,
+                    "waiting for incident-manager start release");
+              }
+            }
+            if (applied == 0 && !safe_mode_already_written) {
+              const bool initial_stop_registration_required =
+                  prev_applied > 0 || incident_stop_registration_required;
+              const bool stop_notification_required =
+                  initial_stop_registration_required ||
+                  (incident_outputs.must_stop &&
+                   !incident_outputs.stop_confirmed);
+              oq_incident_actuator::apply_stop_notification_before_safe_write(
+                  stop_notification_required,
+                  [&]() {
+                    id(oq_incident_manager).request_stop(hp_index, now_ms);
+                  },
+                  [&]() {
+                    set_mode(is_hp1, false, force_safe_stop_write);
+                  });
+              if (initial_stop_registration_required ||
+                  force_safe_stop_write) {
+                last_safe_stop_write_ms = now_ms;
+              }
             }
 
             if (applied == 0 && req_level > 0) {
@@ -471,16 +567,11 @@ interval:
               publish_candidate_blocked(is_hp1, openquatt_decision_log::REASON_UNKNOWN, 0, 0);
             }
 
-            if (applied == 0 && retained_level > 0) {
-              apply_active_mode_hold(is_hp1, retained_level);
-              publish_optimizer_reason("defrost_protect_hold");
-              return retained_level;
-            }
-
             if (is_hp1) {
               auto idx = id(hp1_compressor_level).active_index();
               const int cur = idx.has_value() ? (int) idx.value() : -1;
-              if (cur != applied) {
+              if (cur != applied ||
+                  (applied == 0 && force_safe_stop_write)) {
                 auto c = id(hp1_compressor_level).make_call();
                 c.set_option(lvl_opts[applied]);
                 c.perform();
@@ -488,7 +579,8 @@ interval:
             } else {
               auto idx = id(${secondary_compressor_level_id}).active_index();
               const int cur = idx.has_value() ? (int) idx.value() : -1;
-              if (cur != applied) {
+              if (cur != applied ||
+                  (applied == 0 && force_safe_stop_write)) {
                 auto c = id(${secondary_compressor_level_id}).make_call();
                 c.set_option(lvl_opts[applied]);
                 c.perform();
