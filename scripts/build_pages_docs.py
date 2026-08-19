@@ -53,6 +53,7 @@ PAGES = [
     Page(PurePosixPath("docs/water-temperature-control.md"), PurePosixPath("water-temperature-control.html"), "Water Temperature Control", "Docs", "Uitleg van stooklijn, PID en Single/Duo-gedrag in curve-modus."),
     Page(PurePosixPath("docs/regelgedrag-van-openquatt.md"), PurePosixPath("regelgedrag-van-openquatt.html"), "Regelgedrag van OpenQuatt", "Naslag", "Technische runtime-uitleg over systeemstanden, flowregeling en bronkeuze."),
     Page(PurePosixPath("docs/instellingen-en-meetwaarden.md"), PurePosixPath("instellingen-en-meetwaarden.html"), "Instellingen en meetwaarden", "Naslag", "Praktische naslag voor runtime- en compile-time instellingen."),
+    Page(PurePosixPath("docs/hcq-io-overzicht.md"), PurePosixPath("hcq-io-overzicht.html"), "HCQ aansluitingen en technische I/O", "Naslag", "Aansluitingen, GPIO-koppeling en firmwarefuncties van de Heatpump Controller Q-edition."),
     Page(PurePosixPath("docs/handmatige-installatie.md"), PurePosixPath("handmatige-installatie.html"), "Handmatige installatie", "Naslag", "Fallbackroute voor handmatig flashen buiten de normale installer om."),
     Page(PurePosixPath("docs/diagnose-en-afstelling.md"), PurePosixPath("diagnose-en-afstelling.html"), "Problemen oplossen en afstellen", "Doorverwijzing", "Oude link naar de nieuwe probleemoplos-pagina."),
 ]
@@ -100,6 +101,7 @@ SIDEBAR_GROUPS = [
         "Fallbacks en technische routes die je meestal niet dagelijks nodig hebt.",
         [
             PurePosixPath("docs/mqtt.md"),
+            PurePosixPath("docs/hcq-io-overzicht.md"),
             PurePosixPath("docs/handmatige-installatie.md"),
         ],
     ),
