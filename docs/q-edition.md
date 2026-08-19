@@ -63,6 +63,8 @@ Onderstaand referentiebeeld toont de fysieke positie en functie van alle aanslui
 
 [Open het referentiebeeld op volledige grootte](assets/hcq-aansluitingen-referentie.png)
 
+Voor de technische functie per aansluiting en de GPIO-koppeling zie [HCQ aansluitingen en technische I/O](hcq-io-overzicht.md).
+
 ### Na het overzetten
 
 Controleer in de laatste aansluitstap nog eenmaal `M1`, de gekozen ketelroute, de eventuele `M2`-verbinding en alle stekkers. Sluit daarna de USB-voeding aan op de USB-poort van de HCQ. Schakel vervolgens de Quatt-buitenunit(s) weer in, bijvoorbeeld met de werkschakelaar.

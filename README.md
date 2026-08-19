@@ -72,7 +72,7 @@ OpenQuatt biedt:
 - `Power House` als aanbevolen verwarmingsstrategie voor normale ingebruikname;
 - koeling als bewuste OpenQuatt-functie waar de installatie dat ondersteunt;
 - optionele Home Assistant-integratie met dashboards;
-- OpenTherm-thermostaatuitlezing op Heatpump Controller Q-edition.
+- OpenTherm-thermostaat- en ketelkoppeling op de Heatpump Controller Q-edition.
 
 ## Beperkingen
 
@@ -80,7 +80,7 @@ Belangrijke beperkingen voor deze fase:
 
 - OpenQuatt is bedoeld voor Quatt Hybrid `Single` en `Duo`, niet voor Quatt All-Electric, Quatt Chill of Quatt HomeBattery.
 - De Heatpump Controller Q-edition is de support- en ontwikkelfocus; Waveshare en Heatpump Listener zijn limited/best-effort.
-- OpenTherm betekent nu: thermostaat uitlezen op de Heatpump Controller Q-edition. OpenTherm-aansturing van de ketel staat op de roadmap.
+- OpenTherm-aansturing van de ketel via `OTB` is alleen beschikbaar op de Heatpump Controller Q-edition.
 - Ethernet en Wi-Fi zijn nu nog aparte firmware-builds.
 - CV-assist in Heating Curve, CV/boiler-only mode en uitgebreidere storingsafhandeling staan op de roadmap.
 - OpenQuatt is geen officiële Quatt-helpdesk of individuele installatieservice.
@@ -89,7 +89,6 @@ Belangrijke beperkingen voor deze fase:
 
 Compacte roadmap:
 
-- OpenTherm-aansturing van de ketel;
 - gecombineerde Ethernet/Wi-Fi firmware, afhankelijk van ESPHome-ontwikkelingen;
 - CV-assist in Heating Curve;
 - CV/boiler-only mode;
