@@ -11,6 +11,12 @@ WEB_AUTH_CPP = (
 ).read_text()
 MODBUS_HUB = (ROOT / "openquatt" / "oq_common.yaml").read_text()
 MODBUS_CONTROLLER = (ROOT / "openquatt" / "oq_HP_io.yaml").read_text()
+ODU_EEPROM_HEADER = (
+    ROOT
+    / "components"
+    / "openquatt_odu_eeprom_dump"
+    / "OpenQuattOduEepromDump.h"
+).read_text()
 ODU_RUNTIME_TABLE = (
     ROOT
     / "openquatt"
@@ -53,6 +59,13 @@ class ESPHome20268ContractTest(unittest.TestCase):
         self.assertNotIn("ModbusRegisterType", custom_modbus)
         self.assertNotIn("const std::vector<uint8_t>&", custom_modbus)
         self.assertNotIn("const std::vector<uint8_t> &", custom_modbus)
+
+    def test_odu_eeprom_uses_maximum_fc03_read_size(self) -> None:
+        self.assertIn(
+            "EEPROM_BLOCK_SIZE = modbus::MAX_NUM_OF_REGISTERS_TO_READ",
+            ODU_EEPROM_HEADER,
+        )
+        self.assertNotIn("EEPROM_BLOCK_SIZE = 22", ODU_EEPROM_HEADER)
 
 
 if __name__ == "__main__":
