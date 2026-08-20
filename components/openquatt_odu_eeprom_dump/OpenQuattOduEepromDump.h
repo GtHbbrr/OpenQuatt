@@ -49,7 +49,9 @@ class OpenQuattOduEepromDump : public Component {
   static constexpr uint16_t EEPROM_START_ADDRESS = 2999;
   static constexpr uint16_t EEPROM_REGISTER_COUNT = 512;
   static constexpr uint16_t EEPROM_CRC_DATA_COUNT = 510;
-  static constexpr uint16_t EEPROM_BLOCK_SIZE = 22;
+  // MGMT recommends reading the EEPROM as a whole. FC03 is limited to 125 registers per request,
+  // so use the largest legal contiguous chunks instead of many small diagnostic reads.
+  static constexpr uint16_t EEPROM_BLOCK_SIZE = modbus::MAX_NUM_OF_REGISTERS_TO_READ;
   static constexpr uint16_t CORE_START_ADDRESS = 2114;
   static constexpr uint16_t CORE_REGISTER_COUNT = 14;
   static constexpr uint16_t EXTENDED_START_ADDRESS = 11004;
