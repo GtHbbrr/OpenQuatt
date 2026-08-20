@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <string>
 
+#include "../../boiler/oq_boiler_logic.h"
 #include "../oq_service_runtime.h"
 
 namespace oq_boiler_task {
@@ -366,9 +367,19 @@ class BoilerPowerTestRuntime {
     const uint32_t state_age_ms = now_ms - id(oq_commissioning_state_since_ms);
     if (!id(boiler_active).state) {
       if (state_age_ms >= cfg.boiler_settle_min_ms) {
-        ESP_LOGW("quatt.cm100.boiler", "Boiler did not start in time (flow=%.0fL/h boiler_req=%d elapsed=%lus)",
-                 flow_lph, (int)id(oq_commissioning_boiler_request), (unsigned long)(state_age_ms / 1000UL));
-        finish_task("FAILED: boiler did not start", STATE_FAILED, false, true);
+        const bool opentherm_selected =
+            id(oq_boiler_connection).has_state() && id(oq_boiler_connection).current_option() == "OpenTherm";
+        const char* failure_reason = oq_boiler::commissioning_start_failure_reason(
+            id(oq_boiler_block_reason_code), opentherm_selected, id(oq_boiler_output_request),
+            id(oq_otb_link_available_state));
+        char failure_status[96];
+        snprintf(failure_status, sizeof(failure_status), "FAILED: %s", failure_reason);
+        ESP_LOGW("quatt.cm100.boiler",
+                 "Boiler did not start in time (flow=%.0fL/h boiler_req=%d output_req=%d block=%s otb_link=%d "
+                 "elapsed=%lus)",
+                 flow_lph, (int)id(oq_commissioning_boiler_request), (int)id(oq_boiler_output_request), failure_reason,
+                 (int)id(oq_otb_link_available_state), (unsigned long)(state_age_ms / 1000UL));
+        finish_task(failure_status, STATE_FAILED, false, true);
       } else {
         publish_status("BOILER_SETTLING");
       }

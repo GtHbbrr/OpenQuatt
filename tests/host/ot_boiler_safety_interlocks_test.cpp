@@ -1,6 +1,7 @@
 #include <assert.h>
 #include <math.h>
 #include <stdint.h>
+#include <string.h>
 
 #include "openquatt/includes/boiler/oq_boiler_logic.h"
 
@@ -325,6 +326,20 @@ void test_commissioning_wait_state() {
   assert_decision(decision, true, false, oq_boiler::BLOCK_MIN_ON_TIME);
 }
 
+void test_commissioning_start_failure_reason() {
+  assert(
+      strcmp(oq_boiler::commissioning_start_failure_reason(oq_boiler::BLOCK_TRANSPORT_UNAVAILABLE, true, false, false),
+             oq_boiler::block_reason_text(oq_boiler::BLOCK_TRANSPORT_UNAVAILABLE)) == 0);
+  assert(strcmp(oq_boiler::commissioning_start_failure_reason(oq_boiler::BLOCK_NONE, true, true, false),
+                "OpenTherm link unavailable") == 0);
+  assert(strcmp(oq_boiler::commissioning_start_failure_reason(oq_boiler::BLOCK_NONE, true, false, true),
+                "boiler request not applied") == 0);
+  assert(strcmp(oq_boiler::commissioning_start_failure_reason(oq_boiler::BLOCK_NONE, true, true, true),
+                "OpenTherm CH active not confirmed") == 0);
+  assert(strcmp(oq_boiler::commissioning_start_failure_reason(oq_boiler::BLOCK_NONE, false, true, false),
+                "boiler active state not confirmed") == 0);
+}
+
 }  // namespace
 
 int main() {
@@ -337,5 +352,6 @@ int main() {
   test_fallback_and_flow_guards();
   test_minimum_times_and_ownership_loss();
   test_commissioning_wait_state();
+  test_commissioning_start_failure_reason();
   return 0;
 }
