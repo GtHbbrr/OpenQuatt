@@ -196,10 +196,10 @@ Bij `Expliciet toestaan` gebruikt OpenQuatt geen dauwpuntgrens: ook een beschikb
 Wil je dauwpuntbronnen uit Home Assistant gebruiken, volg dan de
 [companion-handleiding voor dynamische koelbronnen](https://github.com/OpenQuatt/home-assistant-openquatt/blob/main/docs/cooling.md).
 De web-app kiest daarna welke koelingsdauwpuntbron OpenQuatt gebruikt: `Auto`,
-`Home Assistant` of `MQTT`. In `Auto` gebruikt OpenQuatt de hoogste geldige
+`Home Assistant`, `API input` of `MQTT`. In `Auto` gebruikt OpenQuatt de hoogste geldige
 dauwpuntwaarde.
 
-Wil je externe bronwaarden of toestemmingssignalen via MQTT aanleveren, configureer dan eerst de broker bij **Bronnen / integraties -> MQTT inputbronnen**. In **MQTT sensoren** kun je per topic zien wat OpenQuatt verwacht en ongebruikte topics uitzetten. Zie [MQTT inputbronnen](mqtt.md) voor topics, payload en geldigheid.
+Wil je externe bronwaarden of toestemmingssignalen via MQTT aanleveren, configureer dan eerst de broker bij **Bronnen / integraties -> MQTT inputbronnen**. In **MQTT sensoren** kun je per topic zien wat OpenQuatt verwacht en ongebruikte topics uitzetten. Zie [MQTT inputbronnen](mqtt.md) voor topics, payload en geldigheid. Zonder MQTT-broker kan hetzelfde via [API inputbronnen](api-input.md).
 
 ### Bronnen / integraties
 
@@ -208,6 +208,7 @@ Hier beheer je de directe gegevensbronnen en integraties:
 - `OpenTherm`: zet de lokale OpenTherm-thermostaatkoppeling aan of uit;
 - `CIC-polling`: zet het uitlezen van een externe CIC JSON-feed aan of uit en pas de feed-URL aan;
 - `MQTT inputbronnen`: configureer een broker voor externe MQTT-bronwaarden zoals dauwpunt, buiten- en kamerwaarden en toestemmingssignalen, en zet ongebruikte topics uit;
+- `API inputbronnen`: lever dezelfde externe bronwaarden via lokale HTTP-endpoints aan;
 - `CiC-compatibiliteit`: gebruik dit alleen als de Quatt app via de CiC moet blijven meekijken.
 
 Dezelfde groep toont compacte diagnostiek voor OpenTherm en CIC, zoals linkstatus, JSON-feedstatus, kamertemperatuur, setpoint en flow wanneer de firmware die signalen exposeert.
