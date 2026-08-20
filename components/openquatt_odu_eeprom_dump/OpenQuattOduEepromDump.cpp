@@ -450,8 +450,7 @@ void OpenQuattOduEepromDump::queue_current_request_() {
   const uint32_t request_token = this->request_token_.fetch_add(1U, std::memory_order_acq_rel) + 1U;
   auto command = modbus_controller::ModbusCommandItem::create_read_command(
       this->controller_, modbus::EntityType::HOLDING, expected_start, this->request_register_count_,
-      [this, expected_start, request_token](modbus::EntityType, uint16_t start_address,
-                                            std::span<const uint8_t> data) {
+      [this, expected_start, request_token](modbus::EntityType, uint16_t start_address, std::span<const uint8_t> data) {
         if (start_address == expected_start) this->on_response_(request_token, start_address, data);
       });
   this->controller_->queue_command(std::move(command));
