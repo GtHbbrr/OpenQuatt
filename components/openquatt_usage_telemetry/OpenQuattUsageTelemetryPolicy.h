@@ -155,6 +155,9 @@ inline const char* configured_source_wire_value(const std::string& option) {
   if (option == "HA input" || option == "Home Assistant") {
     return "home_assistant";
   }
+  if (option == "API input") {
+    return "api_input";
+  }
   if (option == "MQTT") {
     return "mqtt";
   }
