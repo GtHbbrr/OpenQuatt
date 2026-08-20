@@ -346,12 +346,13 @@ bool OpenQuattWebAuth::apply_storage_(const AuthStorage& storage, const char* so
     return false;
   }
 
+  std::memcpy(&this->runtime_storage_, &storage, sizeof(this->runtime_storage_));
   this->active_username_ = storage.username;
   this->active_password_ = storage.password;
   this->credential_source_ = source != nullptr ? source : "";
 
-  web_server_base::global_web_server_base->set_auth_username(storage.username);
-  web_server_base::global_web_server_base->set_auth_password(storage.password);
+  web_server_base::global_web_server_base->set_auth_username(this->runtime_storage_.username);
+  web_server_base::global_web_server_base->set_auth_password(this->runtime_storage_.password);
   this->publish_state_();
 
   return true;
@@ -362,12 +363,14 @@ bool OpenQuattWebAuth::suspend_auth_runtime_(const char* source) {
     return false;
   }
 
+  this->runtime_storage_.username[0] = '\0';
+  this->runtime_storage_.password[0] = '\0';
   this->active_username_.clear();
   this->active_password_.clear();
   this->credential_source_ = source != nullptr ? source : "";
 
-  web_server_base::global_web_server_base->set_auth_username("");
-  web_server_base::global_web_server_base->set_auth_password("");
+  web_server_base::global_web_server_base->set_auth_username(this->runtime_storage_.username);
+  web_server_base::global_web_server_base->set_auth_password(this->runtime_storage_.password);
   this->publish_state_();
   return true;
 }

@@ -4,7 +4,7 @@
 #include <atomic>
 #include <cstddef>
 #include <cstdint>
-#include <vector>
+#include <span>
 
 #include <esp_http_server.h>
 #include <freertos/FreeRTOS.h>
@@ -135,7 +135,8 @@ class OpenQuattOduEepromDump : public Component {
   bool available_storage_() const;
   void reset_job_();
   void queue_current_request_();
-  void on_response_(uint32_t request_token, uint16_t start_address, const std::vector<uint8_t>& data);
+  bool modbus_bus_idle_() const;
+  void on_response_(uint32_t request_token, uint16_t start_address, std::span<const uint8_t> data);
   void handle_request_result_();
   void handle_request_failure_();
   void advance_after_success_();
@@ -147,7 +148,7 @@ class OpenQuattOduEepromDump : public Component {
   uint16_t current_start_address_() const;
   uint16_t current_register_count_() const;
   uint16_t calculate_crc_() const;
-  static uint16_t read_word_(const std::vector<uint8_t>& data, size_t index);
+  static uint16_t read_word_(std::span<const uint8_t> data, size_t index);
   static void decode_ascii_words_(const uint16_t* words, size_t count, char* output, size_t output_size);
 };
 

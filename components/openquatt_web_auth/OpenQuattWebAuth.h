@@ -73,6 +73,9 @@ class OpenQuattWebAuth : public Component {
   ESPPreferenceObject pref_;
   bool handlers_registered_{false};
   uint32_t setup_window_until_ms_{0};
+  // ESPHome 2026.8 keeps non-owning pointers to these credentials. This member
+  // storage keeps both addresses valid and unchanged for the component lifetime.
+  AuthStorage runtime_storage_{};
   AuthStorage suspended_storage_{};
   bool has_suspended_storage_{false};
 };

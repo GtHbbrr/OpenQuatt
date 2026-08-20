@@ -44,7 +44,7 @@ class IncidentManagerActionContractTest(unittest.TestCase):
     def test_successful_recovery_probe_reports_transport_online(self) -> None:
         probe_callback = HP_IO_YAML[
             HP_IO_YAML.index("create_read_command(") :
-            HP_IO_YAML.index("id(${hp_id}).queue_command(probe);")
+            HP_IO_YAML.index("id(${hp_id}).queue_command(std::move(probe));")
         ]
         self.assertIn("id(${hp_id}_is_online) = true;", probe_callback)
         self.assertIn(

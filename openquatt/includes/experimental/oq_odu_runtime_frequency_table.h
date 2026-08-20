@@ -7,6 +7,8 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdint>
+#include <span>
+#include <utility>
 #include <vector>
 
 #include "esphome/components/modbus_controller/modbus_controller.h"
@@ -55,14 +57,14 @@ inline bool validate_monotonic_table(const std::array<float, 11>& values) {
   return true;
 }
 
-inline bool read_u16_word(const std::vector<uint8_t>& data, size_t index, uint16_t& value) {
+inline bool read_u16_word(std::span<const uint8_t> data, size_t index, uint16_t& value) {
   const size_t offset = index * 2U;
   if (data.size() < offset + 2U) return false;
   value = (uint16_t(data[offset]) << 8) | uint16_t(data[offset + 1U]);
   return true;
 }
 
-inline bool read_word_as_frequency(const std::vector<uint8_t>& data, size_t index, float& value) {
+inline bool read_word_as_frequency(std::span<const uint8_t> data, size_t index, float& value) {
   uint16_t raw = 0;
   if (!read_u16_word(data, index, raw)) return false;
   value = float(raw);
@@ -71,7 +73,7 @@ inline bool read_word_as_frequency(const std::vector<uint8_t>& data, size_t inde
 
 inline void publish_loaded_value(esphome::number::Number* target, float value) { target->publish_state(value); }
 
-inline bool parse_runtime_table(const std::vector<uint8_t>& data, std::array<float, 11>& cooling,
+inline bool parse_runtime_table(std::span<const uint8_t> data, std::array<float, 11>& cooling,
                                 std::array<float, 11>& heating, int& loaded) {
   loaded = 0;
   float value = NAN;
@@ -122,21 +124,21 @@ inline void queue_runtime_write(RuntimeFrequencyTableRefs refs, std::array<float
   auto cmd = esphome::modbus_controller::ModbusCommandItem::create_write_multiple_command(
       refs.controller, RUNTIME_TABLE_START_ADDRESS, RUNTIME_TABLE_REGISTER_COUNT,
       build_runtime_write_values(cooling, heating));
-  cmd.on_data_func = [refs, cooling, heating](esphome::modbus::ModbusRegisterType register_type, uint16_t start_address,
-                                              const std::vector<uint8_t>& data) {
+  cmd.on_data_func = [refs, cooling, heating](esphome::modbus::EntityType register_type, uint16_t start_address,
+                                              std::span<const uint8_t> data) {
     publish_status(refs, "WRITE_CONFIRMED: runtime write acknowledged");
     queue_apply_readback(refs, cooling, heating);
   };
-  refs.controller->queue_command(cmd);
+  refs.controller->queue_command(std::move(cmd));
 }
 
 inline void queue_guarded_runtime_write(RuntimeFrequencyTableRefs refs, std::array<float, 11> cooling,
                                         std::array<float, 11> heating) {
   publish_status(refs, "GUARD_READ_REQUESTED: checking ODU state");
   auto cmd = esphome::modbus_controller::ModbusCommandItem::create_read_command(
-      refs.controller, esphome::modbus::ModbusRegisterType::HOLDING, GUARD_START_ADDRESS, GUARD_REGISTER_COUNT,
-      [refs, cooling, heating](esphome::modbus::ModbusRegisterType register_type, uint16_t start_address,
-                               const std::vector<uint8_t>& data) {
+      refs.controller, esphome::modbus::EntityType::HOLDING, GUARD_START_ADDRESS, GUARD_REGISTER_COUNT,
+      [refs, cooling, heating](esphome::modbus::EntityType register_type, uint16_t start_address,
+                               std::span<const uint8_t> data) {
         uint16_t working_mode = 0;
         uint16_t compressor_hz = 0;
         if (!read_u16_word(data, GUARD_WORKING_MODE_INDEX, working_mode)) {
@@ -157,16 +159,15 @@ inline void queue_guarded_runtime_write(RuntimeFrequencyTableRefs refs, std::arr
         }
         queue_runtime_write(refs, cooling, heating);
       });
-  refs.controller->queue_command(cmd);
+  refs.controller->queue_command(std::move(cmd));
 }
 
 inline void queue_apply_readback(RuntimeFrequencyTableRefs refs, std::array<float, 11> expected_cooling,
                                  std::array<float, 11> expected_heating) {
   auto cmd = esphome::modbus_controller::ModbusCommandItem::create_read_command(
-      refs.controller, esphome::modbus::ModbusRegisterType::HOLDING, RUNTIME_TABLE_START_ADDRESS,
-      RUNTIME_TABLE_REGISTER_COUNT,
-      [refs, expected_cooling, expected_heating](esphome::modbus::ModbusRegisterType register_type,
-                                                 uint16_t start_address, const std::vector<uint8_t>& data) {
+      refs.controller, esphome::modbus::EntityType::HOLDING, RUNTIME_TABLE_START_ADDRESS, RUNTIME_TABLE_REGISTER_COUNT,
+      [refs, expected_cooling, expected_heating](esphome::modbus::EntityType register_type, uint16_t start_address,
+                                                 std::span<const uint8_t> data) {
         std::array<float, 11> cooling{};
         std::array<float, 11> heating{};
         int loaded = 0;
@@ -183,7 +184,7 @@ inline void queue_apply_readback(RuntimeFrequencyTableRefs refs, std::array<floa
         }
         publish_status(refs, "APPLIED: runtime table written and read back");
       });
-  refs.controller->queue_command(cmd);
+  refs.controller->queue_command(std::move(cmd));
 }
 
 inline void load_runtime_table(RuntimeFrequencyTableRefs refs) {
@@ -193,10 +194,8 @@ inline void load_runtime_table(RuntimeFrequencyTableRefs refs) {
   }
   publish_status(refs, "LOAD_REQUESTED");
   auto cmd = esphome::modbus_controller::ModbusCommandItem::create_read_command(
-      refs.controller, esphome::modbus::ModbusRegisterType::HOLDING, RUNTIME_TABLE_START_ADDRESS,
-      RUNTIME_TABLE_REGISTER_COUNT,
-      [refs](esphome::modbus::ModbusRegisterType register_type, uint16_t start_address,
-             const std::vector<uint8_t>& data) {
+      refs.controller, esphome::modbus::EntityType::HOLDING, RUNTIME_TABLE_START_ADDRESS, RUNTIME_TABLE_REGISTER_COUNT,
+      [refs](esphome::modbus::EntityType register_type, uint16_t start_address, std::span<const uint8_t> data) {
         std::array<float, 11> cooling{};
         std::array<float, 11> heating{};
         int loaded = 0;
@@ -212,7 +211,7 @@ inline void load_runtime_table(RuntimeFrequencyTableRefs refs) {
         snprintf(status, sizeof(status), "LOADED: %d/22 runtime registers", loaded);
         publish_status(refs, status);
       });
-  refs.controller->queue_command(cmd);
+  refs.controller->queue_command(std::move(cmd));
 }
 
 inline bool read_desired_values(const std::array<esphome::number::Number*, 11>& entities,
