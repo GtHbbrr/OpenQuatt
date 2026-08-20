@@ -177,6 +177,7 @@ sensor:
     state_class: measurement
     accuracy_decimals: 1
     timeout: 5s
+    internal_filter_mode: PULSE
     internal_filter: 100us
     pin:
       number: ${hpcq_flow_pin}
