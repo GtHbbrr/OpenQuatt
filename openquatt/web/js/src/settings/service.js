@@ -414,7 +414,11 @@ import { renderModalShell } from "../core/modal-shell.js";
     if (upper.startsWith("DONE:") || upper === "DONE" || upper.includes("APPLIED")) {
       const result = getSettingsStatValue("boilerPowerTestResult");
       const conf = getSettingsStatValue("boilerPowerTestConfidence");
+      const isFlowLimited = upper.includes("FLOW LIMITED");
       if (result && result !== "—") {
+        if (isFlowLimited) {
+          return `Klaar - ${result}${conf && conf !== "—" ? ` (${conf})` : ""} - test begrensd door flow/temperatuurmarge.`;
+        }
         return `Klaar - ${result}${conf && conf !== "—" ? ` (${conf})` : ""}. Ketel auto uit.`;
       }
       return upper.includes("APPLIED") ? "Resultaat toegepast." : "Klaar - ketel auto uit.";
@@ -836,7 +840,11 @@ import { renderModalShell } from "../core/modal-shell.js";
           statusCopy: boilerTaskWaitingForCm100
             ? "Wacht totdat CM100 actief is voordat je de boiler-test start."
             : (isCommissioningTaskStatusTerminal(boilerStatus) || boilerTaskRunning
-              ? getBoilerTestStatusCopy(boilerStatus, getEntityNumericValue("flowSelected"), 800)
+              ? getBoilerTestStatusCopy(
+                  boilerStatus,
+                  getEntityNumericValue("flowSelected"),
+                  getEntityNumericValue("flowSetpoint") || 800,
+                )
               : (cm100Ready ? "CM100 staat klaar. Start de boiler-test wanneer je wilt." : "Start CM100 eerst en voer daarna de boilervermogentest uit.")),
           progressTask: "boiler",
           actions: `
