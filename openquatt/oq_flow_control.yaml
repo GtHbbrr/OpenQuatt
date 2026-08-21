@@ -582,12 +582,9 @@ interval:
 
             int pwm = res.pwm;
 
-            // Last-good tracking uses helper's stable_cnt (single source)
+            // Last-good tracking - single source via helper's stable_ready
             constexpr int good_pwm_step = 10;
-            constexpr int stable_time_s = 60;
-            const int stable_time_ticks =
-                (stable_time_s <= 0) ? 0 : (int) roundf((float) stable_time_s / dt);
-            if (startup_hold <= 0 && !pi_failsafe && stable_cnt >= stable_time_ticks) {
+            if (res.stable_ready) {
               const int prev = cooling_target ? id(oq_flow_last_good_pwm_cooling) : id(oq_flow_last_good_pwm);
               if (abs(prev - pwm) >= good_pwm_step) {
                 if (cooling_target) {
@@ -596,7 +593,6 @@ interval:
                   id(oq_flow_last_good_pwm) = pwm;
                 }
               }
-              stable_cnt = stable_time_ticks;
             }
             return pwm;
           };

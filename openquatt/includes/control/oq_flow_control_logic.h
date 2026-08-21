@@ -44,6 +44,7 @@ struct PiResult {
   int pwm = 400;
   bool in_startup_hold = false;
   bool failsafe = false;
+  bool stable_ready = false;
   float sp_f = NAN;
   float error = 0.0f;
   float integral = 0.0f;
@@ -144,7 +145,7 @@ inline PiResult update_pi(State& state, const PiInputs& in) {
   pwm_local = clamp_ipwm(pwm_local);
   res.pwm = pwm_local;
 
-  // Stability counter (kept for completeness, not needed for #464)
+  // Stability counter - single source for last_good tracking
   constexpr float stable_err_lph = 15.0f;
   constexpr int stable_time_s = 60;
   const int stable_time_ticks = (stable_time_s <= 0) ? 0 : (int)roundf((float)stable_time_s / in.dt);
@@ -161,6 +162,7 @@ inline PiResult update_pi(State& state, const PiInputs& in) {
   } else {
     state.stable_cnt = 0;
   }
+  res.stable_ready = (state.stable_cnt >= stable_time_ticks);
 
   return res;
 }

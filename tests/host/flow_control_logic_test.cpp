@@ -46,7 +46,7 @@ void test_stale_zero_should_not_cause_dip() {
   // sp_f should have been seeded to pv (824) then ramped towards 800 -> 800? or 824->800 ramp limited but close
   // With pv 824, sp_target 800, sp_f seeded to 824, then ramp down by 15*10=150 towards 800 => sp_f=800? Actually
   // d=800-824=-24, max_step=150, so sp_f=800 Then e = 800-824 = -24 -> deadband? 24 outside deadband 10 -> e=-24 u =
-  // kp*e = -2.16 plus small integral, limited to -80 (u_down 80) -> pwm = 400 - (-2) = ~402 (slightly harder) Crucially
+  // kp*e = -2.16 plus small integral, limited to -80 (u_down 80) -> pwm = 400 - (-2) = ~402 (slightly softer) Crucially
   // NOT 452.
   assert(r3.pwm < 430);  // no large 452 jump
   assert(r3.pwm > 380 && r3.pwm < 430);
