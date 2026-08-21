@@ -33,6 +33,10 @@
 #
 # ==============================================================================
 
+esphome:
+  includes:
+    - ../../openquatt/includes/control/oq_flow_control_logic.h
+
 # ----------------------------
 # INTERNAL STATE (PI)
 # ----------------------------
@@ -516,10 +520,9 @@ interval:
             const bool commissioning_start = (cm_code == 100) && (id(oq_commissioning_task_code) != oq_commissioning::TASK_NONE);
             const int last_good_pwm =
               cooling_target ? id(oq_flow_last_good_pwm_cooling) : id(oq_flow_last_good_pwm);
-            int start_pwm = commissioning_start
-              ? clamp_iPWM(id(oq_flow_commissioning_start_pwm))
-              : last_good_pwm;
-            if (!commissioning_start && (start_pwm < 50 || start_pwm > 850)) start_pwm = fallback;
+            int start_pwm = oq_flow_control::compute_start_pwm(
+                commissioning_start, id(oq_flow_commissioning_start_pwm), id(oq_flow_last_good_pwm), fallback,
+                cooling_target, id(oq_flow_last_good_pwm_cooling));
 
             ESP_LOGI("flow", "AUTO start(%s): iPWM=%d (last_good=%d bank=%s fallback=%d commissioning=%s hold %ds, fixed iPWM)",
                      tag, start_pwm, last_good_pwm, cooling_target ? "cooling" : "normal",
@@ -533,138 +536,65 @@ interval:
             stable_cnt = 0;
           };
           // AUTO PI path only: setpoint ramp, PI, startup-hold, and last_good tracking.
+          // Single source for ramp/PI - delegates to control/oq_flow_control_logic.h
           auto run_auto_pi = [&](int pwm_seed) -> int {
-            int pwm_local = pwm_seed;
             const bool cooling_target =
                 (id(oq_control_mode_code) == 5) ||
                 (oq_manual_hp::owns_control() &&
-                 (id(oq_manual_hp1_mode_code) == 1 ||
-                  id(oq_manual_hp2_mode_code) == 1));
+                 (id(oq_manual_hp1_mode_code) == 1 || id(oq_manual_hp2_mode_code) == 1));
             const bool manual_flow_owns_pi =
-              id(oq_manual_flow_active) &&
-              (id(oq_control_mode_code) == 100) &&
-              (id(oq_commissioning_task_code) == oq_commissioning::TASK_MANUAL_FLOW);
+                id(oq_manual_flow_active) && (id(oq_control_mode_code) == 100) &&
+                (id(oq_commissioning_task_code) == oq_commissioning::TASK_MANUAL_FLOW);
             float sp_target = manual_flow_owns_pi
-              ? id(oq_manual_flow_setpoint_lph).state
-              : (cooling_target
-                  ? id(oq_cooling_flow_setpoint_lph).state
-                  : id(oq_flow_setpoint_lph).state);
+                ? id(oq_manual_flow_setpoint_lph).state
+                : (cooling_target ? id(oq_cooling_flow_setpoint_lph).state : id(oq_flow_setpoint_lph).state);
             float pv = id(flow_rate_selected).state;
 
-            // Treat 0 L/h as a valid measurement (no-flow state), not as sensor failure.
-            // This prevents an AUTO(start) deadlock where PI would stay in failsafe and never build flow.
-            const bool flow_signal_valid = !isnan(pv);
-            pi_failsafe = (isnan(sp_target) || sp_target <= 0.0f || !flow_signal_valid);
+            oq_flow_control::State hs;
+            hs.sp_f = sp_f;
+            hs.integral = id(oq_flow_i);
+            hs.last_e = last_pi_e;
+            hs.startup_hold = startup_hold;
+            hs.stable_cnt = stable_cnt;
+            hs.pi_failsafe = pi_failsafe;
 
-            if (pi_failsafe) {
-              constexpr int kFailsafeIpwm = 850;
-              pwm_local = kFailsafeIpwm;
-              ESP_LOGW("flow", "Flow PI failsafe engaged: sp=%0.1f pv=%0.1f -> forcing iPWM=%d", sp_target, pv, kFailsafeIpwm);
-              id(oq_flow_i) = 0.0f;
-              last_pi_e = 0.0f;
-              stable_cnt = 0;
-              sp_f = NAN;
-              return pwm_local;
+            oq_flow_control::PiInputs inputs;
+            inputs.pv = pv;
+            inputs.sp_target = sp_target;
+            inputs.pwm_seed = pwm_seed;
+            inputs.kp = id(oq_flow_kp).state;
+            inputs.ki = id(oq_flow_ki).state;
+            inputs.dt = dt;
+
+            auto res = oq_flow_control::update_pi(hs, inputs);
+
+            sp_f = hs.sp_f;
+            id(oq_flow_i) = hs.integral;
+            last_pi_e = hs.last_e;
+            startup_hold = hs.startup_hold;
+            stable_cnt = hs.stable_cnt;
+            pi_failsafe = hs.pi_failsafe;
+
+            if (res.failsafe) {
+              ESP_LOGW("flow", "Flow PI failsafe engaged: sp=%0.1f pv=%0.1f -> forcing iPWM=%d", sp_target, pv,
+                       res.pwm);
             }
 
-            const bool in_startup_hold = (startup_hold > 0);
-            if (in_startup_hold) {
-              // True startup settle: keep iPWM fixed for a short hydraulic delay window.
-              // Keep SP filter aligned to PV so PI starts without a large instantaneous kick.
-              sp_f = pv;
-              startup_hold--;
-              stable_cnt = 0;
-              return clamp_iPWM(pwm_local);
-            }
+            int pwm = res.pwm;
 
-            const float sp_ramp_up = 25.0f;   // L/h per second up
-            const float sp_ramp_dn = 15.0f;   // L/h per second down
-            if (isnan(sp_f)) sp_f = flow_signal_valid ? pv : sp_target;
-
-            float d = sp_target - sp_f;
-            float max_step = ((d >= 0.0f) ? sp_ramp_up : sp_ramp_dn) * dt;
-            if (d >  max_step) d =  max_step;
-            if (d < -max_step) d = -max_step;
-            sp_f += d;
-
-            float e = sp_f - pv;  // positive => more flow needed
-
-            constexpr float deadband_lph = 10.0f;
-            if (fabsf(e) < deadband_lph) e = 0.0f;
-
-            const float kp = id(oq_flow_kp).state;
-            const float ki = id(oq_flow_ki).state;
-
-            // Anti-windup:
-            // - keep I inactive during large setpoint / plant transients
-            // - quickly bleed stored I when we cross the setpoint
-            // - slowly unwind I inside the deadband so it cannot keep pushing past target
-            constexpr float i_active_band_lph = 60.0f;
-            constexpr float i_cross_keep = 0.25f;
-            constexpr float i_deadband_keep = 0.60f;
-            constexpr float i_large_err_keep = 0.35f;
-            const bool have_e = (e > 0.0f) || (e < 0.0f);
-            const bool have_last_e = (last_pi_e > 0.0f) || (last_pi_e < 0.0f);
-            const bool sign_flip = have_e && have_last_e && ((e > 0.0f) != (last_pi_e > 0.0f));
-
-            if (sign_flip) {
-              id(oq_flow_i) *= i_cross_keep;
-            }
-
-            if (!have_e) {
-              id(oq_flow_i) *= i_deadband_keep;
-            } else if (fabsf(e) <= i_active_band_lph) {
-              id(oq_flow_i) += e * dt;
-            } else {
-              id(oq_flow_i) *= i_large_err_keep;
-            }
-
-            id(oq_flow_i) = fmaxf(-4000.0f, fminf(4000.0f, id(oq_flow_i)));
-            last_pi_e = e;
-
-            float u = kp * e + ki * id(oq_flow_i);
-            // Asymmetric action limit: allow faster "pump harder" corrections (u_up)
-            // than "pump softer" corrections (u_down) to recover low-flow sooner.
-            const float u_up_s = 12.0f;
-            const float u_down_s = 8.0f;
-            const float u_up = u_up_s * dt;
-            const float u_down = u_down_s * dt;
-            const float u_lim = (e >= 0.0f) ? u_up : u_down;
-            u = fmaxf(-u_lim, fminf(u_lim, u));
-
-            pwm_local = (int) roundf((float)pwm_local - u);
-            pwm_local = clamp_iPWM(pwm_local);
-
-            const float stable_err_lph = 15.0f;
-            constexpr int stable_time_s = 60;
-            const int stable_time_ticks = (stable_time_s <= 0) ? 0 : (int) roundf((float)stable_time_s / dt);
+            // Last-good tracking - single source via helper's stable_ready
             constexpr int good_pwm_step = 10;
-
-            if (startup_hold <= 0 && !pi_failsafe) {
-              const float e_target = sp_target - pv;
-              if (fabsf(e_target) < stable_err_lph) {
-                stable_cnt++;
-              } else {
-                stable_cnt = 0;
-              }
-
-              if (stable_cnt >= stable_time_ticks) {
-                const int prev = cooling_target
-                  ? id(oq_flow_last_good_pwm_cooling)
-                  : id(oq_flow_last_good_pwm);
-                if (abs(prev - pwm_local) >= good_pwm_step) {
-                  if (cooling_target) {
-                    id(oq_flow_last_good_pwm_cooling) = pwm_local;
-                  } else {
-                    id(oq_flow_last_good_pwm) = pwm_local;
-                  }
+            if (res.stable_ready) {
+              const int prev = cooling_target ? id(oq_flow_last_good_pwm_cooling) : id(oq_flow_last_good_pwm);
+              if (abs(prev - pwm) >= good_pwm_step) {
+                if (cooling_target) {
+                  id(oq_flow_last_good_pwm_cooling) = pwm;
+                } else {
+                  id(oq_flow_last_good_pwm) = pwm;
                 }
-                stable_cnt = stable_time_ticks;
               }
-            } else {
-              stable_cnt = 0;
             }
-            return pwm_local;
+            return pwm;
           };
 
           const int cm_code = id(oq_control_mode_code);
