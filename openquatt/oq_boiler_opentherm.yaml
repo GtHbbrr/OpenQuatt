@@ -14,6 +14,8 @@ external_components:
     components: [opentherm]
 
 esphome:
+  includes:
+    - ../../openquatt/includes/boiler/oq_boiler_transport_logic.h
   on_boot:
     priority: -100
     then:
@@ -846,11 +848,10 @@ interval:
           }
           id(oq_otb_applied_command_active) = command_active;
 
-          id(oq_boiler_transport_active) =
-              opentherm_selected &&
-              id(oq_otb_link_available_state) &&
-              id(otb_ch_active).has_state() &&
-              id(otb_ch_active).state;
+          if (oq_boiler_transport::otb_may_update_transport(opentherm_selected)) {
+            id(oq_boiler_transport_active) = oq_boiler_transport::compute_otb_transport_active(
+                id(oq_otb_link_available_state), id(otb_ch_active).has_state(), id(otb_ch_active).state);
+          }
 
   - interval: ${oq_otb_link_watch_s}s
     startup_delay: 2s
@@ -873,13 +874,17 @@ interval:
             }
           };
 
-          if (field_is_stale(oq_otb::FIELD_STATUS)) {
+           if (field_is_stale(oq_otb::FIELD_STATUS)) {
             id(otb_fault_indication).invalidate_state();
             id(otb_ch_active).invalidate_state();
             id(otb_dhw_active).invalidate_state();
             id(otb_flame_on).invalidate_state();
             id(otb_diagnostic_indication).invalidate_state();
-            id(oq_boiler_transport_active) = false;
+            const bool opentherm_selected_field = id(oq_boiler_connection).has_state() &&
+                                                id(oq_boiler_connection).current_option() == "OpenTherm";
+            if (oq_boiler_transport::should_clear_on_field_stale(opentherm_selected_field, true)) {
+              id(oq_boiler_transport_active) = false;
+            }
           }
           if (field_is_stale(oq_otb::FIELD_DEVICE_CONFIG)) {
             id(otb_dhw_present).invalidate_state();
