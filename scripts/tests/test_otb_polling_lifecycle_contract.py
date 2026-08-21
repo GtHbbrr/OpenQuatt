@@ -198,6 +198,21 @@ class OtbPollingLifecycleContractTest(unittest.TestCase):
             start_block.index("esphome::opentherm::MessageId::STATUS"),
         )
 
+    def test_otb_periodic_loop_does_not_overwrite_r1(self) -> None:
+        # Periodic 1s OTB adapter must be guarded - R1's transport_active is owned by relay, not OTB
+        self.assertIn("oq_boiler_transport::otb_may_update_transport", OTB_PACKAGE)
+        self.assertIn("oq_boiler_transport::compute_otb_transport_active", OTB_PACKAGE)
+        # Old unconditional pattern must be gone
+        self.assertNotIn(
+            "id(oq_boiler_transport_active) =\n              opentherm_selected &&",
+            OTB_PACKAGE,
+        )
+        # FIELD_STATUS stale clearing must also be guarded
+        stale_start = OTB_PACKAGE.index("if (field_is_stale(oq_otb::FIELD_STATUS))")
+        stale_end = OTB_PACKAGE.index("if (field_is_stale(oq_otb::FIELD_DEVICE_CONFIG))", stale_start)
+        stale_block = OTB_PACKAGE[stale_start:stale_end]
+        self.assertIn("otb_may_update_transport", stale_block)
+
 
 if __name__ == "__main__":
     unittest.main()

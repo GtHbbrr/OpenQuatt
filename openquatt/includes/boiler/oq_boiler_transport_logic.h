@@ -1,0 +1,28 @@
+#pragma once
+
+#include <stdint.h>
+
+namespace oq_boiler_transport {
+
+// Single source for which transport owns oq_boiler_transport_active.
+// R1 owns via relay state, OpenTherm owns via link + CH active.
+inline bool compute_otb_transport_active(bool link_available, bool ch_has_state, bool ch_state) {
+  return link_available && ch_has_state && ch_state;
+}
+
+inline bool compute_effective_transport_active(bool opentherm_selected, bool relay_state, bool link_available,
+                                               bool ch_has_state, bool ch_state) {
+  if (opentherm_selected) {
+    return compute_otb_transport_active(link_available, ch_has_state, ch_state);
+  }
+  return relay_state;
+}
+
+// Guard for the periodic OTB adapter: it must not overwrite R1-owned state.
+inline bool otb_may_update_transport(bool opentherm_selected) { return opentherm_selected; }
+
+inline bool should_clear_on_field_stale(bool opentherm_selected, bool field_is_stale) {
+  return opentherm_selected && field_is_stale;
+}
+
+}  // namespace oq_boiler_transport
