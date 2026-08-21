@@ -882,7 +882,7 @@ interval:
             id(otb_diagnostic_indication).invalidate_state();
             const bool opentherm_selected_field = id(oq_boiler_connection).has_state() &&
                                                 id(oq_boiler_connection).current_option() == "OpenTherm";
-            if (oq_boiler_transport::otb_may_update_transport(opentherm_selected_field)) {
+            if (oq_boiler_transport::should_clear_on_field_stale(opentherm_selected_field, true)) {
               id(oq_boiler_transport_active) = false;
             }
           }

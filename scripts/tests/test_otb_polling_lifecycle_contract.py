@@ -211,7 +211,7 @@ class OtbPollingLifecycleContractTest(unittest.TestCase):
         stale_start = OTB_PACKAGE.index("if (field_is_stale(oq_otb::FIELD_STATUS))")
         stale_end = OTB_PACKAGE.index("if (field_is_stale(oq_otb::FIELD_DEVICE_CONFIG))", stale_start)
         stale_block = OTB_PACKAGE[stale_start:stale_end]
-        self.assertIn("otb_may_update_transport", stale_block)
+        self.assertIn("should_clear_on_field_stale", stale_block)
 
 
 if __name__ == "__main__":

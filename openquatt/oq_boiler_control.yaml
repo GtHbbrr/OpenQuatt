@@ -44,6 +44,8 @@
 # ==============================================================================
 
 esphome:
+  includes:
+    - ../../openquatt/includes/boiler/oq_boiler_transport_logic.h
   on_shutdown:
     priority: 700
     then:
