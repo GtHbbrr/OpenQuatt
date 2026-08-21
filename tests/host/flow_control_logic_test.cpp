@@ -75,7 +75,7 @@ void test_low_flow_should_pump_harder() {
   in.pv = 350.0f;
   auto r = update_pi(s, in);
   assert(!r.failsafe);
-  // e = sp_f - pv, sp_f seeded to 350 then ramp to 500 (250 step) => e ~150 -> positive -> u positive -> pwm = 400 -
+  // e = sp_f - pv, sp_f seeded to 350 then ramp to 600 (250 step) => e ~250 -> positive -> u positive -> pwm = 400 -
   // positive = <400 (harder)
   assert(r.pwm < 400);
   assert(r.pwm >= 50);
@@ -115,22 +115,22 @@ void test_nan_flow_failsafe() {
   assert(isnan(s.sp_f));
 }
 
-void test_compute_start_pwm_boiler_uses_last_good() {
-  // Boiler test in CM100 should use last_good, not fixed 400
-  int start = compute_start_pwm(true, 1, 400, 440, 440, false, 460);
-  assert(start == 440);
-  // Cooling bank
-  int start_cooling = compute_start_pwm(true, 1, 400, 440, 440, true, 460);
-  assert(start_cooling == 460);
-  // Non-boiler CM100 task keeps fixed
-  int start_other = compute_start_pwm(true, 2, 400, 440, 440, false, 460);
-  assert(start_other == 400);
-  // Outside CM100 uses last_good
-  int start_auto = compute_start_pwm(false, 0, 400, 440, 440, false, 460);
+void test_compute_start_pwm() {
+  // CM100 commissioning always uses commissioning PWM (400), not last_good
+  int start = compute_start_pwm(true, 400, 440, 440, false, 460);
+  assert(start == 400);
+  int start_cooling = compute_start_pwm(true, 400, 440, 440, true, 460);
+  assert(start_cooling == 400);
+  // Outside CM100 uses last_good per bank
+  int start_auto = compute_start_pwm(false, 400, 440, 440, false, 460);
   assert(start_auto == 440);
-  // Invalid last_good falls back
-  int start_fallback = compute_start_pwm(true, 1, 400, 0, 440, false, 460);
+  int start_auto_cooling = compute_start_pwm(false, 400, 440, 440, true, 460);
+  assert(start_auto_cooling == 460);
+  // Invalid last_good falls back to fallback
+  int start_fallback = compute_start_pwm(false, 400, 0, 440, false, 460);
   assert(start_fallback == 440);
+  int start_fallback_comm = compute_start_pwm(true, 400, 0, 440, false, 460);
+  assert(start_fallback_comm == 400);
 }
 
 }  // namespace
@@ -140,6 +140,6 @@ int main() {
   test_low_flow_should_pump_harder();
   test_pv_around_target_no_big_step();
   test_nan_flow_failsafe();
-  test_compute_start_pwm_boiler_uses_last_good();
+  test_compute_start_pwm();
   return 0;
 }

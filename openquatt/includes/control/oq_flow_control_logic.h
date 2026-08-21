@@ -14,26 +14,12 @@ inline int clamp_ipwm(int value) {
   return value;
 }
 
-// CM100 boiler-test should start from learned last_good PWM instead of
-// the fixed 400 commissioning seed so flow is closer to target and the
-// stale sp_f transient from #464 is not amplified. Other CM100 tasks keep
-// the fixed commissioning seed for reproducibility.
-inline int compute_start_pwm(bool commissioning_start, int commissioning_task_code, int commissioning_start_pwm,
-                             int last_good_pwm, int fallback_pwm, bool cooling_target, int last_good_pwm_cooling) {
-  const int fallback = clamp_ipwm(fallback_pwm);
-  // TASK_BOILER_POWER_TEST == 1, keep dependency local to avoid header cycle.
-  constexpr int kTaskBoiler = 1;
-  const bool is_boiler_test = commissioning_start && commissioning_task_code == kTaskBoiler;
-  if (is_boiler_test) {
-    // Boiler test: prefer learned pwm for the active bank (cooling vs normal).
-    const int candidate = cooling_target ? last_good_pwm_cooling : last_good_pwm;
-    if (candidate >= 50 && candidate <= 850) return clamp_ipwm(candidate);
-    return fallback;
-  }
+inline int compute_start_pwm(bool commissioning_start, int commissioning_start_pwm, int last_good_pwm, int fallback_pwm,
+                             bool cooling_target, int last_good_pwm_cooling) {
   if (commissioning_start) return clamp_ipwm(commissioning_start_pwm);
   const int candidate = cooling_target ? last_good_pwm_cooling : last_good_pwm;
   if (candidate >= 50 && candidate <= 850) return clamp_ipwm(candidate);
-  return fallback;
+  return clamp_ipwm(fallback_pwm);
 }
 
 struct State {
