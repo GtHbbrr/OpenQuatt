@@ -521,9 +521,8 @@ interval:
             const int last_good_pwm =
               cooling_target ? id(oq_flow_last_good_pwm_cooling) : id(oq_flow_last_good_pwm);
             int start_pwm = oq_flow_control::compute_start_pwm(
-                commissioning_start, id(oq_commissioning_task_code),
-                (int) roundf(id(oq_flow_commissioning_start_pwm).state), id(oq_flow_last_good_pwm),
-                fallback, cooling_target, id(oq_flow_last_good_pwm_cooling));
+                commissioning_start, id(oq_commissioning_task_code), id(oq_flow_commissioning_start_pwm),
+                id(oq_flow_last_good_pwm), fallback, cooling_target, id(oq_flow_last_good_pwm_cooling));
 
             ESP_LOGI("flow", "AUTO start(%s): iPWM=%d (last_good=%d bank=%s fallback=%d commissioning=%s hold %ds, fixed iPWM)",
                      tag, start_pwm, last_good_pwm, cooling_target ? "cooling" : "normal",
