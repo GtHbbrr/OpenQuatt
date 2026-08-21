@@ -34,7 +34,6 @@ modbus_controller:
     address: ${device_address}
     modbus_id: mod_bus
     update_interval: never
-    command_throttle: ${oq_modbus_command_throttle_ms}ms
     max_cmd_retries: ${oq_modbus_max_cmd_retries}
     offline_skip_updates: 5
     setup_priority: -10
@@ -1299,16 +1298,17 @@ interval:
               now - last_probe < ${oq_modbus_offline_probe_interval_s}UL * 1000UL) {
             return;
           }
-          if (id(${hp_id}).get_command_queue_length() != 0U) {
+          if (!id(${hp_id}).hub()->tx_buffer_empty() ||
+              id(${hp_id}).hub()->tx_blocked()) {
             return;
           }
 
           id(${hp_id}_last_offline_probe_ms) = now == 0U ? 1U : now;
           auto probe = esphome::modbus_controller::ModbusCommandItem::create_read_command(
-              id(${hp_id}), esphome::modbus::ModbusRegisterType::HOLDING, 2099, 1,
-              [=](esphome::modbus::ModbusRegisterType, uint16_t, const std::vector<uint8_t> &) {
+              id(${hp_id}), esphome::modbus::EntityType::HOLDING, 2099, 1,
+              [=](esphome::modbus::EntityType, uint16_t, std::span<const uint8_t>) {
                 id(${hp_id}_is_online) = true;
                 id(oq_incident_manager).observe_transport(
                     ${hp_index}, true, millis());
               });
-          id(${hp_id}).queue_command(probe);
+          id(${hp_id}).queue_command(std::move(probe));
