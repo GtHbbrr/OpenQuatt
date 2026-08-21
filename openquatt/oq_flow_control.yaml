@@ -33,6 +33,10 @@
 #
 # ==============================================================================
 
+esphome:
+  includes:
+    - ../../openquatt/includes/control/oq_flow_control_logic.h
+
 # ----------------------------
 # INTERNAL STATE (PI)
 # ----------------------------
@@ -516,10 +520,10 @@ interval:
             const bool commissioning_start = (cm_code == 100) && (id(oq_commissioning_task_code) != oq_commissioning::TASK_NONE);
             const int last_good_pwm =
               cooling_target ? id(oq_flow_last_good_pwm_cooling) : id(oq_flow_last_good_pwm);
-            int start_pwm = commissioning_start
-              ? clamp_iPWM(id(oq_flow_commissioning_start_pwm))
-              : last_good_pwm;
-            if (!commissioning_start && (start_pwm < 50 || start_pwm > 850)) start_pwm = fallback;
+            int start_pwm = oq_flow_control::compute_start_pwm(
+                commissioning_start, id(oq_commissioning_task_code),
+                (int) roundf(id(oq_flow_commissioning_start_pwm).state), id(oq_flow_last_good_pwm),
+                fallback, cooling_target, id(oq_flow_last_good_pwm_cooling));
 
             ESP_LOGI("flow", "AUTO start(%s): iPWM=%d (last_good=%d bank=%s fallback=%d commissioning=%s hold %ds, fixed iPWM)",
                      tag, start_pwm, last_good_pwm, cooling_target ? "cooling" : "normal",
@@ -569,9 +573,9 @@ interval:
 
             const bool in_startup_hold = (startup_hold > 0);
             if (in_startup_hold) {
-              // True startup settle: keep iPWM fixed for a short hydraulic delay window.
-              // Keep SP filter aligned to PV so PI starts without a large instantaneous kick.
-              sp_f = pv;
+              // Fix #464: keep sp_f NAN during hold so first post-hold cycle
+              // seeds from actual PV instead of a stale 0 from hydraulic start.
+              // Mirrors oq_flow_control::update_pi() in control/oq_flow_control_logic.h
               startup_hold--;
               stable_cnt = 0;
               return clamp_iPWM(pwm_local);
