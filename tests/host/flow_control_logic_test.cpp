@@ -44,10 +44,10 @@ void test_stale_zero_should_not_cause_dip() {
   assert(!r3.in_startup_hold);
   assert(!r3.failsafe);
   // sp_f should have been seeded to pv (824) then ramped towards 800 -> 800? or 824->800 ramp limited but close
-  // With pv 824, sp_target 800, sp_f seeded to 824, then ramp down by 15*10=150 towards 800 => sp_f=800? Actually d=800-824=-24, max_step=150, so sp_f=800
-  // Then e = 800-824 = -24 -> deadband? 24 outside deadband 10 -> e=-24
-  // u = kp*e = -2.16 plus small integral, limited to -80 (u_down 80) -> pwm = 400 - (-2) = ~402 (slightly harder)
-  // Crucially NOT 452.
+  // With pv 824, sp_target 800, sp_f seeded to 824, then ramp down by 15*10=150 towards 800 => sp_f=800? Actually
+  // d=800-824=-24, max_step=150, so sp_f=800 Then e = 800-824 = -24 -> deadband? 24 outside deadband 10 -> e=-24 u =
+  // kp*e = -2.16 plus small integral, limited to -80 (u_down 80) -> pwm = 400 - (-2) = ~402 (slightly harder) Crucially
+  // NOT 452.
   assert(r3.pwm < 430);  // no large 452 jump
   assert(r3.pwm > 380 && r3.pwm < 430);
   // Extra tick should stay stable around 400-420, not drift to 477
@@ -75,7 +75,8 @@ void test_low_flow_should_pump_harder() {
   in.pv = 350.0f;
   auto r = update_pi(s, in);
   assert(!r.failsafe);
-  // e = sp_f - pv, sp_f seeded to 350 then ramp to 500 (250 step) => e ~150 -> positive -> u positive -> pwm = 400 - positive = <400 (harder)
+  // e = sp_f - pv, sp_f seeded to 350 then ramp to 500 (250 step) => e ~150 -> positive -> u positive -> pwm = 400 -
+  // positive = <400 (harder)
   assert(r.pwm < 400);
   assert(r.pwm >= 50);
 }

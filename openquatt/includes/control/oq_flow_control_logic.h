@@ -18,10 +18,8 @@ inline int clamp_ipwm(int value) {
 // the fixed 400 commissioning seed so flow is closer to target and the
 // stale sp_f transient from #464 is not amplified. Other CM100 tasks keep
 // the fixed commissioning seed for reproducibility.
-inline int compute_start_pwm(bool commissioning_start, int commissioning_task_code,
-                             int commissioning_start_pwm, int last_good_pwm,
-                             int fallback_pwm, bool cooling_target,
-                             int last_good_pwm_cooling) {
+inline int compute_start_pwm(bool commissioning_start, int commissioning_task_code, int commissioning_start_pwm,
+                             int last_good_pwm, int fallback_pwm, bool cooling_target, int last_good_pwm_cooling) {
   const int fallback = clamp_ipwm(fallback_pwm);
   // TASK_BOILER_POWER_TEST == 1, keep dependency local to avoid header cycle.
   constexpr int kTaskBoiler = 1;
@@ -39,10 +37,10 @@ inline int compute_start_pwm(bool commissioning_start, int commissioning_task_co
 }
 
 struct State {
-  float sp_f = NAN;        // filtered setpoint, NAN means not yet seeded
-  float integral = 0.0f;   // oq_flow_i
-  float last_e = 0.0f;     // last_pi_e
-  int startup_hold = 0;    // ticks remaining in AUTO(starting)
+  float sp_f = NAN;       // filtered setpoint, NAN means not yet seeded
+  float integral = 0.0f;  // oq_flow_i
+  float last_e = 0.0f;    // last_pi_e
+  int startup_hold = 0;   // ticks remaining in AUTO(starting)
   int stable_cnt = 0;
   bool pi_failsafe = false;
 };
@@ -69,7 +67,7 @@ struct PiResult {
 // but is fully host-testable. The fix for #464 is that sp_f is kept NAN
 // during startup_hold instead of being seeded with a stale/zero pv each
 // tick, so the first real PI step seeds sp_f from the actual pv.
-inline PiResult update_pi(State &state, const PiInputs &in) {
+inline PiResult update_pi(State& state, const PiInputs& in) {
   PiResult res{};
   res.sp_f = state.sp_f;
   res.integral = state.integral;
