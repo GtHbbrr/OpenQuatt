@@ -82,6 +82,7 @@ sensor:
     state_class: measurement
     accuracy_decimals: 2
     icon: mdi:gauge
+    disabled_by_default: true
     update_interval: never
 
   - platform: template
