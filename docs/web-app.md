@@ -140,11 +140,12 @@ Zie je hier al vreemde waarden, ga dan niet meteen tunen. Controleer eerst de br
 - schakelt het systeem vaak;
 - reageert de regeling logisch op setpoint en kamertemperatuur.
 
-Trendopslag kan onder `Instellingen -> Systeem` worden beheerd. Als trendopslag uit staat, stopt OpenQuatt met nieuwe trendpunten bijhouden en kan de tab minder of geen historie tonen. Bestaande flashhistorie wordt daarbij niet gewist.
+Via `Instellingen → Systeem → Gegevens bewaren` beheer je welke historie OpenQuatt bewaart. OpenQuatt maakt daarbij onderscheid tussen twee soorten geheugen:
 
-OpenQuatt bewaart de korte trendhistorie in PSRAM en kan aanvullend tot 30 dagen trendhistorie in flash bewaren. Als je flashopslag uitzet, blijft bestaande flashhistorie staan; OpenQuatt stopt dan alleen met nieuwe trenddata naar flash schrijven. Alle ondersteunde OpenQuatt-profielen gebruiken PSRAM; ontbrekende PSRAM wijst dus op een hardware- of profielprobleem.
+- **PSRAM (tijdelijk, vluchtig)** — snelle opslag voor recente diagnosegegevens en RAM-logs. Deze historie is direct beschikbaar zolang de controller online is en verdwijnt na een herstart.
+- **Flash-partitie `openquatt_data` (persistent)** — blijft bewaard na een herstart of update. Hier staan energie-dagtotalen (standaard aan, 180 dagen uurdetail), beslislog (standaard aan, maximaal 7 dagen, per uur gebundeld naar flash) en optioneel diagnosehistorie (voorlopig standaard uit tot realtime-impact is gevalideerd).
 
-Via `Instellingen → Systeem → Gegevens bewaren` zijn Diagnose, Beslislog en Energie afzonderlijk te beheren. De Beslislog bewaart maximaal zeven dagen exacte gebeurtenissen en redenen na een herstart. Nieuwe gebeurtenissen worden per uur gebundeld naar flash geschreven. Met `Nu opslaan` kunnen nog niet opgeslagen gebeurtenissen vóór een update of herstart alvast worden vastgelegd.
+Tijdelijke PSRAM-historie is op alle ondersteunde profielen standaard aan en wordt niet als aparte keuze in Quick Start getoond; ontbrekende PSRAM wijst op een hardware- of profielprobleem. Persistente flash-historie kun je per domein (Diagnose / Beslislog / Energie) aan of uit zetten onder Gegevens bewaren. Zet je een flash-optie uit, dan blijft bestaande flashhistorie gewoon staan — OpenQuatt stopt alleen met nieuw wegschrijven. Met `Nu opslaan` kun je vóór een herstart of update alvast een extra opslagmoment forceren.
 
 ## Beslislog
 
