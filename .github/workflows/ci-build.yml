@@ -6,14 +6,17 @@ on:
   pull_request:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   cpp-format:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout PR branch
         uses: actions/checkout@v6
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
 
       - name: Install clang-format
         run: |
@@ -23,18 +26,19 @@ jobs:
           "${clang_format_venv}/bin/python" -m pip install --disable-pip-version-check "clang-format==${clang_format_version}"
           echo "${clang_format_venv}/bin" >> "${GITHUB_PATH}"
 
-      - name: Format C/C++ sources for repair
-        run: python3 scripts/cpp_format.py fix
-
-      - name: Upload formatted crash telemetry sources
-        uses: actions/upload-artifact@v6
-        with:
-          name: cpp-format-repair
-          if-no-files-found: error
-          path: |
-            components/openquatt_crash_telemetry/*.cpp
-            components/openquatt_crash_telemetry/*.h
-            tests/host/openquatt_crash_telemetry_policy_test.cpp
+      - name: Format and push repair
+        env:
+          HEAD_BRANCH: ${{ github.head_ref }}
+          BASE_BRANCH: ${{ github.base_ref }}
+        run: |
+          python3 scripts/cpp_format.py fix
+          git fetch origin "${BASE_BRANCH}"
+          git checkout "origin/${BASE_BRANCH}" -- .github/workflows/ci-build.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add components/openquatt_crash_telemetry tests/host/openquatt_crash_telemetry_policy_test.cpp .github/workflows/ci-build.yml
+          git commit -m "Formatteer crashtelemetrie"
+          git push origin "HEAD:${HEAD_BRANCH}"
 
   docs-consistency:
     runs-on: ubuntu-latest
