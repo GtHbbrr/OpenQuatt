@@ -15,6 +15,9 @@ CONF_TOPIC = "topic"
 CONF_USAGE_SWITCH = "usage_switch"
 CONF_INSTALLATION_ID_SENSOR = "installation_id_sensor"
 CONF_SETUP_COMPLETE_SENSOR = "setup_complete_sensor"
+CONF_SOURCE_REPOSITORY = "source_repository"
+CONF_SOURCE_COMMIT = "source_commit"
+CONF_BUILD_TARGET = "build_target"
 CONF_FIRMWARE_VERSION = "firmware_version"
 CONF_RELEASE_CHANNEL = "release_channel"
 CONF_HARDWARE_PROFILE = "hardware_profile"
@@ -35,10 +38,14 @@ CONFIG_SCHEMA = cv.All(
     cv.Schema(
         {
             cv.GenerateID(): cv.declare_id(OpenQuattCrashTelemetry),
-            cv.Optional(CONF_BROKER, default=""): cv.All(cv.string_strict, cv.Length(max=128)),
+            cv.Optional(CONF_BROKER, default=""): cv.All(
+                cv.string_strict, cv.Length(max=128)
+            ),
             cv.Optional(CONF_PORT, default=8883): cv.port,
             cv.Optional(CONF_TLS, default=True): cv.boolean,
-            cv.Optional(CONF_USERNAME, default=""): cv.All(cv.string_strict, cv.Length(max=96)),
+            cv.Optional(CONF_USERNAME, default=""): cv.All(
+                cv.string_strict, cv.Length(max=96)
+            ),
             cv.Optional(CONF_PASSWORD, default=""): cv.sensitive(
                 cv.All(cv.string_strict, cv.Length(max=192))
             ),
@@ -46,11 +53,30 @@ CONFIG_SCHEMA = cv.All(
             cv.Required(CONF_USAGE_SWITCH): cv.use_id(switch.Switch),
             cv.Required(CONF_INSTALLATION_ID_SENSOR): cv.use_id(text_sensor.TextSensor),
             cv.Required(CONF_SETUP_COMPLETE_SENSOR): cv.use_id(binary_sensor.BinarySensor),
-            cv.Required(CONF_FIRMWARE_VERSION): cv.All(cv.string_strict, cv.Length(max=32)),
-            cv.Required(CONF_RELEASE_CHANNEL): cv.All(cv.string_strict, cv.Length(max=16)),
-            cv.Required(CONF_HARDWARE_PROFILE): cv.All(cv.string_strict, cv.Length(max=32)),
-            cv.Required(CONF_TOPOLOGY): cv.All(cv.string_strict, cv.Length(max=16)),
-            cv.Required(CONF_CONNECTION): cv.All(cv.string_strict, cv.Length(max=16)),
+            cv.Required(CONF_SOURCE_REPOSITORY): cv.All(
+                cv.string_strict, cv.Length(min=1, max=97)
+            ),
+            cv.Required(CONF_SOURCE_COMMIT): cv.All(
+                cv.string_strict, cv.Length(min=1, max=40)
+            ),
+            cv.Required(CONF_BUILD_TARGET): cv.All(
+                cv.string_strict, cv.Length(min=1, max=96)
+            ),
+            cv.Required(CONF_FIRMWARE_VERSION): cv.All(
+                cv.string_strict, cv.Length(max=32)
+            ),
+            cv.Required(CONF_RELEASE_CHANNEL): cv.All(
+                cv.string_strict, cv.Length(max=16)
+            ),
+            cv.Required(CONF_HARDWARE_PROFILE): cv.All(
+                cv.string_strict, cv.Length(max=32)
+            ),
+            cv.Required(CONF_TOPOLOGY): cv.All(
+                cv.string_strict, cv.Length(max=16)
+            ),
+            cv.Required(CONF_CONNECTION): cv.All(
+                cv.string_strict, cv.Length(max=16)
+            ),
         }
     ).extend(cv.COMPONENT_SCHEMA),
     validate_config,
@@ -77,6 +103,9 @@ async def to_code(config):
     cg.add(var.set_installation_id_sensor(installation_id_sensor))
     setup_complete_sensor = await cg.get_variable(config[CONF_SETUP_COMPLETE_SENSOR])
     cg.add(var.set_setup_complete_sensor(setup_complete_sensor))
+    cg.add(var.set_source_repository(config[CONF_SOURCE_REPOSITORY]))
+    cg.add(var.set_source_commit(config[CONF_SOURCE_COMMIT]))
+    cg.add(var.set_build_target(config[CONF_BUILD_TARGET]))
     cg.add(var.set_firmware_version(config[CONF_FIRMWARE_VERSION]))
     cg.add(var.set_release_channel(config[CONF_RELEASE_CHANNEL]))
     cg.add(var.set_hardware_profile(config[CONF_HARDWARE_PROFILE]))
