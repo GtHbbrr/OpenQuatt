@@ -2,7 +2,8 @@
 """Check exact documentation contracts and changed-file documentation impact.
 
 Exact contract violations always fail. Changed-file impact findings are warnings
-by default and fail when ``--strict`` is used for pull requests.
+by default (advisory, see #518) and fail when ``--strict`` is used for pull requests.
+PR-template documentatiekeuzes zijn exclusief: exact één checkbox moet geselecteerd zijn.
 """
 
 from __future__ import annotations
@@ -22,6 +23,7 @@ from typing import Iterable
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DOCS_IMPACT_PATH = REPO_ROOT / ".github/docs-impact.json"
 NO_DOCS_CHECKBOX = "Geen documentatiewijziging nodig"
+DOCS_UPDATED_CHECKBOX = "Documentatie bijgewerkt voor de gebruikersgerichte wijziging"
 DOCS_MOTIVATION_LABEL = "Docs-impact motivatie:"
 
 
@@ -139,23 +141,59 @@ def matching_files(changed: set[str], patterns: list[str]) -> set[str]:
     }
 
 
-def docs_impact_exemption() -> tuple[bool, str | None]:
+def _read_pr_body() -> tuple[str | None, str | None]:
+    """Return PR body or (None, error). Only for pull_request events."""
     if os.getenv("GITHUB_EVENT_NAME") != "pull_request":
-        return False, None
-
+        return None, None
     event_path = os.getenv("GITHUB_EVENT_PATH", "").strip()
     if not event_path:
-        return False, None
+        return None, None
     try:
         event = json.loads(Path(event_path).read_text(encoding="utf-8"))
         body = event.get("pull_request", {}).get("body") or ""
+        return body, None
     except (AttributeError, OSError, json.JSONDecodeError):
-        return False, "Kan de PR-beschrijving niet lezen om de docs-uitzondering te controleren."
+        return None, "Kan de PR-beschrijving niet lezen om de docs-uitzondering te controleren."
 
-    checked = re.search(
-        rf"(?im)^\s*-\s*\[[xX]\]\s*{re.escape(NO_DOCS_CHECKBOX)}\s*$",
-        body,
+
+def _is_checkbox_checked(body: str, label: str) -> bool:
+    return bool(
+        re.search(
+            rf"(?im)^\s*-\s*\[[xX]\]\s*{re.escape(label)}\s*$",
+            body,
+        )
     )
+
+
+def validate_docs_checkboxes(findings: list[Finding], body: str | None) -> None:
+    if body is None:
+        return
+    has_updated = _is_checkbox_checked(body, DOCS_UPDATED_CHECKBOX)
+    has_no_docs = _is_checkbox_checked(body, NO_DOCS_CHECKBOX)
+    if has_updated and has_no_docs:
+        add(
+            findings,
+            ".github/pull_request_template.md",
+            1,
+            f"Kies exact één documentatie-optie: '{DOCS_UPDATED_CHECKBOX}' of '{NO_DOCS_CHECKBOX}', niet beide.",
+        )
+    elif not has_updated and not has_no_docs:
+        add(
+            findings,
+            ".github/pull_request_template.md",
+            1,
+            f"Kies één documentatie-optie: '{DOCS_UPDATED_CHECKBOX}' of '{NO_DOCS_CHECKBOX}'.",
+        )
+
+
+def docs_impact_exemption() -> tuple[bool, str | None]:
+    body, error = _read_pr_body()
+    if error:
+        return False, error
+    if body is None:
+        return False, None
+
+    checked = _is_checkbox_checked(body, NO_DOCS_CHECKBOX)
     if not checked:
         return False, None
 
@@ -242,6 +280,11 @@ def main() -> int:
     except ValueError as exc:
         docs_impact_rules = []
         add(findings, ".github/docs-impact.json", 1, str(exc))
+
+    # PR-template: documentatiekeuzes zijn exclusief (acceptatiecriteria #518).
+    pr_body, _ = _read_pr_body()
+    if pr_body is not None:
+        validate_docs_checkboxes(findings, pr_body)
 
     companion_repo_url = "https://github.com/OpenQuatt/home-assistant-openquatt"
     docs_settings = REPO_ROOT / "docs/instellingen-en-meetwaarden.md"
