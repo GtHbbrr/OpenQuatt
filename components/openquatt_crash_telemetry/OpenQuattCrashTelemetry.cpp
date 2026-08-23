@@ -6,6 +6,7 @@
 #include <cstring>
 
 #include "esp_app_desc.h"
+#include "esp_random.h"
 #include "esp_system.h"
 #include "esphome/components/esp32/crash_handler.h"
 #include "esphome/components/logger/logger.h"
