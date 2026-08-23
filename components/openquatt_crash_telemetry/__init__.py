@@ -63,7 +63,7 @@ CONFIG_SCHEMA = cv.All(
             cv.Required(CONF_BUILD_TARGET): cv.All(
                 cv.string_strict, cv.Length(min=1, max=96)
             ),
-            cv.Required(CONF_RELEASE_MANIFEST_URL): cv.All(
+            cv.Optional(CONF_RELEASE_MANIFEST_URL, default=""): cv.All(
                 cv.string_strict, cv.Length(max=256)
             ),
             cv.Required(CONF_FIRMWARE_VERSION): cv.All(
