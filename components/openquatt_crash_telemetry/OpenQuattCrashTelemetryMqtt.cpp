@@ -56,8 +56,12 @@ bool OpenQuattCrashTelemetry::build_crash_payload_() {
   writer.append_json_string(record.source_commit);
   append_json_key(writer, "build_target");
   writer.append_json_string(record.build_target);
+  append_json_key(writer, "release_manifest_url");
+  writer.append_json_string(record.release_manifest_url);
   append_json_key(writer, "reporting_build_epoch");
   writer.append_uint(record.build_epoch);
+  append_json_key(writer, "esphome_config_hash");
+  writer.append_uint(record.config_hash);
   append_json_key(writer, "firmware_version");
   writer.append_json_string(record.firmware_version);
   append_json_key(writer, "release_channel");
