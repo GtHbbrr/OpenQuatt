@@ -9,7 +9,8 @@ export const WEB_BUNDLE_BUDGETS = [
     // its read-only sensor-correction summary, calibration backup/restore,
     // the read-only ODU EEPROM service export, API ingress source controls,
     // concise CM100 boiler test phase copy (FLOW_SETTLING/BOILER_SETTLING/MEASURING/COOLDOWN),
-    // and pump/ODU incident diagnostics.
+    // pump/ODU incident diagnostics,
+    // and the optional Power House external heat demand source card.
     raw: 906_000,
     // One-time migration ceiling for structured incident monitoring, replay,
     // the CSRF-protected deferred recovery actions, and their compact editor.

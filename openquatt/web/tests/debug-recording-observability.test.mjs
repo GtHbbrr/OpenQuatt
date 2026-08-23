@@ -16,6 +16,7 @@ const FIRMWARE_ENTITY_PACKAGES = [
   "../../oq_sensor_sources.yaml",
   "../../oq_sensor_source_selects_opentherm.yaml",
   "../../oq_ot_slave.yaml",
+  "../../oq_power_house_strategy.yaml",
 ];
 
 const OBSERVABILITY_KEYS = [
@@ -57,7 +58,17 @@ const ISSUE_473_OBSERVABILITY_KEYS = [
   "otThermostatChEnable",
 ];
 
-const ADDED_OBSERVABILITY_KEYS = [...OBSERVABILITY_KEYS, ...ISSUE_473_OBSERVABILITY_KEYS];
+const ISSUE_489_OBSERVABILITY_KEYS = [
+  "externalHeatDemandSource",
+  "externalHeatDemandSelected",
+  "powerHouseDemandSource",
+];
+
+const ADDED_OBSERVABILITY_KEYS = [
+  ...OBSERVABILITY_KEYS,
+  ...ISSUE_473_OBSERVABILITY_KEYS,
+  ...ISSUE_489_OBSERVABILITY_KEYS,
+];
 
 test("debugobservability wordt additief achter het bestaande opnamecontract geplaatst", () => {
   const legacyTailIndex = DEBUG_RECORDING_KEYS.indexOf("otLinkProblem");
@@ -67,7 +78,19 @@ test("debugobservability wordt additief achter het bestaande opnamecontract gepl
     DEBUG_RECORDING_KEYS.slice(legacyTailIndex + 1, legacyTailIndex + 1 + OBSERVABILITY_KEYS.length),
     OBSERVABILITY_KEYS,
   );
-  assert.deepEqual(DEBUG_RECORDING_KEYS.slice(legacyTailIndex + 1 + OBSERVABILITY_KEYS.length), ISSUE_473_OBSERVABILITY_KEYS);
+  assert.deepEqual(
+    DEBUG_RECORDING_KEYS.slice(
+      legacyTailIndex + 1 + OBSERVABILITY_KEYS.length,
+      legacyTailIndex + 1 + OBSERVABILITY_KEYS.length + ISSUE_473_OBSERVABILITY_KEYS.length,
+    ),
+    ISSUE_473_OBSERVABILITY_KEYS,
+  );
+  assert.deepEqual(
+    DEBUG_RECORDING_KEYS.slice(
+      legacyTailIndex + 1 + OBSERVABILITY_KEYS.length + ISSUE_473_OBSERVABILITY_KEYS.length,
+    ),
+    ISSUE_489_OBSERVABILITY_KEYS,
+  );
   assert.equal(new Set(DEBUG_RECORDING_KEYS).size, DEBUG_RECORDING_KEYS.length);
   assert.ok(DEBUG_RECORDING_KEYS.length <= 188, "debugrecorder heeft maximaal 188 entityvelden naast 4 systeemvelden");
 });
