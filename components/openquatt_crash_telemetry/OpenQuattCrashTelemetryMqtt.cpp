@@ -245,17 +245,21 @@ void OpenQuattCrashTelemetry::mqtt_event_handler_(void *handler_args, esp_event_
 
   switch (event_id) {
     case MQTT_EVENT_CONNECTED: {
-      const CrashPublishKind kind = self->active_kind_.load();
-      if (!crash_data_may_be_published(kind, self->consent_enabled_.load(), self->setup_complete_.load())) {
+      if (!self->lock_gate_()) {
         self->session_failed_.store(true);
         App.wake_loop_threadsafe();
         break;
       }
-      static const char EMPTY_PAYLOAD[] = "";
-      const char *payload = kind == CrashPublishKind::TOMBSTONE ? EMPTY_PAYLOAD : self->payload_buffer_.data();
-      const size_t payload_size = kind == CrashPublishKind::TOMBSTONE ? 0U : self->payload_size_;
-      const int message_id = esp_mqtt_client_enqueue(event->client, self->topic_buffer_.data(), payload,
-                                                     static_cast<int>(payload_size), 1, 1, true);
+      const CrashPublishKind kind = self->active_kind_.load();
+      int message_id = -1;
+      if (crash_data_may_be_published(kind, self->consent_enabled_.load(), self->setup_complete_.load())) {
+        static const char EMPTY_PAYLOAD[] = "";
+        const char *payload = kind == CrashPublishKind::TOMBSTONE ? EMPTY_PAYLOAD : self->payload_buffer_.data();
+        const size_t payload_size = kind == CrashPublishKind::TOMBSTONE ? 0U : self->payload_size_;
+        message_id = esp_mqtt_client_enqueue(event->client, self->topic_buffer_.data(), payload,
+                                             static_cast<int>(payload_size), 1, 1, true);
+      }
+      self->unlock_gate_();
       if (message_id < 0) {
         self->session_failed_.store(true);
       } else {
