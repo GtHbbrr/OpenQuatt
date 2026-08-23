@@ -33,6 +33,7 @@ class OpenQuattCrashTelemetry : public Component {
   void set_source_repository(const std::string &value) { this->source_repository_ = value; }
   void set_source_commit(const std::string &value) { this->source_commit_ = value; }
   void set_build_target(const std::string &value) { this->build_target_ = value; }
+  void set_release_manifest_url(const std::string &value) { this->release_manifest_url_ = value; }
   void set_firmware_version(const std::string &value) { this->firmware_version_ = value; }
   void set_release_channel(const std::string &value) { this->release_channel_ = value; }
   void set_hardware_profile(const std::string &value) { this->hardware_profile_ = value; }
@@ -67,12 +68,14 @@ class OpenQuattCrashTelemetry : public Component {
     uint16_t report_length;
     uint16_t reserved2;
     uint32_t build_epoch;
+    uint32_t config_hash;
     uint32_t reset_reason;
     char crash_id[37];
     char build_id[65];
     char source_repository[98];
     char source_commit[41];
     char build_target[97];
+    char release_manifest_url[257];
     char firmware_version[33];
     char release_channel[17];
     char esphome_version[17];
@@ -134,6 +137,7 @@ class OpenQuattCrashTelemetry : public Component {
   std::string source_repository_;
   std::string source_commit_;
   std::string build_target_;
+  std::string release_manifest_url_;
   std::string firmware_version_;
   std::string release_channel_;
   std::string hardware_profile_;
