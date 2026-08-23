@@ -21,24 +21,24 @@ namespace esphome::openquatt_crash_telemetry {
 
 class OpenQuattCrashTelemetry : public Component {
  public:
-  void set_broker(const std::string &value) { this->broker_ = value; }
+  void set_broker(const std::string& value) { this->broker_ = value; }
   void set_port(uint16_t value) { this->port_ = value; }
   void set_tls(bool value) { this->tls_ = value; }
-  void set_username(const std::string &value) { this->username_ = value; }
-  void set_password(const std::string &value) { this->password_ = value; }
-  void set_topic(const std::string &value) { this->topic_ = value; }
-  void set_usage_switch(switch_::Switch *value) { this->usage_switch_ = value; }
-  void set_installation_id_sensor(text_sensor::TextSensor *value) { this->installation_id_sensor_ = value; }
-  void set_setup_complete_sensor(binary_sensor::BinarySensor *value) { this->setup_complete_sensor_ = value; }
-  void set_source_repository(const std::string &value) { this->source_repository_ = value; }
-  void set_source_commit(const std::string &value) { this->source_commit_ = value; }
-  void set_build_target(const std::string &value) { this->build_target_ = value; }
-  void set_release_manifest_url(const std::string &value) { this->release_manifest_url_ = value; }
-  void set_firmware_version(const std::string &value) { this->firmware_version_ = value; }
-  void set_release_channel(const std::string &value) { this->release_channel_ = value; }
-  void set_hardware_profile(const std::string &value) { this->hardware_profile_ = value; }
-  void set_topology(const std::string &value) { this->topology_ = value; }
-  void set_connection(const std::string &value) { this->connection_ = value; }
+  void set_username(const std::string& value) { this->username_ = value; }
+  void set_password(const std::string& value) { this->password_ = value; }
+  void set_topic(const std::string& value) { this->topic_ = value; }
+  void set_usage_switch(switch_::Switch* value) { this->usage_switch_ = value; }
+  void set_installation_id_sensor(text_sensor::TextSensor* value) { this->installation_id_sensor_ = value; }
+  void set_setup_complete_sensor(binary_sensor::BinarySensor* value) { this->setup_complete_sensor_ = value; }
+  void set_source_repository(const std::string& value) { this->source_repository_ = value; }
+  void set_source_commit(const std::string& value) { this->source_commit_ = value; }
+  void set_build_target(const std::string& value) { this->build_target_ = value; }
+  void set_release_manifest_url(const std::string& value) { this->release_manifest_url_ = value; }
+  void set_firmware_version(const std::string& value) { this->firmware_version_ = value; }
+  void set_release_channel(const std::string& value) { this->release_channel_ = value; }
+  void set_hardware_profile(const std::string& value) { this->hardware_profile_ = value; }
+  void set_topology(const std::string& value) { this->topology_ = value; }
+  void set_connection(const std::string& value) { this->connection_ = value; }
 
   void setup() override;
   void loop() override;
@@ -101,9 +101,9 @@ class OpenQuattCrashTelemetry : public Component {
   static_assert(sizeof(StateStorage) < 64U, "Crash telemetry state should remain small");
 
   void capture_pending_crash_();
-  void on_log_(const char *tag, const char *message, size_t message_len);
+  void on_log_(const char* tag, const char* message, size_t message_len);
   void on_consent_state_(bool enabled);
-  void on_installation_id_(const std::string &installation_id);
+  void on_installation_id_(const std::string& installation_id);
   void on_setup_complete_(bool complete);
 
   bool load_record_();
@@ -121,12 +121,12 @@ class OpenQuattCrashTelemetry : public Component {
   bool lock_gate_() const;
   void unlock_gate_() const;
 
-  static uint32_t checksum_(const void *data, size_t length);
-  static bool copy_text_(char *destination, size_t destination_size, const std::string &source);
-  static bool copy_text_(char *destination, size_t destination_size, const char *source);
-  static void random_uuid_(char *destination, size_t destination_size);
-  static const char *extract_message_body_(const char *message);
-  static void mqtt_event_handler_(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data);
+  static uint32_t checksum_(const void* data, size_t length);
+  static bool copy_text_(char* destination, size_t destination_size, const std::string& source);
+  static bool copy_text_(char* destination, size_t destination_size, const char* source);
+  static void random_uuid_(char* destination, size_t destination_size);
+  static const char* extract_message_body_(const char* message);
+  static void mqtt_event_handler_(void* handler_args, esp_event_base_t base, int32_t event_id, void* event_data);
 
   std::string broker_;
   uint16_t port_{8883U};
@@ -145,9 +145,9 @@ class OpenQuattCrashTelemetry : public Component {
   std::string connection_;
   std::string client_id_;
 
-  switch_::Switch *usage_switch_{nullptr};
-  text_sensor::TextSensor *installation_id_sensor_{nullptr};
-  binary_sensor::BinarySensor *setup_complete_sensor_{nullptr};
+  switch_::Switch* usage_switch_{nullptr};
+  text_sensor::TextSensor* installation_id_sensor_{nullptr};
+  binary_sensor::BinarySensor* setup_complete_sensor_{nullptr};
 
   StaticSemaphore_t gate_mutex_storage_{};
   SemaphoreHandle_t gate_mutex_{nullptr};

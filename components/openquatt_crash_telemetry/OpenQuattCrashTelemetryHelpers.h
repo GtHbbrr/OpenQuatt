@@ -10,7 +10,7 @@ namespace esphome::openquatt_crash_telemetry::detail {
 
 class FixedWriter {
  public:
-  FixedWriter(char *data, size_t capacity) : data_(data), capacity_(capacity) {
+  FixedWriter(char* data, size_t capacity) : data_(data), capacity_(capacity) {
     if (this->data_ == nullptr || this->capacity_ == 0U) {
       this->ok_ = false;
     } else {
@@ -18,11 +18,11 @@ class FixedWriter {
     }
   }
 
-  void append(const char *value) {
+  void append(const char* value) {
     if (value != nullptr) this->append(value, std::strlen(value));
   }
 
-  void append(const char *value, size_t length) {
+  void append(const char* value, size_t length) {
     if (!this->ok_ || value == nullptr || length >= this->capacity_ - this->size_) {
       this->ok_ = false;
       return;
@@ -44,7 +44,7 @@ class FixedWriter {
     this->append(buffer, static_cast<size_t>(written));
   }
 
-  void append_json_string(const char *value, size_t length) {
+  void append_json_string(const char* value, size_t length) {
     this->append_char('"');
     for (size_t index = 0U; index < length && this->ok_; ++index) {
       const unsigned char c = static_cast<unsigned char>(value[index]);
@@ -84,7 +84,7 @@ class FixedWriter {
     this->append_char('"');
   }
 
-  void append_json_string(const char *value) {
+  void append_json_string(const char* value) {
     if (value == nullptr) {
       this->append("null");
       return;
@@ -96,19 +96,19 @@ class FixedWriter {
   size_t size() const { return this->size_; }
 
  private:
-  char *data_{nullptr};
+  char* data_{nullptr};
   size_t capacity_{0U};
   size_t size_{0U};
   bool ok_{true};
 };
 
-inline void append_json_key(FixedWriter &writer, const char *key) {
+inline void append_json_key(FixedWriter& writer, const char* key) {
   writer.append(",\"");
   writer.append(key);
   writer.append("\":");
 }
 
-inline const char *reset_reason_name(esp_reset_reason_t reason) {
+inline const char* reset_reason_name(esp_reset_reason_t reason) {
   switch (reason) {
     case ESP_RST_POWERON:
       return "power_on";
@@ -133,8 +133,6 @@ inline const char *reset_reason_name(esp_reset_reason_t reason) {
   }
 }
 
-inline bool valid_installation_id(const char *value) {
-  return value != nullptr && std::strlen(value) == 36U;
-}
+inline bool valid_installation_id(const char* value) { return value != nullptr && std::strlen(value) == 36U; }
 
 }  // namespace esphome::openquatt_crash_telemetry::detail

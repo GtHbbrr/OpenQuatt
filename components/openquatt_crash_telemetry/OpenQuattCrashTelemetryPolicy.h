@@ -23,8 +23,7 @@ inline constexpr CrashPublishKind select_crash_publish_kind(bool tombstone_pendi
 
 inline constexpr bool should_request_tombstone(bool previous_consent_known, bool previous_consent_enabled,
                                                bool current_consent_enabled, bool installation_id_available) {
-  return previous_consent_known && previous_consent_enabled && !current_consent_enabled &&
-         installation_id_available;
+  return previous_consent_known && previous_consent_enabled && !current_consent_enabled && installation_id_available;
 }
 
 inline constexpr bool crash_data_may_be_published(CrashPublishKind kind, bool consent_enabled, bool setup_complete) {

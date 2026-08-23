@@ -2,8 +2,8 @@
 
 #include "components/openquatt_crash_telemetry/OpenQuattCrashTelemetryPolicy.h"
 
-using esphome::openquatt_crash_telemetry::CrashPublishKind;
 using esphome::openquatt_crash_telemetry::crash_data_may_be_published;
+using esphome::openquatt_crash_telemetry::CrashPublishKind;
 using esphome::openquatt_crash_telemetry::select_crash_publish_kind;
 using esphome::openquatt_crash_telemetry::should_request_tombstone;
 

@@ -10,10 +10,10 @@
 namespace esphome::openquatt_crash_telemetry {
 namespace {
 
-static const char *const TAG = "openquatt.crash_telemetry";
+static const char* const TAG = "openquatt.crash_telemetry";
 
-using detail::FixedWriter;
 using detail::append_json_key;
+using detail::FixedWriter;
 using detail::reset_reason_name;
 using detail::valid_installation_id;
 
@@ -38,7 +38,7 @@ bool OpenQuattCrashTelemetry::build_crash_payload_() {
   }
   if (!this->payload_buffer_.allocate_external(CRASH_PAYLOAD_CAPACITY + 1U)) return false;
 
-  const CrashRecord &record = *this->record_.data();
+  const CrashRecord& record = *this->record_.data();
   FixedWriter writer(this->payload_buffer_.data(), this->payload_buffer_.size());
   writer.append("{\"schema_version\":1,\"message_id\":");
   writer.append_json_string(record.crash_id);
@@ -223,9 +223,9 @@ void OpenQuattCrashTelemetry::loop() {
 
   if (!this->state_ || !this->record_ || !this->consent_seen_ || !this->is_configured() || !network::is_connected())
     return;
-  const CrashPublishKind kind = select_crash_publish_kind(
-      this->state_.data()->tombstone_pending != 0U, this->consent_enabled_.load(), this->setup_complete_.load(),
-      this->record_.data()->pending != 0U);
+  const CrashPublishKind kind =
+      select_crash_publish_kind(this->state_.data()->tombstone_pending != 0U, this->consent_enabled_.load(),
+                                this->setup_complete_.load(), this->record_.data()->pending != 0U);
   if (kind == CrashPublishKind::NONE || !valid_installation_id(this->state_.data()->installation_id)) return;
   if (this->next_attempt_ms_ == 0U) this->next_attempt_ms_ = millis() + INITIAL_PUBLISH_DELAY_MS;
   if (static_cast<int32_t>(millis() - this->next_attempt_ms_) < 0) return;
@@ -240,11 +240,11 @@ void OpenQuattCrashTelemetry::dump_config() {
   ESP_LOGCONFIG(TAG, "  Consent observed: %s", YESNO(this->consent_seen_));
 }
 
-void OpenQuattCrashTelemetry::mqtt_event_handler_(void *handler_args, esp_event_base_t base, int32_t event_id,
-                                                   void *event_data) {
-  (void) base;
-  auto *self = static_cast<OpenQuattCrashTelemetry *>(handler_args);
-  auto *event = static_cast<esp_mqtt_event_handle_t>(event_data);
+void OpenQuattCrashTelemetry::mqtt_event_handler_(void* handler_args, esp_event_base_t base, int32_t event_id,
+                                                  void* event_data) {
+  (void)base;
+  auto* self = static_cast<OpenQuattCrashTelemetry*>(handler_args);
+  auto* event = static_cast<esp_mqtt_event_handle_t>(event_data);
   if (self == nullptr || event == nullptr || !self->session_active_.load()) return;
 
   switch (event_id) {
@@ -258,7 +258,7 @@ void OpenQuattCrashTelemetry::mqtt_event_handler_(void *handler_args, esp_event_
       int message_id = -1;
       if (crash_data_may_be_published(kind, self->consent_enabled_.load(), self->setup_complete_.load())) {
         static const char EMPTY_PAYLOAD[] = "";
-        const char *payload = kind == CrashPublishKind::TOMBSTONE ? EMPTY_PAYLOAD : self->payload_buffer_.data();
+        const char* payload = kind == CrashPublishKind::TOMBSTONE ? EMPTY_PAYLOAD : self->payload_buffer_.data();
         const size_t payload_size = kind == CrashPublishKind::TOMBSTONE ? 0U : self->payload_size_;
         message_id = esp_mqtt_client_enqueue(event->client, self->topic_buffer_.data(), payload,
                                              static_cast<int>(payload_size), 1, 1, true);
