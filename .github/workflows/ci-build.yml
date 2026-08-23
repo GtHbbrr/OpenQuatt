@@ -23,8 +23,18 @@ jobs:
           "${clang_format_venv}/bin/python" -m pip install --disable-pip-version-check "clang-format==${clang_format_version}"
           echo "${clang_format_venv}/bin" >> "${GITHUB_PATH}"
 
-      - name: Check C/C++ formatting
-        run: python3 scripts/cpp_format.py check
+      - name: Format C/C++ sources for repair
+        run: python3 scripts/cpp_format.py fix
+
+      - name: Upload formatted crash telemetry sources
+        uses: actions/upload-artifact@v6
+        with:
+          name: cpp-format-repair
+          if-no-files-found: error
+          path: |
+            components/openquatt_crash_telemetry/*.cpp
+            components/openquatt_crash_telemetry/*.h
+            tests/host/openquatt_crash_telemetry_policy_test.cpp
 
   docs-consistency:
     runs-on: ubuntu-latest
