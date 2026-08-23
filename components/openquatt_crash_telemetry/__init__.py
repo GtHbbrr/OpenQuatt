@@ -18,6 +18,7 @@ CONF_SETUP_COMPLETE_SENSOR = "setup_complete_sensor"
 CONF_SOURCE_REPOSITORY = "source_repository"
 CONF_SOURCE_COMMIT = "source_commit"
 CONF_BUILD_TARGET = "build_target"
+CONF_RELEASE_MANIFEST_URL = "release_manifest_url"
 CONF_FIRMWARE_VERSION = "firmware_version"
 CONF_RELEASE_CHANNEL = "release_channel"
 CONF_HARDWARE_PROFILE = "hardware_profile"
@@ -61,6 +62,9 @@ CONFIG_SCHEMA = cv.All(
             ),
             cv.Required(CONF_BUILD_TARGET): cv.All(
                 cv.string_strict, cv.Length(min=1, max=96)
+            ),
+            cv.Required(CONF_RELEASE_MANIFEST_URL): cv.All(
+                cv.string_strict, cv.Length(max=256)
             ),
             cv.Required(CONF_FIRMWARE_VERSION): cv.All(
                 cv.string_strict, cv.Length(max=32)
@@ -106,6 +110,7 @@ async def to_code(config):
     cg.add(var.set_source_repository(config[CONF_SOURCE_REPOSITORY]))
     cg.add(var.set_source_commit(config[CONF_SOURCE_COMMIT]))
     cg.add(var.set_build_target(config[CONF_BUILD_TARGET]))
+    cg.add(var.set_release_manifest_url(config[CONF_RELEASE_MANIFEST_URL]))
     cg.add(var.set_firmware_version(config[CONF_FIRMWARE_VERSION]))
     cg.add(var.set_release_channel(config[CONF_RELEASE_CHANNEL]))
     cg.add(var.set_hardware_profile(config[CONF_HARDWARE_PROFILE]))
