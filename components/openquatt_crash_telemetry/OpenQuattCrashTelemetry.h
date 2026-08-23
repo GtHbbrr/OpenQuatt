@@ -5,6 +5,9 @@
 #include <cstdint>
 #include <string>
 
+#include <freertos/FreeRTOS.h>
+#include <freertos/semphr.h>
+
 #include "OpenQuattCrashTelemetryPolicy.h"
 #include "PsramBuffer.h"
 #include "esphome/components/binary_sensor/binary_sensor.h"
@@ -112,6 +115,8 @@ class OpenQuattCrashTelemetry : public Component {
   bool stop_client_();
   void schedule_retry_();
   void schedule_immediate_();
+  bool lock_gate_() const;
+  void unlock_gate_() const;
 
   static uint32_t checksum_(const void *data, size_t length);
   static bool copy_text_(char *destination, size_t destination_size, const std::string &source);
@@ -140,6 +145,8 @@ class OpenQuattCrashTelemetry : public Component {
   text_sensor::TextSensor *installation_id_sensor_{nullptr};
   binary_sensor::BinarySensor *setup_complete_sensor_{nullptr};
 
+  StaticSemaphore_t gate_mutex_storage_{};
+  SemaphoreHandle_t gate_mutex_{nullptr};
   ESPPreferenceObject record_pref_{};
   ESPPreferenceObject state_pref_{};
   openquatt_common::PsramBuffer<CrashRecord> record_{};
