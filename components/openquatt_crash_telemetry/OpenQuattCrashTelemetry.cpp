@@ -109,12 +109,21 @@ bool OpenQuattCrashTelemetry::save_record_() {
 
 bool OpenQuattCrashTelemetry::clear_record_() {
   if (!this->record_) return false;
-  const CrashRecord previous = *this->record_.data();
-  std::memset(this->record_.data(), 0, sizeof(CrashRecord));
+  CrashRecord *record = this->record_.data();
+  const uint8_t previous_pending = record->pending;
+  record->pending = 0U;
   if (this->save_record_()) return true;
-  *this->record_.data() = previous;
+  record->pending = previous_pending;
+  record->checksum = 0U;
+  record->checksum = checksum_(record, offsetof(CrashRecord, checksum));
   return false;
 }
+
+bool OpenQuattCrashTelemetry::lock_gate_() const {
+  return this->gate_mutex_ != nullptr && xSemaphoreTake(this->gate_mutex_, portMAX_DELAY) == pdTRUE;
+}
+
+void OpenQuattCrashTelemetry::unlock_gate_() const { xSemaphoreGive(this->gate_mutex_); }
 
 bool OpenQuattCrashTelemetry::load_state_() {
   if (!this->state_ || !this->state_pref_.load(this->state_.data())) return false;
@@ -143,6 +152,12 @@ bool OpenQuattCrashTelemetry::save_state_() {
 }
 
 void OpenQuattCrashTelemetry::setup() {
+  this->gate_mutex_ = xSemaphoreCreateMutexStatic(&this->gate_mutex_storage_);
+  if (this->gate_mutex_ == nullptr) {
+    ESP_LOGE(TAG, "Could not initialize crash telemetry publish gate");
+    this->mark_failed();
+    return;
+  }
   if (!this->record_.allocate_external(1U) || !this->state_.allocate_external(1U)) {
     ESP_LOGE(TAG, "Crash telemetry requires PSRAM for its bounded record buffers");
     this->mark_failed();
@@ -285,13 +300,17 @@ void OpenQuattCrashTelemetry::on_installation_id_(const std::string &installatio
 }
 
 void OpenQuattCrashTelemetry::on_setup_complete_(bool complete) {
+  if (!complete) this->setup_complete_.store(false);
+  if (!this->lock_gate_()) return;
   this->setup_complete_.store(complete);
+  this->unlock_gate_();
   if (complete && this->consent_enabled_.load() && this->record_ && this->record_.data()->pending != 0U) {
     this->next_attempt_ms_ = millis() + INITIAL_PUBLISH_DELAY_MS;
   }
 }
 
 void OpenQuattCrashTelemetry::on_consent_state_(bool enabled) {
+  if (!enabled) this->consent_enabled_.store(false);
   if (!this->state_) return;
   StateStorage *state = this->state_.data();
   bool state_changed = false;
@@ -314,7 +333,9 @@ void OpenQuattCrashTelemetry::on_consent_state_(bool enabled) {
   if (state_changed) this->save_state_();
 
   this->consent_seen_ = true;
+  if (!this->lock_gate_()) return;
   this->consent_enabled_.store(enabled);
+  this->unlock_gate_();
   if (!enabled) {
     if (this->record_ && this->record_.data()->pending != 0U && !this->clear_record_()) {
       ESP_LOGW(TAG, "Could not discard an unpublished crash after opt-out");
