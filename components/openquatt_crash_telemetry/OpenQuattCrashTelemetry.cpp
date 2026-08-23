@@ -214,12 +214,14 @@ void OpenQuattCrashTelemetry::capture_pending_crash_() {
   record->pending = 1U;
   record->captured_by_reporting_build = 1U;
   record->build_epoch = static_cast<uint32_t>(ESPHOME_BUILD_TIME);
+  record->config_hash = static_cast<uint32_t>(ESPHOME_CONFIG_HASH);
   record->reset_reason = static_cast<uint32_t>(esp_reset_reason());
   random_uuid_(record->crash_id, sizeof(record->crash_id));
   esp_app_get_elf_sha256(record->build_id, sizeof(record->build_id));
   copy_text_(record->source_repository, sizeof(record->source_repository), this->source_repository_);
   copy_text_(record->source_commit, sizeof(record->source_commit), this->source_commit_);
   copy_text_(record->build_target, sizeof(record->build_target), this->build_target_);
+  copy_text_(record->release_manifest_url, sizeof(record->release_manifest_url), this->release_manifest_url_);
   copy_text_(record->firmware_version, sizeof(record->firmware_version), this->firmware_version_);
   copy_text_(record->release_channel, sizeof(record->release_channel), this->release_channel_);
   copy_text_(record->esphome_version, sizeof(record->esphome_version), ESPHOME_VERSION);
