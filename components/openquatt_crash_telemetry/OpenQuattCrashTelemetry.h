@@ -9,12 +9,14 @@
 #include <freertos/semphr.h>
 
 #include "OpenQuattCrashTelemetryPolicy.h"
+#include "OpenQuattFlashLayout.h"
 #include "PsramBuffer.h"
 #include "esphome/components/binary_sensor/binary_sensor.h"
 #include "esphome/components/switch/switch.h"
 #include "esphome/components/text_sensor/text_sensor.h"
 #include "esphome/core/component.h"
 #include "esphome/core/preferences.h"
+#include "esp_partition.h"
 #include "mqtt_client.h"
 
 namespace esphome::openquatt_crash_telemetry {
@@ -45,6 +47,11 @@ class OpenQuattCrashTelemetry : public Component {
   void dump_config() override;
   float get_setup_priority() const override;
   bool is_configured() const { return !this->broker_.empty() && !this->topic_.empty(); }
+  bool has_pending_record() const { return this->record_ && this->record_.data()->pending != 0U; }
+  bool has_observed_consent() const { return this->consent_seen_; }
+  bool is_consent_enabled() const { return this->consent_enabled_.load(); }
+  bool has_persisted_consent() const { return this->state_ && this->state_.data()->consent_known != 0U; }
+  bool is_persisted_consent_enabled() const { return this->state_ && this->state_.data()->consent_enabled != 0U; }
 
  protected:
   static constexpr uint32_t CRASH_RECORD_MAGIC = 0x4F514352UL;  // OQCR
@@ -67,6 +74,7 @@ class OpenQuattCrashTelemetry : public Component {
     uint8_t reserved[3];
     uint16_t report_length;
     uint16_t reserved2;
+    uint32_t sequence;
     uint32_t build_epoch;
     uint32_t config_hash;
     uint32_t reset_reason;
@@ -109,6 +117,7 @@ class OpenQuattCrashTelemetry : public Component {
   bool load_record_();
   bool save_record_();
   bool clear_record_();
+  bool discard_record_();
   bool load_state_();
   bool save_state_();
   bool build_topic_();
@@ -124,6 +133,7 @@ class OpenQuattCrashTelemetry : public Component {
   static uint32_t checksum_(const void* data, size_t length);
   static bool copy_text_(char* destination, size_t destination_size, const std::string& source);
   static bool copy_text_(char* destination, size_t destination_size, const char* source);
+  static bool valid_record_(const CrashRecord& record);
   static void random_uuid_(char* destination, size_t destination_size);
   static const char* extract_message_body_(const char* message);
   static void mqtt_event_handler_(void* handler_args, esp_event_base_t base, int32_t event_id, void* event_data);
@@ -151,8 +161,9 @@ class OpenQuattCrashTelemetry : public Component {
 
   StaticSemaphore_t gate_mutex_storage_{};
   SemaphoreHandle_t gate_mutex_{nullptr};
-  ESPPreferenceObject record_pref_{};
   ESPPreferenceObject state_pref_{};
+  const esp_partition_t* flash_partition_{nullptr};
+  int8_t active_record_slot_{-1};
   openquatt_common::PsramBuffer<CrashRecord> record_{};
   openquatt_common::PsramBuffer<StateStorage> state_{};
   openquatt_common::PsramBuffer<char> topic_buffer_{};

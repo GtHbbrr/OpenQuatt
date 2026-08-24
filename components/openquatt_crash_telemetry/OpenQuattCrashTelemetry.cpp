@@ -2,6 +2,7 @@
 #include "OpenQuattCrashTelemetryAnsi.h"
 #include "OpenQuattCrashTelemetryHelpers.h"
 
+#include <algorithm>
 #include <array>
 #include <cstdio>
 #include <cstring>
@@ -21,8 +22,8 @@ namespace esphome::openquatt_crash_telemetry {
 namespace {
 
 static const char* const TAG = "openquatt.crash_telemetry";
-static const uint32_t CRASH_RECORD_STORAGE_KEY = fnv1_hash("openquatt_crash_telemetry_record");
 static const uint32_t CRASH_STATE_STORAGE_KEY = fnv1_hash("openquatt_crash_telemetry_state");
+static const char* const FLASH_PARTITION_LABEL = "openquatt_data";
 
 using detail::valid_installation_id;
 
@@ -58,6 +59,13 @@ bool OpenQuattCrashTelemetry::copy_text_(char* destination, size_t destination_s
   return true;
 }
 
+bool OpenQuattCrashTelemetry::valid_record_(const CrashRecord& record) {
+  return record.magic == CRASH_RECORD_MAGIC && record.version == CRASH_RECORD_VERSION && record.pending <= 1U &&
+         record.truncated <= 1U && record.captured_by_reporting_build <= 1U && record.sequence != 0U &&
+         record.report_length < CRASH_REPORT_CAPACITY && record.report[record.report_length] == '\0' &&
+         record.checksum == checksum_(&record, offsetof(CrashRecord, checksum));
+}
+
 void OpenQuattCrashTelemetry::random_uuid_(char* destination, size_t destination_size) {
   if (destination == nullptr || destination_size < 37U) return;
   std::array<uint8_t, 16U> bytes{};
@@ -82,42 +90,110 @@ const char* OpenQuattCrashTelemetry::extract_message_body_(const char* message) 
 }
 
 bool OpenQuattCrashTelemetry::load_record_() {
-  if (!this->record_ || !this->record_pref_.load(this->record_.data())) return false;
-  const CrashRecord& record = *this->record_.data();
-  const bool valid = record.magic == CRASH_RECORD_MAGIC && record.version == CRASH_RECORD_VERSION &&
-                     record.pending <= 1U && record.truncated <= 1U && record.captured_by_reporting_build <= 1U &&
-                     record.report_length < CRASH_REPORT_CAPACITY && record.report[record.report_length] == '\0' &&
-                     record.checksum == checksum_(&record, offsetof(CrashRecord, checksum));
-  if (!valid) {
+  if (!this->record_ || this->flash_partition_ == nullptr) return false;
+  bool found = false;
+  uint32_t newest_sequence = 0U;
+  uint8_t newest_slot = 0U;
+  for (uint8_t slot = 0U; slot < openquatt_common::OpenQuattFlashLayout::CRASH_TELEMETRY_SECTOR_COUNT; ++slot) {
+    const size_t offset = openquatt_common::OpenQuattFlashLayout::CRASH_TELEMETRY_OFFSET +
+                          (static_cast<size_t>(slot) * openquatt_common::OpenQuattFlashLayout::SECTOR_SIZE);
+    if (esp_partition_read(this->flash_partition_, offset, this->record_.data(), sizeof(CrashRecord)) != ESP_OK ||
+        !valid_record_(*this->record_.data())) {
+      continue;
+    }
+    if (!found || flash_sequence_is_newer(this->record_.data()->sequence, newest_sequence)) {
+      found = true;
+      newest_sequence = this->record_.data()->sequence;
+      newest_slot = slot;
+    }
+  }
+  if (!found) {
     std::memset(this->record_.data(), 0, sizeof(CrashRecord));
+    this->active_record_slot_ = -1;
     return false;
   }
+  const size_t newest_offset = openquatt_common::OpenQuattFlashLayout::CRASH_TELEMETRY_OFFSET +
+                               (static_cast<size_t>(newest_slot) * openquatt_common::OpenQuattFlashLayout::SECTOR_SIZE);
+  if (esp_partition_read(this->flash_partition_, newest_offset, this->record_.data(), sizeof(CrashRecord)) != ESP_OK ||
+      !valid_record_(*this->record_.data())) {
+    std::memset(this->record_.data(), 0, sizeof(CrashRecord));
+    this->active_record_slot_ = -1;
+    return false;
+  }
+  this->active_record_slot_ = static_cast<int8_t>(newest_slot);
   this->record_loaded_ = true;
-  return record.pending != 0U;
+  return this->record_.data()->pending != 0U;
 }
 
 bool OpenQuattCrashTelemetry::save_record_() {
-  if (!this->record_ || global_preferences == nullptr) return false;
+  if (!this->record_ || this->flash_partition_ == nullptr) return false;
   CrashRecord* record = this->record_.data();
+  const uint32_t previous_sequence = record->sequence;
+  record->sequence++;
+  if (record->sequence == 0U) record->sequence = 1U;
   record->magic = CRASH_RECORD_MAGIC;
   record->version = CRASH_RECORD_VERSION;
   record->checksum = 0U;
   record->checksum = checksum_(record, offsetof(CrashRecord, checksum));
-  const bool saved = this->record_pref_.save(record) && global_preferences->sync();
-  this->record_loaded_ = saved;
-  return saved;
+  const int8_t previous_slot = this->active_record_slot_;
+  const uint8_t target_slot =
+      this->active_record_slot_ < 0
+          ? 0U
+          : static_cast<uint8_t>((this->active_record_slot_ + 1) %
+                                 openquatt_common::OpenQuattFlashLayout::CRASH_TELEMETRY_SECTOR_COUNT);
+  const size_t target_offset = openquatt_common::OpenQuattFlashLayout::CRASH_TELEMETRY_OFFSET +
+                               (static_cast<size_t>(target_slot) * openquatt_common::OpenQuattFlashLayout::SECTOR_SIZE);
+  bool saved = esp_partition_erase_range(this->flash_partition_, target_offset,
+                                         openquatt_common::OpenQuattFlashLayout::SECTOR_SIZE) == ESP_OK &&
+               esp_partition_write(this->flash_partition_, target_offset, record, sizeof(CrashRecord)) == ESP_OK;
+  std::array<uint8_t, 64U> verify_buffer{};
+  const auto* expected = reinterpret_cast<const uint8_t*>(record);
+  for (size_t verified = 0U; saved && verified < sizeof(CrashRecord); verified += verify_buffer.size()) {
+    const size_t chunk_size = std::min(verify_buffer.size(), sizeof(CrashRecord) - verified);
+    saved = esp_partition_read(this->flash_partition_, target_offset + verified, verify_buffer.data(), chunk_size) ==
+                ESP_OK &&
+            std::memcmp(verify_buffer.data(), expected + verified, chunk_size) == 0;
+  }
+  if (!saved) {
+    record->sequence = previous_sequence;
+    record->checksum = 0U;
+    record->checksum = checksum_(record, offsetof(CrashRecord, checksum));
+    return false;
+  }
+  this->active_record_slot_ = static_cast<int8_t>(target_slot);
+  this->record_loaded_ = true;
+  if (record->pending == 0U && previous_slot >= 0) {
+    const size_t previous_offset =
+        openquatt_common::OpenQuattFlashLayout::CRASH_TELEMETRY_OFFSET +
+        (static_cast<size_t>(previous_slot) * openquatt_common::OpenQuattFlashLayout::SECTOR_SIZE);
+    if (esp_partition_erase_range(this->flash_partition_, previous_offset,
+                                  openquatt_common::OpenQuattFlashLayout::SECTOR_SIZE) != ESP_OK) {
+      ESP_LOGW(TAG, "Could not erase the stale crash telemetry slot after persisting a cleared record");
+    }
+  }
+  return true;
 }
 
 bool OpenQuattCrashTelemetry::clear_record_() {
   if (!this->record_) return false;
   CrashRecord* record = this->record_.data();
-  const uint8_t previous_pending = record->pending;
-  record->pending = 0U;
+  const uint32_t previous_sequence = record->sequence;
+  std::memset(record, 0, sizeof(*record));
+  record->sequence = previous_sequence;
   if (this->save_record_()) return true;
-  record->pending = previous_pending;
-  record->checksum = 0U;
-  record->checksum = checksum_(record, offsetof(CrashRecord, checksum));
+  this->load_record_();
   return false;
+}
+
+bool OpenQuattCrashTelemetry::discard_record_() {
+  if (!this->record_) return false;
+  CrashRecord* record = this->record_.data();
+  const uint32_t previous_sequence = record->sequence;
+  std::memset(record, 0, sizeof(*record));
+  record->sequence = previous_sequence;
+  // Opt-out must fail closed for the current boot. Unlike acknowledged crash
+  // publication, do not reload the old flash slot when persistence fails.
+  return this->save_record_();
 }
 
 bool OpenQuattCrashTelemetry::lock_gate_() const {
@@ -167,12 +243,20 @@ void OpenQuattCrashTelemetry::setup() {
   std::memset(this->record_.data(), 0, sizeof(CrashRecord));
   std::memset(this->state_.data(), 0, sizeof(StateStorage));
 
+  this->flash_partition_ =
+      esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_ANY, FLASH_PARTITION_LABEL);
+  if (this->flash_partition_ == nullptr ||
+      openquatt_common::OpenQuattFlashLayout::CRASH_TELEMETRY_END_OFFSET > this->flash_partition_->size) {
+    ESP_LOGE(TAG, "Crash telemetry flash window is unavailable in '%s'", FLASH_PARTITION_LABEL);
+    this->mark_failed();
+    return;
+  }
+
   if (global_preferences == nullptr) {
     ESP_LOGE(TAG, "Preferences backend is unavailable; crash marker will be preserved");
     this->mark_failed();
     return;
   }
-  this->record_pref_ = global_preferences->make_preference<CrashRecord>(CRASH_RECORD_STORAGE_KEY, true);
   this->state_pref_ = global_preferences->make_preference<StateStorage>(CRASH_STATE_STORAGE_KEY, true);
   this->load_record_();
   if (!this->load_state_()) this->save_state_();
@@ -185,6 +269,10 @@ void OpenQuattCrashTelemetry::setup() {
   } else {
     ESP_LOGE(TAG, "Logger is unavailable; ESPHome crash marker will be preserved");
   }
+
+  // Capture before observing consent. An already-available OFF state must not
+  // discard an old record and then allow this replay to recreate it.
+  this->capture_pending_crash_();
 
   if (this->usage_switch_ != nullptr) {
     this->usage_switch_->add_on_state_callback([this](bool enabled) { this->on_consent_state_(enabled); });
@@ -202,8 +290,6 @@ void OpenQuattCrashTelemetry::setup() {
   if (this->installation_id_sensor_ != nullptr && this->installation_id_sensor_->has_state()) {
     this->on_installation_id_(this->installation_id_sensor_->state);
   }
-
-  this->capture_pending_crash_();
 }
 
 void OpenQuattCrashTelemetry::capture_pending_crash_() {
@@ -211,7 +297,9 @@ void OpenQuattCrashTelemetry::capture_pending_crash_() {
   if (!esp32::crash_handler_has_data() || logger::global_logger == nullptr || !this->record_) return;
 
   CrashRecord* record = this->record_.data();
+  const uint32_t previous_sequence = record->sequence;
   std::memset(record, 0, sizeof(*record));
+  record->sequence = previous_sequence;
   record->pending = 1U;
   record->captured_by_reporting_build = 1U;
   record->build_epoch = static_cast<uint32_t>(ESPHOME_BUILD_TIME);
@@ -309,6 +397,11 @@ void OpenQuattCrashTelemetry::on_consent_state_(bool enabled) {
   if (!enabled) this->consent_enabled_.store(false);
   if (!this->state_) return;
   StateStorage* state = this->state_.data();
+  const bool discard_before_enabling =
+      enabled && persisted_consent_blocks_crash(state->consent_known != 0U, state->consent_enabled != 0U);
+  if (discard_before_enabling && this->record_ && this->record_.data()->pending != 0U && !this->discard_record_()) {
+    ESP_LOGW(TAG, "Could not persist crash discard before restoring consent; publication remains blocked this boot");
+  }
   bool state_changed = false;
   if (this->installation_id_sensor_ != nullptr && this->installation_id_sensor_->has_state()) {
     const std::string& id = this->installation_id_sensor_->state;
@@ -333,7 +426,7 @@ void OpenQuattCrashTelemetry::on_consent_state_(bool enabled) {
   this->consent_enabled_.store(enabled);
   this->unlock_gate_();
   if (!enabled) {
-    if (this->record_ && this->record_.data()->pending != 0U && !this->clear_record_()) {
+    if (this->record_ && this->record_.data()->pending != 0U && !this->discard_record_()) {
       ESP_LOGW(TAG, "Could not discard an unpublished crash after opt-out");
     }
     if (this->active_kind_.load() == CrashPublishKind::CRASH) this->session_failed_.store(true);

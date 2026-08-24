@@ -8,6 +8,26 @@ packages:
 esphome:
   build_path: ../../.esphome/build/hil_crash_telemetry_q_duo_wifi
 
+openquatt_crash_telemetry:
+  release_manifest_url: ""
+
+text_sensor:
+  - platform: template
+    id: oq_hil_crash_state
+    name: "HIL crash telemetry state"
+    entity_category: diagnostic
+    disabled_by_default: true
+    update_interval: 1s
+    lambda: |-
+      char state[96];
+      snprintf(state, sizeof(state), "pending=%u consent_seen=%u consent_enabled=%u persisted_known=%u persisted_enabled=%u",
+               id(oq_crash_telemetry).has_pending_record() ? 1U : 0U,
+               id(oq_crash_telemetry).has_observed_consent() ? 1U : 0U,
+               id(oq_crash_telemetry).is_consent_enabled() ? 1U : 0U,
+               id(oq_crash_telemetry).has_persisted_consent() ? 1U : 0U,
+               id(oq_crash_telemetry).is_persisted_consent_enabled() ? 1U : 0U);
+      return {state};
+
 button:
   - platform: template
     id: oq_hil_crash_abort

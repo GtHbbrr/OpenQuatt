@@ -79,6 +79,7 @@ openquatt_crash_telemetry:
   source_repository: "${build_source_repository}"
   source_commit: "${build_source_commit}"
   build_target: "${build_target}"
+  release_manifest_url: "${release_manifest_url}"
   firmware_version: "${project_version}"
   release_channel: "${release_channel}"
   hardware_profile: "${oq_hardware_profile}"

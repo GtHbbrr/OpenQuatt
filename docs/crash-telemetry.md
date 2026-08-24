@@ -14,8 +14,9 @@ vervangt de vorige retained waarde. Er is geen crashqueue.
 De payload bevat geen gewone runtime-logs, metingen of regelwaarden. Wel bevat
 hij de regels uit het ESPHome-crashrapport, het resettype, firmwareversie,
 releasekanaal, ESPHome-versie, bronrepository, volledige commit-SHA, exact
-buildtarget, hardwareprofiel, topologie, verbinding, buildtijd en de volledige
-ELF-SHA256 van de firmware die het rapport verstuurt.
+buildtarget, release-manifest-URL indien van toepassing, hardwareprofiel,
+topologie, verbinding, buildtijd en de volledige ELF-SHA256 van de firmware die
+het rapport verstuurt.
 
 ESPHome geeft in zijn replay aan wanneer de adressen bij een andere firmwarebuild
 horen. In dat geval staat `captured_by_reporting_build` op `false` en mogen de
