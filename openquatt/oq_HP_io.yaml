@@ -28,14 +28,14 @@
 
 esphome:
   on_boot:
-    - priority: -90
-      then:
-        - lambda: |-
-            // Runtime identity is deliberately not restored across boots.
-            id(${hp_id}_odu_generation_detection_complete) = false;
-            id(${hp_id}_odu_generation_request_pending) = false;
-            id(${hp_id}_odu_generation_request_token) = 0U;
-            id(${hp_id}_generation).publish_state("Unknown");
+    priority: -100
+    then:
+      - lambda: |-
+          // Runtime identity is deliberately not restored across boots.
+          id(${hp_id}_odu_generation_detection_complete) = false;
+          id(${hp_id}_odu_generation_request_pending) = false;
+          id(${hp_id}_odu_generation_request_token) = 0U;
+          id(${hp_id}_generation).publish_state("Unknown");
 
 # ----------------------------
 # MODBUS CONTROLLER
