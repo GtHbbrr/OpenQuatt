@@ -64,8 +64,13 @@ def changed_files_for_ci() -> set[str]:
             check=False,
             text=True,
         )
-        diff = run_git(["diff", "--name-only", f"origin/{base_ref}...HEAD"])
-        return {line.strip() for line in diff.splitlines() if line.strip()}
+        try:
+            diff = run_git(["diff", "--name-only", f"origin/{base_ref}...HEAD"])
+            return {line.strip() for line in diff.splitlines() if line.strip()}
+        except RuntimeError:
+            # Shallow checkout of merge commit may have no merge base; fallback to empty set
+            # so PR-metadata (checkbox) checks still run.
+            return set()
 
     if event == "push":
         try:
