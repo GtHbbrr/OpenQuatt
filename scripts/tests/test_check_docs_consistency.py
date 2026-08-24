@@ -215,21 +215,44 @@ Docs-impact motivatie:
 Docs-impact motivatie:
 """,
             changed_file="openquatt/web/js/src/core/config.js",
-            strict=False,
+            strict=True,
         )
         self.assertEqual(0, exit_code, output)
         self.assertIn("Docs consistency checks passed.", output)
+        self.assertNotIn("::warning", output)
 
     def test_narrowed_settings_core_no_longer_triggers(self) -> None:
-        """settings/core.js, privacy.js etc. waren te breed en zijn versmald."""
+        """settings/core.js en service.js zijn interne infra en blijven buiten mapping; privacy/security/silent wel."""
         for path in [
             "openquatt/web/js/src/settings/core.js",
             "openquatt/web/js/src/settings/service.js",
+        ]:
+            with self.subTest(path=path):
+                exit_code, output = self.run_check(
+                    """
+## Documentatie
+
+- [x] Documentatie bijgewerkt voor de gebruikersgerichte wijziging
+- [ ] Geen documentatiewijziging nodig
+
+Docs-impact motivatie:
+""",
+                    changed_file=path,
+                    strict=True,
+                )
+                self.assertEqual(0, exit_code, output)
+                self.assertIn("Docs consistency checks passed.", output)
+                self.assertNotIn("::warning", output)
+
+    def test_settings_privacy_security_silent_still_triggers(self) -> None:
+        """privacy/security/silent zijn gebruikersgericht en moeten advisory hint blijven geven (fix #518 punt 5)."""
+        for path in [
             "openquatt/web/js/src/settings/privacy.js",
             "openquatt/web/js/src/settings/security.js",
             "openquatt/web/js/src/settings/silent.js",
         ]:
             with self.subTest(path=path):
+                # zonder strict: advisory warning, exit 0
                 exit_code, output = self.run_check(
                     """
 ## Documentatie
@@ -243,6 +266,22 @@ Docs-impact motivatie:
                     strict=False,
                 )
                 self.assertEqual(0, exit_code, output)
+                self.assertIn("Web-appinstellingen raakt gebruikersdocumentatie", output)
+                self.assertIn("warning", output.lower())
+                # met strict: blocking
+                exit_code_s, output_s = self.run_check(
+                    """
+## Documentatie
+
+- [x] Documentatie bijgewerkt voor de gebruikersgerichte wijziging
+- [ ] Geen documentatiewijziging nodig
+
+Docs-impact motivatie:
+""",
+                    changed_file=path,
+                    strict=True,
+                )
+                self.assertEqual(1, exit_code_s, output_s)
 
     def test_narrowed_strategy_manager_no_longer_triggers(self) -> None:
         for path in [
@@ -260,9 +299,11 @@ Docs-impact motivatie:
 Docs-impact motivatie:
 """,
                     changed_file=path,
-                    strict=False,
+                    strict=True,
                 )
                 self.assertEqual(0, exit_code, output)
+                self.assertIn("Docs consistency checks passed.", output)
+                self.assertNotIn("::warning", output)
 
     def test_docs_checkboxes_both_checked_fails(self) -> None:
         exit_code, output = self.run_check(
@@ -313,6 +354,40 @@ Docs-impact motivatie:
         )
         self.assertEqual(0, exit_code, output)
         self.assertIn("Docs consistency checks passed.", output)
+
+    def test_no_docs_without_motivation_fails_without_heuristic(self) -> None:
+        """'Geen documentatiewijziging nodig' zonder motivatie moet blocking falen, ook zonder heuristiek (fix #2)."""
+        # ongemapt bestand, motivatie leeg -> moet falen
+        exit_code, output = self.run_check(
+            """
+## Documentatie
+
+- [ ] Documentatie bijgewerkt voor de gebruikersgerichte wijziging
+- [x] Geen documentatiewijziging nodig
+
+Docs-impact motivatie:
+""",
+            changed_file="README.md",
+            strict=False,
+        )
+        self.assertEqual(1, exit_code, output)
+        self.assertIn("Docs-impact motivatie", output)
+
+        # gemapte bron maar motivatie leeg -> ook blocking (niet alleen advisory)
+        exit_code2, output2 = self.run_check(
+            """
+## Documentatie
+
+- [ ] Documentatie bijgewerkt voor de gebruikersgerichte wijziging
+- [x] Geen documentatiewijziging nodig
+
+Docs-impact motivatie:
+""",
+            changed_file="openquatt/oq_common.yaml",
+            strict=False,
+        )
+        self.assertEqual(1, exit_code2, output2)
+        self.assertIn("Docs-impact motivatie", output2)
 
 
 if __name__ == "__main__":

@@ -165,6 +165,20 @@ def _is_checkbox_checked(body: str, label: str) -> bool:
     )
 
 
+def validate_docs_motivation(body: str) -> str | None:
+    label = re.search(rf"(?im)^\s*{re.escape(DOCS_MOTIVATION_LABEL)}\s*(.*)$", body)
+    if not label:
+        return f"Vul '{DOCS_MOTIVATION_LABEL}' in bij de docs-uitzondering."
+    tail = body[label.end() :]
+    next_section = re.search(r"(?m)^##\s+", tail)
+    motivation_block = tail[: next_section.start()] if next_section else tail
+    motivation = f"{label.group(1)}\n{motivation_block}"
+    motivation = re.sub(r"<!--.*?-->", "", motivation, flags=re.DOTALL).strip()
+    if not re.search(r"[A-Za-zÀ-ÖØ-öø-ÿ0-9]", motivation):
+        return f"Vul '{DOCS_MOTIVATION_LABEL}' inhoudelijk in bij de docs-uitzondering."
+    return None
+
+
 def validate_docs_checkboxes(findings: list[Finding], body: str | None) -> None:
     if body is None:
         return
@@ -184,6 +198,15 @@ def validate_docs_checkboxes(findings: list[Finding], body: str | None) -> None:
             1,
             f"Kies één documentatie-optie: '{DOCS_UPDATED_CHECKBOX}' of '{NO_DOCS_CHECKBOX}'.",
         )
+    if has_no_docs:
+        motivation_error = validate_docs_motivation(body)
+        if motivation_error:
+            add(
+                findings,
+                ".github/pull_request_template.md",
+                1,
+                motivation_error,
+            )
 
 
 def docs_impact_exemption() -> tuple[bool, str | None]:
@@ -197,17 +220,9 @@ def docs_impact_exemption() -> tuple[bool, str | None]:
     if not checked:
         return False, None
 
-    label = re.search(rf"(?im)^\s*{re.escape(DOCS_MOTIVATION_LABEL)}\s*(.*)$", body)
-    if not label:
-        return False, f"Vul '{DOCS_MOTIVATION_LABEL}' in bij de docs-uitzondering."
-
-    tail = body[label.end() :]
-    next_section = re.search(r"(?m)^##\s+", tail)
-    motivation_block = tail[: next_section.start()] if next_section else tail
-    motivation = f"{label.group(1)}\n{motivation_block}"
-    motivation = re.sub(r"<!--.*?-->", "", motivation, flags=re.DOTALL).strip()
-    if not re.search(r"[A-Za-zÀ-ÖØ-öø-ÿ0-9]", motivation):
-        return False, f"Vul '{DOCS_MOTIVATION_LABEL}' inhoudelijk in bij de docs-uitzondering."
+    motivation_error = validate_docs_motivation(body)
+    if motivation_error:
+        return False, motivation_error
     return True, None
 
 
@@ -231,14 +246,9 @@ def check_docs_impact(
     exempt, exemption_error = docs_impact_exemption()
     if exempt:
         return
-    if exemption_error:
-        add(
-            findings,
-            ".github/pull_request_template.md",
-            1,
-            exemption_error,
-            severity="warning",
-        )
+    # Motivatie-fout is al blocking via validate_docs_checkboxes (zie fix #2).
+    # Geen aparte warning hier om dubbele melding te voorkomen; heuristiek-waarschuwingen hieronder blijven advisory.
+
 
     for name, source_changes, docs_any_of in missing:
         source = sorted(source_changes)[0]

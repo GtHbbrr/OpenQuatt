@@ -34,7 +34,10 @@
         "openquatt/web/js/src/settings/boiler.js",
         "openquatt/web/js/src/settings/controls.js",
         "openquatt/web/js/src/settings/storage.js",
-        "openquatt/web/js/src/settings/integrations.js"
+        "openquatt/web/js/src/settings/integrations.js",
+        "openquatt/web/js/src/settings/privacy.js",
+        "openquatt/web/js/src/settings/security.js",
+        "openquatt/web/js/src/settings/silent.js"
       ],
       "docs_any_of": [
         "docs/web-app.md",
