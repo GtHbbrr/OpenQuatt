@@ -69,6 +69,10 @@ import { render } from "../core/render-scheduler.js";
       writeFailures: 0,
       lastWriteDurationMs: 0,
       maxWriteDurationMs: 0,
+      lastFlushDurationMs: 0,
+      maxFlushDurationMs: 0,
+      lastIndexUpdateDurationMs: 0,
+      maxIndexUpdateDurationMs: 0,
       nowMs: Number.NaN,
     };
   }
@@ -156,6 +160,10 @@ import { render } from "../core/render-scheduler.js";
         metadata.writeFailures = parseTrendFlashMetric(parts[5]);
         metadata.lastWriteDurationMs = parseTrendFlashMetric(parts[6]);
         metadata.maxWriteDurationMs = parseTrendFlashMetric(parts[7]);
+        metadata.lastFlushDurationMs = parseTrendFlashMetric(parts[8]);
+        metadata.maxFlushDurationMs = parseTrendFlashMetric(parts[9]);
+        metadata.lastIndexUpdateDurationMs = parseTrendFlashMetric(parts[10]);
+        metadata.maxIndexUpdateDurationMs = parseTrendFlashMetric(parts[11]);
         return;
       }
       if (!line.startsWith("@flash|")) {

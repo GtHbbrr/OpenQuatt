@@ -128,6 +128,10 @@ class OpenQuattTrends : public Component {
     uint32_t write_failure_count{0};
     uint32_t last_write_duration_ms{0};
     uint32_t max_write_duration_ms{0};
+    uint32_t last_flush_duration_ms{0};
+    uint32_t max_flush_duration_ms{0};
+    uint32_t last_index_update_duration_ms{0};
+    uint32_t max_index_update_duration_ms{0};
   };
 
   static_assert(sizeof(TrendValues) == 14, "TrendValues must stay packed");
@@ -174,6 +178,8 @@ class OpenQuattTrends : public Component {
   bool write_flash_block_(const FlashBlockBuilder& builder);
   void record_flash_erase_(uint32_t duration_ms, bool success);
   void record_flash_write_(uint32_t duration_ms, bool success);
+  void record_flash_flush_(uint32_t duration_ms);
+  void record_flash_index_update_(uint32_t duration_ms);
   FlashIOMetrics snapshot_flash_io_metrics_();
   bool read_flash_block_(uint32_t slot_index, uint32_t expected_sequence, FlashBlockInfo* info,
                          std::array<TrendSample, FLASH_SAMPLES_PER_BLOCK>* samples) const;

@@ -722,7 +722,10 @@ bool OpenQuattTrends::write_flash_block_(const FlashBlockBuilder& builder) {
   this->next_flash_sequence_ = builder.sequence + 1U;
   this->flash_dirty_ = false;
   this->last_flash_flush_ms_ = static_cast<uint32_t>(millis());
-  if (!this->update_flash_index_after_write_(info, erased_sector)) {
+  const int64_t index_update_started_us = esp_timer_get_time();
+  const bool index_updated = this->update_flash_index_after_write_(info, erased_sector);
+  this->record_flash_index_update_(elapsed_operation_ms(index_update_started_us));
+  if (!index_updated) {
     this->invalidate_flash_index_();
   }
   return true;
@@ -749,6 +752,21 @@ void OpenQuattTrends::record_flash_write_(uint32_t duration_ms, bool success) {
   portEXIT_CRITICAL(&this->flash_io_metrics_lock_);
 }
 
+void OpenQuattTrends::record_flash_flush_(uint32_t duration_ms) {
+  portENTER_CRITICAL(&this->flash_io_metrics_lock_);
+  this->flash_io_metrics_.last_flush_duration_ms = duration_ms;
+  this->flash_io_metrics_.max_flush_duration_ms = std::max(this->flash_io_metrics_.max_flush_duration_ms, duration_ms);
+  portEXIT_CRITICAL(&this->flash_io_metrics_lock_);
+}
+
+void OpenQuattTrends::record_flash_index_update_(uint32_t duration_ms) {
+  portENTER_CRITICAL(&this->flash_io_metrics_lock_);
+  this->flash_io_metrics_.last_index_update_duration_ms = duration_ms;
+  this->flash_io_metrics_.max_index_update_duration_ms =
+      std::max(this->flash_io_metrics_.max_index_update_duration_ms, duration_ms);
+  portEXIT_CRITICAL(&this->flash_io_metrics_lock_);
+}
+
 OpenQuattTrends::FlashIOMetrics OpenQuattTrends::snapshot_flash_io_metrics_() {
   portENTER_CRITICAL(&this->flash_io_metrics_lock_);
   const FlashIOMetrics snapshot = this->flash_io_metrics_;
@@ -769,10 +787,15 @@ bool OpenQuattTrends::flush_flash_builder_(bool force) {
     return false;
   }
 
+  // A failed erase/write never reaches index maintenance; do not leave the
+  // previous successful index duration looking like part of this attempt.
+  this->record_flash_index_update_(0U);
+  const int64_t flush_started_us = esp_timer_get_time();
   const bool ok = this->write_flash_block_(this->flash_builder_);
   if (ok) {
     this->reset_flash_builder_();
   }
+  this->record_flash_flush_(elapsed_operation_ms(flush_started_us));
   return ok;
 }
 
@@ -1224,13 +1247,18 @@ void OpenQuattTrends::write_metadata(httpd_req_t* req) {
       !writer.printf("@flash|%s|%s|%s|%s|%u.%u|%u\n", available.c_str(), oldest.c_str(), newest.c_str(),
                      last_flush.c_str(), static_cast<unsigned>(size_kib_x10 / 10U),
                      static_cast<unsigned>(size_kib_x10 % 10U), static_cast<unsigned>(this->get_flash_write_count())) ||
-      !writer.printf("@flash_io|%u|%u|%u|%u|%u|%u|%u\n", static_cast<unsigned>(flash_io_metrics.erase_count),
+      !writer.printf("@flash_io|%u|%u|%u|%u|%u|%u|%u|%u|%u|%u|%u\n",
+                     static_cast<unsigned>(flash_io_metrics.erase_count),
                      static_cast<unsigned>(flash_io_metrics.erase_failure_count),
                      static_cast<unsigned>(flash_io_metrics.last_erase_duration_ms),
                      static_cast<unsigned>(flash_io_metrics.max_erase_duration_ms),
                      static_cast<unsigned>(flash_io_metrics.write_failure_count),
                      static_cast<unsigned>(flash_io_metrics.last_write_duration_ms),
-                     static_cast<unsigned>(flash_io_metrics.max_write_duration_ms)) ||
+                     static_cast<unsigned>(flash_io_metrics.max_write_duration_ms),
+                     static_cast<unsigned>(flash_io_metrics.last_flush_duration_ms),
+                     static_cast<unsigned>(flash_io_metrics.max_flush_duration_ms),
+                     static_cast<unsigned>(flash_io_metrics.last_index_update_duration_ms),
+                     static_cast<unsigned>(flash_io_metrics.max_index_update_duration_ms)) ||
       !writer.flush() || httpd_resp_send_chunk(req, nullptr, 0) != ESP_OK) {
     ESP_LOGW(TAG, "Failed to write trend history metadata response");
   }
