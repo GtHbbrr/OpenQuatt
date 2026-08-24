@@ -1,4 +1,5 @@
 #include "OpenQuattCrashTelemetry.h"
+#include "OpenQuattCrashTelemetryAnsi.h"
 #include "OpenQuattCrashTelemetryHelpers.h"
 
 #include <array>
@@ -263,17 +264,10 @@ void OpenQuattCrashTelemetry::on_log_(const char* tag, const char* message, size
     record->captured_by_reporting_build = 0U;
   }
 
-  bool in_escape = false;
+  detail::AnsiSequenceFilter ansi_filter;
   for (const char* cursor = body; *cursor != '\0'; ++cursor) {
     const unsigned char c = static_cast<unsigned char>(*cursor);
-    if (in_escape) {
-      if ((c >= '@' && c <= '~')) in_escape = false;
-      continue;
-    }
-    if (c == 0x1BU) {
-      in_escape = true;
-      continue;
-    }
+    if (ansi_filter.should_skip(c)) continue;
     if (c == '\r' || c == '\n') continue;
     if (record->report_length + 2U >= CRASH_REPORT_CAPACITY) {
       record->truncated = 1U;
