@@ -82,6 +82,7 @@ test("dev firmware exposes an explicit confirmed downgrade to the older main rel
 
   let modal = renderUpdateModal();
   let installButton = modal.match(/<button class="oq-helper-button[^"]*" type="button" data-oq-action="install-firmware-update"[^>]*>/)?.[0] || "";
+  assert.match(modal, /oq-firmware-downgrade-callout/);
   assert.match(modal, /data-oq-firmware-downgrade-confirm="true"/);
   assert.match(modal, /Main v0\.47\.0 vervangt de nieuwere dev-build v0\.48\.0-dev\.696\+86f5997/);
   assert.match(installButton, /oq-helper-button--warning/);

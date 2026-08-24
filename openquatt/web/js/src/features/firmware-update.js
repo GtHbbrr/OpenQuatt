@@ -1339,7 +1339,7 @@ import { render } from "../core/render-scheduler.js";
             </label>
           ` : ""}
           ${downgradeAvailable && !installing && !progress ? `
-            <div class="oq-helper-modal-callout">
+            <div class="oq-helper-modal-callout oq-firmware-downgrade-callout">
               <strong>Bewuste downgrade</strong>
               <span>Main ${escapeHtml(latest)} vervangt de nieuwere dev-build ${escapeHtml(current)}. Functies en instellingen die alleen in dev bestaan, zijn daarna mogelijk niet meer beschikbaar.</span>
               <label class="oq-helper-modal-check">
