@@ -45,7 +45,12 @@ jobs:
           fetch-depth: 0
 
       - name: Report documentation impact (advisory)
-        run: python3 scripts/check_docs_consistency.py --changed-only
+        run: |
+          python3 scripts/check_docs_consistency.py --changed-only 2>&1 | tee /tmp/docs-impact.txt
+          echo "### Docs impact (advisory)" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          cat /tmp/docs-impact.txt >> "$GITHUB_STEP_SUMMARY"
+          cat /tmp/docs-impact.txt
 
   python-contracts:
     runs-on: ubuntu-latest
