@@ -172,6 +172,15 @@ import { renderModalShell } from "../core/modal-shell.js";
       }
       return formatSettingsStorageCount(trendMetadata.writes);
     }
+    if (key === "trendHistoryFlashErases") {
+      return formatSettingsStorageCount(trendMetadata.eraseCount);
+    }
+    if (key === "trendHistoryFlashMaxEraseDuration") {
+      return `${formatSettingsStorageCount(trendMetadata.maxEraseDurationMs)} ms`;
+    }
+    if (key === "trendHistoryFlashFailures") {
+      return formatSettingsStorageCount(Number(trendMetadata.eraseFailures || 0) + Number(trendMetadata.writeFailures || 0));
+    }
 
     const energyMetadata = getSettingsEnergyHistoryMetadata();
     const energyRaw = String(state.energyHistoryRaw || "");
@@ -524,6 +533,9 @@ import { renderModalShell } from "../core/modal-shell.js";
         { label: "Bewaarperiode", value: getSettingsStorageStatOrFallback("trendHistoryFlashAvailable", "Alleen live") },
         { label: "Opslagruimte", value: getSettingsStorageStatOrFallback("trendHistoryFlashSize") },
         { label: "Opslagacties", value: getSettingsStorageStatOrFallback("trendHistoryFlashWrites", "0") },
+        { label: "Sector-erases sinds start", value: getSettingsStorageStatOrFallback("trendHistoryFlashErases", "0") },
+        { label: "Langste sector-erase", value: getSettingsStorageStatOrFallback("trendHistoryFlashMaxEraseDuration", "0 ms") },
+        { label: "Flashfouten sinds start", value: getSettingsStorageStatOrFallback("trendHistoryFlashFailures", "0") },
         { label: "Laatst opgeslagen", value: getSettingsStorageStatOrFallback("trendHistoryFlashLastFlush", "Geen data") },
       ],
     };

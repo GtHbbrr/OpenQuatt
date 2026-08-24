@@ -10,8 +10,8 @@ export const WEB_BUNDLE_BUDGETS = [
     // the read-only ODU EEPROM service export, API ingress source controls,
     // concise CM100 boiler test phase copy (FLOW_SETTLING/BOILER_SETTLING/MEASURING/COOLDOWN),
     // advisory per-ODU generation detection with single bulk-detect button for onboarding and installation settings,
-    // plus toelichting lokale historie in Quick Start (beslislog/energie persistentie).
-    raw: 912_000,
+    // toelichting lokale historie in Quick Start, plus fase-2 flash-I/O observability.
+    raw: 914_000,
     // One-time migration ceiling for structured incident monitoring, replay,
     // the CSRF-protected deferred recovery actions, and their compact editor.
     // Once this bundle is the base, the normal gzip growth limit applies again.

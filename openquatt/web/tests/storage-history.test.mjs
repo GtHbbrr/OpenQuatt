@@ -4,7 +4,34 @@ import test from "node:test";
 globalThis.__OQ_PREVIEW__ = false;
 
 const { SENSOR_CALIBRATION_KEYS, SETTINGS_BACKUP_SECTIONS, SUPPLY_CALIBRATION_BACKUP_KEYS } = await import("../js/src/core/config.js");
-const { isUsageTelemetrySetupCompletionSafe, parseDecisionLogStorageMetadata, shouldDisableUsageTelemetryForSetupRestore } = await import("../js/src/features/storage-history.js");
+const { isUsageTelemetrySetupCompletionSafe, parseDecisionLogStorageMetadata, parseTrendHistoryMetadata, shouldDisableUsageTelemetryForSetupRestore } = await import("../js/src/features/storage-history.js");
+
+test("trend history metadata exposes bounded flash timing evidence", () => {
+  const metadata = parseTrendHistoryMetadata([
+    "@now|1783851000000",
+    "@flash|30 dagen|1 uur geleden|nu|nu|1.5|3",
+    "@flash_io|2|0|83|91|0|2|4",
+  ].join("\n"));
+
+  assert.equal(metadata.writes, 3);
+  assert.equal(metadata.eraseCount, 2);
+  assert.equal(metadata.eraseFailures, 0);
+  assert.equal(metadata.lastEraseDurationMs, 83);
+  assert.equal(metadata.maxEraseDurationMs, 91);
+  assert.equal(metadata.writeFailures, 0);
+  assert.equal(metadata.lastWriteDurationMs, 2);
+  assert.equal(metadata.maxWriteDurationMs, 4);
+});
+
+test("trend history flash metrics clamp malformed endpoint values", () => {
+  const metadata = parseTrendHistoryMetadata("@flash_io|Infinity|-1|not-a-number|3.9|4294967296|2|4");
+
+  assert.equal(metadata.eraseCount, 0);
+  assert.equal(metadata.eraseFailures, 0);
+  assert.equal(metadata.lastEraseDurationMs, 0);
+  assert.equal(metadata.maxEraseDurationMs, 3);
+  assert.equal(metadata.writeFailures, 4294967295);
+});
 
 test("calibration records are restored before the supply source selection", () => {
   const keys = SETTINGS_BACKUP_SECTIONS.find(({ id }) => id === "sensor_sources").keys;
