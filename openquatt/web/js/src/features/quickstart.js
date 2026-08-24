@@ -10,6 +10,7 @@ import { getFirmwareBuildSwitchModel, getFirmwareProgressModel } from "./firmwar
 import { getOduGenerationDetectionModel } from "./odu-generation-ui.js";
 import { formatSettingsOptionLabel, renderSettingsFieldCard, renderSettingsInfoToggle } from "../settings/controls.js";
 import { renderCurveGraph, renderFlowSettingsFields, renderHeatingCurveProfileField, renderHeatingStrategyExplainCards, renderPowerHouseAdvancedField, renderPowerHouseBaseFields, renderSettingsCurveInputs, renderStrategySelectionFields } from "../settings/heating.js";
+import { getHeatingEnableAdvice, getHeatingEnableCurrent, getHeatingEnableRecommendation } from "../core/heating-strategy-matrix.js";
 import { renderBoilerCvFields, renderHpGenerationField } from "../settings/installation.js";
 import { renderSilentSettingsGrid } from "../settings/silent.js";
 import { renderWaterSettingsFields } from "../settings/water.js";
@@ -618,6 +619,48 @@ import { renderUsageTelemetryConsent, renderUsageTelemetryDisclosure } from "./u
   export const captureQuickStartScrollState = quickStartScrollKeeper.capture;
   export const queueQuickStartScrollRestore = quickStartScrollKeeper.queue;
 
+  export function renderHeatingEnableQuickStartAdvice() {
+    if (!hasEntity("heatingEnableSource")) {
+      return "";
+    }
+    const advice = getHeatingEnableAdvice();
+    const recommended = getHeatingEnableRecommendation();
+    const current = getHeatingEnableCurrent();
+    const isPowerHouse = !isCurveMode();
+    const recommendedLabel = recommended === "Disabled" ? "Niet gebruiken" : recommended === "OT thermostat" ? "OpenTherm-thermostaat" : recommended;
+    const currentLabel = current === "Disabled" ? "Niet gebruiken" : current === "OT thermostat" ? "OpenTherm-thermostaat" : current ? formatSettingsOptionLabel(current) : "—";
+    const toneClass = advice.tone === "warning" ? " oq-helper-note--warning" : " oq-helper-note--info";
+    const needsAction = Boolean(advice.deviant);
+    const busy = state.busyAction === "quickstart-heating-enable";
+    return `
+      <div class="oq-helper-surface oq-settings-field oq-settings-field--span-2">
+        <div class="oq-settings-field-head">
+          <h3>Warmtevraag bepalen</h3>
+          ${renderSettingsInfoToggle("heatingEnableAdvice", "Warmtevraag bepalen", advice.copy)}
+        </div>
+        <div class="oq-settings-field-control">
+          <p class="oq-settings-action-note${toneClass}"><strong>${escapeHtml(advice.title)}</strong><br>${escapeHtml(advice.copy)}</p>
+          <div class="oq-settings-source-rows">
+            <div class="oq-settings-source-row"><span>Aanbevolen</span><strong>${escapeHtml(recommendedLabel)}</strong></div>
+            <div class="oq-settings-source-row${needsAction ? " is-warning" : ""}"><span>Huidige keuze</span><strong>${escapeHtml(currentLabel)}</strong></div>
+          </div>
+          ${needsAction ? `
+            <div class="oq-helper-actions">
+              <button class="oq-helper-button oq-helper-button--ghost" type="button" data-oq-action="apply-quickstart-heating-enable" data-heating-enable-target="${escapeHtml(recommended)}" ${state.loadingEntities || busy ? "disabled" : ""}>
+                ${busy ? "Instelling opslaan..." : `Aanbevolen instelling gebruiken (${escapeHtml(recommendedLabel)})`}
+              </button>
+            </div>
+            <p class="oq-settings-action-note">Je kunt ook handmatig een andere keuze laten staan; deze aanbeveling blokkeert niets. Geldige maar afwijkende combinaties blijven mogelijk (bijv. Power House met zone-regeling of stooklijn volledig weersafhankelijk).</p>
+          ` : `
+            <p class="oq-settings-action-note">Huidige keuze komt overeen met het advies voor ${escapeHtml(isPowerHouse ? "Power House" : "Water Temperature Control")}.</p>
+          `}
+          ${state.controlNotice ? `<p class="oq-helper-notice">${escapeHtml(state.controlNotice)}</p>` : ""}
+          ${state.controlError ? `<p class="oq-helper-error">${escapeHtml(state.controlError)}</p>` : ""}
+        </div>
+      </div>
+    `;
+  }
+
   export function renderStrategyWorkspace() {
     return `
       <section class="oq-helper-panel">
@@ -626,6 +669,9 @@ import { renderUsageTelemetryConsent, renderUsageTelemetryDisclosure } from "./u
         <p class="oq-helper-section-copy">Kies hier hoe OpenQuatt je verwarming regelt. Daarna lopen we samen de belangrijkste instellingen langs.</p>
         ${renderHeatingStrategyExplainCards()}
         ${renderStrategySelectionFields("oq-settings-grid oq-settings-grid--quickstart")}
+        <div class="oq-settings-grid oq-settings-grid--quickstart">
+          ${renderHeatingEnableQuickStartAdvice()}
+        </div>
         ${renderQuickStartStepNav()}
       </section>
     `;
@@ -659,6 +705,7 @@ import { renderUsageTelemetryConsent, renderUsageTelemetryDisclosure } from "./u
   }
 
   export function renderHeatingWorkspace() {
+    const showAdvice = hasEntity("heatingEnableSource");
     return `
       <section class="oq-helper-panel">
         <p class="oq-helper-label">${escapeHtml(getQuickStepKicker("heating"))}</p>
@@ -682,6 +729,7 @@ import { renderUsageTelemetryConsent, renderUsageTelemetryDisclosure } from "./u
             ${renderPowerHouseBaseFields("oq-settings-grid oq-settings-grid--quickstart")}
             ${renderPowerHouseAdvancedField()}
           `}
+        ${showAdvice ? `<div class="oq-settings-grid oq-settings-grid--quickstart">${renderHeatingEnableQuickStartAdvice()}</div>` : ""}
         ${renderQuickStartStepNav()}
       </section>
     `;

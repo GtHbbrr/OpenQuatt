@@ -2,6 +2,7 @@ import { getEntityNumericValue, hasEntity } from "../core/app-shared.js";
 import { renderOqIcon, SENSOR_SELECTION_KEYS } from "../core/config.js";
 import { getInputDraftValue } from "../core/control-drafts.js";
 import { getEntityValue } from "../core/entity-store.js";
+import { getHeatingEnableAdvice } from "../core/heating-strategy-matrix.js";
 import { isInstallationMonitoringBinaryActive, isInstallationMonitoringIntegrationEnabled } from "../core/installation-monitoring.js";
 import { state } from "../core/state.js";
 import { formatMqttSensorValiditySummary, getMqttStatusDetail, getMqttStatusLabel, getMqttValidityLabel } from "../features/mqtt.js";
@@ -668,6 +669,7 @@ import { escapeHtml } from "../core/html.js";
         : "Ruwe waarde; niet gekalibreerd.";
     const heatingEnableSourceDisabled = String(getEntityValue("heatingEnableSource") || "").trim() === "Disabled";
     const heatingEnableSourceLabel = formattedSourceValue("heatingEnableSource", { optionLabels: { Disabled: "Niet gebruiken" } });
+    const heatingEnableAdvice = hasEntity("heatingEnableSource") ? getHeatingEnableAdvice() : null;
     const coolingEnableSourceDisabled = String(getEntityValue("coolingEnableSource") || "").trim() === "Disabled";
     const coolingEnableSourceLabels = {
       Disabled: "Niet gebruiken / handmatig",
@@ -854,10 +856,17 @@ import { escapeHtml } from "../core/html.js";
         key: "heating-enable",
         title: "Warmtetoestemming",
         icon: "flame",
+        warning: heatingEnableAdvice && heatingEnableAdvice.deviant
+          ? `${heatingEnableAdvice.title}: ${heatingEnableAdvice.copy}`
+          : heatingEnableSourceDisabled
+            ? "Niet gebruiken betekent: geen externe warmtetoestemming; de actieve verwarmingsstrategie mag zelf warmtevraag opbouwen."
+            : "",
         select: {
           key: "heatingEnableSource",
           label: "Bron",
           optionLabels: { Disabled: "Niet gebruiken", "API input": "API-invoer" },
+          infoId: "heatingEnableSource-info",
+          infoCopy: "Niet gebruiken betekent: geen externe warmtetoestemming; de strategie bepaalt zelf of warmte nodig is. Bij Power House is dat meestal gewenst; bij Water Temperature Control is meestal de OpenTherm-thermostaat als warmtetoestemming gewenst.",
           haKeys: ["heatingEnableHa", "heatingEnableHaValid"],
           apiValueKey: "apiInputHeatingEnable",
           apiValidKey: "apiInputHeatingEnableValid",
@@ -865,8 +874,9 @@ import { escapeHtml } from "../core/html.js";
           keepUnavailableCurrent: true,
         },
         activeRows: [
-          renderSourceRow({ label: "Toestemming", value: heatingEnableSourceDisabled ? "Niet gebruikt" : sourceStateText("heatingEnableSelected", "Toegestaan", "Geblokkeerd") }),
+          renderSourceRow({ label: "Toestemming", value: heatingEnableSourceDisabled ? "Niet gebruikt — strategie bepaalt vraag" : sourceStateText("heatingEnableSelected", "Toegestaan", "Geblokkeerd") }),
           !heatingEnableSourceDisabled ? renderSourceRow({ label: "Bron", value: heatingEnableSourceLabel }) : "",
+          heatingEnableAdvice ? renderSourceRow({ label: "Advies", value: heatingEnableAdvice.deviant ? `${heatingEnableAdvice.title}` : "Komt overeen met strategie", status: heatingEnableAdvice.deviant ? "!" : "✓", statusTone: heatingEnableAdvice.deviant ? "warning" : "valid", statusTitle: heatingEnableAdvice.copy }) : "",
         ],
         measurementRows: [
           otAvailable ? renderSourceRow({ label: "OpenTherm", value: sourceStateText("otThermostatChEnable", "Toegestaan", "Geblokkeerd") }) : "",
