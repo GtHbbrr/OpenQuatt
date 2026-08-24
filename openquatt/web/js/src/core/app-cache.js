@@ -12,16 +12,18 @@ export function getWebAppCacheRefreshUrls() {
 
 async function refreshWebAppResource(url) {
   // `reload` replaces a stale HTTP-cache entry; consuming the full body completes that refresh before navigation.
-  const response = await fetchWithTimeout(
+  return fetchWithTimeout(
     url,
     { cache: "reload", credentials: "same-origin" },
     WEB_APP_CACHE_REFRESH_TIMEOUT_MS,
     `${url} cache refresh timed out after ${WEB_APP_CACHE_REFRESH_TIMEOUT_MS}ms`,
+    async (response) => {
+      if (!response.ok) {
+        throw new Error(`${url} cache refresh HTTP ${response.status}`);
+      }
+      await response.arrayBuffer();
+    },
   );
-  if (!response.ok) {
-    throw new Error(`${url} cache refresh HTTP ${response.status}`);
-  }
-  await response.arrayBuffer();
 }
 
 export async function refreshWebAppCache() {

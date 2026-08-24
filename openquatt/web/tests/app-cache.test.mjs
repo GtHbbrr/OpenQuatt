@@ -82,3 +82,33 @@ test("OTA cache refresh aborts stalled app-shell requests after a bounded timeou
   assert.equal(await refreshPromise, false);
   assert.ok(timers.every((timer) => timer.cancelled));
 });
+
+test("OTA cache refresh also bounds a stalled response body", async () => {
+  const timers = [];
+  window.clearTimeout = (timer) => {
+    timer.cancelled = true;
+  };
+  window.setTimeout = (callback, delay) => {
+    const timer = { callback, cancelled: false, delay };
+    timers.push(timer);
+    return timer;
+  };
+  globalThis.fetch = async (_url, options) => ({
+    ok: true,
+    arrayBuffer: () => new Promise((_resolve, reject) => {
+      if (options.signal.aborted) {
+        reject(new Error("aborted"));
+        return;
+      }
+      options.signal.addEventListener("abort", () => reject(new Error("aborted")));
+    }),
+  });
+
+  const refreshPromise = refreshWebAppCache();
+  await Promise.resolve();
+  assert.equal(timers.length, getWebAppCacheRefreshUrls().length);
+  timers.forEach((timer) => timer.callback());
+
+  assert.equal(await refreshPromise, false);
+  assert.ok(timers.every((timer) => timer.cancelled));
+});
