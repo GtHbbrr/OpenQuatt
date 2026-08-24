@@ -1869,7 +1869,7 @@
     syncMockOduIdentityEntities(1);
     setEntity("text_sensor", "OpenQuatt Hardware Profile", { state: state.hardware, value: state.hardware });
     setEntity("text_sensor", "OpenQuatt Connection", { state: state.connection, value: state.connection });
-    setEntity("text_sensor", "OpenQuatt Version", { state: MOCK_STABLE_VERSION, value: MOCK_STABLE_VERSION });
+    setEntity("text_sensor", "OpenQuatt Version", { state: MOCK_DEV_VERSION, value: MOCK_DEV_VERSION });
     setEntity("text_sensor", "OpenQuatt Release Channel", { state: "dev", value: "dev" });
     setEntity("sensor", "Uptime", { value: 0, uom: "h" });
     syncUptimeEntity();
@@ -1902,12 +1902,12 @@
     setEntity("sensor", "Lifetime energiehistorie grootte", { value: state.energyHistoryStoredKiB, uom: "kB" });
     setEntity("sensor", "Lifetime energiehistorie schrijfacties", { value: state.energyHistoryWrites });
     setEntity("update", "Firmware Update", {
-      state: "available",
-      value: "available",
-      current_version: MOCK_STABLE_VERSION,
+      state: "up_to_date",
+      value: "up_to_date",
+      current_version: MOCK_DEV_VERSION,
       latest_version: MOCK_DEV_VERSION,
       title: "OpenQuatt firmware",
-      summary: "Nieuwe firmware met verdere UI- en regelingverbeteringen staat klaar voor deze preview.",
+      summary: "De preview draait op de nieuwste dev-firmware.",
       release_url: getMockReleaseUrl("dev"),
     });
     setEntity("binary_sensor", "Setup Complete", { value: state.complete, state: state.complete });

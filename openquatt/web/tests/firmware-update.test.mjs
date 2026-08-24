@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 globalThis.__OQ_PREVIEW__ = false;
@@ -19,6 +20,7 @@ const {
   isFirmwareDowngradeAvailable,
   isFirmwareInstallCompletionConfirmed,
   isFirmwareUpdateAvailable,
+  isFirmwareUpdateJustCompleted,
   primeFirmwareInstallProgressHints,
   renderUpdateModal,
 } = await import("../js/src/features/firmware-update.js");
@@ -92,6 +94,19 @@ test("dev firmware exposes an explicit confirmed downgrade to the older main rel
   assert.match(modal, /Terug naar main v0\.47\.0/);
 });
 
+test("firmware preview starts from a consistent running dev build", async () => {
+  const mockSource = await readFile(new URL("../js/mock-device.js", import.meta.url), "utf8");
+
+  assert.match(
+    mockSource,
+    /setEntity\("text_sensor", "OpenQuatt Version", \{ state: MOCK_DEV_VERSION, value: MOCK_DEV_VERSION \}\);/
+  );
+  assert.match(
+    mockSource,
+    /current_version: MOCK_DEV_VERSION,\s+latest_version: MOCK_DEV_VERSION,/
+  );
+});
+
 test("downgrade remains unavailable outside the validated dev-to-main path", () => {
   setDevToMainDowngradeState();
 
@@ -134,6 +149,28 @@ test("downgrade completion requires the device to boot the exact lower target", 
   state.entities.firmwareUpdateStatus = { state: "Idle", value: "Idle" };
 
   assert.equal(isFirmwareInstallCompletionConfirmed(), true);
+});
+
+test("up-to-date firmware is only presented as completed after an install attempt", () => {
+  setDevToMainDowngradeState();
+  state.entities.projectVersionText = { state: "v0.47.0", value: "v0.47.0" };
+  state.entities.releaseChannelText = { state: "main", value: "main" };
+  state.entities.firmwareUpdate = {
+    ...state.entities.firmwareUpdate,
+    state: "up_to_date",
+    value: "up_to_date",
+    current_version: "v0.47.0",
+    latest_version: "v0.47.0",
+  };
+
+  assert.equal(isFirmwareUpdateJustCompleted(), false);
+  assert.doesNotMatch(renderUpdateModal(), /Firmware-update afgerond/);
+
+  state.updateInstallCompleted = true;
+  state.updateInstallCompletedVersion = "v0.47.0";
+
+  assert.equal(isFirmwareUpdateJustCompleted(), true);
+  assert.match(renderUpdateModal(), /Firmware-update afgerond/);
 });
 
 test("a new OTA attempt ignores cached reboot progress until a post-start poll", () => {

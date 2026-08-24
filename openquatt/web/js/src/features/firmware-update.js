@@ -306,7 +306,7 @@ import { render } from "../core/render-scheduler.js";
   }
 
   export function isFirmwareUpdateJustCompleted() {
-    return (state.updateInstallCompleted || isFirmwareInstallSettled())
+    return state.updateInstallCompleted
       && !isFirmwareUpdateChecking()
       && !getFirmwareProgressModel()
       && !isFirmwareUpdateAvailable();
