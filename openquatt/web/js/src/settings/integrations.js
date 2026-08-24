@@ -670,6 +670,12 @@ import { escapeHtml } from "../core/html.js";
     const heatingEnableSourceDisabled = String(getEntityValue("heatingEnableSource") || "").trim() === "Disabled";
     const heatingEnableSourceLabel = formattedSourceValue("heatingEnableSource", { optionLabels: { Disabled: "Niet gebruiken" } });
     const heatingEnableAdvice = hasEntity("heatingEnableSource") ? getHeatingEnableAdvice() : null;
+    const heatingEnableWarning = heatingEnableAdvice && heatingEnableAdvice.deviant
+      ? `${heatingEnableAdvice.title}: ${heatingEnableAdvice.copy}`
+      : "";
+    const heatingEnableInfo = !heatingEnableWarning && heatingEnableSourceDisabled
+      ? "Niet gebruiken = geen externe gate; de strategie bepaalt zelf of warmte nodig is."
+      : "";
     const coolingEnableSourceDisabled = String(getEntityValue("coolingEnableSource") || "").trim() === "Disabled";
     const coolingEnableSourceLabels = {
       Disabled: "Niet gebruiken / handmatig",
@@ -856,17 +862,13 @@ import { escapeHtml } from "../core/html.js";
         key: "heating-enable",
         title: "Warmtetoestemming",
         icon: "flame",
-        warning: heatingEnableAdvice && heatingEnableAdvice.deviant
-          ? `${heatingEnableAdvice.title}: ${heatingEnableAdvice.copy}`
-          : heatingEnableSourceDisabled
-            ? "Niet gebruiken betekent: geen externe warmtetoestemming; de actieve verwarmingsstrategie mag zelf warmtevraag opbouwen."
-            : "",
+        warning: heatingEnableWarning,
         select: {
           key: "heatingEnableSource",
           label: "Bron",
           optionLabels: { Disabled: "Niet gebruiken", "API input": "API-invoer" },
           infoId: "heatingEnableSource-info",
-          infoCopy: "Niet gebruiken betekent: geen externe warmtetoestemming; de strategie bepaalt zelf of warmte nodig is. Bij Power House is dat meestal gewenst; bij Water Temperature Control is meestal de OpenTherm-thermostaat als warmtetoestemming gewenst.",
+          infoCopy: "Niet gebruiken = geen externe gate; de strategie bepaalt zelf of warmte nodig is. Bij Power House meestal gewenst; bij stooklijn meestal OpenTherm-thermostaat.",
           haKeys: ["heatingEnableHa", "heatingEnableHaValid"],
           apiValueKey: "apiInputHeatingEnable",
           apiValidKey: "apiInputHeatingEnableValid",
@@ -876,7 +878,7 @@ import { escapeHtml } from "../core/html.js";
         activeRows: [
           renderSourceRow({ label: "Toestemming", value: heatingEnableSourceDisabled ? "Niet gebruikt — strategie bepaalt vraag" : sourceStateText("heatingEnableSelected", "Toegestaan", "Geblokkeerd") }),
           !heatingEnableSourceDisabled ? renderSourceRow({ label: "Bron", value: heatingEnableSourceLabel }) : "",
-          heatingEnableAdvice ? renderSourceRow({ label: "Advies", value: heatingEnableAdvice.deviant ? `${heatingEnableAdvice.title}` : "Komt overeen met strategie", status: heatingEnableAdvice.deviant ? "!" : "✓", statusTone: heatingEnableAdvice.deviant ? "warning" : "valid", statusTitle: heatingEnableAdvice.copy }) : "",
+          heatingEnableInfo ? renderSourceRow({ label: "", value: heatingEnableInfo, status: "i", statusTone: "valid", statusTitle: heatingEnableInfo }) : "",
         ],
         measurementRows: [
           otAvailable ? renderSourceRow({ label: "OpenTherm", value: sourceStateText("otThermostatChEnable", "Toegestaan", "Geblokkeerd") }) : "",

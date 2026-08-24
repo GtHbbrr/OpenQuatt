@@ -641,18 +641,18 @@ import { renderUsageTelemetryConsent, renderUsageTelemetryDisclosure } from "./u
         <div class="oq-settings-field-control">
           <p class="oq-settings-action-note${toneClass}"><strong>${escapeHtml(advice.title)}</strong><br>${escapeHtml(advice.copy)}</p>
           <div class="oq-settings-source-rows">
-            <div class="oq-settings-source-row"><span>Aanbevolen</span><strong>${escapeHtml(recommendedLabel)}</strong></div>
+            <div class="oq-settings-source-row"><span>Aanbevolen voor ${escapeHtml(isPowerHouse ? "Power House" : "stooklijn")}</span><strong>${escapeHtml(recommendedLabel)}</strong></div>
             <div class="oq-settings-source-row${needsAction ? " is-warning" : ""}"><span>Huidige keuze</span><strong>${escapeHtml(currentLabel)}</strong></div>
           </div>
           ${needsAction ? `
             <div class="oq-helper-actions">
-              <button class="oq-helper-button oq-helper-button--ghost" type="button" data-oq-action="apply-quickstart-heating-enable" data-heating-enable-target="${escapeHtml(recommended)}" ${state.loadingEntities || busy ? "disabled" : ""}>
-                ${busy ? "Instelling opslaan..." : `Aanbevolen instelling gebruiken (${escapeHtml(recommendedLabel)})`}
+              <button class="oq-helper-button oq-helper-button--primary" type="button" data-oq-action="apply-quickstart-heating-enable" data-heating-enable-target="${escapeHtml(recommended)}" ${state.loadingEntities || busy ? "disabled" : ""}>
+                ${busy ? "Opslaan..." : `Aanbevolen instelling gebruiken`}
               </button>
+              <span class="oq-settings-action-note">Afwijkend blijft mogelijk voor zone-regeling of open afgifte.</span>
             </div>
-            <p class="oq-settings-action-note">Je kunt ook handmatig een andere keuze laten staan; deze aanbeveling blokkeert niets. Geldige maar afwijkende combinaties blijven mogelijk (bijv. Power House met zone-regeling of stooklijn volledig weersafhankelijk).</p>
           ` : `
-            <p class="oq-settings-action-note">Huidige keuze komt overeen met het advies voor ${escapeHtml(isPowerHouse ? "Power House" : "Water Temperature Control")}.</p>
+            <p class="oq-settings-action-note">Komt overeen met de aanbeveling voor ${escapeHtml(isPowerHouse ? "Power House" : "stooklijn")}. Niet gebruiken = geen externe gate.</p>
           `}
           ${state.controlNotice ? `<p class="oq-helper-notice">${escapeHtml(state.controlNotice)}</p>` : ""}
           ${state.controlError ? `<p class="oq-helper-error">${escapeHtml(state.controlError)}</p>` : ""}
