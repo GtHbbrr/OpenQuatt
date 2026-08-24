@@ -11,11 +11,45 @@ globalThis.window = {
 
 const { state } = await import("../js/src/core/state.js");
 const {
+  getFirmwareModalCopy,
   getFirmwareProgressModel,
   getFirmwareTestAssetUrls,
+  getFirmwareUpdateVersions,
+  getUpdateStatus,
+  isFirmwareDowngradeAvailable,
   isFirmwareInstallCompletionConfirmed,
+  isFirmwareUpdateAvailable,
   primeFirmwareInstallProgressHints,
+  renderUpdateModal,
 } = await import("../js/src/features/firmware-update.js");
+
+function setDevToMainDowngradeState() {
+  state.drafts = {};
+  state.entities = {
+    firmwareUpdate: {
+      state: "UPDATE AVAILABLE",
+      value: "v0.47.0",
+      current_version: "v0.48.0-dev.696+86f5997",
+      latest_version: "v0.47.0",
+      release_url: "https://github.com/OpenQuatt/OpenQuatt/releases/tag/v0.47.0",
+    },
+    firmwareUpdateChannel: { state: "main", value: "main", option: ["main", "dev"] },
+    installFirmwareUpdateTarget: { state: "" },
+    projectVersionText: { state: "v0.48.0-dev.696+86f5997", value: "v0.48.0-dev.696+86f5997" },
+    releaseChannelText: { state: "dev", value: "dev" },
+  };
+  state.updateCheckBusy = false;
+  state.updateInstallBusy = false;
+  state.updateInstallCompleted = false;
+  state.updateInstallCompletedVersion = "";
+  state.updateInstallMode = "";
+  state.updateInstallTargetVersion = "";
+  state.updateInstallPhaseHint = "";
+  state.updateInstallProgressHint = Number.NaN;
+  state.updateInstallStatusPollObserved = false;
+  state.firmwareDowngradeConfirmedVersion = "";
+  state.updateModalOpen = true;
+}
 
 test("PR firmware uses deterministic release URLs without the GitHub REST API", () => {
   const target = {
@@ -30,6 +64,76 @@ test("PR firmware uses deterministic release URLs without the GitHub REST API", 
     label: "PR 395 · Heatpump Controller Q Duo Wi-Fi",
   });
   assert.equal(getFirmwareTestAssetUrls("395/../../dev-latest", target), null);
+});
+
+test("dev firmware exposes an explicit confirmed downgrade to the older main release", () => {
+  setDevToMainDowngradeState();
+
+  assert.equal(isFirmwareDowngradeAvailable(), true);
+  assert.equal(isFirmwareUpdateAvailable(), false);
+  assert.deepEqual(getFirmwareUpdateVersions(), {
+    current: "v0.48.0-dev.696+86f5997",
+    latest: "v0.47.0",
+  });
+  assert.equal(getUpdateStatus(), "Downgrade beschikbaar");
+  assert.match(getFirmwareModalCopy(), /bewust teruggaan naar main/);
+
+  let modal = renderUpdateModal();
+  let installButton = modal.match(/<button class="oq-helper-button[^"]*" type="button" data-oq-action="install-firmware-update"[^>]*>/)?.[0] || "";
+  assert.match(modal, /data-oq-firmware-downgrade-confirm="true"/);
+  assert.match(modal, /Main v0\.47\.0 vervangt de nieuwere dev-build v0\.48\.0-dev\.696\+86f5997/);
+  assert.match(installButton, /oq-helper-button--warning/);
+  assert.match(installButton, /disabled/);
+
+  state.firmwareDowngradeConfirmedVersion = "v0.47.0";
+  modal = renderUpdateModal();
+  installButton = modal.match(/<button class="oq-helper-button[^"]*" type="button" data-oq-action="install-firmware-update"[^>]*>/)?.[0] || "";
+  assert.doesNotMatch(installButton, /disabled/);
+  assert.match(modal, /Terug naar main v0\.47\.0/);
+});
+
+test("downgrade remains unavailable outside the validated dev-to-main path", () => {
+  setDevToMainDowngradeState();
+
+  delete state.entities.installFirmwareUpdateTarget;
+  assert.equal(isFirmwareDowngradeAvailable(), false);
+
+  state.entities.installFirmwareUpdateTarget = { state: "" };
+  state.entities.releaseChannelText = { state: "main", value: "main" };
+  assert.equal(isFirmwareDowngradeAvailable(), false);
+
+  state.entities.releaseChannelText = { state: "dev", value: "dev" };
+  state.entities.firmwareUpdateChannel = { state: "dev", value: "dev", option: ["main", "dev"] };
+  assert.equal(isFirmwareDowngradeAvailable(), false);
+
+  state.entities.firmwareUpdateChannel = { state: "main", value: "main", option: ["main", "dev"] };
+  state.entities.firmwareUpdate.latest_version = "onbekend";
+  assert.equal(isFirmwareDowngradeAvailable(), false);
+});
+
+test("downgrade completion requires the device to boot the exact lower target", () => {
+  setDevToMainDowngradeState();
+  state.updateInstallBusy = true;
+  state.updateInstallMode = "downgrade";
+  state.updateInstallTargetVersion = "v0.47.0";
+
+  assert.equal(isFirmwareInstallCompletionConfirmed(), false);
+
+  state.entities.projectVersionText = { state: "onbekend", value: "onbekend" };
+  assert.equal(isFirmwareInstallCompletionConfirmed(), false);
+
+  state.entities.projectVersionText = { state: "v0.47.0", value: "v0.47.0" };
+  state.entities.releaseChannelText = { state: "main", value: "main" };
+  state.entities.firmwareUpdate = {
+    ...state.entities.firmwareUpdate,
+    state: "NO UPDATE",
+    value: "v0.47.0",
+    current_version: "v0.47.0",
+    latest_version: "v0.47.0",
+  };
+  state.entities.firmwareUpdateStatus = { state: "Idle", value: "Idle" };
+
+  assert.equal(isFirmwareInstallCompletionConfirmed(), true);
 });
 
 test("a new OTA attempt ignores cached reboot progress until a post-start poll", () => {
