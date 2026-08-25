@@ -1,12 +1,22 @@
 import { hasEntity } from "../core/app-shared.js";
 import { renderModalShell } from "../core/modal-shell.js";
 import { isCurveMode } from "../core/domain-helpers.js";
+import { getEntityValue } from "../core/entity-store.js";
 import { escapeHtml } from "../core/html.js";
 import { state } from "../core/state.js";
 import { getHeatingEnableAdvice, getHeatingEnableCurrent, getHeatingEnableRecommendation } from "../core/heating-strategy-matrix.js";
 
 function pill(text, tone) {
   return `<span class="oq-advice-pill oq-advice-pill--${tone}">${escapeHtml(text)}</span>`;
+}
+function formatSourceLabel(value) {
+  const v = String(value || "").trim();
+  if (!v) return "—";
+  if (v === "Disabled") return "Niet gebruiken";
+  if (v === "OT thermostat") return "OpenTherm-thermostaat";
+  if (v === "HA input") return "HA-invoer";
+  if (v === "API input") return "API-invoer";
+  return v;
 }
 
 export function renderHeatingStrategyAdviceModal() {
@@ -19,10 +29,21 @@ export function renderHeatingStrategyAdviceModal() {
   const advice = getHeatingEnableAdvice();
   const recommended = getHeatingEnableRecommendation();
   const current = getHeatingEnableCurrent();
-  const recommendedLabel = recommended === "Disabled" ? "Niet gebruiken" : recommended === "OT thermostat" ? "OpenTherm-thermostaat" : recommended;
-  const currentLabel = current === "Disabled" ? "Niet gebruiken" : current === "OT thermostat" ? "OpenTherm-thermostaat" : current || "—";
+  const recommendedLabel = formatSourceLabel(recommended);
+  const currentLabel = formatSourceLabel(current);
   const deviant = Boolean(advice.deviant && hasEntity("heatingEnableSource"));
   const busy = state.busyAction === "quickstart-heating-enable";
+
+  // Huidige bronnen voor context
+  const roomTempLabel = formatSourceLabel(getEntityValue("roomTempSource"));
+  const roomSetpointLabel = formatSourceLabel(getEntityValue("roomSetpointSource"));
+  const outsideTempLabel = formatSourceLabel(getEntityValue("outsideTempSource"));
+  const supplyLabel = formatSourceLabel(getEntityValue("waterSupplySource"));
+  const flowLabel = formatSourceLabel(getEntityValue("flowSource") || getEntityValue("qFlowSource"));
+
+  const heatingStatusCell = deviant
+    ? `${escapeHtml(currentLabel)} ${pill("afwijkend", "warning")} <button class="oq-advice-inline-btn" type="button" data-oq-action="apply-heating-strategy-advice" data-heating-enable-target="${escapeHtml(recommended)}" ${busy ? "disabled" : ""}>Overnemen</button>`
+    : `${escapeHtml(currentLabel)} ${pill("ok", "ok")}`;
 
   return renderModalShell({
     modalId: "system",
@@ -60,46 +81,46 @@ export function renderHeatingStrategyAdviceModal() {
         </div>
       </div>
 
-      <h4 class="oq-advice-section-title">Overzicht per instelling</h4>
+      <h4 class="oq-advice-section-title">Overzicht voor ${escapeHtml(strategyLabel)}</h4>
       <div class="oq-advice-matrix-wrap">
-        <table class="oq-advice-matrix">
+        <table class="oq-advice-matrix oq-advice-matrix--single">
           <thead>
             <tr>
               <th>Instelling</th>
-              <th>Power House</th>
-              <th>Stooklijn</th>
+              <th>Advies</th>
+              <th>Jouw instelling</th>
             </tr>
           </thead>
           <tbody>
             <tr>
               <td>Kamertemperatuur</td>
-              <td>${pill("vereist", "required")}</td>
-              <td>${pill("aanbevolen", "recommended")}</td>
+              <td>${isCurve ? pill("aanbevolen", "recommended") : pill("vereist", "required")}</td>
+              <td>${escapeHtml(roomTempLabel)} ${roomTempLabel === "—" ? pill("instellen", "warning") : pill("ok", "ok")}</td>
             </tr>
             <tr>
               <td>Kamer-setpoint</td>
-              <td>${pill("vereist", "required")}</td>
-              <td>${pill("aanbevolen", "recommended")}</td>
+              <td>${isCurve ? pill("aanbevolen", "recommended") : pill("vereist", "required")}</td>
+              <td>${escapeHtml(roomSetpointLabel)} ${roomSetpointLabel === "—" ? pill("instellen", "warning") : pill("ok", "ok")}</td>
             </tr>
             <tr>
               <td>Buitentemperatuur</td>
-              <td>${pill("vereist", "required")}</td>
               <td>${pill("vereist", "required")} <span class="oq-advice-matrix-note">via Auto</span></td>
+              <td>${escapeHtml(outsideTempLabel)} ${outsideTempLabel === "—" ? pill("instellen", "warning") : pill("ok", "ok")}</td>
             </tr>
             <tr>
               <td>Aanvoertemperatuur</td>
-              <td>${pill("nodig voor begrenzing", "muted")}</td>
-              <td>${pill("vereist", "required")}</td>
+              <td>${isCurve ? pill("vereist", "required") : pill("nodig voor begrenzing", "muted")}</td>
+              <td>${escapeHtml(supplyLabel)} ${supplyLabel === "—" ? pill("instellen", "warning") : pill("ok", "ok")}</td>
             </tr>
             <tr>
               <td>Flow</td>
               <td>${pill("vereist", "required")}</td>
-              <td>${pill("vereist", "required")}</td>
+              <td>${escapeHtml(flowLabel)} ${flowLabel === "—" ? pill("instellen", "warning") : pill("ok", "ok")}</td>
             </tr>
             <tr class="is-highlight${deviant ? " is-warning" : ""}">
               <td>Warmtetoestemming</td>
-              <td>${pill("meestal Niet gebruiken", "muted")}</td>
-              <td>${pill("meestal thermostaat / zone", "recommended")}</td>
+              <td>${isCurve ? pill("OpenTherm-thermostaat", "recommended") : pill("Niet gebruiken", "muted")}</td>
+              <td>${heatingStatusCell}</td>
             </tr>
           </tbody>
         </table>

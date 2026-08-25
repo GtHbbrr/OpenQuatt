@@ -814,7 +814,12 @@
 .oq-advice-pill--required { background: #0f172a; color: #fff; }
 .oq-advice-pill--recommended { background: #ecfeff; color: #0e7490; border: 1px solid rgba(14,116,144,.18); }
 .oq-advice-pill--muted { background: #f1f5f9; color: #475569; border: 1px solid rgba(148,163,184,.18); }
+.oq-advice-pill--ok { background: #f0fdf4; color: #166534; border: 1px solid rgba(34,197,94,.18); }
+.oq-advice-pill--warning { background: #fffbeb; color: #92400e; border: 1px solid rgba(245,158,11,.28); }
 .oq-advice-matrix-note { margin-left: 6px; color: var(--oq-helper-soft); font-size: .74rem; font-weight: 600; }
+.oq-advice-inline-btn { margin-left: 8px; padding: 3px 8px; border-radius: 999px; border: 1px solid rgba(234,88,12,.28); background: #fff7ed; color: #9a3412; font-size: .72rem; font-weight: 750; cursor: pointer; }
+.oq-advice-inline-btn:hover { background: #ffedd5; }
+.oq-advice-inline-btn:disabled { opacity: .6; cursor: default; }
 .oq-advice-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
 .oq-advice-card { padding: 12px 14px; border-radius: 14px; border: 1px solid rgba(148,163,184,.14); background: rgba(248,250,252,.7); }
 .oq-advice-card-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; color: var(--oq-helper-ink); font-weight: 800; }
