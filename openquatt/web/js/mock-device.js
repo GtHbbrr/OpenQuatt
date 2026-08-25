@@ -2264,6 +2264,7 @@
       ["OT - Room Setpoint", 20.0, "\u00B0C"],
       ["OT - Room Temperature", 20.9, "\u00B0C"],
       ["CIC - Water Supply Temp", 29.5, "\u00B0C"],
+      ["CIC - Boiler Water Pressure", 1.7, "bar"],
       ["CIC - Control setpoint", 30.0, "\u00B0C"],
       ["CIC - Room setpoint", 20.0, "\u00B0C"],
       ["CIC - Room temperature", 20.9, "\u00B0C"],

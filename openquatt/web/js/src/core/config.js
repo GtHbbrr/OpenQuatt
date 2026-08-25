@@ -227,6 +227,7 @@
     cicPollingEnabled: { domain: "switch", name: "CIC - Enable polling", optional: true },
     cicFeedUrl: { domain: "text", name: "CIC - Feed URL", optional: true },
     cicWaterSupplyTemp: { domain: "sensor", name: "CIC - Water Supply Temp", optional: true },
+    cicBoilerWaterPressure: { domain: "sensor", name: "CIC - Boiler Water Pressure", optional: true },
     cicControlSetpoint: { domain: "sensor", name: "CIC - Control setpoint", optional: true },
     cicRoomSetpoint: { domain: "sensor", name: "CIC - Room setpoint", optional: true },
     cicRoomTemp: { domain: "sensor", name: "CIC - Room temperature", optional: true },
@@ -1061,6 +1062,7 @@
   export const CIC_POLLING_DIAGNOSTIC_KEYS = [
     "cicJsonFeedOk",
     "cicWaterSupplyTemp",
+    "cicBoilerWaterPressure",
     "cicControlSetpoint",
     "cicRoomSetpoint",
     "cicRoomTemp",
