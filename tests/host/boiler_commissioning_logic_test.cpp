@@ -7,6 +7,15 @@ namespace {
 
 using namespace oq_boiler_commissioning;
 
+void test_commissioning_temperature_policy() {
+  assert(normalize_max_water_temperature_c(NAN) == 60.0f);
+  assert(normalize_max_water_temperature_c(10.0f) == 25.0f);
+  assert(normalize_max_water_temperature_c(90.0f) == 75.0f);
+  assert(commissioning_target_temperature_c(50.0f) == 45.0f);
+  assert(commissioning_target_temperature_c(NAN) == 55.0f);
+  assert(isnan(commissioning_target_temperature_c(50.0f, -1.0f)));
+}
+
 void test_sufficient_headroom() {
   auto op = compute_operating_point(6000.0f, 20.0f, 50.0f, 800.0f, 4180.0f, 5.0f);
   assert(op.feasible);
@@ -106,9 +115,47 @@ void test_apply_policy() {
   assert(!result_apply_allowed(true, false, true));
 }
 
+void test_unreachable_flow_after_sustained_saturation() {
+  FlowReachabilityMonitor monitor;
+  assert(!monitor.update(1000, 700.0f, 800.0f, 40.0f, 50.0f));
+  assert(!monitor.update(31000, 704.0f, 800.0f, 40.0f, 50.0f));
+  assert(monitor.update(61000, 703.0f, 800.0f, 40.0f, 50.0f));
+  assert(monitor.best_flow_lph() == 704.0f);
+}
+
+void test_reachability_monitor_allows_meaningful_progress() {
+  FlowReachabilityMonitor monitor;
+  assert(!monitor.update(1000, 680.0f, 800.0f, 40.0f, 55.0f));
+  assert(!monitor.update(31000, 690.0f, 800.0f, 40.0f, 55.0f));
+  assert(!monitor.update(61000, 701.0f, 800.0f, 40.0f, 55.0f));
+  assert(!monitor.update(91000, 715.0f, 800.0f, 40.0f, 55.0f));
+  assert(!monitor.update(121000, 725.0f, 800.0f, 40.0f, 55.0f));
+}
+
+void test_reachability_monitor_resets_when_actuator_not_saturated() {
+  FlowReachabilityMonitor monitor;
+  assert(!monitor.update(1000, 700.0f, 800.0f, 40.0f, 50.0f));
+  assert(!monitor.update(31000, 704.0f, 800.0f, 40.0f, 100.0f));
+  assert(!monitor.update(91000, 704.0f, 800.0f, 40.0f, 50.0f));
+}
+
+void test_reachability_monitor_resets_when_target_band_reached() {
+  FlowReachabilityMonitor monitor;
+  assert(!monitor.update(1000, 700.0f, 800.0f, 40.0f, 50.0f));
+  assert(!monitor.update(31000, 765.0f, 800.0f, 40.0f, 50.0f));
+  assert(!monitor.update(91000, 700.0f, 800.0f, 40.0f, 50.0f));
+}
+
+void test_reachability_monitor_rejects_invalid_flow() {
+  FlowReachabilityMonitor monitor;
+  assert(!monitor.update(1000, NAN, 800.0f, 40.0f, 50.0f));
+  assert(!monitor.update(61000, NAN, 800.0f, 40.0f, 50.0f));
+}
+
 }  // namespace
 
 int main() {
+  test_commissioning_temperature_policy();
   test_sufficient_headroom();
   test_insufficient_headroom_inlet_high();
   test_generic_helper_preserves_theoretical_flow();
@@ -120,5 +167,10 @@ int main() {
   test_dynamic_flow_after_initial_800_preflow();
   test_very_high_theoretical_flow_is_limited_not_refused();
   test_apply_policy();
+  test_unreachable_flow_after_sustained_saturation();
+  test_reachability_monitor_allows_meaningful_progress();
+  test_reachability_monitor_resets_when_actuator_not_saturated();
+  test_reachability_monitor_resets_when_target_band_reached();
+  test_reachability_monitor_rejects_invalid_flow();
   return 0;
 }

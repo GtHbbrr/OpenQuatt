@@ -94,5 +94,6 @@ interval:
     startup_delay: 4600ms
     then:
       - lambda: |-
-          // Boiler power-test task runtime: owns flow settle, boiler settle, measurement and cooldown.
+          // BoilerPowerTestRuntime is the single owner of the CM100 boiler-test state machine,
+          // including flow reachability, boiler settle, measurement, failure cleanup and cooldown.
           oq_boiler_task::runtime().tick(oq_boiler_task::default_config(), (uint32_t) millis());

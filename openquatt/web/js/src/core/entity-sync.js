@@ -8,7 +8,8 @@ import { getDefaultAppView, getUrlAppView, setAppView } from "./navigation.js";
 import { isFirmwareOtaQuietActive } from "./firmware-quiet.js";
 import { getInstallationMonitoringModel, syncInstallationMonitoringDetailsState } from "./installation-monitoring.js";
 import { getIncidentMonitoringFailureUpdate, getIncidentMonitoringSuccessUpdate, getIncidentMonitoringUnsupportedUpdate } from "./incident-monitoring.js";
-import { beginDeviceReconnect, clearDeviceReconnect, markDeviceReconnectRecovered, reconcileOtaEvidence } from "./device-reconnect.js";
+import { ODU_GENERATION_DETECT_KEYS, ODU_GENERATION_KEYS } from "./odu-generation.js";
+import { beginDeviceReconnect, clearDeviceReconnect, isRestartRefreshActive, markDeviceReconnectRecovered, reconcileOtaEvidence, reconcileRestartEvidence } from "./device-reconnect.js";
 import { getSettingsRenderSignature } from "./render-signatures.js";
 import { isSystemSettingsGroupActive } from "./surface-state.js";
 import { getHeaderRenderSignature, patchHeaderDom } from "./header-render-controls.js";
@@ -206,6 +207,8 @@ import { fetchWithTimeout } from "./browser-utils.js";
       "setupComplete",
       "installationTopology",
       "hpGeneration",
+      ...ODU_GENERATION_KEYS,
+      ...ODU_GENERATION_DETECT_KEYS,
       "boilerCvAssistEnabled",
       "boilerRatedHeatPower",
       ...BOILER_SETTING_KEYS,
@@ -559,8 +562,9 @@ import { fetchWithTimeout } from "./browser-utils.js";
     state.lastEntitySyncSuccessAt = now;
     state.entitySyncFailureCount = 0;
     reconcileOtaEvidence();
+    reconcileRestartEvidence();
     const wasReconnectActive = Boolean(state.deviceReconnectMode);
-    const reconnectRecovered = wasReconnectActive && typeof markDeviceReconnectRecovered === "function"
+    const reconnectRecovered = wasReconnectActive && !isRestartRefreshActive() && typeof markDeviceReconnectRecovered === "function"
       ? markDeviceReconnectRecovered()
       : false;
     if (reconnectRecovered) {
@@ -605,11 +609,16 @@ import { fetchWithTimeout } from "./browser-utils.js";
   export function noteEntityRefreshFailure(message) {
     if (!isLikelyDeviceConnectionError(message)) {
       state.entitySyncFailureCount = 0;
-      clearDeviceReconnect();
+      if (!state.restartRefresh.on) {
+        clearDeviceReconnect();
+      }
       return;
     }
     if (state.ota.ok === 1) {
       state.ota.ok = 2;
+    }
+    if (state.restartRefresh.ok === 1) {
+      state.restartRefresh.ok = 2;
     }
     state.entitySyncFailureCount = Number(state.entitySyncFailureCount || 0) + 1;
     state.deviceReconnectLastError = String(message || "");
@@ -619,11 +628,13 @@ import { fetchWithTimeout } from "./browser-utils.js";
       || state.updateInstallBusy
       || state.updateInstallPhaseHint
       || state.ota.on
+      || state.restartRefresh.on
       || state.entitySyncFailureCount >= 2
     ) {
       beginDeviceReconnect(
         state.updateInstallBusy || state.updateInstallPhaseHint || state.ota.on
           ? "ota"
+          : state.restartRefresh.on ? "restart"
           : state.busyAction === "restartAction" ? "restart" : "reconnect",
         message,
       );
@@ -1159,6 +1170,10 @@ import { fetchWithTimeout } from "./browser-utils.js";
     const quickStartThermostatSourceKeys = state.quickStartModalOpen && state.currentStep === "thermostat-source"
       ? QUICK_START_THERMOSTAT_SOURCE_KEYS
       : [];
+    const quickStartGenerationKeys = state.quickStartModalOpen
+      && (state.currentStep === "generation" || state.currentStep === "confirm")
+      ? ODU_GENERATION_KEYS
+      : [];
     const settingsStorageKeys = shouldRefreshSettingsStorageForCurrentSurface()
       ? getSettingsStorageRefreshKeys()
       : [];
@@ -1187,6 +1202,7 @@ import { fetchWithTimeout } from "./browser-utils.js";
               ...(isCurveMode() ? CURVE_POINTS.map((point) => point.key) : POWER_HOUSE_KEYS),
             ]
           : ["setupComplete", ...HEADER_ENTITY_KEYS, "strategy", ...staticKeys];
+    const generationBefore = ODU_GENERATION_KEYS.map(getEntityValue).join();
 
     state.entitySyncInFlight = true;
     state.lastEntitySyncAttemptAt = now;
@@ -1202,7 +1218,7 @@ import { fetchWithTimeout } from "./browser-utils.js";
         }
         return;
       }
-      await refreshEntities([...new Set([...keys, ...(state.ota.wait ? ["uptime", "projectVersionText"] : []), ...quickStartSetupKeys, ...quickStartFlowSourceKeys, ...quickStartThermostatSourceKeys])], isPrefetchOverview ? "state" : appView === "settings" || quickStartSetupKeys.length ? "all" : "state", {
+      await refreshEntities([...new Set([...keys, ...(state.ota.wait || state.restartRefresh.wait ? ["uptime", "projectVersionText"] : []), ...quickStartSetupKeys, ...quickStartFlowSourceKeys, ...quickStartThermostatSourceKeys, ...quickStartGenerationKeys])], isPrefetchOverview ? "state" : appView === "settings" || quickStartSetupKeys.length ? "all" : "state", {
         concurrency: forceFast && isOverviewLike ? FAST_VIEW_ENTITY_REFRESH_CONCURRENCY : ENTITY_REFRESH_CONCURRENCY,
       });
       state.lastFastEntitySyncAt = Date.now();
@@ -1256,6 +1272,10 @@ import { fetchWithTimeout } from "./browser-utils.js";
       const nextHeaderSignature = getHeaderRenderSignature();
       if (shouldDeferSupplementary && !state.nativeOpen) {
         schedulePrimeSupplementaryData(getSupplementaryPrimeDelayMs(syncView));
+      }
+      if (generationBefore !== ODU_GENERATION_KEYS.map(getEntityValue).join()) {
+        render();
+        return;
       }
       if (reconnectChanged) {
         render();

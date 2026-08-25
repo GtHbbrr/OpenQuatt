@@ -14,6 +14,8 @@ import {
   getIncidentMonitoringSuccessUpdate,
   getIncidentMonitoringUnsupportedUpdate,
   getIncidentRecoveryLabel,
+  getIncidentTechnicalCode,
+  getPumpIncidentContextRows,
   normalizeIncidentMonitoringSnapshot,
   postIncidentActionRequest,
   summarizeIncidentMonitoring,
@@ -94,6 +96,7 @@ test("incident snapshot normalizes HP state, lifecycle and stable machine fields
   assert.equal(normalized.heatPumps[0].linkState, "lost");
   assert.equal(normalized.heatPumps[0].runState, "stop_unconfirmed");
   assert.equal(normalized.heatPumps[0].mustStop, true);
+  assert.equal(normalized.heatPumps[0].stopConfirmationPending, false);
   assert.deepEqual(
     normalized.heatPumps[0].incidents[0].effects,
     ["stop_compressor", "mark_hp_unavailable", "allow_cm4"],
@@ -152,6 +155,71 @@ test("incident snapshot accepts the engine definition/runtime shape and derives 
   assert.equal(incident.register, 2121);
   assert.equal(incident.recoveryCondition, "confirmed_odu_power_cycle");
   assert.equal(incident.userAction, "Power-cycle the outdoor unit and confirm.");
+});
+
+test("ODU source metadata and pump context preserve raw zero/false/null values", () => {
+  const normalized = normalizeIncidentMonitoringSnapshot(snapshot({
+    heat_pumps: [{
+      index: 1,
+      pump_context: {
+        request_on: true,
+        relay_on: true,
+        flow_switch_on: false,
+        ipwm_feedback_raw: 950,
+        ipwm_status: "pump_off_failure",
+        pump_power_w: null,
+        flow_lph: 0,
+      },
+      incidents: [{
+        definition: {
+          id: 46,
+          key: "dc_water_pump",
+          category: "fault",
+          severity: "fault",
+          effects: ["display", "pump_unavailable"],
+          register_address: 2121,
+          bit: 13,
+          source_description: "DC water pump failure",
+        },
+        runtime: {
+          lifecycle: "active",
+          confirmed_active: true,
+          last_seen_ms: 12_000,
+        },
+      }],
+    }],
+  }));
+  const heatPump = normalized.heatPumps[0];
+  const incident = heatPump.incidents[0];
+
+  assert.equal(getIncidentTechnicalCode(incident), "R2121.b13");
+  assert.equal(incident.technicalDescription, "DC water pump failure");
+  assert.equal(heatPump.pumpContext.flowSwitchOn, false);
+  assert.equal(heatPump.pumpContext.flowLph, 0);
+  assert.equal(heatPump.pumpContext.pumpPowerW, null);
+  assert.deepEqual(getPumpIncidentContextRows(incident, heatPump.pumpContext), [
+    ["Pompaanvraag (OpenQuatt) · R2010.b12", "AAN"],
+    ["Pomprelais · R2108.b11", "AAN"],
+    ["Flowswitch · R2115.b13", "UIT"],
+    ["iPWM-feedback · R2137", "950 raw · PumpOffFailure"],
+    ["Flow · R2138", "0 L/h"],
+  ]);
+  const unavailable = normalizeIncidentMonitoringSnapshot(snapshot({
+    heat_pumps: [{
+      index: 1,
+      pump_context: {
+        request_on: null,
+        relay_on: null,
+        flow_switch_on: null,
+        ipwm_feedback_raw: null,
+        pump_power_w: null,
+        flow_lph: null,
+      },
+    }],
+  })).heatPumps[0].pumpContext;
+  assert.equal(unavailable.feedbackRaw, null);
+  assert.equal(unavailable.flowLph, null);
+  assert.equal(unavailable.requestOn, null);
 });
 
 test("status is not raised as a problem while protection and latched recovery remain distinct", () => {
@@ -362,6 +430,25 @@ test("a suspect HP link is shown as confirmation in progress instead of an outag
   assert.equal(presentation.label, "Status wordt bepaald");
   assert.equal(presentation.tone, "clear");
   assert.match(presentation.note, /eerst bevestigd/);
+});
+
+test("stop revalidation is presented as a neutral pending status", () => {
+  const normalized = normalizeIncidentMonitoringSnapshot(snapshot({
+    heat_pumps: [{
+      index: 1,
+      link_state: "healthy",
+      protection_state: "clear",
+      run_state: "stopping",
+      stop_confirmation_pending: true,
+    }],
+  }));
+  const heatPump = normalized.heatPumps[0];
+  const presentation = getHeatPumpStatusPresentation(heatPump);
+
+  assert.equal(heatPump.stopConfirmationPending, true);
+  assert.equal(presentation.label, "Status wordt bepaald");
+  assert.equal(presentation.note, "Verbinding gezond · Stopstatus wordt opnieuw bevestigd");
+  assert.equal(presentation.tone, "warning");
 });
 
 test("incident polling keeps last-good data through transient failures and cleanly handles 404", () => {
