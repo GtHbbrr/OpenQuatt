@@ -116,7 +116,7 @@ import { escapeHtml } from "../core/html.js";
           data-select-key="strategy"
           data-select-option="${escapeHtml(STRATEGY_OPTION_POWER_HOUSE)}"
           aria-pressed="${curveActive ? "false" : "true"}"
-          ${state.loadingEntities || state.busyAction === "save-strategy" ? "disabled" : ""}
+          ${state.loadingEntities || state.busyAction === "save-strategy" || state.busyAction === "save-heatingEnableSource" ? "disabled" : ""}
         >
           <p class="oq-helper-label">Power House</p>
           <h4>Automatisch op basis van je woning</h4>
@@ -134,7 +134,7 @@ import { escapeHtml } from "../core/html.js";
           data-select-key="strategy"
           data-select-option="${escapeHtml(STRATEGY_OPTION_CURVE)}"
           aria-pressed="${curveActive ? "true" : "false"}"
-          ${state.loadingEntities || state.busyAction === "save-strategy" ? "disabled" : ""}
+          ${state.loadingEntities || state.busyAction === "save-strategy" || state.busyAction === "save-heatingEnableSource" ? "disabled" : ""}
         >
           <p class="oq-helper-label">Stooklijn</p>
           <h4>Regelen met een stooklijn</h4>

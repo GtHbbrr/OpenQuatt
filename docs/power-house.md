@@ -130,7 +130,7 @@ Dat is belangrijk, want vreemd gedrag komt niet altijd uit het huismodel zelf. S
 
 Gebruik een externe warmtetoestemming bij `Power House` alleen bewust, bijvoorbeeld als een zone-regeling als harde toestemming dient wanneer geen enkele zone openstaat.
 
-Quick Start adviseert daarom bij `Power House` standaard `Heating Enable Source = Niet gebruiken`. In `Instellingen → Verwarmen` en `Instellingen → Bronnen / integraties → Sensorselectie` zie je een advies wanneer de huidige keuze afwijkt. De instelling wordt bij een strategieswitch niet stil overschreven; je krijgt een `Aanbevolen instelling` melding met een knop om het advies over te nemen. Afwijkende combinaties blijven geldig.
+Tijdens Quick Start zet een strategieswitch naar `Power House` daarom automatisch `Heating Enable Source = Niet gebruiken`; een bestaande keuze wordt in die onboardingstap bewust vervangen. Buiten Quick Start wordt de instelling niet stil overschreven. In `Instellingen → Verwarmen` en `Instellingen → Bronnen / integraties → Sensorselectie` zie je dan alleen een advies wanneer de huidige keuze afwijkt, met een knop om het advies over te nemen. Afwijkende combinaties blijven geldig.
 
 Voor de volledige matrix per strategie zie [Instellingen en meetwaarden](instellingen-en-meetwaarden.md#5-bronselectie).
 
