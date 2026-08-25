@@ -193,7 +193,7 @@ test("koelherstart toont alleen de instelling van de gekozen modus", () => {
   });
   markup = renderSettingsCoolingSection();
   assert.match(markup, /Minimale uit-tijd koelen/);
-  assert.match(markup, /beide warmtepompen bij Duo/);
+  assert.match(markup, /Bij Duo geldt dit voor beide warmtepompen/);
   assert.doesNotMatch(markup, /Herstartmarge watertemperatuur/);
 });
 
