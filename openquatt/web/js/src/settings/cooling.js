@@ -19,7 +19,7 @@ import { escapeHtml } from "../core/html.js";
     }
 
     const labels = {
-      Ready: "Gereed",
+      Ready: "Gereed om te koelen",
       "Waiting for room request": "Koeling toegestaan, wacht op kamertemperatuur boven koel-setpoint",
       "Cooling enabled, waiting for room temperature above cooling setpoint": "Koeling toegestaan, wacht op kamertemperatuur boven koel-setpoint",
       "No dew point source": "Geen dauwpuntbron",

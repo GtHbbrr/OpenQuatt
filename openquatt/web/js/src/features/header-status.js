@@ -672,7 +672,7 @@ import { render } from "../core/render-scheduler.js";
         closeLabel: "Sluit regeling-popup",
         bodyMarkup: `
           <p class="oq-helper-modal-copy">${enabled
-              ? "Kies hoe lang de regeling uit moet blijven. Verwarmen en koelen stoppen dan, maar beveiligingen blijven actief."
+              ? "Kies hoe lang de regeling uit moet blijven. Verwarmen en koelen stoppen dan, maar beveiligingen (inclusief vorstbeveiliging) blijven actief."
               : "De regeling staat nu tijdelijk uit. Je kunt meteen weer inschakelen of een nieuw hervatmoment plannen."
           }</p>
           ${resumeScheduled
