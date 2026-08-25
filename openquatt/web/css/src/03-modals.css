@@ -828,8 +828,11 @@
   .oq-advice-summary { grid-template-columns: 1fr; }
   .oq-advice-cards { grid-template-columns: 1fr; }
 }
-.oq-helper-button--warning-soft { background: #fff7ed; border-color: rgba(234,88,12,.28); color: #9a3412; gap: 6px; }
-.oq-helper-button--warning-soft:hover { background: #ffedd5; border-color: rgba(234,88,12,.36); color: #7c2d12; }
-.oq-advice-warn-icon { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 999px; background: #ea580c; color: #fff; font-size: 11px; font-weight: 900; line-height: 1; flex: 0 0 auto; }
+.oq-helper-button--warning-soft { background: rgba(255,251,235,.96); border-color: rgba(245,158,11,.26); color: #78350f; gap: 6px; }
+.oq-helper-button--warning-soft:hover { background: #fffbeb; border-color: rgba(245,158,11,.32); color: #78350f; }
+.oq-advice-warn-icon { display: inline-flex; align-items: center; justify-content: center; width: 14px; height: 14px; flex: 0 0 14px; }
+.oq-advice-warn-icon svg { width: 14px; height: 14px; display: block; }
+.oq-advice-warn-icon path { fill: #f59e0b; }
+.oq-advice-warn-icon rect, .oq-advice-warn-icon circle { fill: #78350f; }
 .oq-settings-subpanel.is-warning { border-color: rgba(234,88,12,.26); background: rgba(255,247,237,.55); }
 .oq-settings-field.is-warning { border-color: rgba(234,88,12,.26); box-shadow: inset 0 0 0 1px rgba(234,88,12,.08); }
