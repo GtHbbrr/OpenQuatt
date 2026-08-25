@@ -82,7 +82,7 @@ import { isSystemInStandby, replaceOuterHtmlIfSignatureChanged, setInnerHtmlIfCh
     if (!sourceLabel || sourceLabel === "geen bron") {
       return copy;
     }
-    return `${copy} Toestemming: ${sourceLabel}.`;
+    return `${copy} Toestemming via ${sourceLabel}.`;
   }
 
   export function getHeatPumpPanelStatusLabel(mode, running) {
