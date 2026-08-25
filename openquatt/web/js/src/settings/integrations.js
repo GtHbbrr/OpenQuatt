@@ -867,7 +867,13 @@ import { escapeHtml } from "../core/html.js";
           keepUnavailableCurrent: true,
         },
         activeRows: [
-          renderSourceRow({ label: "Toestemming", value: heatingEnableSourceDisabled ? "Niet gebruikt — strategie bepaalt vraag" : sourceStateText("heatingEnableSelected", "Toegestaan", "Geblokkeerd") }),
+          renderSourceRow({
+            label: "Toestemming",
+            value: heatingEnableSourceDisabled ? "Niet gebruikt" : sourceStateText("heatingEnableSelected", "Toegestaan", "Geblokkeerd"),
+            status: heatingEnableSourceDisabled ? "i" : "",
+            statusTone: heatingEnableSourceDisabled ? "valid" : "",
+            statusTitle: heatingEnableSourceDisabled ? "Geen externe gate; de strategie bepaalt zelf of warmte nodig is." : "",
+          }),
           !heatingEnableSourceDisabled ? renderSourceRow({ label: "Bron", value: heatingEnableSourceLabel }) : "",
         ],
         measurementRows: [
