@@ -280,6 +280,10 @@
   line-height: 1.5;
 }
 
+.oq-firmware-downgrade-callout {
+  margin-top: 12px;
+}
+
 .oq-helper-modal-auth-stack {
   display: grid;
   gap: 12px;
