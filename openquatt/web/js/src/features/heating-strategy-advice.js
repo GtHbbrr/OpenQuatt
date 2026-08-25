@@ -16,6 +16,9 @@ function formatLabel(value) {
   if (v === "MQTT") return "MQTT";
   return v;
 }
+function pill(text, tone) {
+  return `<span class="oq-advice-pill oq-advice-pill--${tone}">${escapeHtml(text)}</span>`;
+}
 
 export function renderHeatingStrategyAdviceModal() {
   if (state.systemModal !== "heating-strategy-advice") {
