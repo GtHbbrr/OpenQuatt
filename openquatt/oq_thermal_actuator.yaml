@@ -715,7 +715,25 @@ interval:
             return applied;
           };
 
+          #if OQ_TOPOLOGY_DUO
+          int hp1_applied = 0;
+          int hp2_applied = 0;
+          // Process the active cooling owner first so a downstream forced stop
+          // arms the same-tick gate before a stopped replacement can start.
+          const bool apply_hp2_first =
+              restart_by_minimum_off_time &&
+              !manual_hp_service_active && request_mode_code == 1 &&
+              oq_cooling::apply_hp2_before_hp1_for_cooling_handover(
+                  hp1_was_cooling, hp2_was_cooling);
+          if (apply_hp2_first) {
+            hp2_applied = apply_level(false, hp2_req, hp2_was_cooling);
+            hp1_applied = apply_level(true, hp1_req, hp1_was_cooling);
+          } else {
+            hp1_applied = apply_level(true, hp1_req, hp1_was_cooling);
+          }
+          #else
           const int hp1_applied = apply_level(true, hp1_req, hp1_was_cooling);
+          #endif
           auto heating_transition_reason = [&]()->uint8_t {
             if (id(oq_control_mode_code) == 98) {
               return openquatt_decision_log::REASON_FROST_PROTECTION;
@@ -784,7 +802,9 @@ interval:
             return heating_transition_reason();
           };
           #if OQ_TOPOLOGY_DUO
-          const int hp2_applied = apply_level(false, hp2_req, hp2_was_cooling);
+          if (!apply_hp2_first) {
+            hp2_applied = apply_level(false, hp2_req, hp2_was_cooling);
+          }
           const int prev_topology_count =
               (id(hp1_last_applied_level) > 0 ? 1 : 0) + (id(${secondary_last_applied_level_id}) > 0 ? 1 : 0);
           const int new_topology_count = (hp1_applied > 0 ? 1 : 0) + (hp2_applied > 0 ? 1 : 0);

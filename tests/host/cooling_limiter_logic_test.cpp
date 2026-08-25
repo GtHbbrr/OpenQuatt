@@ -4,6 +4,7 @@
 
 namespace {
 
+using oq_cooling::apply_hp2_before_hp1_for_cooling_handover;
 using oq_cooling::cooling_minimum_off_stop_is_pending;
 using oq_cooling::cooling_stop_is_planned;
 using oq_cooling::global_minimum_off_time_blocks_start;
@@ -98,6 +99,13 @@ void test_pending_or_same_tick_cooling_stop_blocks_duo_replacement_start() {
   assert(!global_minimum_off_time_blocks_start(0, true, true, 2));
 }
 
+void test_active_cooling_owner_is_applied_before_a_stopped_duo_candidate() {
+  assert(!apply_hp2_before_hp1_for_cooling_handover(true, false));
+  assert(apply_hp2_before_hp1_for_cooling_handover(false, true));
+  assert(!apply_hp2_before_hp1_for_cooling_handover(true, true));
+  assert(!apply_hp2_before_hp1_for_cooling_handover(false, false));
+}
+
 void test_minimum_off_time_waits_for_confirmed_physical_stop() {
   uint32_t last_confirmed_stop_ms = 1234UL;
   bool confirmed_stop_seen = false;
@@ -137,6 +145,7 @@ int main() {
   test_existing_restart_exceptions_remain_unchanged();
   test_global_minimum_off_time_blocks_boot_and_both_owner_candidates();
   test_pending_or_same_tick_cooling_stop_blocks_duo_replacement_start();
+  test_active_cooling_owner_is_applied_before_a_stopped_duo_candidate();
   test_minimum_off_time_waits_for_confirmed_physical_stop();
   test_global_minimum_off_time_is_millis_wrap_safe();
   test_minimum_off_time_preserves_an_applied_water_stop_during_mode_switch();
