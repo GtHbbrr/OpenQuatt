@@ -1,6 +1,7 @@
 import { hasEntity } from "../core/app-shared.js";
 import { getOpenQuattPauseDraftValue, getOpenQuattPausePresetValue } from "../core/entity-store.js";
 import { commitOpenQuattRegulationPause, commitOpenQuattRegulationResumeNow, commitSelect, triggerNamedButton } from "../core/entity-write-actions.js";
+import { invokeActionMap } from "../core/action-router.js";
 import { render } from "../core/render-scheduler.js";
 import { state } from "../core/state.js";
 import { clearDebugRecordingDevicePollTimer, scheduleDebugRecordingDeviceStatusPoll } from "./debug-recording.js";
@@ -152,4 +153,3 @@ const systemActionHandlers = {
 export function handleSystemAction(action, button) {
   return invokeActionMap(systemActionHandlers, action, button);
 }
-import { invokeActionMap } from "../core/action-router.js";
