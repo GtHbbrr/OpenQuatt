@@ -2044,6 +2044,11 @@
         "Allow without dew point, user responsibility",
       ],
     });
+    setEntity("select", "Cooling Restart Mode", {
+      value: "Water temperature",
+      state: "Water temperature",
+      option: ["Water temperature", "Minimum off time"],
+    });
     setEntity("select", "Cooling Dew Point Source", {
       value: "Auto",
       state: "Auto",
@@ -2165,6 +2170,7 @@
       ["Cooling Minimum Supply Temp", 18, 5, 24, 0.5, "°C"],
       ["Cooling Demand Max", 4, 1, 10, 1, "step"],
       ["Cooling Restart Delta", 1.0, 0, 5, 0.1, "°C"],
+      ["Cooling Minimum Off Time", 600, 240, 3600, 30, "s"],
       ["Cooling Request On Delta", 0.4, 0, 2, 0.1, "°C"],
       ["Cooling Request Off Delta", 0.1, 0, 2, 0.1, "°C"],
       ["Cooling Safety Margin", 2, 0, 4, 0.1, "°C"],
@@ -2289,6 +2295,7 @@
       ["Cooling Dew Point (Selected)", 16.1, "°C"],
       ["Cooling Minimum Safe Supply Temp", 18.1, "°C"],
       ["Cooling Effective Minimum Supply Temp", 18.1, "°C"],
+      ["Cooling Minimum Off Time Remaining", 0, "s"],
       ["Cooling Fallback Night Minimum Outdoor Temp", 14.3, "°C"],
       ["Cooling Fallback Minimum Supply Temp", 19.0, "°C"],
       ["Cooling Supply Target", 18.0, "°C"],

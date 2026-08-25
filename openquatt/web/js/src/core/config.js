@@ -173,7 +173,10 @@
     localWaterSupplyTempSource: { domain: "select", name: "Local Water Supply Temp Source", optional: true },
     coolingMinimumSupplyTemp: { domain: "number", name: "Cooling Minimum Supply Temp", optional: true },
     coolingDemandMax: { domain: "number", name: "Cooling Demand Max", optional: true },
+    coolingRestartMode: { domain: "select", name: "Cooling Restart Mode", optional: true },
     coolingRestartDelta: { domain: "number", name: "Cooling Restart Delta", optional: true },
+    coolingMinimumOffTime: { domain: "number", name: "Cooling Minimum Off Time", optional: true },
+    coolingMinimumOffTimeRemaining: { domain: "sensor", name: "Cooling Minimum Off Time Remaining", optional: true },
     coolingPidKp: { domain: "number", name: "Cooling PID Kp", optional: true },
     coolingPidKi: { domain: "number", name: "Cooling PID Ki", optional: true },
     coolingPidKd: { domain: "number", name: "Cooling PID Kd", optional: true },
@@ -1230,7 +1233,9 @@
   export const COOLING_SETTING_KEYS = [
     "coolingMinimumSupplyTemp",
     "coolingDemandMax",
+    "coolingRestartMode",
     "coolingRestartDelta",
+    "coolingMinimumOffTime",
     "coolingPidKp",
     "coolingPidKi",
     "coolingPidKd",
@@ -1460,6 +1465,9 @@
     "externalHeatDemandSource",
     "externalHeatDemandSelected",
     "powerHouseDemandSource",
+    "coolingRestartMode",
+    "coolingMinimumOffTime",
+    "coolingMinimumOffTimeRemaining",
   ];
   export const FIRMWARE_ENTITY_KEYS = ["firmwareUpdate", "firmwareUpdateChannel", "firmwareUpdateTarget", "firmwareUpdateProgress", "firmwareUpdateStatus"];
   export const FIRMWARE_TEST_ENTITY_KEYS = ["firmwareTestOtaUrl", "firmwareTestOtaMd5Url", "installFirmwareTestOta"];
@@ -1949,7 +1957,9 @@
       keys: [
         "coolingMinimumSupplyTemp",
         "coolingDemandMax",
+        "coolingRestartMode",
         "coolingRestartDelta",
+        "coolingMinimumOffTime",
         "coolingPidKp",
         "coolingPidKi",
         "coolingPidKd",
