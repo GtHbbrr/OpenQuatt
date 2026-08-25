@@ -108,6 +108,18 @@ test("firmware preview starts from a consistent running dev build", async () => 
   );
 });
 
+test("opening the firmware modal closes the interface panel before rendering", async () => {
+  const actionsSource = await readFile(new URL("../js/src/features/firmware-actions.js", import.meta.url), "utf8");
+  const handlerStart = actionsSource.indexOf('    "open-update-modal": () => {');
+  const handlerEnd = actionsSource.indexOf('\n    "close-update-modal":', handlerStart);
+  const handlerSource = actionsSource.slice(handlerStart, handlerEnd);
+
+  assert.notEqual(handlerStart, -1);
+  assert.notEqual(handlerEnd, -1);
+  assert.match(handlerSource, /state\.interfacePanelOpen = false;/);
+  assert.ok(handlerSource.indexOf("state.interfacePanelOpen = false;") < handlerSource.indexOf("render();"));
+});
+
 test("downgrade remains unavailable outside the validated dev-to-main path", () => {
   setDevToMainDowngradeState();
 

@@ -568,6 +568,7 @@ import { render } from "../core/render-scheduler.js";
 
   const firmwareActionHandlers = {
     "open-update-modal": () => {
+      state.interfacePanelOpen = false;
       state.updateModalOpen = true;
       state.firmwareDowngradeConfirmedVersion = "";
       render();
