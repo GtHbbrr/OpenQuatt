@@ -129,7 +129,8 @@ test("elk nieuw debugveld verwijst naar een echte firmware-entity", async () => 
 });
 
 test("flowOutputIpwm publiceert de bestaande actuatoruitgang zonder tweede regelstate", async () => {
-  const flowPackage = await readFile(new URL("../../oq_flow_control.yaml", import.meta.url), "utf8");
+  const flowPackageRaw = await readFile(new URL("../../oq_flow_control.yaml", import.meta.url), "utf8");
+  const flowPackage = flowPackageRaw.replace(/\r\n/g, "\n");
   const flowOutputSensor = flowPackage.match(
     /  - platform: template\n    id: oq_flow_output_ipwm\n[\s\S]*?(?=\n  - platform: template\n)/,
   )?.[0];

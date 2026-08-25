@@ -17,6 +17,7 @@ import { getControlModeOverrideLabel, renderSettingsServiceTaskModal } from "../
 import { renderSilentSettingsFields } from "../settings/silent.js";
 import { renderSettingsBackupImportModal, renderSettingsBackupRestoreModal, renderSettingsHistoryStorageModal } from "../settings/storage.js";
 import { renderHpWaterSensorOffsetsModal } from "../settings/water.js";
+import { renderHeatingStrategyAdviceModal } from "./heating-strategy-advice.js";
 import { formatNumericState } from "../core/formatting.js";
 import { escapeHtml } from "../core/html.js";
 import { render } from "../core/render-scheduler.js";
@@ -646,6 +647,10 @@ import { render } from "../core/render-scheduler.js";
 
     if (state.systemModal === "debug-recording") {
       return renderDebugRecordingModal();
+    }
+
+    if (state.systemModal === "heating-strategy-advice") {
+      return renderHeatingStrategyAdviceModal();
     }
 
     if (state.systemModal === "openquatt-pause") {
