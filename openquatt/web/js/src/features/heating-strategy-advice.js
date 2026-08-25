@@ -161,6 +161,35 @@ export function renderHeatingStrategyAdviceModal() {
           <div class="details-content">${otherDetails}</div>
         </details>
 
+        <details class="strategy-details">
+          <summary>
+            <span class="other-icon" aria-hidden="true">▦</span>
+            <span class="other-copy">
+              <strong>Volledige matrix per strategie</strong>
+              <small>Kamer, buiten, aanvoer, flow en toestemming — wat is vereist of aanbevolen.</small>
+            </span>
+            <span class="chevron" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+            </span>
+          </summary>
+          <div class="details-content" style="padding-top:10px">
+            <div class="oq-advice-matrix-wrap" style="margin:0">
+              <table class="oq-advice-matrix">
+                <thead><tr><th>Instelling</th><th>Power House</th><th>Stooklijn</th></tr></thead>
+                <tbody>
+                  <tr><td>Kamertemperatuur</td><td>${pill("vereist","required")}</td><td>${pill("aanbevolen","recommended")}</td></tr>
+                  <tr><td>Kamer-setpoint</td><td>${pill("vereist","required")}</td><td>${pill("aanbevolen","recommended")}</td></tr>
+                  <tr><td>Buitentemperatuur</td><td>${pill("vereist","required")}</td><td>${pill("vereist","required")}</td></tr>
+                  <tr><td>Aanvoertemperatuur</td><td>${pill("nodig voor begrenzing","muted")}</td><td>${pill("vereist","required")}</td></tr>
+                  <tr><td>Flow</td><td>${pill("vereist","required")}</td><td>${pill("vereist","required")}</td></tr>
+                  <tr class="is-highlight"><td>Warmtetoestemming</td><td>${pill("Niet gebruiken","muted")}</td><td>${pill("OpenTherm-thermostaat","recommended")}</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <p style="margin:10px 0 0;color:#5f6b7d;font-size:12.5px;line-height:1.5">Andere instellingen blijven relevant, maar de keuze hierboven is de kern van #474. Meer uitleg in de <a href="https://github.com/OpenQuatt/OpenQuatt/blob/dev/docs/instellingen-en-meetwaarden.md#5-bronselectie" target="_blank" rel="noreferrer">documentatie</a>.</p>
+          </div>
+        </details>
+
         <div class="modal-footer">
           <div class="change-note">Alleen <strong>Warmtetoestemming</strong> wordt aangepast.</div>
           <button class="button secondary" type="button" data-oq-action="close-system-modal">Huidige keuze behouden</button>
