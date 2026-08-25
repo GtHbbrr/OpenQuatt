@@ -12,7 +12,7 @@ import { handleDebugRecordingAction } from "../features/debug-recording.js";
 import { handleControlReplayAction } from "../features/control-replay-actions.js";
 import { handleFirmwareAction } from "../features/firmware-actions.js";
 import { updateFirmwareState, updateEnergyHistoryState } from "./feature-state.js";
-import { getFirmwareTestAssetUrls, getFirmwareTestPrNumber, getFirmwareTestTargetModel, resetFirmwareManualUploadSelection, resetFirmwareTestSelection } from "../features/firmware-update.js";
+import { getFirmwareLatestVersion, getFirmwareTestAssetUrls, getFirmwareTestPrNumber, getFirmwareTestTargetModel, resetFirmwareManualUploadSelection, resetFirmwareTestSelection } from "../features/firmware-update.js";
 import { handleMqttAction, syncMqttDraftFromInput } from "../features/mqtt-actions.js";
 import { handleOduEepromDumpAction } from "../features/odu-eeprom-dump.js";
 import { handleQuickStartAction } from "../features/quickstart-ui-actions.js";
@@ -86,6 +86,14 @@ const actionDelegates = [
   export function handleInput(event) {
     if (event.target.dataset.oqQuickstartSetupConfirm) {
       state.quickStartSetupConfirmed = Boolean(event.target.checked);
+      render();
+      return;
+    }
+
+    if (event.target.dataset.oqFirmwareDowngradeConfirm) {
+      updateFirmwareState({
+        firmwareDowngradeConfirmedVersion: event.target.checked ? getFirmwareLatestVersion() : "",
+      });
       render();
       return;
     }
@@ -328,6 +336,9 @@ const actionDelegates = [
     }
 
     if (entity.domain === "select") {
+      if (field === "firmwareUpdateChannel") {
+        updateFirmwareState({ firmwareDowngradeConfirmedVersion: "" });
+      }
       commitSelect(field, String(event.target.value));
       return;
     }
@@ -422,6 +433,7 @@ const actionDelegates = [
             updateTestFirmwareOpen: false,
             firmwareConnectionSwitchConfirmed: false,
             firmwareTopologySwitchConfirmed: false,
+            firmwareDowngradeConfirmedVersion: "",
           });
           resetFirmwareManualUploadSelection();
           resetFirmwareTestSelection();
