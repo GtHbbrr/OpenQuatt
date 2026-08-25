@@ -479,33 +479,16 @@ import { escapeHtml } from "../core/html.js";
     if (!hasEntity("heatingEnableSource")) {
       return "";
     }
-    const advice = getHeatingEnableAdvice();
-    const recommended = getHeatingEnableRecommendation();
-    const current = getHeatingEnableCurrent();
-    const recommendedLabel = recommended === "Disabled" ? "Niet gebruiken" : recommended === "OT thermostat" ? "OpenTherm-thermostaat" : recommended;
-    const currentLabel = current === "Disabled" ? "Niet gebruiken" : current === "OT thermostat" ? "OpenTherm-thermostaat" : current || "—";
-    const isWarning = Boolean(advice.deviant);
     return `
-      <div class="oq-settings-subpanel oq-settings-subpanel--advice${isWarning ? " oq-settings-subpanel--warning" : ""}">
+      <div class="oq-settings-subpanel oq-settings-subpanel--advice">
         <div class="oq-settings-subpanel-head">
           <p class="oq-helper-label">Warmtetoestemming</p>
-          <h4>${escapeHtml(advice.title)}</h4>
-          <p>${escapeHtml(advice.copy)}</p>
+          <h4>Welke warmtetoestemming past bij je strategie?</h4>
+          <p>Power House bepaalt zelf de vraag; bij stooklijn bepaalt de thermostaat of er verwarmd wordt. Open de overwegingen en aanbevelingen per strategie.</p>
         </div>
-        <div class="oq-settings-source-rows">
-          <div class="oq-settings-source-row"><span>Aanbevolen voor ${escapeHtml(isCurveMode() ? "stooklijn" : "Power House")}</span><strong>${escapeHtml(recommendedLabel)}</strong></div>
-          <div class="oq-settings-source-row${isWarning ? " is-warning" : ""}"><span>Huidige keuze</span><strong>${escapeHtml(currentLabel)}</strong></div>
+        <div class="oq-helper-actions">
+          <button class="oq-helper-button oq-helper-button--ghost" type="button" data-oq-action="open-heating-strategy-advice-modal">Advies per strategie bekijken</button>
         </div>
-        ${advice.deviant ? `
-          <div class="oq-helper-actions">
-            <button class="oq-helper-button oq-helper-button--primary" type="button" data-oq-action="apply-quickstart-heating-enable" data-heating-enable-target="${escapeHtml(recommended)}" ${state.loadingEntities || state.busyAction === "quickstart-heating-enable" ? "disabled" : ""}>
-              ${state.busyAction === "quickstart-heating-enable" ? "Opslaan..." : `Aanbevolen instelling gebruiken`}
-            </button>
-            <span class="oq-settings-action-note">Afwijkend blijft mogelijk voor zone-regeling of volledig open afgifte.</span>
-          </div>
-        ` : `
-          <p class="oq-settings-action-note">Komt overeen met de aanbeveling. <span class="oq-settings-action-note--muted">Niet gebruiken = geen externe gate; de strategie bepaalt zelf de warmtevraag.</span></p>
-        `}
       </div>
     `;
   }

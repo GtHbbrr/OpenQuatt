@@ -2,7 +2,6 @@ import { getEntityNumericValue, hasEntity } from "../core/app-shared.js";
 import { renderOqIcon, SENSOR_SELECTION_KEYS } from "../core/config.js";
 import { getInputDraftValue } from "../core/control-drafts.js";
 import { getEntityValue } from "../core/entity-store.js";
-import { getHeatingEnableAdvice } from "../core/heating-strategy-matrix.js";
 import { isInstallationMonitoringBinaryActive, isInstallationMonitoringIntegrationEnabled } from "../core/installation-monitoring.js";
 import { state } from "../core/state.js";
 import { formatMqttSensorValiditySummary, getMqttStatusDetail, getMqttStatusLabel, getMqttValidityLabel } from "../features/mqtt.js";
@@ -669,13 +668,6 @@ import { escapeHtml } from "../core/html.js";
         : "Ruwe waarde; niet gekalibreerd.";
     const heatingEnableSourceDisabled = String(getEntityValue("heatingEnableSource") || "").trim() === "Disabled";
     const heatingEnableSourceLabel = formattedSourceValue("heatingEnableSource", { optionLabels: { Disabled: "Niet gebruiken" } });
-    const heatingEnableAdvice = hasEntity("heatingEnableSource") ? getHeatingEnableAdvice() : null;
-    const heatingEnableWarning = heatingEnableAdvice && heatingEnableAdvice.deviant
-      ? `${heatingEnableAdvice.title}: ${heatingEnableAdvice.copy}`
-      : "";
-    const heatingEnableInfo = !heatingEnableWarning && heatingEnableSourceDisabled
-      ? "Niet gebruiken = geen externe gate; de strategie bepaalt zelf of warmte nodig is."
-      : "";
     const coolingEnableSourceDisabled = String(getEntityValue("coolingEnableSource") || "").trim() === "Disabled";
     const coolingEnableSourceLabels = {
       Disabled: "Niet gebruiken / handmatig",
@@ -862,13 +854,12 @@ import { escapeHtml } from "../core/html.js";
         key: "heating-enable",
         title: "Warmtetoestemming",
         icon: "flame",
-        warning: heatingEnableWarning,
         select: {
           key: "heatingEnableSource",
           label: "Bron",
           optionLabels: { Disabled: "Niet gebruiken", "API input": "API-invoer" },
           infoId: "heatingEnableSource-info",
-          infoCopy: "Niet gebruiken = geen externe gate; de strategie bepaalt zelf of warmte nodig is. Bij Power House meestal gewenst; bij stooklijn meestal OpenTherm-thermostaat.",
+          infoCopy: "Niet gebruiken = geen externe gate; de strategie bepaalt zelf of warmte nodig is.",
           haKeys: ["heatingEnableHa", "heatingEnableHaValid"],
           apiValueKey: "apiInputHeatingEnable",
           apiValidKey: "apiInputHeatingEnableValid",
@@ -878,7 +869,6 @@ import { escapeHtml } from "../core/html.js";
         activeRows: [
           renderSourceRow({ label: "Toestemming", value: heatingEnableSourceDisabled ? "Niet gebruikt — strategie bepaalt vraag" : sourceStateText("heatingEnableSelected", "Toegestaan", "Geblokkeerd") }),
           !heatingEnableSourceDisabled ? renderSourceRow({ label: "Bron", value: heatingEnableSourceLabel }) : "",
-          heatingEnableInfo ? renderSourceRow({ label: "", value: heatingEnableInfo, status: "i", statusTone: "valid", statusTitle: heatingEnableInfo }) : "",
         ],
         measurementRows: [
           otAvailable ? renderSourceRow({ label: "OpenTherm", value: sourceStateText("otThermostatChEnable", "Toegestaan", "Geblokkeerd") }) : "",
@@ -975,11 +965,15 @@ import { escapeHtml } from "../core/html.js";
       return "";
     }
 
+    const heatingAdviceHeaderAction = hasEntity("heatingEnableSource") ? `<button class="oq-helper-button oq-helper-button--ghost" type="button" data-oq-action="open-heating-strategy-advice-modal">Advies per strategie</button>` : "";
     return renderSettingsSection(
       "Bronnen",
       "Sensorselectie",
       "Kies welke bron OpenQuatt gebruikt voor metingen en vraag-signalen. Uitgeschakelde integraties verdwijnen uit de keuzes.",
       `<div class="oq-settings-source-grid">${sourceCards.join("")}</div>`,
+      "",
+      "",
+      heatingAdviceHeaderAction,
     );
   }
 

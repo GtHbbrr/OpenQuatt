@@ -97,6 +97,35 @@ const systemActionHandlers = {
     state.systemModal = "openquatt-pause";
     render();
   },
+  "open-heating-strategy-advice-modal": () => {
+    state.systemModal = "heating-strategy-advice";
+    render();
+  },
+  "apply-heating-strategy-advice": (button) => {
+    const target = String(button.dataset.heatingEnableTarget || "").trim() || "Disabled";
+    state.busyAction = "quickstart-heating-enable";
+    render();
+    import("../core/entity-backup.js").then(({ setEntityBackupValue }) => {
+      import("../core/entity-sync.js").then(({ refreshEntities }) => {
+        const apply = async () => {
+          try {
+            const applied = await setEntityBackupValue("heatingEnableSource", target);
+            state.entities.heatingEnableSource = { ...(state.entities.heatingEnableSource || {}), value: applied, state: applied };
+            state.systemModal = "";
+            state.busyAction = "";
+            state.controlNotice = target === "Disabled" ? "Warmtetoestemming op Niet gebruiken gezet." : `Warmtetoestemming op ${target} gezet.`;
+            await refreshEntities(["heatingEnableSource", "heatingEnableValid", "heatingEnableSelected"], "all");
+          } catch (error) {
+            state.controlError = `Warmtetoestemming kon niet worden opgeslagen. ${error.message}`;
+          } finally {
+            state.busyAction = "";
+            render();
+          }
+        };
+        void apply();
+      });
+    });
+  },
   "enable-openquatt-now": () => commitOpenQuattRegulationResumeNow(),
   "apply-openquatt-preset": (button) => {
     const presetValue = getOpenQuattPausePresetValue(button.dataset.pausePreset || "");
