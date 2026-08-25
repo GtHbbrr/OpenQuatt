@@ -69,13 +69,26 @@ inline uint32_t global_minimum_off_time_remaining_ms(bool enabled, uint32_t now_
   return now_ms >= minimum_off_ms ? 0 : minimum_off_ms - now_ms;
 }
 
-inline bool global_minimum_off_time_blocks_start(uint32_t remaining_ms, int previous_applied_level) {
-  return remaining_ms > 0 && previous_applied_level <= 0;
+inline bool cooling_stop_is_planned(bool was_cooling, int previous_applied_level, int requested_level) {
+  return was_cooling && previous_applied_level > 0 && requested_level <= 0;
+}
+
+inline bool record_confirmed_cooling_stop(bool confirmation_pending, bool stop_confirmed, uint32_t now_ms,
+                                          uint32_t& last_confirmed_stop_ms, bool& confirmed_stop_seen) {
+  if (!confirmation_pending || !stop_confirmed) return false;
+  last_confirmed_stop_ms = now_ms;
+  confirmed_stop_seen = true;
+  return true;
+}
+
+inline bool global_minimum_off_time_blocks_start(uint32_t remaining_ms, bool stop_confirmation_pending,
+                                                 bool stop_planned_this_tick, int previous_applied_level) {
+  return previous_applied_level <= 0 && (remaining_ms > 0 || stop_confirmation_pending || stop_planned_this_tick);
 }
 
 inline bool cooling_minimum_off_stop_is_pending(bool enabled, bool water_cycle_active, int stop_reason_code,
-                                                bool cooling_hp_applied) {
-  return enabled && !water_cycle_active && cooling_hp_applied && stop_reason_code != WATER_STOP_NONE &&
+                                                bool cooling_stop_or_wait_active) {
+  return enabled && !water_cycle_active && cooling_stop_or_wait_active && stop_reason_code != WATER_STOP_NONE &&
          stop_reason_code != WATER_STOP_REQUEST_CLEARED;
 }
 

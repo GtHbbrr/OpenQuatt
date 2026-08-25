@@ -217,14 +217,24 @@ globals:
     restore_value: false
     initial_value: '0'
 
-  # Shared automatic-cooling stop anchor. In minimum-off-time mode this blocks
-  # both HPs, so Duo cannot restart immediately on the other compressor.
-  - id: oq_cooling_last_applied_stop_ms
+  # Shared confirmed automatic-cooling stop anchor. In minimum-off-time mode
+  # this blocks both HPs, so Duo cannot restart on the other compressor.
+  - id: oq_cooling_last_confirmed_stop_ms
     type: uint32_t
     restore_value: false
     initial_value: '0'
 
-  - id: oq_cooling_applied_stop_seen
+  - id: oq_cooling_confirmed_stop_seen
+    type: bool
+    restore_value: false
+    initial_value: 'false'
+
+  - id: oq_cooling_stop_confirmation_pending_hp1
+    type: bool
+    restore_value: false
+    initial_value: 'false'
+
+  - id: oq_cooling_stop_confirmation_pending_hp2
     type: bool
     restore_value: false
     initial_value: 'false'
@@ -779,13 +789,19 @@ interval:
               || id(${secondary_last_applied_level_id}) > 0
               #endif
               ;
-          if (!restart_by_minimum_off_time) {
-            id(oq_cooling_min_off_stop_pending) = false;
-          } else if (oq_cooling::cooling_minimum_off_stop_is_pending(
-                         true,
+          const bool cooling_minimum_off_wait_active =
+              cooling_hp_applied ||
+              id(oq_cooling_confirmed_stop_seen) ||
+              id(oq_cooling_stop_confirmation_pending_hp1)
+              #if OQ_TOPOLOGY_DUO
+              || id(oq_cooling_stop_confirmation_pending_hp2)
+              #endif
+              ;
+          if (oq_cooling::cooling_minimum_off_stop_is_pending(
+                         restart_by_minimum_off_time,
                          id(oq_cooling_water_cycle_active),
                          id(oq_cooling_stop_reason_code),
-                         cooling_hp_applied)) {
+                         cooling_minimum_off_wait_active)) {
             // Preserve a water-side stop already in progress when the user
             // switches from temperature restart to minimum off-time.
             id(oq_cooling_min_off_stop_pending) = true;
@@ -1308,12 +1324,19 @@ interval:
               oq_cooling::global_minimum_off_time_remaining_ms(
                   restart_by_minimum_off_time,
                   now_ms,
-                  id(oq_cooling_applied_stop_seen),
-                  id(oq_cooling_last_applied_stop_ms),
+                  id(oq_cooling_confirmed_stop_seen),
+                  id(oq_cooling_last_confirmed_stop_ms),
                   id(oq_cooling_boot_min_off_elapsed),
                   cooling_minimum_off_ms);
+          const bool cooling_stop_confirmation_pending =
+              id(oq_cooling_stop_confirmation_pending_hp1)
+              #if OQ_TOPOLOGY_DUO
+              || id(oq_cooling_stop_confirmation_pending_hp2)
+              #endif
+              ;
           const bool global_cooling_restart_blocked =
-              global_minimum_off_remaining_ms > 0;
+              global_minimum_off_remaining_ms > 0 ||
+              (restart_by_minimum_off_time && cooling_stop_confirmation_pending);
           const uint32_t global_cooling_restart_remaining_s =
               (global_minimum_off_remaining_ms + 999UL) / 1000UL;
 
@@ -1391,6 +1414,8 @@ interval:
                    !hp_restart_blocked(is_hp1) &&
                    !oq_cooling::global_minimum_off_time_blocks_start(
                        global_minimum_off_remaining_ms,
+                       restart_by_minimum_off_time && cooling_stop_confirmation_pending,
+                       false,
                        previous_applied);
           };
 
@@ -1481,8 +1506,12 @@ interval:
           if (cooling_start_blocked != last_cooling_start_blocked) {
             if (cooling_start_blocked) {
               if (global_cooling_restart_blocked) {
-                ESP_LOGI("quatt.cool", "Cooling request blocked: global minimum off-time remaining %u s",
-                         (unsigned int) global_cooling_restart_remaining_s);
+                if (cooling_stop_confirmation_pending) {
+                  ESP_LOGI("quatt.cool", "Cooling request blocked: waiting for confirmed cooling stop");
+                } else {
+                  ESP_LOGI("quatt.cool", "Cooling request blocked: global minimum off-time remaining %u s",
+                           (unsigned int) global_cooling_restart_remaining_s);
+                }
               } else {
                 ESP_LOGI("quatt.cool", "Cooling request blocked: both HPs are still in minimum off-time or unavailable");
               }
@@ -1519,8 +1548,12 @@ interval:
           if (cooling_start_blocked != last_cooling_start_blocked) {
             if (cooling_start_blocked) {
               if (global_cooling_restart_blocked) {
-                ESP_LOGI("quatt.cool", "Cooling request blocked: global minimum off-time remaining %u s",
-                         (unsigned int) global_cooling_restart_remaining_s);
+                if (cooling_stop_confirmation_pending) {
+                  ESP_LOGI("quatt.cool", "Cooling request blocked: waiting for confirmed cooling stop");
+                } else {
+                  ESP_LOGI("quatt.cool", "Cooling request blocked: global minimum off-time remaining %u s",
+                           (unsigned int) global_cooling_restart_remaining_s);
+                }
               } else {
                 ESP_LOGI("quatt.cool", "Cooling request blocked: HP1 is still in minimum off-time or unavailable");
               }

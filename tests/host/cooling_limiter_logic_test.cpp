@@ -5,8 +5,10 @@
 namespace {
 
 using oq_cooling::cooling_minimum_off_stop_is_pending;
+using oq_cooling::cooling_stop_is_planned;
 using oq_cooling::global_minimum_off_time_blocks_start;
 using oq_cooling::global_minimum_off_time_remaining_ms;
+using oq_cooling::record_confirmed_cooling_stop;
 using oq_cooling::record_pi_zero_stop;
 using oq_cooling::water_restart_gap_recovered;
 using oq_cooling::WATER_STOP_DEW;
@@ -76,10 +78,38 @@ void test_global_minimum_off_time_blocks_boot_and_both_owner_candidates() {
          480000UL);
   assert(global_minimum_off_time_remaining_ms(true, stop_ms + minimum_off_ms, true, stop_ms, true, minimum_off_ms) ==
          0);
-  assert(global_minimum_off_time_blocks_start(480000UL, 0));
-  assert(global_minimum_off_time_blocks_start(480000UL, -1));
-  assert(!global_minimum_off_time_blocks_start(480000UL, 1));
-  assert(!global_minimum_off_time_blocks_start(0, 0));
+  assert(global_minimum_off_time_blocks_start(480000UL, false, false, 0));
+  assert(global_minimum_off_time_blocks_start(480000UL, false, false, -1));
+  assert(!global_minimum_off_time_blocks_start(480000UL, false, false, 1));
+  assert(!global_minimum_off_time_blocks_start(0, false, false, 0));
+}
+
+void test_pending_or_same_tick_cooling_stop_blocks_duo_replacement_start() {
+  // The original strategy request remains authoritative when the downstream
+  // minimum-runtime floor temporarily keeps the outgoing HP at level 1.
+  const bool outgoing_stop_planned = cooling_stop_is_planned(true, 3, 0);
+  assert(outgoing_stop_planned);
+  assert(!cooling_stop_is_planned(false, 3, 0));
+  assert(!cooling_stop_is_planned(true, 0, 0));
+  assert(!cooling_stop_is_planned(true, 3, 2));
+
+  assert(global_minimum_off_time_blocks_start(0, true, false, 0));
+  assert(global_minimum_off_time_blocks_start(0, false, outgoing_stop_planned, 0));
+  assert(!global_minimum_off_time_blocks_start(0, true, true, 2));
+}
+
+void test_minimum_off_time_waits_for_confirmed_physical_stop() {
+  uint32_t last_confirmed_stop_ms = 1234UL;
+  bool confirmed_stop_seen = false;
+  assert(!record_confirmed_cooling_stop(false, true, 2000UL, last_confirmed_stop_ms, confirmed_stop_seen));
+  assert(last_confirmed_stop_ms == 1234UL);
+  assert(!confirmed_stop_seen);
+  assert(!record_confirmed_cooling_stop(true, false, 3000UL, last_confirmed_stop_ms, confirmed_stop_seen));
+  assert(last_confirmed_stop_ms == 1234UL);
+  assert(!confirmed_stop_seen);
+  assert(record_confirmed_cooling_stop(true, true, 4000UL, last_confirmed_stop_ms, confirmed_stop_seen));
+  assert(last_confirmed_stop_ms == 4000UL);
+  assert(confirmed_stop_seen);
 }
 
 void test_global_minimum_off_time_is_millis_wrap_safe() {
@@ -89,6 +119,8 @@ void test_global_minimum_off_time_is_millis_wrap_safe() {
 }
 
 void test_minimum_off_time_preserves_an_applied_water_stop_during_mode_switch() {
+  // An applied stop or an active confirmation/countdown preserves the water
+  // stop latch while minimum-off-time mode is selected.
   assert(cooling_minimum_off_stop_is_pending(true, false, WATER_STOP_LIMITER, true));
   assert(!cooling_minimum_off_stop_is_pending(true, false, WATER_STOP_REQUEST_CLEARED, true));
   assert(!cooling_minimum_off_stop_is_pending(true, false, WATER_STOP_LIMITER, false));
@@ -104,6 +136,8 @@ int main() {
   test_pi_zero_stop_preserves_higher_priority_reason();
   test_existing_restart_exceptions_remain_unchanged();
   test_global_minimum_off_time_blocks_boot_and_both_owner_candidates();
+  test_pending_or_same_tick_cooling_stop_blocks_duo_replacement_start();
+  test_minimum_off_time_waits_for_confirmed_physical_stop();
   test_global_minimum_off_time_is_millis_wrap_safe();
   test_minimum_off_time_preserves_an_applied_water_stop_during_mode_switch();
   return 0;

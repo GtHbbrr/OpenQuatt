@@ -1,7 +1,8 @@
+import { hasEntity } from "./app-shared.js";
 import { ENTITY_DEFS } from "./config.js";
 import { getInputDraftValue } from "./control-drafts.js";
 import { reportUnknownAction } from "./action-router.js";
-import { handleControlAction } from "./control-actions.js";
+import { commitQuickStartStrategySelection, handleControlAction } from "./control-actions.js";
 import { isCurveMode } from "./domain-helpers.js";
 import { formatValue, getEntityValue, getNumberMeta, normalizeDateTimeValue, normalizeNumber, normalizeTimeValue, parseLooseNumber } from "./entity-store.js";
 import { commitDateTime, commitNumber, commitSelect, commitText, commitTime, triggerNamedButton, updateCurveDraftFromPointer } from "./entity-write-actions.js";
@@ -339,7 +340,12 @@ const actionDelegates = [
       if (field === "firmwareUpdateChannel") {
         updateFirmwareState({ firmwareDowngradeConfirmedVersion: "" });
       }
-      commitSelect(field, String(event.target.value));
+      const value = String(event.target.value);
+      if (field === "strategy" && state.quickStartModalOpen) {
+        void commitQuickStartStrategySelection(value);
+      } else {
+        commitSelect(field, value);
+      }
       return;
     }
 
