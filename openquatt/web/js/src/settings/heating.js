@@ -479,15 +479,17 @@ import { escapeHtml } from "../core/html.js";
     if (!hasEntity("heatingEnableSource")) {
       return "";
     }
+    const advice = getHeatingEnableAdvice();
+    const deviant = Boolean(advice.deviant);
     return `
-      <div class="oq-settings-subpanel oq-settings-subpanel--advice">
+      <div class="oq-settings-subpanel oq-settings-subpanel--advice${deviant ? " is-warning" : ""}">
         <div class="oq-settings-subpanel-head">
           <p class="oq-helper-label">Warmtetoestemming</p>
           <h4>Welke warmtetoestemming past bij je strategie?</h4>
           <p>Power House bepaalt zelf de vraag; bij stooklijn bepaalt de thermostaat of er verwarmd wordt. Open de overwegingen en aanbevelingen per strategie.</p>
         </div>
         <div class="oq-helper-actions">
-          <button class="oq-helper-button oq-helper-button--ghost" type="button" data-oq-action="open-heating-strategy-advice-modal">Advies per strategie bekijken</button>
+          <button class="oq-helper-button ${deviant ? "oq-helper-button--warning-soft" : "oq-helper-button--ghost"}" type="button" data-oq-action="open-heating-strategy-advice-modal">${deviant ? '<span class="oq-advice-warn-icon">▲</span> Advies · afwijking' : "Advies per strategie bekijken"}</button>
         </div>
       </div>
     `;

@@ -2,6 +2,7 @@ import { getEntityNumericValue, hasEntity } from "../core/app-shared.js";
 import { renderOqIcon, SENSOR_SELECTION_KEYS } from "../core/config.js";
 import { getInputDraftValue } from "../core/control-drafts.js";
 import { getEntityValue } from "../core/entity-store.js";
+import { getHeatingEnableAdvice } from "../core/heating-strategy-matrix.js";
 import { isInstallationMonitoringBinaryActive, isInstallationMonitoringIntegrationEnabled } from "../core/installation-monitoring.js";
 import { state } from "../core/state.js";
 import { formatMqttSensorValiditySummary, getMqttStatusDetail, getMqttStatusLabel, getMqttValidityLabel } from "../features/mqtt.js";
@@ -971,7 +972,8 @@ import { escapeHtml } from "../core/html.js";
       return "";
     }
 
-    const heatingAdviceHeaderAction = hasEntity("heatingEnableSource") ? `<button class="oq-helper-button oq-helper-button--ghost" type="button" data-oq-action="open-heating-strategy-advice-modal">Advies per strategie</button>` : "";
+    const heatingAdvice = hasEntity("heatingEnableSource") ? getHeatingEnableAdvice() : null;
+    const heatingAdviceHeaderAction = hasEntity("heatingEnableSource") ? `<button class="oq-helper-button ${heatingAdvice && heatingAdvice.deviant ? "oq-helper-button--warning-soft" : "oq-helper-button--ghost"}" type="button" data-oq-action="open-heating-strategy-advice-modal">${heatingAdvice && heatingAdvice.deviant ? '<span class="oq-advice-warn-icon">▲</span> Advies · afwijking' : "Advies per strategie"}</button>` : "";
     return renderSettingsSection(
       "Bronnen",
       "Sensorselectie",
