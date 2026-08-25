@@ -621,15 +621,19 @@ import { isSystemInStandby, replaceOuterHtmlIfSignatureChanged, setInnerHtmlIfCh
       : coolingConfiguredSource && coolingConfiguredSource !== "geen bron"
       ? `Koeltoestemming is niet gegeven: ${coolingConfiguredSource} geeft geen toestemming en handmatig staat uit.`
       : "Koeltoestemming is niet gegeven.";
+    const coolingIsReady = String(coolingBlockReasonRaw).trim().toLowerCase() === "ready" || String(coolingBlockReasonRaw).trim().toLowerCase() === "gereed" || String(coolingBlockReasonRaw).trim().toLowerCase() === "gereed om te koelen";
     if (coolingEnabled && coolingModeActive) {
       coolingStatus = "Actief";
       coolingCopy = appendCoolingPermissionSource("Koeling draait nu.", coolingEffectiveSource);
     } else if (coolingEnabled && coolingWaitingForRoomRequest) {
       coolingStatus = "Aan";
       coolingCopy = appendCoolingPermissionSource("Koeling is toegestaan en wacht op kamertemperatuur boven het koel-setpoint.", coolingEffectiveSource);
-    } else if (coolingEnabled && coolingBlocked) {
+    } else if (coolingEnabled && coolingBlocked && !coolingIsReady) {
       coolingStatus = "Geblokkeerd";
       coolingCopy = appendCoolingPermissionSource(formatCoolingBlockReason(coolingBlockReasonRaw || "Koeling wacht nog op veilige condities."), coolingEffectiveSource);
+    } else if (coolingEnabled && coolingBlocked && coolingIsReady) {
+      coolingStatus = "Aan";
+      coolingCopy = appendCoolingPermissionSource("Koeltoestemming is gegeven en wacht op koelvraag.", coolingEffectiveSource);
     } else if (coolingEnabled && coolingRequestActive) {
       coolingStatus = "Start bijna";
       coolingCopy = appendCoolingPermissionSource("Er is koelvraag. Koeling start zodra dat kan.", coolingEffectiveSource);
