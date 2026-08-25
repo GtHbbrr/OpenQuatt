@@ -489,7 +489,7 @@ import { escapeHtml } from "../core/html.js";
           <p>Power House bepaalt zelf de vraag; bij stooklijn bepaalt de thermostaat of er verwarmd wordt. Open de overwegingen en aanbevelingen per strategie.</p>
         </div>
         <div class="oq-helper-actions">
-          <button class="oq-helper-button ${deviant ? "oq-helper-button--warning-soft" : "oq-helper-button--ghost"}" type="button" data-oq-action="open-heating-strategy-advice-modal">${deviant ? '<span class="oq-advice-warn-icon">▲</span> Advies · afwijking' : "Advies per strategie bekijken"}</button>
+          <button class="oq-helper-button ${deviant ? "oq-helper-button--warning-soft" : "oq-helper-button--ghost"}" type="button" data-oq-action="open-heating-strategy-advice-modal">${deviant ? '<span class="oq-advice-warn-icon">!</span> Advies per strategie bekijken' : "Advies per strategie bekijken"}</button>
         </div>
       </div>
     `;

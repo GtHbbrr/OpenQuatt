@@ -973,7 +973,7 @@ import { escapeHtml } from "../core/html.js";
     }
 
     const heatingAdvice = hasEntity("heatingEnableSource") ? getHeatingEnableAdvice() : null;
-    const heatingAdviceHeaderAction = hasEntity("heatingEnableSource") ? `<button class="oq-helper-button ${heatingAdvice && heatingAdvice.deviant ? "oq-helper-button--warning-soft" : "oq-helper-button--ghost"}" type="button" data-oq-action="open-heating-strategy-advice-modal">${heatingAdvice && heatingAdvice.deviant ? '<span class="oq-advice-warn-icon">▲</span> Advies · afwijking' : "Advies per strategie"}</button>` : "";
+    const heatingAdviceHeaderAction = hasEntity("heatingEnableSource") ? `<button class="oq-helper-button ${heatingAdvice && heatingAdvice.deviant ? "oq-helper-button--warning-soft" : "oq-helper-button--ghost"}" type="button" data-oq-action="open-heating-strategy-advice-modal">${heatingAdvice && heatingAdvice.deviant ? '<span class="oq-advice-warn-icon">!</span> Advies per strategie' : "Advies per strategie"}</button>` : "";
     return renderSettingsSection(
       "Bronnen",
       "Sensorselectie",

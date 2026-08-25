@@ -632,7 +632,7 @@ import { renderUsageTelemetryConsent, renderUsageTelemetryDisclosure } from "./u
           <p class="oq-settings-action-note" style="margin:0">Bekijk welke warmtetoestemming logisch past bij je gekozen strategie. OpenTherm heeft voorkeur waar beschikbaar.</p>
         </div>
         <div class="oq-settings-field-control">
-          <button class="oq-helper-button ${deviant ? "oq-helper-button--warning-soft" : "oq-helper-button--ghost"}" type="button" data-oq-action="open-heating-strategy-advice-modal">${deviant ? '<span class="oq-advice-warn-icon">▲</span> Advies · afwijking' : "Advies per strategie bekijken"}</button>
+          <button class="oq-helper-button ${deviant ? "oq-helper-button--warning-soft" : "oq-helper-button--ghost"}" type="button" data-oq-action="open-heating-strategy-advice-modal">${deviant ? '<span class="oq-advice-warn-icon">!</span> Advies per strategie bekijken' : "Advies per strategie bekijken"}</button>
         </div>
       </div>
     `;
