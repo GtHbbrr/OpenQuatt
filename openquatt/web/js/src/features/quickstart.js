@@ -749,6 +749,10 @@ import { renderUsageTelemetryConsent, renderUsageTelemetryDisclosure } from "./u
         <h2 class="oq-helper-section-title">Bevestigen en afronden</h2>
         <p class="oq-helper-section-copy">Controleer nog één keer je keuzes. Met afronden markeer je Quick Start als voltooid.</p>
         ${renderConfirmReviewCards()}
+        <section class="oq-helper-surface oq-helper-surface--muted" aria-label="Lokale historie">
+          <h3>Lokale historie</h3>
+          <p>Energiegegevens en belangrijke regelgebeurtenissen worden lokaal bewaard zodat Resultaten en diagnose ook na een herstart beschikbaar blijven. Dit kan later worden aangepast onder Instellingen → Gegevens bewaren.</p>
+        </section>
         ${state.controlNotice ? `<p class="oq-helper-notice">${escapeHtml(state.controlNotice)}</p>` : ""}
         ${state.controlError ? `<p class="oq-helper-error">${escapeHtml(state.controlError)}</p>` : ""}
         <div class="oq-helper-actions oq-helper-actions--step">
