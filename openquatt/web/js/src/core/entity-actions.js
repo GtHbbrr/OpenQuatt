@@ -1,3 +1,4 @@
+import { hasEntity } from "./app-shared.js";
 import { ENTITY_DEFS } from "./config.js";
 import { getInputDraftValue } from "./control-drafts.js";
 import { reportUnknownAction } from "./action-router.js";
@@ -328,7 +329,15 @@ const actionDelegates = [
     }
 
     if (entity.domain === "select") {
-      commitSelect(field, String(event.target.value));
+      const value = String(event.target.value);
+      commitSelect(field, value);
+      if (field === "strategy" && state.quickStartModalOpen && hasEntity("heatingEnableSource")) {
+        const isCurve = value.includes("Water Temperature Control");
+        const recommended = isCurve ? (hasEntity("otEnabled") ? "OT thermostat" : hasEntity("cicPollingEnabled") ? "CIC" : "OT thermostat") : "Disabled";
+        if (String(getEntityValue("heatingEnableSource") || "") !== recommended) {
+          commitSelect("heatingEnableSource", recommended);
+        }
+      }
       return;
     }
 

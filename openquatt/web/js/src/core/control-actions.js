@@ -1,6 +1,8 @@
 import { invokeActionMap } from "./action-router.js";
+import { hasEntity } from "./app-shared.js";
 import { getCurveFallbackSuggestion, getEntityValue } from "./entity-store.js";
 import { commitNumber, commitSelect, commitSwitch, triggerButton } from "./entity-write-actions.js";
+import { state } from "./state.js";
 
 const controlActionHandlers = {
   "select-settings-option": (button) => {
@@ -8,6 +10,17 @@ const controlActionHandlers = {
     const option = button.dataset.selectOption || "";
     if (key && option && String(getEntityValue(key) || "") !== option) {
       commitSelect(key, option);
+      if (key === "strategy" && state.quickStartModalOpen && hasEntity("heatingEnableSource")) {
+        const isCurve = String(option).includes("Water Temperature Control");
+        const recommended = isCurve
+          ? (hasEntity("otEnabled") ? "OT thermostat" : hasEntity("cicPollingEnabled") ? "CIC" : "OT thermostat")
+          : "Disabled";
+        const current = String(getEntityValue("heatingEnableSource") || "");
+        if (current !== recommended) {
+          // Automatisch goed zetten tijdens onboarding; geen modal nodig
+          commitSelect("heatingEnableSource", recommended);
+        }
+      }
     }
   },
   "toggle-overview-control": (button) => {

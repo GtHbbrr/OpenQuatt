@@ -84,8 +84,8 @@ Quick Start begint op de Heatpump Controller Q met een controle van de firmware-
 | `Flowmeting configureren` | De juiste flowbron | Zorgt dat de regeling de juiste meting gebruikt. |
 | `Thermostaatgegevens configureren` | Eén bron voor kamertemperatuur en setpoint | Voorkomt dat OpenQuatt waarden uit verschillende bronnen combineert. |
 | `CV-ketel of boiler` | Ondersteuning en fysieke aansluiting (`R1` of `OTB`) | Bepaalt of OpenQuatt aanvullende warmte mag inzetten. Op Q-hardware controleert OpenQuatt bij een R1-keuze tijdens het opstarten kort of toch een OpenTherm-ketel antwoordt. Tijdens Quick Start wordt een gedetecteerde OT-ketel automatisch als `OpenTherm (OTB)` ingesteld en wordt die keuze toegelicht. Na afgeronde onboarding blijft een onverwachte OT-ketel geblokkeerd totdat de aansluiting handmatig is gecorrigeerd. |
-| `Kies de verwarmingsstrategie` | `Power House` of `Water Temperature Control` | Bepaalt hoe OpenQuatt warmtevraag maakt. Toont daarna een aanbeveling voor **Warmtevraag bepalen**: bij `Power House` meestal `Warmtetoestemming = Niet gebruiken`, bij `Water Temperature Control` meestal de thermostaat (`OT thermostat` op Q-edition). |
-| `Werk de regeling uit` | Strategie-instellingen | Toont alleen de instellingen die bij de gekozen strategie horen, plus de warmtetoestemmings-aanbeveling voor die strategie. |
+| `Kies de verwarmingsstrategie` | `Power House` of `Water Temperature Control` | Bepaalt hoe OpenQuatt warmtevraag maakt en stelt daarbij automatisch de warmtetoestemming goed in (`Niet gebruiken` voor Power House, `OT thermostat` voor stooklijn). |
+| `Werk de regeling uit` | Strategie-instellingen | Toont alleen de instellingen die bij de gekozen strategie horen. |
 | `Flowregeling en afstelling` | Automatische flow of vaste pompstand | Bepaalt hoe OpenQuatt de waterdoorstroming regelt. |
 | `Watertemperatuur beveiligen` | Maximale watertemperatuur | Laat OpenQuatt terugregelen voordat het water te warm wordt. |
 | `Stille uren en niveaus` | Tijdvenster en compressorlimieten | Begrenst de compressor bijvoorbeeld 's nachts. |

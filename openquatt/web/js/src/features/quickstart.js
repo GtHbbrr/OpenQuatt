@@ -646,9 +646,6 @@ import { renderUsageTelemetryConsent, renderUsageTelemetryDisclosure } from "./u
         <p class="oq-helper-section-copy">Kies hier hoe OpenQuatt je verwarming regelt. Daarna lopen we samen de belangrijkste instellingen langs.</p>
         ${renderHeatingStrategyExplainCards()}
         ${renderStrategySelectionFields("oq-settings-grid oq-settings-grid--quickstart")}
-        <div class="oq-settings-grid oq-settings-grid--quickstart">
-          ${renderHeatingEnableQuickStartAdvice()}
-        </div>
         ${renderQuickStartStepNav()}
       </section>
     `;
@@ -682,7 +679,6 @@ import { renderUsageTelemetryConsent, renderUsageTelemetryDisclosure } from "./u
   }
 
   export function renderHeatingWorkspace() {
-    const showAdvice = hasEntity("heatingEnableSource");
     return `
       <section class="oq-helper-panel">
         <p class="oq-helper-label">${escapeHtml(getQuickStepKicker("heating"))}</p>
@@ -706,7 +702,6 @@ import { renderUsageTelemetryConsent, renderUsageTelemetryDisclosure } from "./u
             ${renderPowerHouseBaseFields("oq-settings-grid oq-settings-grid--quickstart")}
             ${renderPowerHouseAdvancedField()}
           `}
-        ${showAdvice ? `<div class="oq-settings-grid oq-settings-grid--quickstart">${renderHeatingEnableQuickStartAdvice()}</div>` : ""}
         ${renderQuickStartStepNav()}
       </section>
     `;
@@ -810,11 +805,11 @@ import { renderUsageTelemetryConsent, renderUsageTelemetryDisclosure } from "./u
     if (activeStep === "thermostat-source") {
       return renderThermostatSourceWorkspace();
     }
-    if (activeStep === "flow") {
-      return renderFlowWorkspace();
-    }
     if (activeStep === "heating") {
       return renderHeatingWorkspace();
+    }
+    if (activeStep === "flow") {
+      return renderFlowWorkspace();
     }
     if (activeStep === "water") {
       return renderWaterWorkspace();

@@ -42,10 +42,10 @@ import { render } from "../core/render-scheduler.js";
       ])];
     }
     if (stepId === "strategy") {
-      return [...new Set([...base, "strategy", "heatingEnableSource", "heatingEnableValid", "heatingEnableSelected"])];
+      return [...new Set([...base, "strategy"])];
     }
     if (stepId === "heating") {
-      return [...new Set([...base, ...POWER_HOUSE_KEYS, ...CURVE_SETTING_KEYS, "dayMax", "silentMax", "heatingEnableSource", "heatingEnableValid", "heatingEnableSelected"])];
+      return [...new Set([...base, ...POWER_HOUSE_KEYS, ...CURVE_SETTING_KEYS, "dayMax", "silentMax"])];
     }
     if (stepId === "flow") {
       return [...new Set([...base, ...FLOW_SETTING_KEYS, ...FLOW_TUNING_KEYS])];

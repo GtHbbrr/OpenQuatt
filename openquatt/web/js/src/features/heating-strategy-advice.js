@@ -47,29 +47,25 @@ export function renderHeatingStrategyAdviceModal() {
     return "Externe bron bepaalt óf verwarming mag starten.";
   })();
   const recommendedDesc = isPH ? "Power House bepaalt zelf wanneer warmte nodig is." : "Thermostaat bepaalt óf verwarming nodig is.";
-  const currentMini = deviant ? (isPH ? "externe gate actief" : "zonder thermostaat") : "komt overeen";
+  const currentMini = deviant ? (isPH ? "externe gate actief" : "zonder thermostaat") : "";
   const recommendedMini = isPH ? "voor Power House" : "voor stooklijn";
   const statusBadge = deviant
     ? '<span class="status-badge"><span class="status-dot"></span>Aanpassing aanbevolen</span>'
     : '<span class="status-badge status-badge--ok"><span class="status-dot"></span>Komt overeen</span>';
-  const title = deviant ? "Warmtetoestemming controleren" : "Warmtetoestemming";
+  const title = deviant ? "Regeling controleren" : "Regeling — advies gevolgd";
   const subtitle = deviant
-    ? `De huidige keuze werkt, maar past niet goed bij hoe <strong>${escapeHtml(strategyLabel)}</strong> de warmtevraag bepaalt.`
-    : `Jouw instelling komt overeen met het advies voor <strong>${escapeHtml(strategyLabel)}</strong>.`;
+    ? `De huidige keuze voor warmtetoestemming past niet goed bij ${strategyLabel}.`
+    : `Je warmtetoestemming komt overeen met het advies voor ${strategyLabel}.`;
   const decisionClass = deviant ? "decision" : "decision decision--ok";
 
   const whyTitle = isPH ? "Waarom dit advies?" : "Waarom thermostaat bij stooklijn?";
   const whyText = isPH
     ? "Power House gebruikt al buitentemperatuur, kamertemperatuur, setpoint en het huismodel. Een tweede aan/uit-regelaar kan die modulatie onnodig onderbreken."
     : "De stooklijn bepaalt hoe warm het water moet zijn; de thermostaat of zone-regeling bepaalt of verwarming nodig is. Zonder thermostaat verwarmt de stooklijn ook als de kamer al warm is.";
-  const whenTitle = isPH ? "Wanneer HA input behouden?" : "Wanneer Niet gebruiken behouden?";
-  const whenText = isPH ? "Alleen wanneer Home Assistant bewust als harde zone-toestemming dient." : "Alleen bij permanent open afgifte zonder thermostaat, volledig weersafhankelijk.";
+  const whenTitle = isPH ? "Wanneer wél een externe toestemming?" : "Wanneer Niet gebruiken behouden?";
+  const whenText = isPH ? "Alleen als een externe zone-regeling bewust als harde gate moet dienen." : "Alleen bij permanent open afgifte zonder thermostaat, volledig weersafhankelijk.";
   const example = isPH ? "geen zone open → blokkeren" : "open vloer altijd open";
-  const otherTitle = isPH ? "Water Temperature Control" : "Power House";
-  const otherSmall = isPH ? "Daar is een thermostaat of zonevraag meestal juist wél aanbevolen." : "Daar bepaalt Power House zelf de vraag — geen extra toestemming nodig.";
-  const otherDetails = isPH
-    ? "<strong>Waarom?</strong> De stooklijn bepaalt hoe warm het water moet zijn; de thermostaat of zone-regeling bepaalt of verwarming nodig is. De volledige invoermatrix hoort beter in de documentatie dan in deze beslismodal."
-    : "<strong>Waarom?</strong> Power House bepaalt zelf de warmtevraag uit buitentemp, kamer, setpoint en huismodel. Een extra gate verstoort modulatie.";
+
 
   return renderModalShell({
     modalId: "system",
@@ -94,9 +90,10 @@ export function renderHeatingStrategyAdviceModal() {
             </div>
             ${statusBadge}
           </div>
+          <div style="padding: 8px 16px 0; color: #7d8797; font-size: 11px; font-weight: 800; letter-spacing: .055em; text-transform: uppercase;">Warmtetoestemming</div>
           <div class="comparison">
             <article class="choice current">
-              <div class="choice-label"><span>Huidig</span><span class="mini">${escapeHtml(currentMini)}</span></div>
+              <div class="choice-label"><span>Huidig</span>${currentMini ? `<span class="mini">${escapeHtml(currentMini)}</span>` : ""}</div>
               <strong>${escapeHtml(currentLabel)}</strong>
               <p>${escapeHtml(currentDesc)}</p>
             </article>
@@ -144,25 +141,10 @@ export function renderHeatingStrategyAdviceModal() {
               </span>
               <h2>${escapeHtml(whenTitle)}</h2>
             </div>
-            <p>${escapeHtml(isPH ? "Alleen wanneer Home Assistant bewust als harde zone-toestemming dient." : "Alleen bij permanent open afgifte zonder thermostaat.")}</p>
+            <p>${escapeHtml(isPH ? "Alleen als een externe zone-regeling bewust als harde gate moet dienen." : "Alleen bij permanent open afgifte zonder thermostaat.")}</p>
             <span class="example"><b>Voorbeeld</b> ${escapeHtml(example)}</span>
           </aside>
         </div>
-
-        <details class="strategy-details">
-          <summary>
-            <span class="other-icon" aria-hidden="true">≈</span>
-            <span class="other-copy">
-              <strong>${escapeHtml(otherTitle)}</strong>
-              <small>${escapeHtml(otherSmall)}</small>
-            </span>
-            <span class="other-badge">Andere strategie</span>
-            <span class="chevron" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
-            </span>
-          </summary>
-          <div class="details-content">${otherDetails}</div>
-        </details>
 
         <details class="strategy-details">
           <summary>
@@ -180,12 +162,12 @@ export function renderHeatingStrategyAdviceModal() {
               <table class="oq-advice-matrix">
                 <thead><tr><th>Instelling</th><th>Power House</th><th>Stooklijn</th></tr></thead>
                 <tbody>
-                  <tr><td>Kamertemperatuur</td><td>${pill("vereist","required")}</td><td>${pill("aanbevolen","recommended")}</td></tr>
-                  <tr><td>Kamer-setpoint</td><td>${pill("vereist","required")}</td><td>${pill("aanbevolen","recommended")}</td></tr>
+                  <tr><td>Kamertemperatuur</td><td>${pill("vereist","required")}</td><td>${pill("actief als correctie","recommended")}</td></tr>
+                  <tr><td>Kamer-setpoint</td><td>${pill("vereist","required")}</td><td>${pill("actief als correctie","recommended")}</td></tr>
                   <tr><td>Buitentemperatuur</td><td>${pill("vereist","required")}</td><td>${pill("vereist","required")}</td></tr>
                   <tr><td>Aanvoertemperatuur</td><td>${pill("nodig voor begrenzing","muted")}</td><td>${pill("vereist","required")}</td></tr>
                   <tr><td>Flow</td><td>${pill("vereist","required")}</td><td>${pill("vereist","required")}</td></tr>
-                  <tr class="is-highlight"><td>Warmtetoestemming</td><td>${pill("Niet gebruiken","muted")}</td><td>${pill("OpenTherm-thermostaat","recommended")}</td></tr>
+                  <tr><td>Warmtetoestemming</td><td>${pill("Niet gebruiken","muted")}</td><td>${pill("OpenTherm-thermostaat","recommended")}</td></tr>
                 </tbody>
               </table>
             </div>
@@ -194,9 +176,7 @@ export function renderHeatingStrategyAdviceModal() {
         </details>
 
         <div class="modal-footer">
-          <div class="change-note">Alleen <strong>Warmtetoestemming</strong> wordt aangepast.</div>
-          <button class="button secondary" type="button" data-oq-action="close-system-modal">Huidige keuze behouden</button>
-          ${deviant ? `<button class="button primary" type="button" data-oq-action="apply-heating-strategy-advice" data-heating-enable-target="${escapeHtml(recommended)}" ${busy ? "disabled" : ""}>${busy ? "Opslaan..." : `Instellen op ‘${escapeHtml(recommendedLabel)}’`}</button>` : `<button class="button secondary" type="button" data-oq-action="close-system-modal">Sluiten</button>`}
+          ${deviant ? `<div class="change-note">Alleen <strong>Warmtetoestemming</strong> wordt aangepast.</div><button class="button secondary" type="button" data-oq-action="close-system-modal">Huidige keuze behouden</button><button class="button primary" type="button" data-oq-action="apply-heating-strategy-advice" data-heating-enable-target="${escapeHtml(recommended)}" ${busy ? "disabled" : ""}>${busy ? "Opslaan..." : `Instellen op ‘${escapeHtml(recommendedLabel)}’`}</button>` : `<button class="button secondary" type="button" data-oq-action="close-system-modal" style="margin-left:auto">Sluiten</button>`}
         </div>
       </div>
     `,

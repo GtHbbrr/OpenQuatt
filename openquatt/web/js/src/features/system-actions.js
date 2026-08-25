@@ -105,6 +105,8 @@ const systemActionHandlers = {
   "apply-heating-strategy-advice": (button) => {
     const target = String(button.dataset.heatingEnableTarget || "").trim() || "Disabled";
     state.busyAction = "quickstart-heating-enable";
+    state.controlNotice = "";
+    state.controlError = "";
     render();
     import("../core/entity-backup.js").then(({ setEntityBackupValue }) => {
       import("../core/entity-sync.js").then(({ refreshEntities }) => {
@@ -112,9 +114,7 @@ const systemActionHandlers = {
           try {
             const applied = await setEntityBackupValue("heatingEnableSource", target);
             state.entities.heatingEnableSource = { ...(state.entities.heatingEnableSource || {}), value: applied, state: applied };
-            state.systemModal = "";
-            state.busyAction = "";
-            state.controlNotice = target === "Disabled" ? "Warmtetoestemming op Niet gebruiken gezet." : `Warmtetoestemming op ${target} gezet.`;
+            state.controlNotice = target === "Disabled" ? "Warmtetoestemming op Niet gebruiken gezet — je ziet nu ‘Komt overeen’." : `Warmtetoestemming op ${target} gezet — je ziet nu ‘Komt overeen’.`;
             await refreshEntities(["heatingEnableSource", "heatingEnableValid", "heatingEnableSelected"], "all");
           } catch (error) {
             state.controlError = `Warmtetoestemming kon niet worden opgeslagen. ${error.message}`;
