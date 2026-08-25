@@ -171,6 +171,7 @@ import { escapeHtml } from "../core/html.js";
       }) : "",
       renderBinaryDiagnosticItem("cicChEnabled", "CH-vraag", "Actief", "Normaal"),
       renderBinaryDiagnosticItem("cicCoolingEnabled", "Koeling", "Actief", "Normaal"),
+      renderValueDiagnosticItem("cicBoilerWaterPressure", "Waterdruk"),
       renderValueDiagnosticItem("cicControlSetpoint", "Control setpoint"),
       renderValueDiagnosticItem("cicRoomSetpoint", "Room setpoint"),
       renderValueDiagnosticItem("cicRoomTemp", "Room temperature"),
