@@ -55,6 +55,30 @@ inline bool water_restart_gap_recovered(const WaterCycleState& state, float filt
   return filtered_gap_c >= state.stop_buffer_gap_c + restart_delta_c;
 }
 
+inline uint32_t global_minimum_off_time_remaining_ms(bool enabled, uint32_t now_ms, bool stop_seen,
+                                                     uint32_t last_stop_ms, bool boot_hold_elapsed,
+                                                     uint32_t minimum_off_ms) {
+  if (!enabled || minimum_off_ms == 0) return 0;
+
+  if (stop_seen) {
+    const uint32_t elapsed_ms = now_ms - last_stop_ms;
+    return elapsed_ms >= minimum_off_ms ? 0 : minimum_off_ms - elapsed_ms;
+  }
+
+  if (boot_hold_elapsed) return 0;
+  return now_ms >= minimum_off_ms ? 0 : minimum_off_ms - now_ms;
+}
+
+inline bool global_minimum_off_time_blocks_start(uint32_t remaining_ms, int previous_applied_level) {
+  return remaining_ms > 0 && previous_applied_level <= 0;
+}
+
+inline bool cooling_minimum_off_stop_is_pending(bool enabled, bool water_cycle_active, int stop_reason_code,
+                                                bool cooling_hp_applied) {
+  return enabled && !water_cycle_active && cooling_hp_applied && stop_reason_code != WATER_STOP_NONE &&
+         stop_reason_code != WATER_STOP_REQUEST_CLEARED;
+}
+
 struct LimiterTuning {
   float hard_dew_stop_base_gap_c = 0.15f;
   float hard_dew_stop_margin_gain_c = 0.30f;

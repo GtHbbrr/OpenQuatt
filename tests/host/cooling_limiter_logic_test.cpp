@@ -4,12 +4,16 @@
 
 namespace {
 
+using oq_cooling::cooling_minimum_off_stop_is_pending;
+using oq_cooling::global_minimum_off_time_blocks_start;
+using oq_cooling::global_minimum_off_time_remaining_ms;
 using oq_cooling::record_pi_zero_stop;
 using oq_cooling::water_restart_gap_recovered;
 using oq_cooling::WATER_STOP_DEW;
 using oq_cooling::WATER_STOP_LIMITER;
 using oq_cooling::WATER_STOP_NONE;
 using oq_cooling::WATER_STOP_PROJECTED_FLOOR;
+using oq_cooling::WATER_STOP_REQUEST_CLEARED;
 using oq_cooling::WaterCycleState;
 
 void test_pi_zero_stop_requires_an_active_nonzero_run() {
@@ -60,6 +64,38 @@ void test_existing_restart_exceptions_remain_unchanged() {
   assert(water_restart_gap_recovered(projected_floor_pause, -1.0f, 1.0f));
 }
 
+void test_global_minimum_off_time_blocks_boot_and_both_owner_candidates() {
+  constexpr uint32_t minimum_off_ms = 600000UL;
+
+  assert(global_minimum_off_time_remaining_ms(false, 1000UL, false, 0, false, minimum_off_ms) == 0);
+  assert(global_minimum_off_time_remaining_ms(true, 300000UL, false, 0, false, minimum_off_ms) == 300000UL);
+  assert(global_minimum_off_time_remaining_ms(true, minimum_off_ms, false, 0, true, minimum_off_ms) == 0);
+
+  constexpr uint32_t stop_ms = 900000UL;
+  assert(global_minimum_off_time_remaining_ms(true, stop_ms + 120000UL, true, stop_ms, true, minimum_off_ms) ==
+         480000UL);
+  assert(global_minimum_off_time_remaining_ms(true, stop_ms + minimum_off_ms, true, stop_ms, true, minimum_off_ms) ==
+         0);
+  assert(global_minimum_off_time_blocks_start(480000UL, 0));
+  assert(global_minimum_off_time_blocks_start(480000UL, -1));
+  assert(!global_minimum_off_time_blocks_start(480000UL, 1));
+  assert(!global_minimum_off_time_blocks_start(0, 0));
+}
+
+void test_global_minimum_off_time_is_millis_wrap_safe() {
+  constexpr uint32_t stop_ms = UINT32_MAX - 3000UL;
+  constexpr uint32_t now_ms = 2000UL;
+  assert(global_minimum_off_time_remaining_ms(true, now_ms, true, stop_ms, true, 10000UL) == 4999UL);
+}
+
+void test_minimum_off_time_preserves_an_applied_water_stop_during_mode_switch() {
+  assert(cooling_minimum_off_stop_is_pending(true, false, WATER_STOP_LIMITER, true));
+  assert(!cooling_minimum_off_stop_is_pending(true, false, WATER_STOP_REQUEST_CLEARED, true));
+  assert(!cooling_minimum_off_stop_is_pending(true, false, WATER_STOP_LIMITER, false));
+  assert(!cooling_minimum_off_stop_is_pending(true, true, WATER_STOP_LIMITER, true));
+  assert(!cooling_minimum_off_stop_is_pending(false, false, WATER_STOP_LIMITER, true));
+}
+
 }  // namespace
 
 int main() {
@@ -67,5 +103,8 @@ int main() {
   test_low_load_pi_zero_stop_waits_for_restart_delta();
   test_pi_zero_stop_preserves_higher_priority_reason();
   test_existing_restart_exceptions_remain_unchanged();
+  test_global_minimum_off_time_blocks_boot_and_both_owner_candidates();
+  test_global_minimum_off_time_is_millis_wrap_safe();
+  test_minimum_off_time_preserves_an_applied_water_stop_during_mode_switch();
   return 0;
 }

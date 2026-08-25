@@ -166,6 +166,8 @@ export function formatSettingsOptionLabel(option) {
     [STRATEGY_OPTION_POWER_HOUSE]: "Power House",
     "Heating demand": "Warmtevraag",
     "Cooling demand": "Koelvraag",
+    "Water temperature": "Watertemperatuur",
+    "Minimum off time": "Minimale uit-tijd",
     "Heating or cooling demand": "Warmte- of koelvraag",
     "External control": "Externe bediening",
     "Dew point required": "Dauwpuntmeting vereist",

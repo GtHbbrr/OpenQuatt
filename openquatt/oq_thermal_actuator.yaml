@@ -42,6 +42,22 @@ interval:
               (uint32_t) ${oq_heat_loop_tick_s} * 1000UL);
           id(oq_thermal_actuator_last_loop_ms) = now_ms;
 
+          // Maintain the shared cooling timer outside CM5 as well, so an elapsed
+          // stop cannot become active again after the 32-bit millis counter wraps.
+          const float cooling_minimum_off_state = id(cooling_minimum_off_time).state;
+          int cooling_minimum_off_s =
+              isnan(cooling_minimum_off_state) ? 600 : (int) lroundf(cooling_minimum_off_state);
+          cooling_minimum_off_s = std::max(240, std::min(3600, cooling_minimum_off_s));
+          const uint32_t cooling_minimum_off_ms =
+              (uint32_t) cooling_minimum_off_s * 1000UL;
+          if (!id(oq_cooling_boot_min_off_elapsed) && now_ms >= cooling_minimum_off_ms) {
+            id(oq_cooling_boot_min_off_elapsed) = true;
+          }
+          if (id(oq_cooling_applied_stop_seen) &&
+              (uint32_t)(now_ms - id(oq_cooling_last_applied_stop_ms)) >= cooling_minimum_off_ms) {
+            id(oq_cooling_applied_stop_seen) = false;
+          }
+
           auto publish_optimizer_reason = [&](const char* reason)->void {
             #if OQ_TOPOLOGY_DUO
             static std::string last_optimizer_reason = "";
@@ -594,6 +610,20 @@ interval:
 
           const int hp1_req = id(oq_actuator_hp1_req);
           const int hp2_req = id(oq_actuator_hp2_req);
+          auto applied_mode_is_cooling = [&](bool is_hp1)->bool {
+            const int previous_applied =
+                is_hp1 ? id(hp1_last_applied_level)
+                       : id(${secondary_last_applied_level_id});
+            return previous_applied > 0 &&
+                   (request_mode_code == 1 ||
+                    id(oq_control_mode_code) == 5 ||
+                    hp_mode_is_cooling(is_hp1) ||
+                    hp_mode_target_is_cooling(is_hp1));
+          };
+          const bool hp1_was_cooling = applied_mode_is_cooling(true);
+          #if OQ_TOPOLOGY_DUO
+          const bool hp2_was_cooling = applied_mode_is_cooling(false);
+          #endif
           const int hp1_applied = apply_level(true, hp1_req);
           auto heating_transition_reason = [&]()->uint8_t {
             if (id(oq_control_mode_code) == 98) {
@@ -767,7 +797,7 @@ interval:
             }
           }
 
-          auto log_transition = [&](bool is_hp1, int new_lvl) {
+          auto log_transition = [&](bool is_hp1, int new_lvl, bool was_cooling) {
             int &prev = is_hp1 ? id(hp1_last_applied_level) : id(${secondary_last_applied_level_id});
             if (prev != new_lvl) {
               if (is_hp1) id(hp1_last_level_change_ms) = now_ms;
@@ -791,6 +821,11 @@ interval:
             } else if (prev > 0 && new_lvl == 0) {
               if (is_hp1) id(hp1_last_stop_ms) = now_ms;
               else id(${secondary_last_stop_ms_id}) = now_ms;
+              if (was_cooling) {
+                id(oq_cooling_last_applied_stop_ms) = now_ms;
+                id(oq_cooling_applied_stop_seen) = true;
+                id(oq_cooling_min_off_stop_pending) = false;
+              }
               id(oq_decision_log).emit(
                   openquatt_decision_log::EVENT_SOURCE_STOP,
                   is_hp1 ? openquatt_decision_log::SUBJECT_HP1 : openquatt_decision_log::SUBJECT_HP2,
@@ -827,7 +862,7 @@ interval:
             prev = new_lvl;
           };
 
-          log_transition(true, hp1_applied);
+          log_transition(true, hp1_applied, hp1_was_cooling);
           #if OQ_TOPOLOGY_DUO
-          log_transition(false, hp2_applied);
+          log_transition(false, hp2_applied, hp2_was_cooling);
           #endif

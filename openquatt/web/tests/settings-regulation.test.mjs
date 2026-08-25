@@ -161,6 +161,40 @@ test("koelscherm laadt de stille-moduslimiet en actuele status", () => {
   assert.ok(SETTINGS_GROUP_KEY_MAP.cooling.includes("silentModeOverride"));
   assert.ok(SETTINGS_GROUP_KEY_MAP.cooling.includes("silentActive"));
   assert.ok(SETTINGS_GROUP_KEY_MAP.cooling.includes("silentMax"));
+  assert.ok(SETTINGS_GROUP_KEY_MAP.cooling.includes("coolingRestartMode"));
+  assert.ok(SETTINGS_GROUP_KEY_MAP.cooling.includes("coolingMinimumOffTime"));
+});
+
+test("koelherstart toont alleen de instelling van de gekozen modus", () => {
+  const restartMode = {
+    value: "Water temperature",
+    state: "Water temperature",
+    option: ["Water temperature", "Minimum off time"],
+  };
+  const baseEntities = {
+    coolingRestartMode: restartMode,
+    coolingRestartDelta: numberEntity(1, "°C", { min_value: 0, max_value: 5, step: 0.1 }),
+    coolingMinimumOffTime: numberEntity(600, "s", { min_value: 240, max_value: 3600, step: 30 }),
+  };
+
+  resetSettingsState(baseEntities);
+  let markup = renderSettingsCoolingSection();
+  assert.match(markup, /Herstartvoorwaarde/);
+  assert.match(markup, /Herstartmarge watertemperatuur/);
+  assert.doesNotMatch(markup, /Minimale uit-tijd koelen/);
+
+  resetSettingsState({
+    ...baseEntities,
+    coolingRestartMode: {
+      ...restartMode,
+      value: "Minimum off time",
+      state: "Minimum off time",
+    },
+  });
+  markup = renderSettingsCoolingSection();
+  assert.match(markup, /Minimale uit-tijd koelen/);
+  assert.match(markup, /beide warmtepompen bij Duo/);
+  assert.doesNotMatch(markup, /Herstartmarge watertemperatuur/);
 });
 
 test("Service toont runtime, draaiurenreset en de bevestigde tijdelijke override", () => {

@@ -11,8 +11,9 @@ export const WEB_BUNDLE_BUDGETS = [
     // concise CM100 boiler test phase copy (FLOW_SETTLING/BOILER_SETTLING/MEASURING/COOLDOWN),
     // advisory per-ODU generation detection with single bulk-detect button for onboarding and installation settings,
     // the explicitly confirmed dev-to-main firmware downgrade flow,
+    // selectable cooling restart by water temperature or minimum off-time,
     // toelichting lokale historie in Quick Start, plus fase-2 flash-I/O observability.
-    raw: 917_500,
+    raw: 919_000,
     // One-time migration ceiling for structured incident monitoring, replay,
     // the CSRF-protected deferred recovery actions, and their compact editor.
     // Once this bundle is the base, the normal gzip growth limit applies again.
