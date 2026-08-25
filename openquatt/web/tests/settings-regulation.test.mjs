@@ -181,6 +181,7 @@ test("koelherstart toont alleen de instelling van de gekozen modus", () => {
   let markup = renderSettingsCoolingSection();
   assert.match(markup, /Herstartvoorwaarde/);
   assert.match(markup, /helpt zo pendelgedrag te verminderen/);
+  assert.match(markup, /vaste minimale uit-tijd van iedere compressor blijft in beide modi altijd gelden/);
   assert.match(markup, /Herstartmarge watertemperatuur/);
   assert.doesNotMatch(markup, /Minimale uit-tijd koelen/);
 
@@ -195,6 +196,7 @@ test("koelherstart toont alleen de instelling van de gekozen modus", () => {
   markup = renderSettingsCoolingSection();
   assert.match(markup, /Minimale uit-tijd koelen/);
   assert.match(markup, /Bij Duo geldt dit voor beide warmtepompen/);
+  assert.match(markup, /vaste minimale compressor-uit-tijd voorbij is/);
   assert.doesNotMatch(markup, /Herstartmarge watertemperatuur/);
 });
 

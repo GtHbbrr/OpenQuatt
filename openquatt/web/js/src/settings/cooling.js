@@ -66,9 +66,9 @@ import { escapeHtml } from "../core/html.js";
         valueLabel: `${formatValue("coolingDemandMax")} max`,
         footerMarkup: renderCoolingSilentLimitWarning(),
       }),
-      hasEntity("coolingRestartMode") ? renderSettingsSelectField("coolingRestartMode", "Herstartvoorwaarde", "Kies of koeling herstart nadat het water voldoende is opgewarmd of na een vaste minimale uit-tijd. Een minimale uit-tijd remt snelle opeenvolgende koelstarts af en helpt zo pendelgedrag te verminderen.") : "",
+      hasEntity("coolingRestartMode") ? renderSettingsSelectField("coolingRestartMode", "Herstartvoorwaarde", "Kies of koeling herstart nadat het water voldoende is opgewarmd of na een vaste minimale uit-tijd. Een minimale uit-tijd remt snelle opeenvolgende koelstarts af en helpt zo pendelgedrag te verminderen. De vaste minimale uit-tijd van iedere compressor blijft in beide modi altijd gelden.") : "",
       restartByMinimumOffTime
-        ? renderSettingsNumberField("coolingMinimumOffTime", "Minimale uit-tijd koelen", "Na een werkelijke koelstop blijft de warmtepomp gedurende deze tijd uit. Bij Duo geldt dit voor beide warmtepompen.")
+        ? renderSettingsNumberField("coolingMinimumOffTime", "Minimale uit-tijd koelen", "Na een werkelijke koelstop blijft de warmtepomp gedurende deze tijd uit. Bij Duo geldt dit voor beide warmtepompen. OpenQuatt start pas wanneer ook de vaste minimale compressor-uit-tijd voorbij is.")
         : renderSettingsNumberField("coolingRestartDelta", "Herstartmarge watertemperatuur", "Na het bereiken van het koel-aanvoerdoel start de watercyclus pas opnieuw zodra de aanvoer deze marge boven het doel ligt."),
       renderSettingsNumberField("coolingSafetyMargin", "Dauwpunt veiligheidsmarge", "Extra marge boven het geselecteerde dauwpunt voor de minimale veilige watertemperatuur."),
     ].filter(Boolean);

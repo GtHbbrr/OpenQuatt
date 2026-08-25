@@ -102,7 +102,7 @@ Voor koeling zijn vooral belangrijk:
 - `Cooling Request Off Delta`
 - `Cooling Safety Margin`
 
-Met `Cooling Restart Mode` kies je tussen herstart op watertemperatuur en herstart na een minimale uit-tijd. In de eerste modus bepaalt `Cooling Restart Delta` hoeveel de aanvoer na een waterzijdige stop moet opwarmen. In de tweede modus bepaalt `Cooling Minimum Off Time` hoe lang een werkelijk gestopte koelcyclus uit blijft; bij Duo blokkeert die tijd beide warmtepompen. De normale dauwpunt-, flow- en veiligheidsgrenzen blijven in beide modi actief.
+Met `Cooling Restart Mode` kies je tussen herstart op watertemperatuur en herstart na een minimale uit-tijd. In de eerste modus bepaalt `Cooling Restart Delta` hoeveel de aanvoer na een waterzijdige stop moet opwarmen. In de tweede modus bepaalt `Cooling Minimum Off Time` hoe lang een werkelijk gestopte koelcyclus uit blijft; bij Duo blokkeert die tijd beide warmtepompen. Los daarvan bewaakt OpenQuatt altijd de vaste minimale uit-tijd per compressor. Een compressor start dus pas wanneer zowel de gekozen koelherstartvoorwaarde als zijn eigen minimale uit-tijd is vrijgegeven. De normale dauwpunt-, flow- en veiligheidsgrenzen blijven in beide modi actief.
 
 ### 3. Duo en looptijdgedrag
 
