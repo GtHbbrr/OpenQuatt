@@ -46,26 +46,24 @@ export function getHeatingEnableAdvice(strategyValue = getEntityValue("strategy"
       return {
         tone: "warning",
         title: "Warmtetoestemming staat op Niet gebruiken",
-        copy: "Bij Water Temperature Control bepaalt normaal de thermostaat óf er verwarmd wordt; OpenQuatt bepaalt met de stooklijn hoe warm. Met Niet gebruiken kan de stooklijn ook verwarmen terwijl de kamer al boven setpoint is. Voor een installatie met kamerthermostaat adviseren we meestal de thermostaat als warmtetoestemming.",
+        copy: "Zonder thermostaat kan de stooklijn verwarmen terwijl de kamer al warm is. Met een thermostaat als toestemming voorkom je dat.",
         recommended,
         deviant,
       };
     }
-    if (deviant && recommended === HEATING_ENABLE_RECOMMENDED_CURVE_OT && current !== HEATING_ENABLE_RECOMMENDED_CURVE_OT) {
+    if (deviant) {
       return {
         tone: "info",
-        title: "Warmtetoestemming wijkt af van advies",
-        copy: `Aanbevolen voor stooklijn met kamerthermostaat is ${recommended}. Je gebruikt nu ${current || "onbekend"}.`,
+        title: "Andere toestemming dan aanbevolen",
+        copy: `Voor stooklijn adviseren we ${recommended}. Je gebruikt nu ${current || "onbekend"}.`,
         recommended,
         deviant,
       };
     }
     return {
       tone: "info",
-      title: "Thermostaat bepaalt warmtevraag, stooklijn de watertemperatuur",
-      copy: recommended === HEATING_ENABLE_RECOMMENDED_CURVE_OT
-        ? "Aanbevolen: laat de OpenTherm-thermostaat bepalen wanneer warmte nodig is; OpenQuatt regelt daarna met de stooklijn de gewenste aanvoertemperatuur. Kies Volledig weersafhankelijk (Niet gebruiken) alleen bij een permanent open afgiftesysteem zonder kamerthermostaat."
-        : "Aanbevolen: laat de thermostaat/zonevraag bepalen wanneer warmte nodig is; OpenQuatt regelt daarna met de stooklijn de gewenste aanvoertemperatuur.",
+      title: "Goed zo — thermostaat en stooklijn vullen elkaar aan",
+      copy: "Thermostaat bepaalt óf er verwarmd wordt, de stooklijn hoe warm.",
       recommended,
       deviant: false,
     };
@@ -74,16 +72,16 @@ export function getHeatingEnableAdvice(strategyValue = getEntityValue("strategy"
   if (current !== "Disabled" && current) {
     return {
       tone: "warning",
-      title: "Externe warmtetoestemming actief bij Power House",
-      copy: "Power House bepaalt zelf de warmtevraag uit buitentemperatuur, kamertemperatuur, setpoint en het huismodel. Met een externe thermostaat als harde gate krijg je twee regelaars achter elkaar; dat kan extra stop/start geven. Gebruik een externe gate alleen bewust, bijvoorbeeld bij zone-regeling.",
+      title: "Externe toestemming bij Power House",
+      copy: "Power House bepaalt zelf of verwarmen nodig is. Een extra thermostaat als harde schakelaar laat de pomp vaker aan en uit gaan. Alleen handig bij zone-verwarming.",
       recommended,
       deviant,
     };
   }
   return {
     tone: "info",
-    title: "OpenQuatt bepaalt de warmtevraag",
-    copy: "Aanbevolen voor Power House: geen externe warmtetoestemming (Niet gebruiken). Power House bouwt de vraag zelf op en af op basis van kamer en huismodel. Kies een externe thermostaat/zonevraag alleen als je bewust een harde warmte-gate wilt.",
+    title: "Goed zo — Power House regelt de warmtevraag zelf",
+    copy: "Geen extra toestemming nodig. Power House kijkt zelf naar kamer en buitentemperatuur.",
     recommended,
     deviant: false,
   };

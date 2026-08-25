@@ -15,7 +15,7 @@ export function renderHeatingStrategyAdviceModal() {
   }
   const isCurve = isCurveMode();
   const strategyLabel = isCurve ? "Water Temperature Control" : "Power House";
-  const strategySub = isCurve ? "Stooklijn · buitentemp bepaalt aanvoer" : "Automatisch · huismodel + kamer";
+  const strategySub = isCurve ? "Stooklijn" : "Regelt zelf de vraag";
   const advice = getHeatingEnableAdvice();
   const recommended = getHeatingEnableRecommendation();
   const current = getHeatingEnableCurrent();
@@ -29,7 +29,7 @@ export function renderHeatingStrategyAdviceModal() {
     titleId: "oq-heating-advice-modal-title",
     kicker: "Regeling",
     title: "Warmtetoestemming per strategie",
-    copy: "OpenTherm-thermostaat heeft voorkeur waar beschikbaar. Kies de toestemming die past bij hoe de regeling denkt.",
+    copy: "Kies de toestemming die past bij je strategie. De tabel maakt het overzichtelijk.",
     closeAction: "close-system-modal",
     closeLabel: "Sluit advies",
     className: "oq-helper-modal--wide oq-advice-modal",
@@ -41,36 +41,26 @@ export function renderHeatingStrategyAdviceModal() {
           <span class="oq-advice-stat-sub">${escapeHtml(strategySub)}</span>
         </div>
         <div class="oq-advice-stat${deviant ? " is-warning" : " is-ok"}">
-          <span class="oq-advice-stat-kicker">Huidige warmtetoestemming</span>
+          <span class="oq-advice-stat-kicker">Huidige keuze</span>
           <strong class="oq-advice-stat-value">${escapeHtml(currentLabel)}</strong>
-          <span class="oq-advice-stat-sub">${escapeHtml(deviant ? "wijkt af van advies" : "komt overeen met advies")}</span>
+          <span class="oq-advice-stat-sub">${escapeHtml(deviant ? "wijkt af" : "komt overeen")}</span>
         </div>
         <div class="oq-advice-stat is-recommended">
           <span class="oq-advice-stat-kicker">Aanbevolen</span>
           <strong class="oq-advice-stat-value">${escapeHtml(recommendedLabel)}</strong>
-          <span class="oq-advice-stat-sub">${escapeHtml(isCurve ? "thermostaat bepaalt óf, stooklijn hoe warm" : "strategie bepaalt zelf de vraag")}</span>
+          <span class="oq-advice-stat-sub">${escapeHtml(isCurve ? "thermostaat bepaalt óf" : "geen extra toestemming")}</span>
         </div>
       </div>
 
-      ${deviant ? `
-        <div class="oq-advice-callout oq-advice-callout--warning">
-          <div class="oq-advice-callout-icon">!</div>
-          <div>
-            <strong>${escapeHtml(advice.title)}</strong>
-            <p>${escapeHtml(advice.copy)}</p>
-          </div>
+      <div class="oq-advice-callout ${deviant ? "oq-advice-callout--warning" : "oq-advice-callout--ok"}">
+        <div class="oq-advice-callout-icon">${deviant ? "!" : "✓"}</div>
+        <div>
+          <strong>${escapeHtml(advice.title)}</strong>
+          <p>${escapeHtml(advice.copy)}</p>
         </div>
-      ` : `
-        <div class="oq-advice-callout oq-advice-callout--ok">
-          <div class="oq-advice-callout-icon">✓</div>
-          <div>
-            <strong>Komt overeen met de aanbeveling</strong>
-            <p>${escapeHtml(advice.copy)}</p>
-          </div>
-        </div>
-      `}
+      </div>
 
-      <h4 class="oq-advice-section-title">Matrix — wat is vereist of aanbevolen?</h4>
+      <h4 class="oq-advice-section-title">Overzicht per instelling</h4>
       <div class="oq-advice-matrix-wrap">
         <table class="oq-advice-matrix">
           <thead>
@@ -115,26 +105,7 @@ export function renderHeatingStrategyAdviceModal() {
         </table>
       </div>
 
-      <div class="oq-advice-cards">
-        <div class="oq-advice-card">
-          <div class="oq-advice-card-head">
-            <span class="oq-advice-card-icon">◈</span>
-            <strong>Power House</strong>
-          </div>
-          <p>Bepaalt zelf de warmtevraag uit buitentemp, kamer, setpoint en huismodel. Een externe gate als tweede regelaar verstoort modulatie en geeft extra start/stop.</p>
-          <p class="oq-advice-card-note">Alleen bewust voor zone-regeling (bijv. geen zone open → blokkeren).</p>
-        </div>
-        <div class="oq-advice-card">
-          <div class="oq-advice-card-head">
-            <span class="oq-advice-card-icon">≋</span>
-            <strong>Water Temperature Control</strong>
-          </div>
-          <p>Buitentemp → stooklijn → PID op aanvoer. Kamer is correctie. Thermostaat bepaalt <em>óf</em>, OpenQuatt <em>hoe warm</em>.</p>
-          <p class="oq-advice-card-note"><code>Niet gebruiken</code> alleen voor permanent open afgifte zonder thermostaat.</p>
-        </div>
-      </div>
-
-      <p class="oq-advice-footnote"><strong>Niet gebruiken</strong> = geen externe gate; strategie mag zelf vraag opbouwen (niet “verwarming uit”). Afwijkende maar geldige combinaties blijven mogelijk.</p>
+      <p class="oq-advice-footnote"><strong>Niet gebruiken</strong> = geen externe toestemming (niet “uit”). Afwijkend mag, bijvoorbeeld voor zone-verwarming of open vloer.</p>
 
       <div class="oq-helper-modal-actions oq-advice-actions">
         <button class="oq-helper-button oq-helper-button--ghost" type="button" data-oq-action="close-system-modal">Sluiten</button>
