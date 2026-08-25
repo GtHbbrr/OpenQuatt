@@ -106,11 +106,11 @@ Bij `Water Temperature Control` bepaalt de buitentemperatuur via de curve het ge
 
 Daarom is bij een normale installatie met kamerthermostaat een externe warmtetoestemming juist logisch: de thermostaat/zone-regeling bepaalt *of* verwarming nodig is, OpenQuatt bepaalt met de stooklijn *hoe warm* het water moet zijn.
 
-Quick Start adviseert daarom bij `Water Temperature Control` standaard de thermostaat als warmtetoestemming — op de Q-edition `Heating Enable Source = OT thermostat`; op andere hardware `CIC` of de gekozen kamerbron. `Niet gebruiken` blijft mogelijk voor bewust volledig weersafhankelijk bedrijf met permanent open afgiftesysteem.
+Tijdens Quick Start zet een strategieswitch naar `Water Temperature Control` de warmtetoestemming automatisch op de eerder gekozen, gekoppelde thermostaatbron. Dat is op de Q-edition normaal `Heating Enable Source = OT thermostat`; op andere hardware kan dit `CIC` of `HA input` zijn. Een uitgeschakelde of niet-geconfigureerde bron wordt niet automatisch als harde gate gekozen. `Niet gebruiken` blijft mogelijk voor bewust volledig weersafhankelijk bedrijf met permanent open afgiftesysteem.
 
 `Heating Enable Source = Niet gebruiken` betekent: geen externe warmtetoestemming; de strategie mag zelf warmtevraag opbouwen zonder harde gate. Met `Niet gebruiken` kan de stooklijn dus ook verwarmen terwijl de kamer al boven setpoint is.
 
-Zie je een afwijkende keuze, dan toont Quick Start en `Instellingen → Verwarmen` een advies (`Aanbevolen instelling` / `Controleer configuratie`) zonder de instelling stil te overschrijven. Voor de volledige matrix zie [Instellingen en meetwaarden](instellingen-en-meetwaarden.md#5-bronselectie).
+Buiten Quick Start toont `Instellingen → Verwarmen` bij een afwijkende keuze alleen een advies (`Aanbevolen instelling` / `Controleer configuratie`) en wordt de instelling niet stil overschreven. Voor de volledige matrix zie [Instellingen en meetwaarden](instellingen-en-meetwaarden.md#5-bronselectie).
 
 ## Welke instellingen zijn voor de meeste gebruikers het belangrijkst?
 

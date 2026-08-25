@@ -2,7 +2,7 @@ import { hasEntity } from "./app-shared.js";
 import { ENTITY_DEFS } from "./config.js";
 import { getInputDraftValue } from "./control-drafts.js";
 import { reportUnknownAction } from "./action-router.js";
-import { handleControlAction } from "./control-actions.js";
+import { commitQuickStartStrategySelection, handleControlAction } from "./control-actions.js";
 import { isCurveMode } from "./domain-helpers.js";
 import { formatValue, getEntityValue, getNumberMeta, normalizeDateTimeValue, normalizeNumber, normalizeTimeValue, parseLooseNumber } from "./entity-store.js";
 import { commitDateTime, commitNumber, commitSelect, commitText, commitTime, triggerNamedButton, updateCurveDraftFromPointer } from "./entity-write-actions.js";
@@ -341,13 +341,10 @@ const actionDelegates = [
         updateFirmwareState({ firmwareDowngradeConfirmedVersion: "" });
       }
       const value = String(event.target.value);
-      commitSelect(field, value);
-      if (field === "strategy" && state.quickStartModalOpen && hasEntity("heatingEnableSource")) {
-        const isCurve = value.includes("Water Temperature Control");
-        const recommended = isCurve ? (hasEntity("otEnabled") ? "OT thermostat" : hasEntity("cicPollingEnabled") ? "CIC" : "OT thermostat") : "Disabled";
-        if (String(getEntityValue("heatingEnableSource") || "") !== recommended) {
-          commitSelect("heatingEnableSource", recommended);
-        }
+      if (field === "strategy" && state.quickStartModalOpen) {
+        void commitQuickStartStrategySelection(value);
+      } else {
+        commitSelect(field, value);
       }
       return;
     }

@@ -629,7 +629,7 @@ import { renderUsageTelemetryConsent, renderUsageTelemetryDisclosure } from "./u
       <div class="oq-helper-surface oq-settings-field oq-settings-field--span-2${deviant ? " is-warning" : ""}">
         <div class="oq-settings-field-head">
           <h3>Warmtevraag bepalen</h3>
-          <p class="oq-settings-action-note" style="margin:0">Bekijk welke warmtetoestemming logisch past bij je gekozen strategie. OpenTherm heeft voorkeur waar beschikbaar.</p>
+          <p class="oq-settings-action-note" style="margin:0">Bekijk welke warmtetoestemming logisch past bij je gekozen strategie. De gekoppelde en actieve thermostaatbron is het advies.</p>
         </div>
         <div class="oq-settings-field-control">
           <button class="oq-helper-button ${deviant ? "oq-helper-button--warning-soft" : "oq-helper-button--ghost"}" type="button" data-oq-action="open-heating-strategy-advice-modal">${deviant ? '<span class="oq-advice-warn-icon"><svg viewBox="0 0 20 18" aria-hidden="true"><path d="M10 1.6 L18.2 16.4 H1.8 Z"/><rect x="9.1" y="5.4" width="1.8" height="5.8" rx="0.9"/><circle cx="10" cy="13.6" r="1.1"/></svg></span> Advies per strategie bekijken' : "Advies per strategie bekijken"}</button>

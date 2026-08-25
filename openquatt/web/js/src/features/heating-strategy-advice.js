@@ -27,8 +27,9 @@ export function renderHeatingStrategyAdviceModal() {
   const isCurve = isCurveMode();
   const advice = getHeatingEnableAdvice();
   const recommended = getHeatingEnableRecommendation();
+  const recommendationAvailable = Boolean(recommended);
   const current = getHeatingEnableCurrent();
-  const recommendedLabel = formatLabel(recommended);
+  const recommendedLabel = recommendationAvailable ? formatLabel(recommended) : "Eerst bron activeren";
   const currentLabel = formatLabel(current);
   const deviant = Boolean(advice.deviant && hasEntity("heatingEnableSource"));
   const busy = state.busyAction === "quickstart-heating-enable";
@@ -46,15 +47,21 @@ export function renderHeatingStrategyAdviceModal() {
     if (current === "API input") return "API bepaalt óf verwarming mag starten.";
     return "Externe bron bepaalt óf verwarming mag starten.";
   })();
-  const recommendedDesc = isPH ? "Power House bepaalt zelf wanneer warmte nodig is." : "Thermostaat bepaalt óf verwarming nodig is.";
-  const currentMini = deviant ? (isPH ? "externe gate actief" : "zonder thermostaat") : "";
-  const recommendedMini = isPH ? "voor Power House" : "voor stooklijn";
+  const recommendedDesc = isPH
+    ? "Power House bepaalt zelf wanneer warmte nodig is."
+    : recommendationAvailable
+      ? "Thermostaat bepaalt óf verwarming nodig is."
+      : "Configureer en activeer eerst één gekoppelde thermostaatbron.";
+  const currentMini = deviant ? (isPH ? "externe gate actief" : recommendationAvailable ? "andere bron" : "bron niet actief") : "";
+  const recommendedMini = isPH ? "voor Power House" : recommendationAvailable ? "voor stooklijn" : "eerst configureren";
   const statusBadge = deviant
     ? '<span class="status-badge"><span class="status-dot"></span>Aanpassing aanbevolen</span>'
     : '<span class="status-badge status-badge--ok"><span class="status-dot"></span>Komt overeen</span>';
-  const title = deviant ? "Regeling controleren" : "Regeling — advies gevolgd";
-  const subtitle = deviant
-    ? `De huidige keuze voor warmtetoestemming past niet goed bij ${strategyLabel}.`
+  const title = !recommendationAvailable && isCurve ? "Thermostaatbron activeren" : deviant ? "Regeling controleren" : "Regeling — advies gevolgd";
+  const subtitle = !recommendationAvailable && isCurve
+    ? "Quick Start past de warmtetoestemming pas aan zodra de gekozen thermostaatbron actief en gekoppeld is."
+    : deviant
+      ? `De huidige keuze voor warmtetoestemming past niet goed bij ${strategyLabel}.`
     : `Je warmtetoestemming komt overeen met het advies voor ${strategyLabel}.`;
   const decisionClass = deviant ? "decision" : "decision decision--ok";
 
@@ -167,7 +174,7 @@ export function renderHeatingStrategyAdviceModal() {
                   <tr><td>Buitentemperatuur</td><td>${pill("vereist","required")}</td><td>${pill("vereist","required")}</td></tr>
                   <tr><td>Aanvoertemperatuur</td><td>${pill("nodig voor begrenzing","muted")}</td><td>${pill("vereist","required")}</td></tr>
                   <tr><td>Flow</td><td>${pill("vereist","required")}</td><td>${pill("vereist","required")}</td></tr>
-                  <tr><td>Warmtetoestemming</td><td>${pill("Niet gebruiken","muted")}</td><td>${pill("OpenTherm-thermostaat","recommended")}</td></tr>
+                  <tr><td>Warmtetoestemming</td><td>${pill("Niet gebruiken","muted")}</td><td>${pill(recommendationAvailable ? recommendedLabel : "actieve thermostaatbron","recommended")}</td></tr>
                 </tbody>
               </table>
             </div>
@@ -175,8 +182,9 @@ export function renderHeatingStrategyAdviceModal() {
           </div>
         </details>
 
+        ${state.controlError ? `<p class="oq-helper-error" role="alert">${escapeHtml(state.controlError)}</p>` : state.controlNotice ? `<p class="oq-helper-notice" role="status">${escapeHtml(state.controlNotice)}</p>` : ""}
         <div class="modal-footer">
-          ${deviant ? `<div class="change-note">Alleen <strong>Warmtetoestemming</strong> wordt aangepast.</div><button class="button secondary" type="button" data-oq-action="close-system-modal">Huidige keuze behouden</button><button class="button primary" type="button" data-oq-action="apply-heating-strategy-advice" data-heating-enable-target="${escapeHtml(recommended)}" ${busy ? "disabled" : ""}>${busy ? "Opslaan..." : `Instellen op ‘${escapeHtml(recommendedLabel)}’`}</button>` : `<button class="button secondary" type="button" data-oq-action="close-system-modal" style="margin-left:auto">Sluiten</button>`}
+          ${deviant && recommendationAvailable ? `<div class="change-note">Alleen <strong>Warmtetoestemming</strong> wordt aangepast.</div><button class="button secondary" type="button" data-oq-action="close-system-modal">Huidige keuze behouden</button><button class="button primary" type="button" data-oq-action="apply-heating-strategy-advice" data-heating-enable-target="${escapeHtml(recommended)}" ${busy ? "disabled" : ""}>${busy ? "Opslaan..." : `Instellen op ‘${escapeHtml(recommendedLabel)}’`}</button>` : `<button class="button secondary" type="button" data-oq-action="close-system-modal" style="margin-left:auto">Sluiten</button>`}
         </div>
       </div>
     `,

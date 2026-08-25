@@ -1,4 +1,4 @@
-import { hasEntity } from "./app-shared.js";
+import { hasEntity, isEntityActive } from "./app-shared.js";
 import { isCurveMode } from "./domain-helpers.js";
 import { getEntityValue } from "./entity-store.js";
 
@@ -6,19 +6,35 @@ export const HEATING_ENABLE_RECOMMENDED_POWER_HOUSE = "Disabled";
 export const HEATING_ENABLE_RECOMMENDED_CURVE_OT = "OT thermostat";
 export const HEATING_ENABLE_RECOMMENDED_CURVE_FALLBACK = "CIC";
 
+function hasConfiguredCicFeed() {
+  if (!hasEntity("cicFeedUrl")) {
+    return false;
+  }
+  const value = String(getEntityValue("cicFeedUrl") || "").trim().toLowerCase();
+  return Boolean(value) && value !== "unknown" && value !== "unavailable";
+}
+
+export function getActiveConfiguredThermostatSource() {
+  const roomTempSource = String(getEntityValue("roomTempSource") || "").trim();
+  const roomSetpointSource = String(getEntityValue("roomSetpointSource") || "").trim();
+  if (!roomTempSource || roomTempSource !== roomSetpointSource) {
+    return "";
+  }
+  if (roomTempSource === HEATING_ENABLE_RECOMMENDED_CURVE_OT) {
+    return hasEntity("otEnabled") && isEntityActive("otEnabled") ? roomTempSource : "";
+  }
+  if (roomTempSource === HEATING_ENABLE_RECOMMENDED_CURVE_FALLBACK) {
+    return hasEntity("cicPollingEnabled") && isEntityActive("cicPollingEnabled") && hasConfiguredCicFeed()
+      ? roomTempSource
+      : "";
+  }
+  return roomTempSource === "HA input" ? roomTempSource : "";
+}
+
 export function getHeatingEnableRecommendation(strategyValue = getEntityValue("strategy")) {
   const isCurve = isCurveMode(strategyValue);
-  const otAvailable = hasEntity("otEnabled");
-  const cicAvailable = hasEntity("cicPollingEnabled");
   if (isCurve) {
-    // OT heeft altijd voorkeur (Q-edition). Fallback naar CIC op remote.
-    if (otAvailable) {
-      return HEATING_ENABLE_RECOMMENDED_CURVE_OT;
-    }
-    if (cicAvailable) {
-      return HEATING_ENABLE_RECOMMENDED_CURVE_FALLBACK;
-    }
-    return HEATING_ENABLE_RECOMMENDED_CURVE_FALLBACK;
+    return getActiveConfiguredThermostatSource();
   }
   return HEATING_ENABLE_RECOMMENDED_POWER_HOUSE;
 }
@@ -33,6 +49,9 @@ export function isHeatingEnableRecommendationDeviant(strategyValue = getEntityVa
   if (!current) {
     return false;
   }
+  if (isCurveMode(strategyValue) && !recommended) {
+    return true;
+  }
   return current !== recommended;
 }
 
@@ -42,6 +61,15 @@ export function getHeatingEnableAdvice(strategyValue = getEntityValue("strategy"
   const current = getHeatingEnableCurrent();
   const deviant = current && current !== recommended;
   if (isCurve) {
+    if (!recommended) {
+      return {
+        tone: "warning",
+        title: "Geen actieve thermostaatbron beschikbaar",
+        copy: "Configureer of activeer eerst één gekoppelde bron voor kamertemperatuur en kamer-setpoint. Warmtetoestemming wordt niet automatisch op een inactieve bron gezet.",
+        recommended: "",
+        deviant: true,
+      };
+    }
     if (current === "Disabled") {
       return {
         tone: "warning",
