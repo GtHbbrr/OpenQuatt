@@ -26,6 +26,11 @@ struct CrashTimeBreadcrumbSnapshot {
   uint32_t sequence;
 };
 
+struct CrashTimeBreadcrumbBootCache {
+  bool valid;
+  CrashTimeBreadcrumbSnapshot snapshot;
+};
+
 inline bool crash_epoch_is_sane(uint32_t epoch_s) {
   return epoch_s >= MIN_VALID_CRASH_EPOCH_S && epoch_s < MAX_VALID_CRASH_EPOCH_S;
 }
@@ -47,7 +52,36 @@ inline bool crash_time_breadcrumb_is_valid(const CrashTimeBreadcrumb& breadcrumb
          crash_epoch_is_sane(breadcrumb.epoch_s) && breadcrumb.crc == crash_time_breadcrumb_checksum(breadcrumb);
 }
 
-bool read_crash_time_breadcrumb(CrashTimeBreadcrumbSnapshot* snapshot);
+inline uint32_t crash_uptime_seconds_from_microseconds(uint64_t uptime_us) {
+  return static_cast<uint32_t>(uptime_us / 1000000ULL);
+}
+
+inline bool consume_crash_time_breadcrumb_state(CrashTimeBreadcrumb* breadcrumb,
+                                                CrashTimeBreadcrumbBootCache* boot_cache,
+                                                CrashTimeBreadcrumbSnapshot* snapshot) {
+  if (breadcrumb == nullptr || boot_cache == nullptr || snapshot == nullptr) return false;
+  if (!boot_cache->valid) {
+    const CrashTimeBreadcrumb copy = *breadcrumb;
+    if (!crash_time_breadcrumb_is_valid(copy)) return false;
+    // Invalidate first so a reset during the handoff fails closed instead of
+    // exposing the previous boot's timestamp to another crash.
+    breadcrumb->magic = 0U;
+    boot_cache->snapshot.epoch_s = copy.epoch_s;
+    boot_cache->snapshot.uptime_s = copy.uptime_s;
+    boot_cache->snapshot.sequence = copy.sequence;
+    boot_cache->valid = true;
+  }
+  *snapshot = boot_cache->snapshot;
+  return true;
+}
+
+inline void invalidate_crash_time_breadcrumb_state(CrashTimeBreadcrumb* breadcrumb,
+                                                   CrashTimeBreadcrumbBootCache* boot_cache) {
+  if (breadcrumb != nullptr) breadcrumb->magic = 0U;
+  if (boot_cache != nullptr) *boot_cache = {};
+}
+
+bool consume_crash_time_breadcrumb(CrashTimeBreadcrumbSnapshot* snapshot);
 void invalidate_crash_time_breadcrumb();
 
 }  // namespace esphome::openquatt_log_history

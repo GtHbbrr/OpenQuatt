@@ -12,6 +12,7 @@
 #ifdef USE_ESP32_CRASH_HANDLER
 #include <esp_attr.h>
 #include <esp_system.h>
+#include <esp_timer.h>
 
 #include "esphome/components/esp32/crash_handler.h"
 #endif
@@ -81,6 +82,7 @@ static constexpr uint32_t CRASH_TIME_BREADCRUMB_UPDATE_INTERVAL_MS = 15000UL;
 static constexpr uint32_t CRASH_REPORT_WAIT_TIMEOUT_MS = 120000UL;
 
 RTC_NOINIT_ATTR static CrashTimeBreadcrumb crash_time_breadcrumb;
+static CrashTimeBreadcrumbBootCache crash_time_breadcrumb_boot_cache;
 
 static const char* reset_reason_to_string(esp_reset_reason_t reason) {
   switch (reason) {
@@ -319,20 +321,14 @@ class OpenQuattLogHistoryRequestHandler : public AsyncWebHandler {
 }  // namespace
 
 #ifdef USE_ESP32_CRASH_HANDLER
-bool read_crash_time_breadcrumb(CrashTimeBreadcrumbSnapshot* snapshot) {
-  if (snapshot == nullptr) return false;
-  const CrashTimeBreadcrumb copy = crash_time_breadcrumb;
-  if (!crash_time_breadcrumb_is_valid(copy)) return false;
-  snapshot->epoch_s = copy.epoch_s;
-  snapshot->uptime_s = copy.uptime_s;
-  snapshot->sequence = copy.sequence;
-  return true;
+bool consume_crash_time_breadcrumb(CrashTimeBreadcrumbSnapshot* snapshot) {
+  return consume_crash_time_breadcrumb_state(&crash_time_breadcrumb, &crash_time_breadcrumb_boot_cache, snapshot);
 }
 
 void invalidate_crash_time_breadcrumb() {
   // Invalidate the aligned marker so a reset during cleanup fails closed instead
   // of exposing a stale timestamp from an earlier normal boot.
-  crash_time_breadcrumb.magic = 0U;
+  invalidate_crash_time_breadcrumb_state(&crash_time_breadcrumb, &crash_time_breadcrumb_boot_cache);
 }
 #endif
 
@@ -546,7 +542,7 @@ void OpenQuattLogHistory::load_crash_time_breadcrumb_() {
   this->pending_crash_breadcrumb_sequence_ = 0;
 
   CrashTimeBreadcrumbSnapshot snapshot{};
-  if (!read_crash_time_breadcrumb(&snapshot)) return;
+  if (!consume_crash_time_breadcrumb(&snapshot)) return;
 
   this->pending_crash_breadcrumb_valid_ = true;
   this->pending_crash_epoch_s_ = snapshot.epoch_s;
@@ -571,7 +567,7 @@ void OpenQuattLogHistory::update_crash_time_breadcrumb_() {
   next.version = CRASH_TIME_BREADCRUMB_VERSION;
   next.reserved = 0;
   next.epoch_s = static_cast<uint32_t>(now.timestamp);
-  next.uptime_s = now_ms / 1000UL;
+  next.uptime_s = crash_uptime_seconds_from_microseconds(static_cast<uint64_t>(esp_timer_get_time()));
   next.sequence = crash_time_breadcrumb_is_valid(crash_time_breadcrumb) ? (crash_time_breadcrumb.sequence + 1) : 1;
   next.crc = crash_time_breadcrumb_checksum(next);
   crash_time_breadcrumb = next;

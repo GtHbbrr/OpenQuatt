@@ -14,11 +14,15 @@ using esphome::openquatt_crash_telemetry::detail::CrashRecord;
 using esphome::openquatt_crash_telemetry::detail::LEGACY_CRASH_REPORT_CAPACITY;
 using esphome::openquatt_crash_telemetry::detail::migrate_crash_record;
 using esphome::openquatt_crash_telemetry::detail::valid_stored_crash_record;
+using esphome::openquatt_log_history::consume_crash_time_breadcrumb_state;
 using esphome::openquatt_log_history::crash_time_breadcrumb_checksum;
 using esphome::openquatt_log_history::crash_time_breadcrumb_is_valid;
 using esphome::openquatt_log_history::CRASH_TIME_BREADCRUMB_MAGIC;
 using esphome::openquatt_log_history::CRASH_TIME_BREADCRUMB_VERSION;
+using esphome::openquatt_log_history::crash_uptime_seconds_from_microseconds;
 using esphome::openquatt_log_history::CrashTimeBreadcrumb;
+using esphome::openquatt_log_history::CrashTimeBreadcrumbBootCache;
+using esphome::openquatt_log_history::CrashTimeBreadcrumbSnapshot;
 using esphome::openquatt_log_history::MAX_VALID_CRASH_EPOCH_S;
 using esphome::openquatt_log_history::MIN_VALID_CRASH_EPOCH_S;
 
@@ -82,6 +86,19 @@ int main() {
   assert(!crash_time_breadcrumb_is_valid(breadcrumb));
   assert(!crash_time_breadcrumb_is_valid(make_breadcrumb(MIN_VALID_CRASH_EPOCH_S - 1U)));
   assert(!crash_time_breadcrumb_is_valid(make_breadcrumb(MAX_VALID_CRASH_EPOCH_S)));
+  assert(crash_uptime_seconds_from_microseconds(4294967296000ULL) == 4294967U);
+
+  CrashTimeBreadcrumb retained = make_breadcrumb(MIN_VALID_CRASH_EPOCH_S);
+  CrashTimeBreadcrumbBootCache boot_cache{};
+  CrashTimeBreadcrumbSnapshot first_consumer{};
+  CrashTimeBreadcrumbSnapshot second_consumer{};
+  assert(consume_crash_time_breadcrumb_state(&retained, &boot_cache, &first_consumer));
+  assert(retained.magic == 0U);
+  assert(consume_crash_time_breadcrumb_state(&retained, &boot_cache, &second_consumer));
+  assert(std::memcmp(&first_consumer, &second_consumer, sizeof(first_consumer)) == 0);
+  CrashTimeBreadcrumbBootCache next_boot_cache{};
+  CrashTimeBreadcrumbSnapshot next_boot_consumer{};
+  assert(!consume_crash_time_breadcrumb_state(&retained, &next_boot_cache, &next_boot_consumer));
 
   CrashRecord current{};
   current.magic = CRASH_RECORD_MAGIC;

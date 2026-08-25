@@ -294,7 +294,7 @@ void OpenQuattCrashTelemetry::capture_pending_crash_() {
   if (logger::global_logger == nullptr || !this->record_) return;
 
   openquatt_log_history::CrashTimeBreadcrumbSnapshot crash_time{};
-  const bool crash_time_valid = openquatt_log_history::read_crash_time_breadcrumb(&crash_time);
+  const bool crash_time_valid = openquatt_log_history::consume_crash_time_breadcrumb(&crash_time);
 
   CrashRecord* record = this->record_.data();
   const uint32_t previous_sequence = record->sequence;
