@@ -180,6 +180,7 @@ test("koelherstart toont alleen de instelling van de gekozen modus", () => {
   resetSettingsState(baseEntities);
   let markup = renderSettingsCoolingSection();
   assert.match(markup, /Herstartvoorwaarde/);
+  assert.match(markup, /helpt zo pendelgedrag te verminderen/);
   assert.match(markup, /Herstartmarge watertemperatuur/);
   assert.doesNotMatch(markup, /Minimale uit-tijd koelen/);
 
