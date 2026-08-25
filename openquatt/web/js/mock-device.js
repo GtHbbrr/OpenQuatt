@@ -2295,6 +2295,7 @@
       ["Cooling Dew Point (Selected)", 16.1, "°C"],
       ["Cooling Minimum Safe Supply Temp", 18.1, "°C"],
       ["Cooling Effective Minimum Supply Temp", 18.1, "°C"],
+      ["Cooling Minimum Off Time Remaining", 0, "s"],
       ["Cooling Fallback Night Minimum Outdoor Temp", 14.3, "°C"],
       ["Cooling Fallback Minimum Supply Temp", 19.0, "°C"],
       ["Cooling Supply Target", 18.0, "°C"],

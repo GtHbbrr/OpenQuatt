@@ -605,6 +605,44 @@ sensor:
     lambda: |-
       return id(oq_cooling_water_cycle_active) ? 1.0f : 0.0f;
 
+  - platform: template
+    id: oq_cooling_minimum_off_time_remaining_sensor
+    name: "Cooling Minimum Off Time Remaining"
+    internal: true
+    icon: mdi:timer-sand
+    unit_of_measurement: "s"
+    accuracy_decimals: 0
+    update_interval: 5s
+    entity_category: diagnostic
+    lambda: |-
+      const bool restart_by_minimum_off_time =
+          id(cooling_restart_mode).has_state() &&
+          id(cooling_restart_mode).current_option() == "Minimum off time";
+      if (!restart_by_minimum_off_time) return 0.0f;
+
+      const float configured_state = id(cooling_minimum_off_time).state;
+      int configured_s =
+          isnan(configured_state) ? 600 : (int) lroundf(configured_state);
+      configured_s = std::max(240, std::min(3600, configured_s));
+      const uint32_t configured_ms = (uint32_t) configured_s * 1000UL;
+      uint32_t remaining_ms = oq_cooling::global_minimum_off_time_remaining_ms(
+          true,
+          (uint32_t) millis(),
+          id(oq_cooling_confirmed_stop_seen),
+          id(oq_cooling_last_confirmed_stop_ms),
+          id(oq_cooling_boot_min_off_elapsed),
+          configured_ms);
+      const bool stop_confirmation_pending =
+          id(oq_cooling_stop_confirmation_pending_hp1)
+          #if OQ_TOPOLOGY_DUO
+          || id(oq_cooling_stop_confirmation_pending_hp2)
+          #endif
+          ;
+      // The countdown starts at the confirmed physical stop. Until then the
+      // configured duration is the minimum remaining wait visible to support.
+      if (stop_confirmation_pending) remaining_ms = std::max(remaining_ms, configured_ms);
+      return (float) ((remaining_ms + 999UL) / 1000UL);
+
 interval:
   - interval: 5s
     then:
