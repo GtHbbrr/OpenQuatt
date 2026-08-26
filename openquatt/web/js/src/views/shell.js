@@ -430,7 +430,7 @@ export function renderSettingsView() {
                 if (currentMode === 'cloud') {
                   // ROUTE A: GOOGLE GEMINI 3.7 CLOUD
                   try {
-                    const url = 'https://googleapis.com' + apiKey;
+                    const url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.7-flash:generateContent?key=' + apiKey;
                     const payload = { contents: [{ parts: [{ text: promptText }] }] };
 
                     const response = await window.fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
@@ -518,7 +518,7 @@ export function renderAiSidePanel() {
             style="border: none; padding: 4px 10px; border-radius: 12px; cursor: pointer; font-size: 11px; font-weight: bold; background: ${aiMode === 'local' ? '#ff9900' : 'transparent'}; color: ${aiMode === 'local' ? '#000' : '#aaa'};"
             onclick="(() => { localStorage.setItem('oq_ai_mode', 'local'); document.getElementById('oq-cloud-key-section').style.display = 'none'; document.getElementById('oq-mode-local-btn').style.background = '#ff9900'; document.getElementById('oq-mode-local-btn').style.color = '#000'; document.getElementById('oq-mode-cloud-btn').style.background = 'transparent'; document.getElementById('oq-mode-cloud-btn').style.color = '#aaa'; })()"
           >
-            💻 Mac (Llama3)
+            💻 Lokaal (Llama3)
           </button>
         </div>
       </div>
