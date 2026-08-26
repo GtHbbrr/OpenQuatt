@@ -243,6 +243,15 @@
       state: profile.generation,
       value: profile.generation,
     });
+    setEntity("text_sensor", `HP${hp} - ODU generation variant`, {
+      state: profile.variant,
+      value: profile.variant,
+    });
+    const customerModelCode = profile.customerModel || (profile.generation === "Unknown" ? "Unknown" : "Missing");
+    setEntity("text_sensor", `HP${hp} - ODU customer model code`, {
+      state: customerModelCode,
+      value: customerModelCode,
+    });
   }
 
   function setMockOduGeneration(hp, generation) {
@@ -4128,6 +4137,8 @@
     if (generationDetectMatch) {
       const hp = Number(generationDetectMatch[1]);
       setText("text_sensor", `HP${hp} - ODU generation`, "Unknown");
+      setText("text_sensor", `HP${hp} - ODU generation variant`, "Unknown");
+      setText("text_sensor", `HP${hp} - ODU customer model code`, "Unknown");
       window.setTimeout(() => {
         syncMockOduIdentityEntities(hp);
         notifyMockUpdated();
@@ -5122,17 +5133,26 @@
 
   function getMockOduIdentity(hp) {
     const profile = getMockOduProfile(hp);
-    const { controlBoardItem, eepromProgram, model, officialFirmware, pcbProgram, serial } = profile;
+    const {
+      compressorCode,
+      controlBoardItem,
+      customerModel,
+      eepromProgram,
+      model,
+      officialFirmware,
+      pcbProgram,
+      serial,
+    } = profile;
     const core = Array(14).fill(0);
-    core[0] = hp === 2 ? 2 : 1;
-    core[1] = hp;
+    core[0] = compressorCode;
+    core[1] = 6144;
     core[7] = 0;
     core[8] = pcbProgram;
     core[9] = eepromProgram;
     core[13] = controlBoardItem;
     return {
       model,
-      customerModel: model,
+      customerModel,
       serial,
       pcbProgram,
       pcbLabel: `V${String((pcbProgram >>> 8) & 0xff).padStart(3, "0")}_T${String(pcbProgram & 0xff).padStart(2, "0")}`,
@@ -5142,7 +5162,7 @@
       core,
       extended: [hp, profile.projectCode, profile.hardwareVersion, officialFirmware, 0, eepromProgram],
       modelWords: encodeMockAsciiWords(model),
-      customerModelWords: encodeMockAsciiWords(model),
+      customerModelWords: encodeMockAsciiWords(customerModel),
       serialWords: encodeMockAsciiWords(serial),
     };
   }
