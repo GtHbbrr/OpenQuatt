@@ -19,6 +19,7 @@ import { renderEnergyView, renderResultsView } from "./energy.js";
 import { renderControlReplayView } from "../features/control-replay-view.js";
 import { renderOverviewView, syncTechTooltipLayers } from "./heatpump.js";
 import { renderDiagnosisView, syncOverviewTrendInteractions } from "./overview.js";
+import { getEntityValue } from "../core/entity-store.js";
 
 function captureFocusedSettingsField() {
   const active = document.activeElement;
@@ -392,54 +393,76 @@ export function renderSettingsView() {
                 chatInput.value = '';
                 msgContainer.scrollTop = msgContainer.scrollHeight;
 
+                const currentMode = localStorage.getItem('oq_ai_mode') || 'cloud';
                 const apiKey = localStorage.getItem('openquatt_gemini_key');
                 const includeJson = document.getElementById('oq-ai-include-json-chk').checked;
 
                 const profiel = {
                   firmware_version: 'v0.47.0',
                   heating_strategy: 'power_house',
-                  boiler_connection: 'opentherm',
+                  boiler_connection: 'on_off',
                   boiler_assist_enabled: true
                 };
 
                 let jsonPromptPart = '';
                 if (includeJson) {
                   try {
+                    // Route A: Probeer de echte warmtepomp endpoint te pollen
                     const res = await fetch('/api/status');
-                    const rawJson = await res.text();
-                    jsonPromptPart = '\\nHUIDIGE LIVE SENSOR DATA (JSON):\\n' + rawJson;
-                  } catch(e) { console.error(e); }
-                }
-
-                try {
-                  const url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.7-flash:generateContent?key=' + apiKey;
-                  const payload = {
-                    contents: [{
-                      parts: [{
-                        text: 'Je bent de AI-assistent van OpenQuatt (open-source, best-effort basis, support via Discord, bugs via GitHub).\\n\\nINSTALLATIEPROFIEL:\\n' + JSON.stringify(profiel) + jsonPromptPart + '\\n\\nVRAAG: ' + question
-                      }]
-                    }]
-                  };
-
-                  const response = await window.fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-                
-                // ALS DE SERVER EEN FOUTCODE (ZOALS 503) TERUGGEEFT:
-                if (!response.ok) {
-                  msgContainer.innerHTML += '<div style="background: #552222; padding: 10px; border-radius: 6px; margin-bottom: 5px;"><p style="margin:0;"><strong>Fout:</strong> De AI is (even) niet beschikbaar. Probeer het over een moment opnieuw.</p></div>';
-                  msgContainer.scrollTop = msgContainer.scrollHeight;
-                  return; // Stop hier, ga niet proberen de kapotte JSON te lezen
-                }
-                  
-                  const data = await response.json();
-                  
-                  if (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts[0]) {
-                    const reply = data.candidates[0].content.parts[0].text;
-                    msgContainer.innerHTML += '<div style="background: #2a2a2a; padding: 10px; border-radius: 6px; border-left: 3px solid #ff9900; margin-bottom: 5px;"><p style="margin:0;"><strong>Assistent:</strong> ' + escapeHtml(reply) + '</p></div>';
-                  } else {
-                    msgContainer.innerHTML += '<div style="background: #552222; padding: 10px; border-radius: 6px; margin-bottom: 5px;"><p style="margin:0;"><strong>Fout:</strong> Onverwacht antwoordformaat van API.</p></div>';
+                    if (res.ok) {
+                      const rawJson = await res.text();
+                      jsonPromptPart = '\\nHUIDIGE LIVE SENSOR DATA (JSON):\\n' + rawJson;
+                    } else {
+                      // Route B: Als we in de simulator zitten (404/leeg), sturen we de complete gesimuleerde matrix mee!
+                      const simData = typeof USAGE_TELEMETRY_EXAMPLE_JSON !== 'undefined' ? USAGE_TELEMETRY_EXAMPLE_JSON : JSON.stringify(profiel);
+                      jsonPromptPart = '\\nHUIDIGE LIVE SIMULATOR DATA (JSON):\\n' + simData;
+                    }
+                  } catch(e) { 
+                    // Mocht de fetch crashen door CORS/netwerk, gebruik dan direct de simulator data
+                    const simData = typeof USAGE_TELEMETRY_EXAMPLE_JSON !== 'undefined' ? USAGE_TELEMETRY_EXAMPLE_JSON : JSON.stringify(profiel);
+                    jsonPromptPart = '\\nHUIDIGE LIVE SIMULATOR DATA (JSON):\\n' + simData;
                   }
-                } catch (err) {
-                  msgContainer.innerHTML += '<div style="background: #552222; padding: 10px; border-radius: 6px; margin-bottom: 5px;"><p style="margin:0;"><strong>Fout:</strong> AI kon niet worden bereikt. Controleer internet of API-key.</p></div>';
+                }
+
+                const promptText = 'Je bent de AI-assistent van OpenQuatt (open-source, best-effort basis).\\n\\nINSTALLATIEPROFIEL:\\n' + JSON.stringify(profiel) + jsonPromptPart + '\\n\\nVRAAG: ' + question;
+
+                // --- TWEETRAPS LOGICA VERZENDEN ---
+                if (currentMode === 'cloud') {
+                  // ROUTE A: GOOGLE GEMINI 3.7 CLOUD
+                  try {
+                    const url = 'https://googleapis.com' + apiKey;
+                    const payload = { contents: [{ parts: [{ text: promptText }] }] };
+
+                    const response = await window.fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                    if (!response.ok) {
+                      msgContainer.innerHTML += '<div style="background: #552222; padding: 10px; border-radius: 6px; margin-bottom: 5px;"><p style="margin:0;"><strong>Fout:</strong> De AI is (even) niet beschikbaar. Probeer het over een moment opnieuw.</p></div>';
+                      msgContainer.scrollTop = msgContainer.scrollHeight;
+                      return;
+                    }
+                    const data = await response.json();
+                    const reply = data.candidates[0].content.parts[0].text;
+                    msgContainer.innerHTML += '<div style="background: #2a2a2a; padding: 10px; border-radius: 6px; border-left: 3px solid #ff9900; margin-bottom: 5px;"><p style="margin:0;"><strong>Assistent (Cloud):</strong> ' + escapeHtml(reply) + '</p></div>';
+                  } catch (err) {
+                    msgContainer.innerHTML += '<div style="background: #552222; padding: 10px; border-radius: 6px; margin-bottom: 5px;"><p style="margin:0;"><strong>Fout:</strong> Cloud AI kon niet worden bereikt.</p></div>';
+                  }
+                } else {
+                  // ROUTE B: LOKAAL OLLAMA (LLAMA 3 8B MOOT)
+                  try {
+                    const url = 'http://localhost:11434/api/generate';
+                    const payload = { model: 'llama3', prompt: promptText, stream: false };
+
+                    const response = await window.fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                    if (!response.ok) {
+                      msgContainer.innerHTML += '<div style="background: #552222; padding: 10px; border-radius: 6px; margin-bottom: 5px;"><p style="margin:0;"><strong>Fout:</strong> Lokale Ollama AI reageert niet. Staat de app aan?</p></div>';
+                      msgContainer.scrollTop = msgContainer.scrollHeight;
+                      return;
+                    }
+                    const data = await response.json();
+                    const reply = data.response;
+                    msgContainer.innerHTML += '<div style="background: #2a2a2a; padding: 10px; border-radius: 6px; border-left: 3px solid #ffaa00; margin-bottom: 5px;"><p style="margin:0;"><strong>Assistent (Lokaal):</strong> ' + escapeHtml(reply) + '</p></div>';
+                  } catch (err) {
+                    msgContainer.innerHTML += '<div style="background: #552222; padding: 10px; border-radius: 6px; margin-bottom: 5px;"><p style="margin:0;"><strong>Fout:</strong> Lokale AI-verbinding verbroken.</p></div>';
+                  }
                 }
                 msgContainer.scrollTop = msgContainer.scrollHeight;
               });
@@ -456,6 +479,7 @@ setRenderCallback(render);
 
 export function renderAiSidePanel() {
   const savedKey = localStorage.getItem('openquatt_gemini_key') || '';
+  const aiMode = localStorage.getItem('oq_ai_mode') || 'cloud'; // Onthoud 'cloud' of 'local'
   
   let maskedKey = savedKey;
   if (savedKey.length > 10) {
@@ -476,8 +500,31 @@ export function renderAiSidePanel() {
         </button>
       </div>
 
-      <!-- API Key Beheer Direct in het Paneel -->
-      <div style="padding: 15px; background: #111; border-bottom: 1px solid #333; font-size: 13px;">
+      <!-- HYBRIDE MOTOR SCHAKELAAR (Cloud vs Lokaal) -->
+      <div style="padding: 10px 15px; background: #151515; border-bottom: 1px solid #333; display: flex; align-items: center; justify-content: space-between; font-size: 12px;">
+        <span style="color: #ccc; font-weight: bold;">AI Motor selectie:</span>
+        <div style="display: flex; background: #222; border-radius: 15px; padding: 2px; border: 1px solid #444;">
+          <button 
+            id="oq-mode-cloud-btn"
+            type="button"
+            style="border: none; padding: 4px 10px; border-radius: 12px; cursor: pointer; font-size: 11px; font-weight: bold; background: ${aiMode === 'cloud' ? '#ff9900' : 'transparent'}; color: ${aiMode === 'cloud' ? '#000' : '#aaa'};"
+            onclick="(() => { localStorage.setItem('oq_ai_mode', 'cloud'); document.getElementById('oq-cloud-key-section').style.display = 'block'; document.getElementById('oq-mode-cloud-btn').style.background = '#ff9900'; document.getElementById('oq-mode-cloud-btn').style.color = '#000'; document.getElementById('oq-mode-local-btn').style.background = 'transparent'; document.getElementById('oq-mode-local-btn').style.color = '#aaa'; })()"
+          >
+            ☁️ Cloud (3.7)
+          </button>
+          <button 
+            id="oq-mode-local-btn"
+            type="button"
+            style="border: none; padding: 4px 10px; border-radius: 12px; cursor: pointer; font-size: 11px; font-weight: bold; background: ${aiMode === 'local' ? '#ff9900' : 'transparent'}; color: ${aiMode === 'local' ? '#000' : '#aaa'};"
+            onclick="(() => { localStorage.setItem('oq_ai_mode', 'local'); document.getElementById('oq-cloud-key-section').style.display = 'none'; document.getElementById('oq-mode-local-btn').style.background = '#ff9900'; document.getElementById('oq-mode-local-btn').style.color = '#000'; document.getElementById('oq-mode-cloud-btn').style.background = 'transparent'; document.getElementById('oq-mode-cloud-btn').style.color = '#aaa'; })()"
+          >
+            💻 Mac (Llama3)
+          </button>
+        </div>
+      </div>
+
+      <!-- API Key Beheer (Verbergt automatisch als lokaal is gekozen) -->
+      <div id="oq-cloud-key-section" style="padding: 15px; background: #111; border-bottom: 1px solid #333; font-size: 13px; display: ${aiMode === 'cloud' ? 'block' : 'none'};">
         <label style="display: block; margin-bottom: 5px; font-weight: bold; color: #ccc;">Gemini API-sleutel:</label>
         <div style="display: flex; gap: 8px;">
           <input 
@@ -495,12 +542,7 @@ export function renderAiSidePanel() {
               const key = document.getElementById('oq-ai-api-key-input').value.trim();
               if(key) {
                 localStorage.setItem('openquatt_gemini_key', key);
-                alert('Gemini API-sleutel succesvol opgeslagen! Je kunt nu chatten.');
-                window.location.reload();
-              } else {
-                localStorage.removeItem('openquatt_gemini_key');
-                alert('Sleutel verwijderd.');
-                window.location.reload();
+                alert('Gemini API-sleutel opgeslagen!');
               }
             })()"
           >
