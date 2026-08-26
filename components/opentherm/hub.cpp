@@ -1,4 +1,5 @@
 #include "hub.h"
+#include "opentherm_timing.h"
 #include "esphome/core/helpers.h"
 
 #include <string>
@@ -6,6 +7,9 @@
 namespace esphome::opentherm {
 
 static const char* const TAG = "opentherm";
+static constexpr uint32_t MIN_CONVERSATION_GAP_US = 100000;
+static constexpr uint32_t MAX_CONVERSATION_CADENCE_US = 1150000;
+static constexpr uint32_t SLOW_PHASE_US = 50000;
 namespace message_data {
 bool parse_flag8_lb_0(OpenthermData& data) { return read_bit(data.valueLB, 0); }
 bool parse_flag8_lb_1(OpenthermData& data) { return read_bit(data.valueLB, 1); }
@@ -27,11 +31,11 @@ uint8_t parse_u8_lb(OpenthermData& data) { return data.valueLB; }
 uint8_t parse_u8_hb(OpenthermData& data) { return data.valueHB; }
 int8_t parse_s8_lb(OpenthermData& data) { return (int8_t)data.valueLB; }
 int8_t parse_s8_hb(OpenthermData& data) { return (int8_t)data.valueHB; }
-uint16_t parse_u16(OpenthermData& data) { return data.u16(); }
+uint16_t parse_u16(OpenthermData& data) { return data.get_u16(); }
 uint16_t parse_u8_lb_60(OpenthermData& data) { return data.valueLB * 60; }
 uint16_t parse_u8_hb_60(OpenthermData& data) { return data.valueHB * 60; }
-int16_t parse_s16(OpenthermData& data) { return data.s16(); }
-float parse_f88(OpenthermData& data) { return data.f88(); }
+int16_t parse_s16(OpenthermData& data) { return data.get_s16(); }
+float parse_f88(OpenthermData& data) { return data.get_f88(); }
 
 void write_flag8_lb_0(const bool value, OpenthermData& data) { data.valueLB = write_bit(data.valueLB, 0, value); }
 void write_flag8_lb_1(const bool value, OpenthermData& data) { data.valueLB = write_bit(data.valueLB, 1, value); }
@@ -53,9 +57,9 @@ void write_u8_lb(const uint8_t value, OpenthermData& data) { data.valueLB = valu
 void write_u8_hb(const uint8_t value, OpenthermData& data) { data.valueHB = value; }
 void write_s8_lb(const int8_t value, OpenthermData& data) { data.valueLB = (uint8_t)value; }
 void write_s8_hb(const int8_t value, OpenthermData& data) { data.valueHB = (uint8_t)value; }
-void write_u16(const uint16_t value, OpenthermData& data) { data.u16(value); }
-void write_s16(const int16_t value, OpenthermData& data) { data.s16(value); }
-void write_f88(const float value, OpenthermData& data) { data.f88(value); }
+void write_u16(const uint16_t value, OpenthermData& data) { data.set_u16(value); }
+void write_s16(const int16_t value, OpenthermData& data) { data.set_s16(value); }
+void write_f88(const float value, OpenthermData& data) { data.set_f88(value); }
 
 }  // namespace message_data
 
@@ -161,13 +165,33 @@ void OpenthermHub::setup() {
 void OpenthermHub::on_shutdown() { this->suspend_polling(); }
 
 void OpenthermHub::prioritize_messages(MessageId first, MessageId second) {
-  this->opentherm_->stop();
-  this->messages_ = {first, second};
-  this->message_iterator_ = this->messages_.begin();
-  this->sending_initial_ = false;
-  this->priority_sequence_active_ = true;
-  this->last_conversation_start_ = 0;
-  this->last_conversation_end_ = 0;
+  // Urgent priority is reserved for fail-safe lifecycle transitions. It
+  // always supersedes a deferred runtime start, but it must not truncate an
+  // active request/response exchange: a slow but valid boiler response may
+  // still be on the bus. start_conversation_() installs the sequence as soon
+  // as the current exchange reaches IDLE.
+  this->deferred_priority_pending_ = false;
+  if (!this->polling_enabled_) {
+    this->urgent_priority_pending_ = false;
+    return;
+  }
+  this->urgent_priority_first_ = first;
+  this->urgent_priority_second_ = second;
+  this->urgent_priority_pending_ = true;
+}
+
+void OpenthermHub::defer_priority_messages(MessageId first, MessageId second) {
+  // Do not stop an active request/response exchange for a normal runtime
+  // command. The sequence is installed from start_conversation_() once the
+  // current conversation, and any already active fail-safe priority sequence,
+  // has completed.
+  if (!this->polling_enabled_) {
+    this->deferred_priority_pending_ = false;
+    return;
+  }
+  this->deferred_priority_first_ = first;
+  this->deferred_priority_second_ = second;
+  this->deferred_priority_pending_ = true;
 }
 
 void OpenthermHub::start_priority_polling(MessageId first, MessageId second) {
@@ -178,18 +202,23 @@ void OpenthermHub::start_priority_polling(MessageId first, MessageId second) {
 
 void OpenthermHub::resume_polling() {
   this->polling_enabled_ = true;
+  this->urgent_priority_pending_ = false;
+  this->deferred_priority_pending_ = false;
   this->opentherm_->stop();
   this->sending_initial_ = true;
   this->priority_sequence_active_ = false;
   this->write_initial_messages_(this->messages_);
   this->message_iterator_ = this->messages_.begin();
-  this->last_conversation_start_ = 0;
-  this->last_conversation_end_ = 0;
+  this->has_last_conversation_start_ = false;
+  this->has_last_conversation_end_ = false;
+  this->has_last_wire_response_ = false;
   this->enable_loop();
 }
 
 void OpenthermHub::suspend_polling() {
   this->polling_enabled_ = false;
+  this->urgent_priority_pending_ = false;
+  this->deferred_priority_pending_ = false;
   if (this->opentherm_ != nullptr) {
     this->opentherm_->stop();
   }
@@ -225,13 +254,15 @@ void OpenthermHub::loop() {
   if (!this->polling_enabled_) {
     return;
   }
+  const uint32_t transport_started_us = micros();
   this->opentherm_->process();
+  this->warn_if_slow_("RMT completion processing", transport_started_us);
   if (this->sync_mode_) {
     this->sync_loop_();
     return;
   }
 
-  auto cur_time = millis();
+  auto cur_time_us = micros();
   auto const cur_mode = this->opentherm_->get_mode();
 
   if (this->handle_error_(cur_mode)) {
@@ -244,8 +275,7 @@ void OpenthermHub::loop() {
     case OperationMode::LISTEN:
       break;
     case OperationMode::IDLE:
-      this->check_timings_(cur_time);
-      if (this->should_skip_loop_(cur_time)) {
+      if (this->should_skip_loop_(cur_time_us)) {
         break;
       }
       this->start_conversation_();
@@ -288,11 +318,9 @@ void OpenthermHub::sync_loop_() {
     return;
   }
 
-  auto cur_time = millis();
+  auto cur_time_us = micros();
 
-  this->check_timings_(cur_time);
-
-  if (this->should_skip_loop_(cur_time)) {
+  if (this->should_skip_loop_(cur_time_us)) {
     return;
   }
 
@@ -357,17 +385,34 @@ void OpenthermHub::sync_loop_() {
   this->read_response_();
 }
 
-void OpenthermHub::check_timings_(uint32_t cur_time) {
-  if (this->last_conversation_start_ > 0 && (cur_time - this->last_conversation_start_) > 1150) {
-    ESP_LOGW(TAG,
-             "%d ms elapsed since the start of the last convo, but 1150 ms are allowed at maximum. Look at other "
-             "components that might slow the loop down.",
-             (int)(cur_time - this->last_conversation_start_));
+void OpenthermHub::check_cadence_(uint32_t started_us) const {
+  if (!this->has_last_conversation_start_) {
+    return;
   }
+
+  const uint32_t cadence_us = timing::elapsed_us(started_us, this->last_conversation_start_us_);
+  if (cadence_us <= MAX_CONVERSATION_CADENCE_US) {
+    return;
+  }
+
+  if (this->has_last_wire_response_) {
+    ESP_LOGW(TAG,
+             "OpenTherm request cadence delayed to %u ms: previous wire response %u ms, main-loop processing "
+             "latency %u ms. Response timeouts are reported separately.",
+             static_cast<unsigned>(cadence_us / 1000U), static_cast<unsigned>(this->last_wire_response_us_ / 1000U),
+             static_cast<unsigned>(this->last_processing_latency_us_ / 1000U));
+  } else {
+    ESP_LOGW(TAG,
+             "OpenTherm request cadence delayed to %u ms; the previous conversation had no captured response. "
+             "Response timeouts are reported separately.",
+             static_cast<unsigned>(cadence_us / 1000U));
+  }
+  this->log_transport_diagnostics_();
 }
 
-bool OpenthermHub::should_skip_loop_(uint32_t cur_time) const {
-  if (this->last_conversation_end_ > 0 && (cur_time - this->last_conversation_end_) < 100) {
+bool OpenthermHub::should_skip_loop_(uint32_t cur_time_us) const {
+  if (this->has_last_conversation_end_ &&
+      !timing::delay_elapsed(cur_time_us, this->last_conversation_end_us_, MIN_CONVERSATION_GAP_US)) {
     ESP_LOGV(TAG, "Less than 100 ms elapsed since last convo, skipping this iteration");
     return true;
   }
@@ -375,7 +420,60 @@ bool OpenthermHub::should_skip_loop_(uint32_t cur_time) const {
   return false;
 }
 
+void OpenthermHub::warn_if_slow_(const char* phase, uint32_t started_us) const {
+  const uint32_t elapsed = timing::elapsed_us(micros(), started_us);
+  if (elapsed >= SLOW_PHASE_US) {
+    ESP_LOGW(TAG, "%s took %u ms in the main loop; this is not OpenTherm wire wait time", phase,
+             static_cast<unsigned>(elapsed / 1000U));
+  }
+}
+
+void OpenthermHub::log_transport_diagnostics_() const {
+  ESP_LOGD(TAG,
+           "OpenTherm transport: requests=%u tx_completed=%u rx_captured=%u rx_accepted=%u rx_rejected=%u "
+           "tx_timeouts=%u response_timeouts=%u late_timeouts=%u max_wire_response=%u ms "
+           "max_processing_latency=%u ms",
+           static_cast<unsigned>(this->requests_started_), static_cast<unsigned>(this->tx_completed_),
+           static_cast<unsigned>(this->rx_captured_), static_cast<unsigned>(this->rx_accepted_),
+           static_cast<unsigned>(this->rx_rejected_), static_cast<unsigned>(this->tx_timeouts_),
+           static_cast<unsigned>(this->response_timeouts_), static_cast<unsigned>(this->late_response_timeouts_),
+           static_cast<unsigned>(this->max_wire_response_us_ / 1000U),
+           static_cast<unsigned>(this->max_processing_latency_us_ / 1000U));
+}
+
+void OpenthermHub::activate_priority_sequence_(MessageId first, MessageId second) {
+  this->messages_ = {first, second};
+  this->message_iterator_ = this->messages_.begin();
+  this->sending_initial_ = false;
+  this->priority_sequence_active_ = true;
+}
+
+void OpenthermHub::apply_urgent_priority_() {
+  if (!this->urgent_priority_pending_) {
+    return;
+  }
+  this->activate_priority_sequence_(this->urgent_priority_first_, this->urgent_priority_second_);
+  this->urgent_priority_pending_ = false;
+}
+
+void OpenthermHub::apply_deferred_priority_() {
+  if (!this->deferred_priority_pending_) {
+    return;
+  }
+  // A fail-safe priority sequence must finish before a queued start can take
+  // ownership. message_iterator_ reaches end only after both responses were
+  // processed successfully.
+  if (this->priority_sequence_active_ && this->message_iterator_ != this->messages_.end()) {
+    return;
+  }
+
+  this->activate_priority_sequence_(this->deferred_priority_first_, this->deferred_priority_second_);
+  this->deferred_priority_pending_ = false;
+}
+
 void OpenthermHub::start_conversation_() {
+  this->apply_urgent_priority_();
+  this->apply_deferred_priority_();
   if (this->message_iterator_ == this->messages_.end()) {
     if (this->priority_sequence_active_) {
       this->priority_sequence_active_ = false;
@@ -390,17 +488,44 @@ void OpenthermHub::start_conversation_() {
 
   auto request = this->build_request_(*this->message_iterator_);
 
+  const uint32_t request_processing_started_us = micros();
   this->before_send_callback_.call(request);
 
   ESP_LOGD(TAG, "Sending request with id %d (%s)", request.id,
            this->opentherm_->message_id_to_str((MessageId)request.id));
   this->opentherm_->debug_data(request);
+  uint32_t fallback_started_us = micros();
+#ifndef USE_ESP32
+  // Avoid diagnostics while the timer-driven Manchester transmission is active.
+  this->check_cadence_(fallback_started_us);
+  this->warn_if_slow_("request preparation", request_processing_started_us);
+  fallback_started_us = micros();
+  this->last_conversation_start_us_ = fallback_started_us;
+  this->has_last_conversation_start_ = true;
+#endif
   // Send the request
-  this->last_conversation_start_ = millis();
   this->opentherm_->send(request);
+
+#ifdef USE_ESP32
+  ConversationTiming conversation_timing;
+  const bool has_wire_timing = this->opentherm_->get_conversation_timing(conversation_timing);
+  if (has_wire_timing) {
+    this->requests_started_++;
+  }
+  const uint32_t started_us = has_wire_timing ? conversation_timing.request_started_us : fallback_started_us;
+  this->check_cadence_(started_us);
+  this->last_conversation_start_us_ = started_us;
+  this->has_last_conversation_start_ = true;
+  this->warn_if_slow_("request preparation and send", request_processing_started_us);
+#else
+  if (!this->opentherm_->is_error()) {
+    this->requests_started_++;
+  }
+#endif
 }
 
 void OpenthermHub::read_response_() {
+  const uint32_t response_processing_started_us = micros();
   OpenthermData response;
   if (!this->opentherm_->get_message(response)) {
     ESP_LOGW(TAG, "Couldn't get the response, but flags indicated success. This is a bug.");
@@ -412,13 +537,74 @@ void OpenthermHub::read_response_() {
 
   this->before_process_response_callback_.call(response);
   this->process_response(response);
+  this->warn_if_slow_("response callbacks and entity updates", response_processing_started_us);
 
   this->message_iterator_++;
 }
 
 void OpenthermHub::stop_opentherm_() {
-  this->opentherm_->stop();
-  this->last_conversation_end_ = millis();
+  const OperationMode completed_mode = this->opentherm_->get_mode();
+  ConversationTiming conversation_timing;
+  const bool has_wire_timing = this->opentherm_->stop(conversation_timing);
+  const uint32_t processed_us = micros();
+
+  this->has_last_wire_response_ = has_wire_timing && conversation_timing.response_captured;
+  const bool receive_timed_out = completed_mode == OperationMode::ERROR_TIMEOUT && has_wire_timing &&
+                                 conversation_timing.request_completed && !conversation_timing.response_captured;
+  this->last_conversation_end_us_ =
+      timing::conversation_end_us(this->has_last_wire_response_, conversation_timing.response_captured_us,
+                                  receive_timed_out, conversation_timing.response_deadline_us, processed_us);
+  if (this->has_last_wire_response_) {
+    this->last_processing_latency_us_ = timing::elapsed_us(processed_us, conversation_timing.response_captured_us);
+    if (conversation_timing.request_completed) {
+      this->last_wire_response_us_ =
+          timing::elapsed_us(conversation_timing.response_captured_us, conversation_timing.request_completed_us);
+    } else {
+      this->last_wire_response_us_ =
+          timing::elapsed_us(conversation_timing.response_captured_us, conversation_timing.request_started_us);
+    }
+  } else if (receive_timed_out) {
+    // No response occupied the wire. Use the existing receive deadline as the
+    // protocol end so scheduler latency does not extend the 100 ms gap.
+    this->last_processing_latency_us_ = 0;
+    this->last_wire_response_us_ = 0;
+  } else {
+    this->last_processing_latency_us_ = 0;
+    this->last_wire_response_us_ = 0;
+  }
+  this->has_last_conversation_end_ = true;
+
+  if (has_wire_timing && conversation_timing.request_completed) {
+    this->tx_completed_++;
+  }
+  if (this->has_last_wire_response_) {
+    this->rx_captured_++;
+    if (this->last_wire_response_us_ > this->max_wire_response_us_) {
+      this->max_wire_response_us_ = this->last_wire_response_us_;
+    }
+    if (this->last_processing_latency_us_ > this->max_processing_latency_us_) {
+      this->max_processing_latency_us_ = this->last_processing_latency_us_;
+    }
+  }
+  if (completed_mode == OperationMode::RECEIVED) {
+    this->rx_accepted_++;
+  } else if (completed_mode == OperationMode::ERROR_PROTOCOL) {
+    this->rx_rejected_++;
+  } else if (completed_mode == OperationMode::ERROR_TIMEOUT) {
+    if (has_wire_timing && !conversation_timing.request_completed) {
+      this->tx_timeouts_++;
+    } else {
+      this->response_timeouts_++;
+      if (this->has_last_wire_response_) {
+        this->late_response_timeouts_++;
+      }
+    }
+  }
+
+  // Keep the counter summary useful for soak tests without logging every conversation.
+  if (this->requests_started_ > 0 && (this->requests_started_ % 128U) == 0U) {
+    this->log_transport_diagnostics_();
+  }
 }
 
 void OpenthermHub::handle_protocol_error_() {
@@ -431,11 +617,23 @@ void OpenthermHub::handle_protocol_error_() {
 }
 
 void OpenthermHub::handle_timeout_error_() {
-  ESP_LOGW(TAG, "Timeout while waiting for response from device");
+  ConversationTiming conversation_timing;
+  const bool has_wire_timing = this->opentherm_->get_conversation_timing(conversation_timing);
+  if (has_wire_timing && !conversation_timing.request_completed) {
+    ESP_LOGW(TAG, "Timeout while waiting for response from device: RMT TX did not complete");
+  } else if (has_wire_timing && conversation_timing.response_captured) {
+    ESP_LOGW(TAG, "Timeout while waiting for response from device: frame was captured after the receive deadline");
+  } else if (has_wire_timing) {
+    ESP_LOGW(TAG, "Timeout while waiting for response from device: no frame captured before the receive deadline");
+  } else {
+    ESP_LOGW(TAG, "Timeout while waiting for response from device");
+  }
   this->stop_opentherm_();
 }
 
 void OpenthermHub::handle_timer_error_() {
+  this->urgent_priority_pending_ = false;
+  this->deferred_priority_pending_ = false;
   this->opentherm_->report_and_reset_timer_error();
   this->stop_opentherm_();
   // Timer error is critical, there is no point in retrying.

@@ -250,7 +250,8 @@ modbus:
   - uart_id: uart_bus
     id: mod_bus
     send_wait_time: 100ms
-    turnaround_time: 100ms
+    # ESPHome 2026.8 moved command spacing from modbus_controller to the shared hub.
+    turnaround_time: ${oq_modbus_command_throttle_ms}ms
 
 # ==============================================================================
 # SHARED RUNTIME STATE
@@ -1037,7 +1038,7 @@ switch:
     icon: mdi:database
     entity_category: config
     optimistic: true
-    restore_mode: RESTORE_DEFAULT_OFF
+    restore_mode: RESTORE_DEFAULT_ON
     turn_on_action:
       - lambda: |-
           id(oq_trends_endpoint).set_flash_enabled(true);
@@ -1067,7 +1068,7 @@ switch:
     icon: mdi:database-clock
     entity_category: config
     optimistic: true
-    restore_mode: RESTORE_DEFAULT_OFF
+    restore_mode: RESTORE_DEFAULT_ON
     turn_on_action:
       - script.execute: oq_capture_energy_history_sample
 

@@ -19,6 +19,7 @@
   const state = {
     scenario: "heating",
     installation: "duo",
+    oduGenerations: { ...mockFixtures.defaultOduGenerations },
     hardware: "heatpump_controller_q",
     connection: "wifi",
     boiler: "off",
@@ -227,6 +228,38 @@
   const ODU_RUNTIME_FREQUENCY_LEVELS = Array.from({ length: 11 }, (_item, index) => index);
   const ODU_RUNTIME_FREQUENCY_MODES = ["cooling", "heating"];
 
+  function getMockOduProfile(hp) {
+    const generation = state.oduGenerations[hp === 2 ? 2 : 1];
+    return mockFixtures.oduProfiles[generation] || mockFixtures.oduProfiles.Unknown;
+  }
+
+  function syncMockOduIdentityEntities(hp) {
+    if (hp === 2 && state.installation === "single") {
+      return;
+    }
+    const profile = getMockOduProfile(hp);
+    setEntity("sensor", `HP${hp} - Control board item number`, { value: profile.controlBoardItem });
+    setEntity("text_sensor", `HP${hp} - ODU generation`, {
+      state: profile.generation,
+      value: profile.generation,
+    });
+    setEntity("text_sensor", `HP${hp} - ODU generation variant`, {
+      state: profile.variant,
+      value: profile.variant,
+    });
+    const customerModelCode = profile.customerModel || (profile.generation === "Unknown" ? "Unknown" : "Missing");
+    setEntity("text_sensor", `HP${hp} - ODU customer model code`, {
+      state: customerModelCode,
+      value: customerModelCode,
+    });
+  }
+
+  function setMockOduGeneration(hp, generation) {
+    const profile = mockFixtures.oduProfiles[generation] || mockFixtures.oduProfiles.Unknown;
+    state.oduGenerations[hp === 2 ? 2 : 1] = profile.generation;
+    syncMockOduIdentityEntities(hp);
+  }
+
   function oduRuntimePrefix(hp) {
     return `${hp} - EXPERIMENTAL`;
   }
@@ -346,6 +379,7 @@
 
   function syncUptimeEntity() {
     const uptimeHours = Math.max(0, (Date.now() - state.bootedAt) / 3600000);
+    setNumber("Uptime raw", Math.floor(uptimeHours * 3600), "s");
     setNumber("Uptime", Number(uptimeHours.toFixed(2)), "h");
   }
 
@@ -1842,13 +1876,22 @@
     syncDevMeta();
     seedEntityDefinitions();
     setEntity("text_sensor", "OpenQuatt Installation Topology", { state: state.installation, value: state.installation });
+    syncMockOduIdentityEntities(1);
     setEntity("text_sensor", "OpenQuatt Hardware Profile", { state: state.hardware, value: state.hardware });
+    setEntity("text_sensor", "OpenQuatt Hardware Revision", { state: "1.0 (batch 42)", value: "1.0 (batch 42)" });
     setEntity("text_sensor", "OpenQuatt Connection", { state: state.connection, value: state.connection });
-    setEntity("text_sensor", "OpenQuatt Version", { state: MOCK_STABLE_VERSION, value: MOCK_STABLE_VERSION });
+    setEntity("text_sensor", "OpenQuatt Version", { state: MOCK_DEV_VERSION, value: MOCK_DEV_VERSION });
     setEntity("text_sensor", "OpenQuatt Release Channel", { state: "dev", value: "dev" });
+    setEntity("sensor", "Uptime raw", { value: 0, uom: "s" });
     setEntity("sensor", "Uptime", { value: 0, uom: "h" });
     syncUptimeEntity();
     setEntity("sensor", "ESP Internal Temperature", { value: 37.8, uom: "°C" });
+    setEntity("sensor", "WiFi Signal", { value: -61, uom: "dBm" });
+    setEntity("sensor", "Heap Free", { value: 178432, uom: "B" });
+    setEntity("sensor", "Heap Min Free", { value: 151008, uom: "B" });
+    setEntity("sensor", "Heap Max Block", { value: 98304, uom: "B" });
+    setEntity("sensor", "PSRAM Free", { value: 7023616, uom: "B" });
+    setEntity("sensor", "Loop Time", { value: 14, uom: "ms" });
     setEntity("sensor", "Firmware Update Progress", { value: 0, uom: "%" });
     setEntity("text_sensor", "Firmware Update Status", { state: "Idle", value: "Idle" });
     setEntity("text_sensor", "Trendhistorie beschikbaar", { state: "18,4 dagen", value: "18,4 dagen" });
@@ -1877,12 +1920,12 @@
     setEntity("sensor", "Lifetime energiehistorie grootte", { value: state.energyHistoryStoredKiB, uom: "kB" });
     setEntity("sensor", "Lifetime energiehistorie schrijfacties", { value: state.energyHistoryWrites });
     setEntity("update", "Firmware Update", {
-      state: "available",
-      value: "available",
-      current_version: MOCK_STABLE_VERSION,
+      state: "up_to_date",
+      value: "up_to_date",
+      current_version: MOCK_DEV_VERSION,
       latest_version: MOCK_DEV_VERSION,
       title: "OpenQuatt firmware",
-      summary: "Nieuwe firmware met verdere UI- en regelingverbeteringen staat klaar voor deze preview.",
+      summary: "De preview draait op de nieuwste dev-firmware.",
       release_url: getMockReleaseUrl("dev"),
     });
     setEntity("binary_sensor", "Setup Complete", { value: state.complete, state: state.complete });
@@ -1918,6 +1961,7 @@
     setEntity("switch", "CiC Compatibility Mode", { value: false, state: false });
     setEntity("switch", "Trendopslag", { value: true, state: true });
     setEntity("switch", "Trendhistorie opslaan in flash", { value: true, state: true });
+    setEntity("switch", "Beslisloghistorie bewaren", { value: false, state: false });
     setEntity("switch", "Lifetime energiehistorie opslaan", { value: true, state: true });
     setEntity("switch", "RAM log history", { value: true, state: true });
     updateEnergyHistoryStats();
@@ -2019,6 +2063,11 @@
         "Allow without dew point, user responsibility",
       ],
     });
+    setEntity("select", "Cooling Restart Mode", {
+      value: "Water temperature",
+      state: "Water temperature",
+      option: ["Water temperature", "Minimum off time"],
+    });
     setEntity("select", "Cooling Dew Point Source", {
       value: "Auto",
       state: "Auto",
@@ -2078,6 +2127,11 @@
       value: "Disabled",
       state: "Disabled",
       option: ["Disabled", "OT thermostat", "CIC", "HA input", "MQTT"],
+    });
+    setEntity("select", "External Heat Demand Source", {
+      value: "Disabled",
+      state: "Disabled",
+      option: ["Disabled", "API input", "MQTT"],
     });
     setEntity("select", "Firmware Update Channel", {
       value: "dev",
@@ -2140,6 +2194,7 @@
       ["Cooling Minimum Supply Temp", 18, 5, 24, 0.5, "°C"],
       ["Cooling Demand Max", 4, 1, 10, 1, "step"],
       ["Cooling Restart Delta", 1.0, 0, 5, 0.1, "°C"],
+      ["Cooling Minimum Off Time", 600, 240, 3600, 30, "s"],
       ["Cooling Request On Delta", 0.4, 0, 2, 0.1, "°C"],
       ["Cooling Request Off Delta", 0.1, 0, 2, 0.1, "°C"],
       ["Cooling Safety Margin", 2, 0, 4, 0.1, "°C"],
@@ -2233,6 +2288,7 @@
       ["OT - Room Setpoint", 20.0, "\u00B0C"],
       ["OT - Room Temperature", 20.9, "\u00B0C"],
       ["CIC - Water Supply Temp", 29.5, "\u00B0C"],
+      ["CIC - Boiler Water Pressure", 1.7, "bar"],
       ["CIC - Control setpoint", 30.0, "\u00B0C"],
       ["CIC - Room setpoint", 20.0, "\u00B0C"],
       ["CIC - Room temperature", 20.9, "\u00B0C"],
@@ -2263,6 +2319,7 @@
       ["Cooling Dew Point (Selected)", 16.1, "°C"],
       ["Cooling Minimum Safe Supply Temp", 18.1, "°C"],
       ["Cooling Effective Minimum Supply Temp", 18.1, "°C"],
+      ["Cooling Minimum Off Time Remaining", 0, "s"],
       ["Cooling Fallback Night Minimum Outdoor Temp", 14.3, "°C"],
       ["Cooling Fallback Minimum Supply Temp", 19.0, "°C"],
       ["Cooling Supply Target", 18.0, "°C"],
@@ -2410,6 +2467,7 @@
     HP2_ENTITIES.forEach(([domain, name, payload]) => {
       setEntity(domain, name, clone(payload));
     });
+    syncMockOduIdentityEntities(2);
   }
 
   function syncRuntimeCounterEntities() {
@@ -3849,7 +3907,6 @@
       applyPreset(value);
     } else if (name === "Firmware Update Channel") {
       clearOtaSimulation();
-      setText("text_sensor", "OpenQuatt Release Channel", value);
       setText("text_sensor", "Firmware Update Status", "Idle");
       setNumber("Firmware Update Progress", 0, "%");
       const updateEntity = getEntity("update", "Firmware Update");
@@ -3859,14 +3916,16 @@
         updateEntity.current_version = currentVersion;
         updateEntity.latest_version = latestVersion;
         updateEntity.release_url = getMockReleaseUrl(value);
-        if (value === "main" || currentVersion === latestVersion) {
+        if (currentVersion === latestVersion) {
           updateEntity.state = "up_to_date";
           updateEntity.value = "up_to_date";
-          updateEntity.summary = "Je preview gebruikt nu het stabiele kanaal. Er staat op dit moment geen nieuwere stable release klaar.";
+          updateEntity.summary = `De preview draait al op de nieuwste ${value}-firmware.`;
         } else {
           updateEntity.state = "available";
           updateEntity.value = "available";
-          updateEntity.summary = "Het dev-kanaal heeft een nieuwere OTA-build beschikbaar voor deze preview.";
+          updateEntity.summary = value === "main"
+            ? "De stabiele main-release is beschikbaar als bewuste downgrade voor deze preview."
+            : "Het dev-kanaal heeft een nieuwere OTA-build beschikbaar voor deze preview.";
         }
       }
     } else if (name === "Firmware Update Target") {
@@ -3875,6 +3934,8 @@
       setNumber("Firmware Update Progress", 0, "%");
       const updateEntity = getEntity("update", "Firmware Update");
       const currentVersion = String(getEntity("text_sensor", "OpenQuatt Version")?.value || MOCK_STABLE_VERSION);
+      const channel = String(getEntity("select", "Firmware Update Channel")?.value || "dev");
+      const latestVersion = channel === "main" ? MOCK_STABLE_VERSION : MOCK_DEV_VERSION;
       const alternateBuild = value !== "current build";
       const targetConnection = value === "alternate connection" || value === "alternate topology and connection"
         ? state.connection === "wifi" ? "eth" : "wifi"
@@ -3885,9 +3946,9 @@
       const targetLabel = `Heatpump Controller Q ${targetTopology === "duo" ? "Duo" : "Single"} ${targetConnection === "eth" ? "Ethernet" : "Wi-Fi"}`;
       if (updateEntity) {
         updateEntity.current_version = currentVersion;
-        updateEntity.latest_version = alternateBuild ? currentVersion : MOCK_DEV_VERSION;
-        updateEntity.release_url = getMockReleaseUrl(String(getEntity("select", "Firmware Update Channel")?.value || "dev"));
-        updateEntity.state = alternateBuild ? "up_to_date" : "available";
+        updateEntity.latest_version = latestVersion;
+        updateEntity.release_url = getMockReleaseUrl(channel);
+        updateEntity.state = currentVersion === latestVersion ? "up_to_date" : "available";
         updateEntity.value = updateEntity.state;
         updateEntity.summary = alternateBuild
           ? `${targetLabel} is als alternatieve target-build geselecteerd voor deze preview.`
@@ -4087,6 +4148,20 @@
   }
 
   function handleButtonPress(name) {
+    const generationDetectMatch = /^HP([12]) - Detect ODU generation$/.exec(name);
+    if (generationDetectMatch) {
+      const hp = Number(generationDetectMatch[1]);
+      setText("text_sensor", `HP${hp} - ODU generation`, "Unknown");
+      setText("text_sensor", `HP${hp} - ODU generation variant`, "Unknown");
+      setText("text_sensor", `HP${hp} - ODU customer model code`, "Unknown");
+      window.setTimeout(() => {
+        syncMockOduIdentityEntities(hp);
+        notifyMockUpdated();
+      }, 100);
+      notifyMockUpdated();
+      return;
+    }
+
     const oduRuntimeButton = parseOduRuntimeButtonName(name);
     if (oduRuntimeButton) {
       if (oduRuntimeButton.action === "load") {
@@ -4219,14 +4294,14 @@
           state.commissioning.boilerStatusText = "FLOW_SETTLING";
           setText("text_sensor", "Boiler power test status", "FLOW_SETTLING");
         });
-        scheduleCommissioningStep(1700, () => {
+        scheduleCommissioningStep(3700, () => {
           setCommissioningPhase("boiler", "boiler_settling");
           state.commissioning.boilerStatusText = "BOILER_SETTLING";
           setText("text_sensor", "Boiler power test status", "BOILER_SETTLING");
           setBinary("Boiler active", true);
           setNumber("Boiler Heat Power", 0, "W");
         });
-        scheduleCommissioningStep(2900, () => {
+        scheduleCommissioningStep(6700, () => {
           setCommissioningPhase("boiler", "measuring");
           state.commissioning.boilerStatusText = "MEASURING";
           setText("text_sensor", "Boiler power test status", "MEASURING");
@@ -4234,7 +4309,7 @@
           setNumber("Boiler Heat Power", 1803, "W");
           setNumber("Flow average (Selected)", 802, "L/h");
         });
-        scheduleCommissioningStep(4300, () => {
+        scheduleCommissioningStep(9700, () => {
           setCommissioningPhase("boiler", "done", {
             boilerResult: 1803,
             boilerConfidence: 65,
@@ -4805,6 +4880,9 @@
         ? "De preview draait nu op testfirmware."
         : "De preview draait nu op de nieuwste firmware.";
       setText("text_sensor", "OpenQuatt Version", targetVersion);
+      if (!testFirmware) {
+        setText("text_sensor", "OpenQuatt Release Channel", String(getEntity("select", "Firmware Update Channel")?.value || "main"));
+      }
       setInstallationMode(targetTopology);
       state.connection = targetConnection;
       setText("text_sensor", "OpenQuatt Connection", state.connection);
@@ -5069,22 +5147,27 @@
   }
 
   function getMockOduIdentity(hp) {
-    const v2 = hp === 2;
-    const pcbProgram = v2 ? 0x0204 : 0x0102;
-    const eepromProgram = v2 ? 0x0032 : 0x0021;
-    const officialFirmware = v2 ? 0x0206 : 0x0108;
-    const model = v2 ? "QUATT ODU V2" : "QUATT ODU V1";
-    const serial = v2 ? "QV2-MOCK-000002" : "QV1-MOCK-000001";
+    const profile = getMockOduProfile(hp);
+    const {
+      compressorCode,
+      controlBoardItem,
+      customerModel,
+      eepromProgram,
+      model,
+      officialFirmware,
+      pcbProgram,
+      serial,
+    } = profile;
     const core = Array(14).fill(0);
-    core[0] = v2 ? 2 : 1;
-    core[1] = hp;
+    core[0] = compressorCode;
+    core[1] = 6144;
     core[7] = 0;
     core[8] = pcbProgram;
     core[9] = eepromProgram;
-    core[13] = v2 ? 0x1202 : 0x1101;
+    core[13] = controlBoardItem;
     return {
       model,
-      customerModel: model,
+      customerModel,
       serial,
       pcbProgram,
       pcbLabel: `V${String((pcbProgram >>> 8) & 0xff).padStart(3, "0")}_T${String(pcbProgram & 0xff).padStart(2, "0")}`,
@@ -5092,9 +5175,9 @@
       officialFirmware,
       officialLabel: `${(officialFirmware >>> 8) & 0xff}.${officialFirmware & 0xff}`,
       core,
-      extended: [hp, v2 ? 202 : 101, v2 ? 2 : 1, officialFirmware, 0, eepromProgram],
+      extended: [hp, profile.projectCode, profile.hardwareVersion, officialFirmware, 0, eepromProgram],
       modelWords: encodeMockAsciiWords(model),
-      customerModelWords: encodeMockAsciiWords(model),
+      customerModelWords: encodeMockAsciiWords(customerModel),
       serialWords: encodeMockAsciiWords(serial),
     };
   }
@@ -5480,6 +5563,22 @@
             </select>
           </label>
           <label class="oq-helper-hub-dev-row">
+            <span class="oq-helper-hub-dev-label">HP1 ODU-generatie</span>
+            <select class="oq-helper-hub-dev-select" data-oq-dev-control="hp1-generation">
+              ${renderDevControlOptions("oduGeneration")}
+            </select>
+          </label>
+          <label class="oq-helper-hub-dev-row">
+            <span class="oq-helper-hub-dev-label">HP2 ODU-generatie</span>
+            <select
+              class="oq-helper-hub-dev-select"
+              data-oq-dev-control="hp2-generation"
+              ${state.installation === "single" ? "disabled" : ""}
+            >
+              ${renderDevControlOptions("oduGeneration")}
+            </select>
+          </label>
+          <label class="oq-helper-hub-dev-row">
             <span class="oq-helper-hub-dev-label">Hardware</span>
             <select class="oq-helper-hub-dev-select" data-oq-dev-control="hardware">
               ${renderDevControlOptions("hardware")}
@@ -5584,6 +5683,19 @@
         notifyDevControlsChanged();
       };
     }
+
+    [1, 2].forEach((hp) => {
+      const generation = controlsRoot.querySelector(`[data-oq-dev-control="hp${hp}-generation"]`);
+      if (!generation) {
+        return;
+      }
+      generation.value = state.oduGenerations[hp];
+      generation.onchange = () => {
+        setMockOduGeneration(hp, generation.value);
+        notifyMockUpdated();
+        notifyDevControlsChanged();
+      };
+    });
 
     const connection = controlsRoot.querySelector('[data-oq-dev-control="connection"]');
     if (connection) {

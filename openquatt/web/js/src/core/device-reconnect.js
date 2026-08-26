@@ -1,11 +1,13 @@
 import { state } from "./state.js";
 import { render } from "./render-scheduler.js";
 import { updateFirmwareState } from "./feature-state.js";
+import { refreshWebAppCache } from "./app-cache.js";
 
 export const DEVICE_RECONNECT_RECOVERY_CLEAR_DELAY_MS = 1500;
 export const OTA_REFRESH_DELAY_MS = 1500;
+export const RESTART_REFRESH_DELAY_MS = 0;
 
-function getOtaEvidence() {
+function getRebootEvidence() {
   const uptime = state.entities.uptime;
   const version = state.entities.projectVersionText;
   return [
@@ -15,14 +17,7 @@ function getOtaEvidence() {
   ];
 }
 
-export function armOtaRefresh() {
-  clearOtaRefresh();
-  state.ota.on = true;
-  state.ota.base = [...getOtaEvidence(), performance.now()];
-}
-
-export function clearOtaRefresh() {
-  const refresh = state.ota;
+function clearBrowserRefresh(refresh) {
   if (refresh.id) {
     window.clearTimeout(refresh.id);
     refresh.id = null;
@@ -33,8 +28,13 @@ export function clearOtaRefresh() {
   refresh.base = null;
 }
 
-export function awaitOtaEvidence(timeoutMs = 300000) {
-  const refresh = state.ota;
+function armBrowserRefresh(refresh, clearRefresh) {
+  clearRefresh();
+  refresh.on = true;
+  refresh.base = [...getRebootEvidence(), performance.now()];
+}
+
+function awaitRebootEvidence(refresh, clearRefresh, timeoutMs) {
   if (!refresh.on) {
     return;
   }
@@ -45,31 +45,25 @@ export function awaitOtaEvidence(timeoutMs = 300000) {
   refresh.id = window.setTimeout(() => {
     refresh.id = null;
     if (refresh.wait) {
-      clearOtaRefresh();
+      clearRefresh();
     }
   }, timeoutMs);
 }
 
-export function reconcileOtaEvidence() {
-  const refresh = state.ota;
+function hasRebootEvidence(refresh, acceptVersionChange = false) {
   if (!refresh.on || !refresh.wait) {
-    return;
+    return false;
   }
 
-  const evidence = getOtaEvidence();
-  if (
-    evidence[0] < refresh.base[0]
-    // A low post-boot uptime proves its boot happened after the OTA request.
+  const evidence = getRebootEvidence();
+  return evidence[0] < refresh.base[0]
+    // A low post-boot uptime proves its boot happened after the initiating request.
     || (isNaN(refresh.base[0]) && evidence[0] + 1000 <= performance.now() - refresh.base[2])
     || refresh.ok === 2
-    || (refresh.base[1] && evidence[1] && evidence[1] !== refresh.base[1])
-  ) {
-    scheduleOtaRefresh();
-  }
+    || (acceptVersionChange && refresh.base[1] && evidence[1] && evidence[1] !== refresh.base[1]);
 }
 
-export function scheduleOtaRefresh(delayMs = OTA_REFRESH_DELAY_MS) {
-  const refresh = state.ota;
+function scheduleBrowserRefresh(refresh, clearRefresh, delayMs, refreshAppCache = false) {
   if (!refresh.on || (refresh.id && !refresh.wait)) {
     return;
   }
@@ -78,13 +72,67 @@ export function scheduleOtaRefresh(delayMs = OTA_REFRESH_DELAY_MS) {
     window.clearTimeout(refresh.id);
   }
   refresh.wait = false;
-  refresh.id = window.setTimeout(() => {
+  refresh.id = window.setTimeout(async () => {
     if (!refresh.on) {
       return;
     }
-    clearOtaRefresh();
+    if (refreshAppCache) {
+      await refreshWebAppCache();
+      if (!refresh.on) {
+        return;
+      }
+    }
+    clearRefresh();
     window.location.reload();
   }, delayMs);
+}
+
+export function armOtaRefresh() {
+  armBrowserRefresh(state.ota, clearOtaRefresh);
+}
+
+export function clearOtaRefresh() {
+  clearBrowserRefresh(state.ota);
+}
+
+export function awaitOtaEvidence(timeoutMs = 300000) {
+  awaitRebootEvidence(state.ota, clearOtaRefresh, timeoutMs);
+}
+
+export function reconcileOtaEvidence() {
+  if (hasRebootEvidence(state.ota, true)) {
+    scheduleOtaRefresh();
+  }
+}
+
+export function scheduleOtaRefresh(delayMs = OTA_REFRESH_DELAY_MS) {
+  scheduleBrowserRefresh(state.ota, clearOtaRefresh, delayMs, true);
+}
+
+export function armRestartRefresh() {
+  armBrowserRefresh(state.restartRefresh, clearRestartRefresh);
+}
+
+export function clearRestartRefresh() {
+  clearBrowserRefresh(state.restartRefresh);
+}
+
+export function awaitRestartEvidence(timeoutMs = 300000) {
+  awaitRebootEvidence(state.restartRefresh, clearRestartRefresh, timeoutMs);
+}
+
+export function reconcileRestartEvidence() {
+  if (hasRebootEvidence(state.restartRefresh)) {
+    scheduleRestartRefresh();
+  }
+}
+
+export function scheduleRestartRefresh(delayMs = RESTART_REFRESH_DELAY_MS) {
+  scheduleBrowserRefresh(state.restartRefresh, clearRestartRefresh, delayMs);
+}
+
+export function isRestartRefreshActive() {
+  return state.restartRefresh.on;
 }
 
 export function clearDeviceReconnectRecoveryTimer() {

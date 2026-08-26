@@ -83,9 +83,9 @@ import { renderModalShell } from "../core/modal-shell.js";
       boiler: [
         { match: ["REQUESTED", "WAITING_FOR_CM100", "REFUSED"], phase: "Voorbereiden", percent: 12 },
         { match: ["FLOW_SETTLING"], phase: "Flow stabiliseren", percent: 28 },
-        { match: ["BOILER_SETTLING"], phase: "Boiler stabiliseren", percent: 48 },
-        { match: ["MEASURING"], phase: "Meten", percent: 72 },
-        { match: ["COOLDOWN"], phase: "Afronden", percent: 90 },
+        { match: ["BOILER_SETTLING"], phase: "Ketel starten", percent: 48 },
+        { match: ["MEASURING"], phase: "Vermogen meten", percent: 72 },
+        { match: ["COOLDOWN"], phase: "Test afronden", percent: 90 },
         { match: ["DONE", "APPLIED"], phase: "Klaar", percent: 100 },
         { match: ["ABORTED", "FAILED", "ABORT"], phase: "Afgebroken", percent: 100 },
       ],
@@ -389,6 +389,65 @@ import { renderModalShell } from "../core/modal-shell.js";
     `;
   }
 
+  export function getBoilerTestStatusCopy(boilerStatus, flowLph, targetLph = 800) {
+    const status = String(boilerStatus || "").trim();
+    const upper = status.toUpperCase();
+    const flow = Number(flowLph);
+    const target = Number(targetLph);
+    const flowText = Number.isFinite(flow) ? `${Math.round(flow)} L/h` : "— L/h";
+    const targetText = Number.isFinite(target) ? `${Math.round(target)} L/h` : "800 L/h";
+
+    if (upper.includes("FLOW_SETTLING")) {
+      return `Flow naar ${targetText} ±40. Ketel start daarna. Min. 2 min. Nu ${flowText}.`;
+    }
+    if (upper.includes("BOILER_SETTLING")) {
+      return `Warmtevraag verstuurd; wachten op ketel. Flow ${flowText} (doel ±40).`;
+    }
+    if (upper.includes("MEASURING")) {
+      const heat = getSettingsStatValue("boilerHeatPower");
+      return `Ketel actief; meten.${heat && heat !== "—" ? ` Nu ${heat}.` : ""} Min. 3 min; daarna auto uit zodra meting compleet is.`;
+    }
+    if (upper.includes("COOLDOWN")) {
+      const result = getSettingsStatValue("boilerPowerTestResult");
+      return `Metingen klaar; ketel uit.${result && result !== "—" ? ` ${result}.` : ""} 15s afkoelen.`;
+    }
+    if (upper.startsWith("DONE:") || upper === "DONE" || upper.includes("APPLIED")) {
+      const result = getSettingsStatValue("boilerPowerTestResult");
+      const conf = getSettingsStatValue("boilerPowerTestConfidence");
+      const isFlowLimited = upper.includes("FLOW LIMITED");
+      if (result && result !== "—") {
+        if (isFlowLimited) {
+          return `Klaar - ${result}${conf && conf !== "—" ? ` (${conf})` : ""} - test begrensd door flow/temperatuurmarge.`;
+        }
+        return `Klaar - ${result}${conf && conf !== "—" ? ` (${conf})` : ""}. Ketel auto uit.`;
+      }
+      return upper.includes("APPLIED") ? "Resultaat toegepast." : "Klaar - ketel auto uit.";
+    }
+    if (upper === "ABORTED" || upper === "ABORT") {
+      return "Handmatig gestopt. Flow en ketel zijn hersteld naar vorige instelling.";
+    }
+    if (upper.startsWith("ABORTED:") || upper.startsWith("ABORT:")) {
+      const reason = status.slice(status.indexOf(":") + 1).trim();
+      return `Afgebroken: ${reason}`;
+    }
+    if (upper.startsWith("REFUSED:")) {
+      const reason = status.slice(status.indexOf(":") + 1).trim();
+      return `Start geweigerd: ${reason}`;
+    }
+    if (upper.includes("FAILED")) {
+      const colonIdx = status.indexOf(":");
+      if (colonIdx > 0) {
+        const reason = status.slice(colonIdx + 1).trim();
+        return `Mislukt: ${reason}`;
+      }
+      return `Mislukt: ${status}`;
+    }
+    if (upper === "REFUSED") {
+      return `Start geweigerd: ${status}`;
+    }
+    return status;
+  }
+
   export function getSettingsServiceModel() {
     const hasBoilerAssist = hasEntity("boilerCvAssistEnabled") && isEntityActive("boilerCvAssistEnabled");
     const cm100Status = getCommissioningStatusValue();
@@ -490,13 +549,18 @@ import { renderModalShell } from "../core/modal-shell.js";
     const flowKiSuggested = getSettingsStatValue("flowKiSuggested", { decimals: 5, trimTrailingZeros: true });
     const boilerResultReady = /DONE|APPLIED/.test(String(boilerStatus || "").toUpperCase());
     const autotuneResultReady = /DONE|APPLIED/.test(String(autotuneStatus || "").toUpperCase());
-    const boilerStatusDisplay = cm100Ready
-      ? (boilerTaskWaitingForCm100
-        ? "Wachten op CM100"
-        : (boilerTaskRunning
-          ? boilerProgress.phase
-          : (boilerResultReady ? "Klaar om toe te passen" : "Klaar om te starten")))
-      : "Wachten op CM100";
+    const boilerStatusDisplay = (() => {
+      const upper = String(boilerStatus || "").toUpperCase();
+      if (upper.includes("FAILED")) return "Mislukt";
+      if (upper.startsWith("REFUSED:") || upper === "REFUSED") return "Start geweigerd";
+      if (upper === "ABORTED" || upper === "ABORT") return "Handmatig gestopt";
+      if (upper.startsWith("ABORTED:") || upper.startsWith("ABORT:")) return "Afgebroken";
+      if (upper.startsWith("DONE:") || upper === "DONE" || upper.includes("APPLIED")) return "Klaar";
+      if (boilerTaskWaitingForCm100) return "Wachten op CM100";
+      if (boilerTaskRunning) return boilerProgress.phase;
+      if (boilerResultReady) return "Klaar om toe te passen";
+      return cm100Ready ? "Klaar om te starten" : "Wachten op CM100";
+    })();
     const autotuneStatusDisplay = cm100Ready
       ? (autotuneTaskWaitingForCm100
         ? "Wachten op CM100"
@@ -775,8 +839,12 @@ import { renderModalShell } from "../core/modal-shell.js";
           status: boilerStatusDisplay,
           statusCopy: boilerTaskWaitingForCm100
             ? "Wacht totdat CM100 actief is voordat je de boiler-test start."
-            : (boilerTaskRunning
-              ? "De boiler-test draait op dit moment."
+            : (isCommissioningTaskStatusTerminal(boilerStatus) || boilerTaskRunning
+              ? getBoilerTestStatusCopy(
+                  boilerStatus,
+                  getEntityNumericValue("flowSelected"),
+                  getEntityNumericValue("flowSetpoint") || 800,
+                )
               : (cm100Ready ? "CM100 staat klaar. Start de boiler-test wanneer je wilt." : "Start CM100 eerst en voer daarna de boilervermogentest uit.")),
           progressTask: "boiler",
           actions: `

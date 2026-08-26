@@ -1,9 +1,9 @@
 import { hasEntity } from "./app-shared.js";
 import { CURVE_POINTS, ENTITY_DEFS, FIRMWARE_ENTITY_KEYS, FLOW_SETTING_KEYS, getOduRuntimeFrequencyButtonHp, getOduRuntimeFrequencyHpKeys, HEADER_ENTITY_KEYS, LIMIT_KEYS, ODU_RUNTIME_FREQUENCY_BUTTON_KEYS, OPENQUATT_RESUME_CLEAR_VALUE, OVERVIEW_KEYS, POWER_HOUSE_KEYS, QUICK_STEPS } from "./config.js";
-import { beginDeviceReconnect } from "./device-reconnect.js";
+import { armRestartRefresh, awaitRestartEvidence, beginDeviceReconnect, clearRestartRefresh } from "./device-reconnect.js";
 import { buildEntityPath, isCurveMode } from "./domain-helpers.js";
 import { formatOpenQuattResumeDateTime, getEntityValue, normalizeDateTimeValue, normalizeNumber, normalizeTimeValue, parseLooseNumber, toDateTimeInputValue } from "./entity-store.js";
-import { getSettingsRefreshKeys, refreshEntities, refreshIncidentMonitoringData, syncEntities } from "./entity-sync.js";
+import { getSettingsRefreshKeys, isLikelyDeviceConnectionError, refreshEntities, refreshIncidentMonitoringData, syncEntities } from "./entity-sync.js";
 import {
   createIncidentActionRequestId,
   postIncidentActionRequest,
@@ -170,11 +170,13 @@ export async function commitSelect(key, option) {
     if (key === "strategy" && state.appView !== "settings") {
       await refreshEntities(isCurveMode(option) ? CURVE_POINTS.map((point) => point.key) : POWER_HOUSE_KEYS, "state");
     }
+    return true;
   } catch (error) {
     if (!verifyControlModeOverride && previousEntity) {
       state.entities[key] = previousEntity;
     }
     state.controlError = `${entity.name} kon niet worden bijgewerkt. ${error.message}`;
+    return false;
   } finally {
     state.busyAction = "";
     render();
@@ -662,6 +664,10 @@ export async function triggerNamedButton(key, options = {}) {
   if (!entity) {
     return;
   }
+  const refreshAfterRestart = options.reconnectMode === "restart";
+  if (refreshAfterRestart) {
+    armRestartRefresh();
+  }
   state.busyAction = key;
   state.controlError = "";
   state.controlNotice = "";
@@ -673,6 +679,9 @@ export async function triggerNamedButton(key, options = {}) {
     });
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}`);
+    }
+    if (refreshAfterRestart) {
+      state.restartRefresh.ok = 1;
     }
     const keepCommissioningModalOpen = [
       "commissioningCm100Start",
@@ -708,6 +717,9 @@ export async function triggerNamedButton(key, options = {}) {
     if (options.reconnectMode) {
       beginDeviceReconnect(options.reconnectMode);
     }
+    if (refreshAfterRestart) {
+      awaitRestartEvidence();
+    }
     if (Array.isArray(options.refreshKeys) && options.refreshKeys.length) {
       const refreshDelayMs = Number(options.refreshDelayMs || 0);
       if (Number.isFinite(refreshDelayMs) && refreshDelayMs > 0) {
@@ -741,13 +753,62 @@ export async function triggerNamedButton(key, options = {}) {
       state.pendingManualHpStart = false;
       state.commissioningTaskLock = "";
     }
-    state.controlError = `${options.errorPrefix || `Actie mislukt voor "${entity.name}"`}. ${error.message}`;
+    if (refreshAfterRestart && isLikelyDeviceConnectionError(error.message)) {
+      state.restartRefresh.ok = 2;
+      awaitRestartEvidence();
+      beginDeviceReconnect("restart", error.message);
+      state.controlNotice = options.successNotice || `${entity.name} gestart.`;
+    } else {
+      if (refreshAfterRestart) {
+        clearRestartRefresh();
+      }
+      state.controlError = `${options.errorPrefix || `Actie mislukt voor "${entity.name}"`}. ${error.message}`;
+    }
   } finally {
     state.busyAction = "";
     render();
     if (key === "hpWaterCalibrationApply") {
       queueHpWaterCalibrationApplyAnchor();
     }
+  }
+}
+
+export async function triggerNamedButtonGroup(keys, options = {}) {
+  const entities = keys.map((key) => ENTITY_DEFS[key]).filter(Boolean);
+  if (entities.length === 0) return;
+
+  const busyAction = String(options.busyAction || "named-button-group");
+  state.busyAction = busyAction;
+  state.controlError = "";
+  state.controlNotice = "";
+  render();
+
+  try {
+    const results = await Promise.allSettled(entities.map(async (entity) => {
+      const response = await fetch(buildEntityPath(entity.domain, entity.name, "press"), { method: "POST" });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    }));
+
+    const failed = results.find((result) => result.status === "rejected");
+    const refreshDelayMs = Number(options.refreshDelayMs || 0);
+    if (Number.isFinite(refreshDelayMs) && refreshDelayMs > 0) {
+      await new Promise((resolve) => window.setTimeout(resolve, refreshDelayMs));
+    }
+    if (Array.isArray(options.refreshKeys) && options.refreshKeys.length) {
+      await refreshEntities(options.refreshKeys, "state");
+    }
+    if (failed) throw failed.reason;
+
+    if (state.busyAction === busyAction) {
+      state.controlNotice = options.successNotice || "Acties gestart.";
+    }
+  } catch (error) {
+    if (state.busyAction === busyAction) {
+      state.controlError = `${options.errorPrefix || "Actie mislukt"}. ${error.message}`;
+    }
+  } finally {
+    if (state.busyAction === busyAction) state.busyAction = "";
+    render();
   }
 }
 

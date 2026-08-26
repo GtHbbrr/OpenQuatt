@@ -64,14 +64,35 @@ class OpenthermHub final : public Component {
 
   bool sending_initial_ = true;
   bool priority_sequence_active_ = false;
+  bool urgent_priority_pending_ = false;
+  MessageId urgent_priority_first_ = MessageId::STATUS;
+  MessageId urgent_priority_second_ = MessageId::STATUS;
+  bool deferred_priority_pending_ = false;
+  MessageId deferred_priority_first_ = MessageId::STATUS;
+  MessageId deferred_priority_second_ = MessageId::STATUS;
   // The OpenQuatt transport owner explicitly starts polling after restore.
   bool polling_enabled_ = false;
   std::unordered_map<MessageId, uint8_t> configured_messages_;
   std::vector<MessageId> messages_;
   std::vector<MessageId>::const_iterator message_iterator_;
 
-  uint32_t last_conversation_start_ = 0;
-  uint32_t last_conversation_end_ = 0;
+  bool has_last_conversation_start_ = false;
+  bool has_last_conversation_end_ = false;
+  bool has_last_wire_response_ = false;
+  uint32_t last_conversation_start_us_ = 0;
+  uint32_t last_conversation_end_us_ = 0;
+  uint32_t last_wire_response_us_ = 0;
+  uint32_t last_processing_latency_us_ = 0;
+  uint32_t requests_started_ = 0;
+  uint32_t tx_completed_ = 0;
+  uint32_t rx_captured_ = 0;
+  uint32_t rx_accepted_ = 0;
+  uint32_t rx_rejected_ = 0;
+  uint32_t tx_timeouts_ = 0;
+  uint32_t response_timeouts_ = 0;
+  uint32_t late_response_timeouts_ = 0;
+  uint32_t max_wire_response_us_ = 0;
+  uint32_t max_processing_latency_us_ = 0;
   OperationMode last_mode_ = IDLE;
   OpenthermData last_request_;
 
@@ -90,10 +111,15 @@ class OpenthermHub final : public Component {
   void handle_timeout_error_();
   void handle_timer_error_();
   void stop_opentherm_();
+  void activate_priority_sequence_(MessageId first, MessageId second);
+  void apply_urgent_priority_();
+  void apply_deferred_priority_();
   void start_conversation_();
   void read_response_();
-  void check_timings_(uint32_t cur_time);
-  bool should_skip_loop_(uint32_t cur_time) const;
+  void check_cadence_(uint32_t started_us) const;
+  bool should_skip_loop_(uint32_t cur_time_us) const;
+  void warn_if_slow_(const char* phase, uint32_t started_us) const;
+  void log_transport_diagnostics_() const;
   void sync_loop_();
 
   void write_initial_messages_(std::vector<MessageId>& target);
@@ -164,6 +190,7 @@ class OpenthermHub final : public Component {
   void set_sync_mode(bool sync_mode) { this->sync_mode_ = sync_mode; }
 
   void prioritize_messages(MessageId first, MessageId second);
+  void defer_priority_messages(MessageId first, MessageId second);
   void start_priority_polling(MessageId first, MessageId second);
   void resume_polling();
   void suspend_polling();
