@@ -1000,3 +1000,59 @@ import { escapeHtml } from "../core/html.js";
       `,
     );
   }
+
+    export function renderSettingsAiSection() {
+    const savedKey = localStorage.getItem('openquatt_gemini_key') || '';
+    
+    let maskedKey = savedKey;
+    if (savedKey.length > 10) {
+      maskedKey = savedKey.substring(0, 4) + '...' + savedKey.substring(savedKey.length - 4);
+    }
+
+    return renderSettingsSection(
+      "Integratie",
+      "OpenQuatt AI Copilot (Experimenteel)",
+      "Voeg een cloud-gebaseerde AI-assistent toe aan je dashboard. De assistent maakt gebruik van het geautomatiseerde OpenQuatt-installatieprofiel om gerichte uitleg en diagnoses te geven.",
+      `
+        <div class="oq-settings-mqtt-shell">
+          <section class="oq-settings-mqtt-panel oq-settings-mqtt-panel--broker">
+            <div class="oq-settings-field-head">
+              <h3>Google Gemini Cloud API</h3>
+              <p>Maak een gratis account aan op <a href="https://google.com" target="_blank" style="color: #ff9900; text-decoration: underline;">Google AI Studio</a> om een API-sleutel te genereren.</p>
+            </div>
+            
+            <div style="margin-top: 15px;">
+              <label style="display: block; margin-bottom: 5px; font-weight: bold;">Gemini API-sleutel:</label>
+              <div style="display: flex; gap: 10px;">
+                <input 
+                  id="oq-ai-api-key-input" 
+                  type="password" 
+                  value="${escapeHtml(savedKey)}" 
+                  placeholder="${savedKey ? maskedKey : 'AIzaSy...'}"
+                  style="flex-grow: 1; padding: 8px; background: #222; border: 1px solid #444; color: #fff; border-radius: 4px;"
+                >
+                <button 
+                  id="oq-save-ai-key-btn"
+                  class="oq-helper-button"
+                  type="button"
+                  style="background: #ff9900; color: #000; font-weight: bold; border: none; padding: 0 15px; border-radius: 4px; cursor: pointer;"
+                  onclick="(() => {
+                    const key = document.getElementById('oq-ai-api-key-input').value.trim();
+                    if(key) {
+                      localStorage.setItem('openquatt_gemini_key', key);
+                      alert('Gemini API-sleutel succesvol lokaal opgeslagen!');
+                    } else {
+                      localStorage.removeItem('openquatt_gemini_key');
+                      alert('Sleutel verwijderd.');
+                    }
+                  })()"
+                >
+                  Opslaan
+                </button>
+              </div>
+            </div>
+          </section>
+        </div>
+      `,
+    );
+  }

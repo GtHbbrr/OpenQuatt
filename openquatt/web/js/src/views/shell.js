@@ -245,7 +245,12 @@ export function renderSettingsView() {
     if (state.nativeOpen) {
       state.root.innerHTML = `
         ${renderDevPanel()}
-        ${renderNativeSurfaceShell()}
+        <div class="oq-main-layout-wrapper" style="display: flex; width: 100vw; height: 100vh; overflow: hidden;">
+          <div style="flex-grow: 1; height: 100%; overflow-y: auto;">
+            ${renderNativeSurfaceShell()}
+          </div>
+          ${renderAiSidePanel()}
+        </div>
       `;
       syncModalFocus(state.root);
       restoreModalContinuity(state.root, modalContinuity);
@@ -284,9 +289,24 @@ export function renderSettingsView() {
             <div class="oq-helper-brand">
               <div class="oq-helper-logo-lockup">
                 ${LOGO_MARKUP}
-              <div class="oq-helper-brand-copy">
-                  <h1>OpenQuatt Control</h1>
-                </div>
+              <div class="oq-helper-brand-copy" style="display: flex; align-items: center; gap: 15px;">
+                <h1>OpenQuatt Control</h1>
+                <button 
+                  id="oq-ai-toggle-btn"
+                  title="Open AI Copilot"
+                  type="button"
+                  style="background: #efefef; border: 1px solid #ccc; font-size: 16px; cursor: pointer; padding: 4px 12px; border-radius: 20px; display: flex; align-items: center; justify-content: center; transition: background 0.2s; font-family: sans-serif;"
+                  onmouseover="this.style.background='#ff9900'"
+                  onmouseout="this.style.background='#efefef'"
+                  onclick="(() => { 
+                    const current = localStorage.getItem('oq_ai_panel_visible') === 'true';
+                    localStorage.setItem('oq_ai_panel_visible', !current ? 'true' : 'false'); 
+                    window.location.reload(); 
+                  })()"
+                >
+                  🤖 <span style="font-size: 12px; margin-left: 5px; font-weight: bold; color: #333;">AI Copilot</span>
+                </button>
+              </div>
               </div>
               <p class="oq-helper-lead">Stel je OpenQuatt in, volg live wat er gebeurt en verfijn de regeling wanneer nodig.</p>
             </div>
@@ -337,3 +357,120 @@ export function renderSettingsView() {
   }
 
 setRenderCallback(render);
+
+
+export function renderAiSidePanel() {
+  const isVisible = localStorage.getItem('oq_ai_panel_visible') === 'true';
+  const savedKey = localStorage.getItem('openquatt_gemini_key') || '';
+  
+  // Als de knop in de header op 'dicht' staat, geeft deze functie niks terug
+  if (!isVisible) {
+    return "";
+  }
+
+  // De HTML-structuur van het geopende AI-Zijpaneel (350 pixels breed aan de rechterkant)
+  return `
+    <aside id="oq-ai-side-panel" style="width: 350px; min-width: 350px; height: 100%; background: #1a1a1a; border-left: 1px solid #333; display: flex; flex-direction: column; color: #fff; font-family: sans-serif; z-index: 9998;">
+      <!-- Panel Header -->
+      <div style="padding: 15px; border-bottom: 1px solid #333; display: flex; justify-content: space-between; align-items: center; background: #222;">
+        <h3 style="margin: 0; font-size: 16px; color: #ff9900;">🤖 OpenQuatt AI Copilot</h3>
+        <button 
+          style="background: transparent; border: none; color: #aaa; font-size: 20px; cursor: pointer;"
+          onclick="(() => { localStorage.setItem('oq_ai_panel_visible', 'false'); window.location.reload(); })()"
+        >
+          ✕
+        </button>
+      </div>
+
+      <!-- Chat Berichtenbak -->
+      <div id="oq-ai-chat-messages" style="flex-grow: 1; padding: 15px; overflow-y: auto; font-size: 14px; display: flex; flex-direction: column; gap: 10px;">
+        <div style="background: #2a2a2a; padding: 10px; border-radius: 6px; border-left: 3px solid #ff9900;">
+          <p style="margin: 0;"><strong>Assistent:</strong> Hallo! Ik ben je OpenQuatt Copilot. Ik ken je installatieprofiel. Hoe kan ik je vandaag helpen?</p>
+        </div>
+      </div>
+
+      <!-- Live Diagnose Schakelaar (Tweetraps-logica) -->
+      <div style="padding: 10px 15px; background: #111; border-top: 1px solid #333; font-size: 12px; display: flex; align-items: center; gap: 8px;">
+        <input type="checkbox" id="oq-ai-include-json-chk" style="cursor: pointer;">
+        <label for="oq-ai-include-json-chk" style="cursor: pointer; color: #ccc;">Stuur uitgebreide live sensordata (JSON) mee</label>
+      </div>
+
+      <!-- Inputveld en Verzendknop -->
+      <div style="padding: 15px; border-top: 1px solid #333; display: flex; gap: 8px; background: #222;">
+        <input 
+          id="oq-ai-chat-input" 
+          type="text" 
+          placeholder="${savedKey ? 'Stel een vraag...' : 'Voer eerst je API-key in bij Instellingen'}" 
+          style="flex-grow: 1; padding: 8px; background: #2a2a2a; border: 1px solid #444; color: #fff; border-radius: 4px;"
+          ${savedKey ? '' : 'disabled'}
+          onkeypress="if(event.key === 'Enter') { document.getElementById('oq-ai-send-btn').click(); }"
+        >
+        <button 
+          id="oq-ai-send-btn" 
+          style="background: #ff9900; color: #000; border: none; font-weight: bold; padding: 0 15px; border-radius: 4px; cursor: pointer;"
+          ${savedKey ? '' : 'disabled'}
+          onclick="async (() => {
+            const inputEl = document.getElementById('oq-ai-chat-input');
+            const question = inputEl.value.trim();
+            if (!question) return;
+
+            // Toon vraag in de UI
+            const msgContainer = document.getElementById('oq-ai-chat-messages');
+            msgContainer.innerHTML += \`<div style='background: #333; padding: 10px; border-radius: 6px; align-self: flex-end; max-width: 85%; margin-bottom: 5px;'><p style='margin:0;'><strong>Jij:</strong> \${question}</p></div>\`;
+            inputEl.value = '';
+            msgContainer.scrollTop = msgContainer.scrollHeight;
+
+            const apiKey = localStorage.getItem('openquatt_gemini_key');
+            const includeJson = document.getElementById('oq-ai-include-json-chk').checked;
+
+            // Bouw het installatieprofiel op basis van de actuele telemetriestaat
+            const profiel = {
+              firmware_version: state.telemetry?.firmware_version || "v0.47.0",
+              heating_strategy: state.telemetry?.heating_strategy || "power_house",
+              boiler_connection: state.telemetry?.boiler_connection || "opentherm",
+              boiler_assist_enabled: state.telemetry?.boiler_assist_enabled ?? true
+            };
+
+            let jsonPromptPart = '';
+            if (includeJson) {
+              try {
+                const res = await fetch('/api/status');
+                const rawJson = await res.text();
+                jsonPromptPart = '\\nHUIDIGE LIVE SENSOR DATA (JSON):\\n' + rawJson;
+              } catch(e) { console.error(e); }
+            }
+
+            // Cloud API aanroep naar Gemini 1.5 Flash
+            try {
+              const url = 'https://googleapis.com' + apiKey;
+              const payload = {
+                contents: [{
+                  parts: [{
+                    text: 'Je bent de AI-assistent van OpenQuatt (open-source, best-effort basis, support via Discord, bugs via GitHub).\\n\\nINSTALLATIEPROFIEL:\\n' + JSON.stringify(profiel) + jsonPromptPart + '\\n\\nVRAAG: ' + question
+                  }]
+                }]
+              };
+
+              const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+              const data = await response.json();
+              const reply = data.candidates.content.parts.text;
+
+              // Toon antwoord in UI
+              msgContainer.innerHTML += \`<div style='background: #2a2a2a; padding: 10px; border-radius: 6px; border-left: 3px solid #ff9900; margin-bottom: 5px;'><p style='margin:0;'><strong>Assistent:</strong> \${reply}</p></div>\`;
+            } catch (err) {
+              msgContainer.innerHTML += \`<div style='background: #552222; padding: 10px; border-radius: 6px; margin-bottom: 5px;'><p style='margin:0;'><strong>Fout:</strong> AI kon niet worden bereikt. Controleer internet of API-key.</p></div>\`;
+            }
+            msgContainer.scrollTop = msgContainer.scrollHeight;
+          })()"
+        >
+          Stuur
+        </button>
+      </div>
+      
+      <!-- Project Footer / Vangrail Links -->
+      <div style="padding: 10px; background: #111; font-size: 11px; text-align: center; border-top: 1px solid #333; color: #888;">
+        Best-effort project. Hulp nodig? <a href="https://discord.gg" target="_blank" style="color: #ff9900; text-decoration: none;">Discord</a> | Bug? <a href="https://github.com" target="_blank" style="color: #ff9900; text-decoration: none;">GitHub</a>
+      </div>
+    </aside>
+  `;
+}
