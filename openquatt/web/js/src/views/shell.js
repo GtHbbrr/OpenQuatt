@@ -426,40 +426,54 @@ export function renderSettingsView() {
 
                 const promptText = 'Je bent de AI-assistent van OpenQuatt (open-source, best-effort basis).\\n\\nINSTALLATIEPROFIEL:\\n' + JSON.stringify(profiel) + jsonPromptPart + '\\n\\nVRAAG: ' + question;
 
-                // --- TWEETRAPS LOGICA VERZENDEN ---
+                // --- DRIETRAPS LOGICA VERZENDEN ---
                 if (currentMode === 'cloud') {
                   // ROUTE A: GOOGLE GEMINI 3.7 CLOUD
                   try {
                     const url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.7-flash:generateContent?key=' + apiKey;
                     const payload = { contents: [{ parts: [{ text: promptText }] }] };
-
                     const response = await window.fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-                    if (!response.ok) {
-                      msgContainer.innerHTML += '<div style="background: #552222; padding: 10px; border-radius: 6px; margin-bottom: 5px;"><p style="margin:0;"><strong>Fout:</strong> De AI is (even) niet beschikbaar. Probeer het over een moment opnieuw.</p></div>';
-                      msgContainer.scrollTop = msgContainer.scrollHeight;
-                      return;
-                    }
+                    if (!response.ok) throw new Error();
                     const data = await response.json();
-                    const reply = data.candidates[0].content.parts[0].text;
-                    msgContainer.innerHTML += '<div style="background: #2a2a2a; padding: 10px; border-radius: 6px; border-left: 3px solid #ff9900; margin-bottom: 5px;"><p style="margin:0;"><strong>Assistent (Cloud):</strong> ' + escapeHtml(reply) + '</p></div>';
+                    msgContainer.innerHTML += '<div style="background: #2a2a2a; padding: 10px; border-radius: 6px; border-left: 3px solid #ff9900; margin-bottom: 5px;"><p style="margin:0;"><strong>Assistent (Gemini):</strong> ' + escapeHtml(data.candidates[0].content.parts[0].text) + '</p></div>';
                   } catch (err) {
-                    msgContainer.innerHTML += '<div style="background: #552222; padding: 10px; border-radius: 6px; margin-bottom: 5px;"><p style="margin:0;"><strong>Fout:</strong> Cloud AI kon niet worden bereikt.</p></div>';
+                    msgContainer.innerHTML += '<div style="background: #552222; padding: 10px; border-radius: 6px; margin-bottom: 5px;"><p style="margin:0;"><strong>Fout:</strong> Gemini Cloud overbelast (503/429). Schakel over naar Groq of Llama3.</p></div>';
+                  }
+                } else if (currentMode === 'groq') {
+                  // ROUTE B: LIGTNING FAST GROQ CLOUD (Llama 3 8B)
+                  try {
+                    const groqKey = localStorage.getItem('openquatt_groq_key');
+
+                    // Controleer eerst of de sleutel überhaupt aanwezig is
+                    if (!groqKey) {
+                      throw new Error('Geen API-sleutel gevonden in localStorage.');
+                    }
+                    
+                    const url = 'https://api.groq.com/openai/v1/chat/completions';
+                    const payload = {
+                      model: 'llama-3.3-70b-versatile',
+                      messages: [{ role: 'user', content: promptText }]
+                    };
+                    const response = await window.fetch(url, { 
+                      method: 'POST', 
+                      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + groqKey }, 
+                      body: JSON.stringify(payload) 
+                    });
+                    if (!response.ok) throw new Error('API status fout: ${response.status}');
+                    const data = await response.json();
+                    msgContainer.innerHTML += '<div style="background: #2a2a2a; padding: 10px; border-radius: 6px; border-left: 3px solid #00ffcc; margin-bottom: 5px;"><p style="margin:0;"><strong>Assistent (Groq):</strong> ' + escapeHtml(data.choices[0].message.content) + '</p></div>';
+                  } catch (err) {
+                    msgContainer.innerHTML += '<div style="background: #552222; padding: 10px; border-radius: 6px; margin-bottom: 5px;"><p style="margin:0;"><strong>Fout:</strong> Groq API kon niet worden bereikt. Controleer je gsk_ sleutel.</p></div>';
                   }
                 } else {
-                  // ROUTE B: LOKAAL OLLAMA (LLAMA 3 8B MOOT)
+                  // ROUTE C: LOKAAL OLLAMA (LLAMA 3 8B)
                   try {
                     const url = 'http://localhost:11434/api/generate';
                     const payload = { model: 'llama3', prompt: promptText, stream: false };
-
                     const response = await window.fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-                    if (!response.ok) {
-                      msgContainer.innerHTML += '<div style="background: #552222; padding: 10px; border-radius: 6px; margin-bottom: 5px;"><p style="margin:0;"><strong>Fout:</strong> Lokale Ollama AI reageert niet. Staat de app aan?</p></div>';
-                      msgContainer.scrollTop = msgContainer.scrollHeight;
-                      return;
-                    }
+                    if (!response.ok) throw new Error();
                     const data = await response.json();
-                    const reply = data.response;
-                    msgContainer.innerHTML += '<div style="background: #2a2a2a; padding: 10px; border-radius: 6px; border-left: 3px solid #ffaa00; margin-bottom: 5px;"><p style="margin:0;"><strong>Assistent (Lokaal):</strong> ' + escapeHtml(reply) + '</p></div>';
+                    msgContainer.innerHTML += '<div style="background: #2a2a2a; padding: 10px; border-radius: 6px; border-left: 3px solid #ffaa00; margin-bottom: 5px;"><p style="margin:0;"><strong>Assistent (Lokaal):</strong> ' + escapeHtml(data.response) + '</p></div>';
                   } catch (err) {
                     msgContainer.innerHTML += '<div style="background: #552222; padding: 10px; border-radius: 6px; margin-bottom: 5px;"><p style="margin:0;"><strong>Fout:</strong> Lokale AI-verbinding verbroken.</p></div>';
                   }
@@ -500,49 +514,56 @@ export function renderAiSidePanel() {
         </button>
       </div>
 
-      <!-- HYBRIDE MOTOR SCHAKELAAR (Cloud vs Lokaal) -->
-      <div style="padding: 10px 15px; background: #151515; border-bottom: 1px solid #333; display: flex; align-items: center; justify-content: space-between; font-size: 12px;">
+      <!-- HYBRIDE MOTOR SCHAKELAAR (Drietraps) -->
+      <div style="padding: 10px 15px; background: #151515; border-bottom: 1px solid #333; display: flex; flex-direction: column; gap: 8px; font-size: 12px;">
         <span style="color: #ccc; font-weight: bold;">AI Motor selectie:</span>
-        <div style="display: flex; background: #222; border-radius: 15px; padding: 2px; border: 1px solid #444;">
+        <div style="display: flex; background: #222; border-radius: 15px; padding: 2px; border: 1px solid #444; justify-content: space-between;">
           <button 
-            id="oq-mode-cloud-btn"
-            type="button"
-            style="border: none; padding: 4px 10px; border-radius: 12px; cursor: pointer; font-size: 11px; font-weight: bold; background: ${aiMode === 'cloud' ? '#ff9900' : 'transparent'}; color: ${aiMode === 'cloud' ? '#000' : '#aaa'};"
-            onclick="(() => { localStorage.setItem('oq_ai_mode', 'cloud'); document.getElementById('oq-cloud-key-section').style.display = 'block'; document.getElementById('oq-mode-cloud-btn').style.background = '#ff9900'; document.getElementById('oq-mode-cloud-btn').style.color = '#000'; document.getElementById('oq-mode-local-btn').style.background = 'transparent'; document.getElementById('oq-mode-local-btn').style.color = '#aaa'; })()"
+            id="oq-mode-cloud-btn" type="button"
+            style="border: none; padding: 4px 8px; border-radius: 12px; cursor: pointer; font-size: 10px; font-weight: bold; background: ${aiMode === 'cloud' ? '#ff9900' : 'transparent'}; color: ${aiMode === 'cloud' ? '#000' : '#aaa'};"
+            onclick="(() => { localStorage.setItem('oq_ai_mode', 'cloud'); window.location.reload(); })()"
           >
-            ☁️ Cloud (3.7)
+            ☁️ Gemini
           </button>
           <button 
-            id="oq-mode-local-btn"
-            type="button"
-            style="border: none; padding: 4px 10px; border-radius: 12px; cursor: pointer; font-size: 11px; font-weight: bold; background: ${aiMode === 'local' ? '#ff9900' : 'transparent'}; color: ${aiMode === 'local' ? '#000' : '#aaa'};"
-            onclick="(() => { localStorage.setItem('oq_ai_mode', 'local'); document.getElementById('oq-cloud-key-section').style.display = 'none'; document.getElementById('oq-mode-local-btn').style.background = '#ff9900'; document.getElementById('oq-mode-local-btn').style.color = '#000'; document.getElementById('oq-mode-cloud-btn').style.background = 'transparent'; document.getElementById('oq-mode-cloud-btn').style.color = '#aaa'; })()"
+            id="oq-mode-groq-btn" type="button"
+            style="border: none; padding: 4px 8px; border-radius: 12px; cursor: pointer; font-size: 10px; font-weight: bold; background: ${aiMode === 'groq' ? '#ff9900' : 'transparent'}; color: ${aiMode === 'groq' ? '#000' : '#aaa'};"
+            onclick="(() => { localStorage.setItem('oq_ai_mode', 'groq'); window.location.reload(); })()"
           >
-            💻 Lokaal (Llama3)
+            ⚡ Groq
+          </button>
+          <button 
+            id="oq-mode-local-btn" type="button"
+            style="border: none; padding: 4px 8px; border-radius: 12px; cursor: pointer; font-size: 10px; font-weight: bold; background: ${aiMode === 'local' ? '#ff9900' : 'transparent'}; color: ${aiMode === 'local' ? '#000' : '#aaa'};"
+            onclick="(() => { localStorage.setItem('oq_ai_mode', 'local'); window.location.reload(); })()"
+          >
+            💻 Llama3
           </button>
         </div>
       </div>
 
-      <!-- API Key Beheer (Verbergt automatisch als lokaal is gekozen) -->
-      <div id="oq-cloud-key-section" style="padding: 15px; background: #111; border-bottom: 1px solid #333; font-size: 13px; display: ${aiMode === 'cloud' ? 'block' : 'none'};">
-        <label style="display: block; margin-bottom: 5px; font-weight: bold; color: #ccc;">Gemini API-sleutel:</label>
+      <!-- API Key Beheer (Dynamisch label op basis van modus) -->
+      <div id="oq-cloud-key-section" style="padding: 15px; background: #111; border-bottom: 1px solid #333; font-size: 13px; display: ${aiMode !== 'local' ? 'block' : 'none'};">
+        <label style="display: block; margin-bottom: 5px; font-weight: bold; color: #ccc;">
+          ${aiMode === 'groq' ? 'Groq API-sleutel (gsk_...):' : 'Gemini API-sleutel (AIzaSy...):'}
+        </label>
         <div style="display: flex; gap: 8px;">
           <input 
-            id="oq-ai-api-key-input" 
-            type="password" 
-            value="${savedKey}" 
-            placeholder="${savedKey ? maskedKey : 'AIzaSy...'}"
+            id="oq-ai-api-key-input" type="password" 
+            value="${aiMode === 'groq' ? (localStorage.getItem('openquatt_groq_key') || '') : (localStorage.getItem('openquatt_gemini_key') || '')}" 
+            placeholder="Plak hier je sleutel..."
             style="flex-grow: 1; padding: 6px; background: #222; border: 1px solid #444; color: #fff; border-radius: 4px; font-size: 12px;"
           >
           <button 
-            id="oq-save-ai-key-btn"
-            type="button"
+            id="oq-save-ai-key-btn" type="button"
             style="background: #ff9900; color: #000; font-weight: bold; border: none; padding: 0 10px; border-radius: 4px; cursor: pointer; font-size: 12px;"
             onclick="(() => {
               const key = document.getElementById('oq-ai-api-key-input').value.trim();
+              const mode = localStorage.getItem('oq_ai_mode') || 'cloud';
               if(key) {
-                localStorage.setItem('openquatt_gemini_key', key);
-                alert('Gemini API-sleutel opgeslagen!');
+                localStorage.setItem(mode === 'groq' ? 'openquatt_groq_key' : 'openquatt_gemini_key', key);
+                alert('Sleutel succesvol opgeslagen!');
+                window.location.reload();
               }
             })()"
           >
