@@ -468,7 +468,7 @@ export function renderSettingsView() {
                 } else {
                   // ROUTE C: LOKAAL OLLAMA (LLAMA 3 8B)
                   try {
-                    const url = 'http://localhost:11434/api/generate';
+                    const url = 'http://192.168.178.82:11434/api/generate';
                     const payload = { model: 'llama3', prompt: promptText, stream: false };
                     const response = await window.fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
                     if (!response.ok) throw new Error();
