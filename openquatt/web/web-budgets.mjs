@@ -41,9 +41,10 @@ export const WEB_BUNDLE_BUDGETS = [
     // Compact pipeline plus the bottom-plate editor/backup: ~914 kB.
     // the issue-649 heating supply target source card with OT/HA/API/MQTT rows:
     // measured +3.668 kB over its compact baseline.
+    // Includes the separate issue-670 performance-telemetry privacy control.
     // Keep a narrow margin for the merged issue-642, V2 and issue-649 set;
     // do not restore the pre-compaction 1 MB ceiling.
-    raw: 930_000,
+    raw: 931_000,
     // One-time migration ceiling for structured incident monitoring, replay,
     // the CSRF-protected deferred recovery actions, and their compact editor.
     // Once this bundle is the base, the normal gzip growth limit applies again.
