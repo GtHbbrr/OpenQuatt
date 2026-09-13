@@ -528,6 +528,7 @@ test("DHW permission follows a current OT thermostat status and fails open", () 
   assert.match(boilerOpenThermRuntime, /id\(oq_otb_dhw_enable\)\.turn_off\(\);/);
   assert.match(otSlaveYaml, /master_dhw_enable:\n\s+id: ot_thermostat_dhw_enable/);
   assert.match(otSlaveCpp, /void OpenQuattOTSlave::stop_opentherm_\(\)[\s\S]*?m_lastMasterStatusMs = 0;/);
+  assert.match(otSlaveCpp, /if \(this->master_status_valid_binary_sensor != nullptr\)/);
   assert.match(otSlaveCpp, /void OpenQuattOTSlave::stop_opentherm_\(\)[\s\S]*?master_status_valid_binary_sensor->publish_state\(false\);/);
   assert.match(boilerTransportLogic, /static_assert\(!compute_otb_dhw_permission\(true, true, false\)/);
   assert.match(boilerTransportLogic, /static_assert\(compute_otb_dhw_permission\(true, false, false\)/);

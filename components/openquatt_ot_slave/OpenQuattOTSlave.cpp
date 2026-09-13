@@ -151,8 +151,12 @@ void OpenQuattOTSlave::stop_opentherm_() {
   m_lastMasterRoomSetpointMs = 0;
   m_lastMasterControlSetpointMs = 0;
 #ifdef OPENQUATT_OT_SLAVE_HAS_BINARY_SENSOR_master_status_valid
-  this->master_status_valid_binary_sensor->publish_state(false);
-  m_lastPublishedMasterStatusValid = 0;
+  if (this->master_status_valid_binary_sensor != nullptr) {
+    this->master_status_valid_binary_sensor->publish_state(false);
+    m_lastPublishedMasterStatusValid = 0;
+  } else {
+    m_lastPublishedMasterStatusValid = -1;
+  }
 #endif
   if (m_ot_thermostat_ == NULL || !m_otStarted) {
     return;
