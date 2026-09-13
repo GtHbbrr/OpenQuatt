@@ -42,9 +42,29 @@ inline void connection_changed(bool opentherm_selected) {
   id(oq_otb_invalidate_telemetry).execute();
 }
 
+inline void apply_dhw_permission(bool opentherm_selected) {
+  const bool thermostat_status_valid = id(oq_ot_slave_enabled).state && id(ot_thermostat_status_valid).has_state() &&
+                                       id(ot_thermostat_status_valid).state;
+  const bool thermostat_dhw_enabled = id(ot_thermostat_dhw_enable).has_state() && id(ot_thermostat_dhw_enable).state;
+  const bool dhw_permission = oq_boiler_transport::compute_otb_dhw_permission(
+      opentherm_selected, thermostat_status_valid, thermostat_dhw_enabled);
+  if (id(oq_otb_dhw_enable).state == dhw_permission) return;
+
+  if (dhw_permission) {
+    id(oq_otb_dhw_enable).turn_on();
+  } else {
+    id(oq_otb_dhw_enable).turn_off();
+  }
+  // Do not truncate an active request/response exchange. The updated STATUS
+  // frame is sent next, before non-control telemetry.
+  id(oq_otb_hub)
+      .defer_priority_messages(esphome::opentherm::MessageId::STATUS, esphome::opentherm::MessageId::CH_SETPOINT);
+}
+
 inline void apply_command(float minimum_flow_lph, uint32_t status_timeout_ms) {
   const bool opentherm_selected =
       id(oq_boiler_connection).has_state() && id(oq_boiler_connection).current_option() == "OpenTherm";
+  apply_dhw_permission(opentherm_selected);
   const auto decision = oq_boiler_transport::evaluate_command_adapter({
       opentherm_selected,
       !id(oq_runtime_polling_paused).state && !id(oq_boiler_runtime_pause_state),

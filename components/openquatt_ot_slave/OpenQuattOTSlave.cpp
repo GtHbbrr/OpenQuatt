@@ -146,9 +146,18 @@ void OpenQuattOTSlave::stop_opentherm_() {
   m_runtimeGraceUntilMs = 0;
   m_linkProblemGraceUntilMs = 0;
   m_lastSuccessfulFrameMs = 0;
+  m_lastMasterStatusMs = 0;
   m_lastMasterRoomTemperatureMs = 0;
   m_lastMasterRoomSetpointMs = 0;
   m_lastMasterControlSetpointMs = 0;
+#ifdef OPENQUATT_OT_SLAVE_HAS_BINARY_SENSOR_master_status_valid
+  if (this->master_status_valid_binary_sensor != nullptr) {
+    this->master_status_valid_binary_sensor->publish_state(false);
+    m_lastPublishedMasterStatusValid = 0;
+  } else {
+    m_lastPublishedMasterStatusValid = -1;
+  }
+#endif
   if (m_ot_thermostat_ == NULL || !m_otStarted) {
     return;
   }
@@ -481,6 +490,10 @@ void OpenQuattOTSlave::publish_master_runtime_state_() {
 #ifdef OPENQUATT_OT_SLAVE_HAS_BINARY_SENSOR_master_ch_enable
   publish_binary_if_changed(this->master_ch_enable_binary_sensor, m_master_state.ch_enable,
                             m_lastPublishedMasterCHEnableBinary);
+#endif
+#ifdef OPENQUATT_OT_SLAVE_HAS_BINARY_SENSOR_master_dhw_enable
+  publish_binary_if_changed(this->master_dhw_enable_binary_sensor, m_master_state.dhw_enable,
+                            m_lastPublishedMasterDHWEnableBinary);
 #endif
 #ifdef OPENQUATT_OT_SLAVE_HAS_BINARY_SENSOR_master_cooling_enable
   publish_binary_if_changed(this->master_cooling_enable_binary_sensor, m_master_state.cooling_enable,

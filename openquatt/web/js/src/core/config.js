@@ -236,6 +236,7 @@
     ["cicDataStale", DOMAIN_BINARY_SENSOR, "CIC - Data stale"],
     ["otEnabled", DOMAIN_SWITCH, "OpenTherm Enabled"],
     ["otThermostatChEnable", DOMAIN_BINARY_SENSOR, "OT - Thermostat CH Enable"],
+    ["otThermostatDhwEnable", DOMAIN_BINARY_SENSOR, "OT - Thermostat DHW Enable"],
     ["otThermostatStatusValid", DOMAIN_BINARY_SENSOR, "OT - Thermostat Status Valid"],
     ["otThermostatControlSetpointValid", DOMAIN_BINARY_SENSOR, "OT - Control Setpoint Valid"],
     ["otThermostatCoolingEnable", DOMAIN_BINARY_SENSOR, "OT - Thermostat Cooling Enable"],
@@ -1035,6 +1036,7 @@
   export const CIC_POLLING_SETTING_KEYS = ["cicPollingEnabled", "cicFeedUrl", "cicDataStale"];
   export const OPENTHERM_DIAGNOSTIC_KEYS = [
     "otThermostatChEnable",
+    "otThermostatDhwEnable",
     "otThermostatCoolingEnable",
     "otThermostatControlSetpointValid",
     "otControlSetpoint",

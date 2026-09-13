@@ -149,6 +149,7 @@ function setSourceSelectionState(mqttEnabled) {
     otRoomTemp: valueEntity(21.8, "°C"),
     otRoomSetpoint: valueEntity(20, "°C"),
     otThermostatChEnable: binaryEntity(true),
+    otThermostatDhwEnable: binaryEntity(true),
     otThermostatCoolingEnable: binaryEntity(false),
     roomTempHa: valueEntity(21.6, "°C"),
     roomTempHaValid: binaryEntity(true),
