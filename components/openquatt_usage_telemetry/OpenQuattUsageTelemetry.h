@@ -20,6 +20,7 @@
 #include "esphome/core/static_task.h"
 #include "mqtt_client.h"
 #include "OpenQuattUsageTelemetryPolicy.h"
+#include "OpenQuattExternalTelemetryTransport.h"
 #include "PsramBuffer.h"
 
 namespace esphome {
@@ -28,8 +29,12 @@ class OpenQuattMqttConfig;
 }
 namespace openquatt_usage_telemetry {
 
-class OpenQuattUsageTelemetry : public switch_::Switch, public Component {
+class OpenQuattUsageTelemetry : public switch_::Switch,
+                                public Component,
+                                public openquatt_common::OpenQuattExternalTelemetryTransport {
  public:
+  using ExternalPublishResult = openquatt_common::ExternalTelemetryPublishResult;
+
   void set_broker(const std::string& broker) { this->broker_ = broker; }
   void set_port(uint16_t port) { this->port_ = port; }
   void set_tls(bool tls) { this->tls_ = tls; }
@@ -87,6 +92,15 @@ class OpenQuattUsageTelemetry : public switch_::Switch, public Component {
   void set_energy_history_flash_switch(switch_::Switch* feature_switch) {
     this->energy_history_flash_switch_ = feature_switch;
   }
+
+  // A second opt-in telemetry feature may reuse this outbound-only client.
+  // Its payload stays separate from usage statistics and is protected by its
+  // own fail-closed gate. The caller owns retry policy and logical message ID.
+  bool ensure_installation_id_for_external() override;
+  const char* external_installation_id() const override { return this->installation_id_.c_str(); }
+  bool request_external_publish(const char* suffix, const char* payload, size_t payload_size) override;
+  void cancel_external_publish() override;
+  ExternalPublishResult take_external_publish_result() override;
   void setup() override;
   void loop() override;
   void dump_config() override;
@@ -103,6 +117,7 @@ class OpenQuattUsageTelemetry : public switch_::Switch, public Component {
   static constexpr uint32_t SESSION_TIMEOUT_MS = 30000;
   static constexpr uint32_t RETRY_MIN_MS = 5UL * 60UL * 1000UL;
   static constexpr uint32_t RETRY_MAX_MS = 60UL * 60UL * 1000UL;
+  static constexpr size_t EXTERNAL_PAYLOAD_MAX = 4096U;
 #if defined(CONFIG_IDF_TARGET_ESP32S3)
   // PSRAM is abundant, so keep a conservative stack until HIL watermarks
   // demonstrate that this can safely be reduced.
@@ -119,6 +134,12 @@ class OpenQuattUsageTelemetry : public switch_::Switch, public Component {
   enum class WorkerCommand : uint32_t {
     START = 1U,
     CLEANUP = 2U,
+  };
+
+  enum class SessionKind : uint8_t {
+    NONE = 0U,
+    USAGE = 1U,
+    EXTERNAL = 2U,
   };
 
   struct StorageV1 {
@@ -148,12 +169,16 @@ class OpenQuattUsageTelemetry : public switch_::Switch, public Component {
   bool set_consent_publish_blocked_(bool blocked);
   bool ensure_installation_id_(Storage* storage);
   bool is_setup_complete_() const;
+  bool session_permitted_() const;
+  const char* active_publish_topic_() const;
+  const char* active_payload_() const;
+  size_t active_payload_size_() const;
   bool apply_storage_(const Storage& storage);
   void schedule_initial_publish_();
   void schedule_immediate_publish_();
   void schedule_regular_publish_();
   void schedule_retry_();
-  void start_publish_session_();
+  void start_publish_session_(SessionKind kind);
   bool ensure_worker_task_();
   bool notify_worker_(WorkerCommand command);
   bool start_client_();
@@ -219,6 +244,9 @@ class OpenQuattUsageTelemetry : public switch_::Switch, public Component {
   openquatt_common::PsramBuffer<char> payload_;
   size_t payload_size_{0U};
   std::string payload_message_id_;
+  openquatt_common::PsramBuffer<char> external_publish_topic_;
+  openquatt_common::PsramBuffer<char> external_payload_;
+  size_t external_payload_size_{0U};
   esp_mqtt_client_handle_t mqtt_client_{nullptr};
   bool mqtt_client_started_{false};
   uint8_t cleanup_stop_failures_{0U};
@@ -229,6 +257,9 @@ class OpenQuattUsageTelemetry : public switch_::Switch, public Component {
   StaticTask worker_task_state_{};
   std::atomic<bool> enabled_{false};
   std::atomic<bool> consent_publish_blocked_{true};
+  std::atomic<bool> external_publish_blocked_{true};
+  std::atomic<bool> external_publish_pending_{false};
+  std::atomic<ExternalPublishResult> external_publish_result_{ExternalPublishResult::NONE};
   std::atomic<bool> choice_configured_{false};
   std::atomic<bool> session_active_{false};
   std::atomic<bool> finishing_session_{false};
@@ -241,6 +272,7 @@ class OpenQuattUsageTelemetry : public switch_::Switch, public Component {
   std::atomic<bool> publish_succeeded_{false};
   std::atomic<bool> publish_failed_{false};
   std::atomic<int> pending_message_id_{-1};
+  std::atomic<SessionKind> session_kind_{SessionKind::NONE};
   uint32_t session_started_ms_{0};
   uint32_t next_publish_ms_{0};
   uint8_t consecutive_failures_{0};

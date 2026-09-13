@@ -15,7 +15,7 @@ external_components:
   - source:
       type: local
       path: ${external_components_path}
-    components: [openquatt_usage_telemetry, openquatt_crash_telemetry]
+    components: [openquatt_usage_telemetry, openquatt_performance_telemetry, openquatt_crash_telemetry]
 
 openquatt_usage_telemetry:
   id: oq_usage_telemetry

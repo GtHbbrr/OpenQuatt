@@ -93,6 +93,7 @@
     ["usageTelemetryEnabled", DOMAIN_SWITCH, "Usage statistics"],
     ["usageTelemetryChoiceConfigured", DOMAIN_BINARY_SENSOR, "Usage statistics choice configured"],
     ["usageTelemetryInstallationId", DOMAIN_TEXT_SENSOR, "Usage statistics installation ID"],
+    ["performanceTelemetryEnabled", DOMAIN_SWITCH, "Performance model validation"],
     ["hpGeneration", DOMAIN_SELECT, "Quatt Hybrid version", false],
     ["electricalCurrentLimit", DOMAIN_NUMBER, "Electrical current limit"],
     ["strategy", DOMAIN_SELECT, "Heating Control Mode", false],
@@ -1885,6 +1886,7 @@
     "manualCoolingEnable",
     "usageTelemetryEnabled",
     "usageTelemetryInstallationId",
+    "performanceTelemetryEnabled",
     "silentModeOverride",
     "silentActive",
     "trendHistoryEnabled",
@@ -1942,6 +1944,7 @@
     "coolingEffectiveMinSupplyTemp",
     "statusLedsEnabled",
     "usageTelemetryEnabled",
+    "performanceTelemetryEnabled",
     "controlModeOverride",
   ]);
   // Keep this aligned with persisted UI settings. The build checks that new
