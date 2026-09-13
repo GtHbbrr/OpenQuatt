@@ -40,6 +40,7 @@ const otSlaveHeader = await readFile(
   "utf8",
 );
 const commonSubstitutionsYaml = await readFile(new URL("../../oq_substitutions_common.yaml", import.meta.url), "utf8");
+const boilerTransportLogic = await readFile(new URL("../../includes/boiler/oq_boiler_transport_logic.h", import.meta.url), "utf8");
 const quickStartSource = await readFile(new URL("../js/src/features/quickstart.js", import.meta.url), "utf8");
 const quickStartActionsSource = await readFile(new URL("../js/src/features/quickstart-actions.js", import.meta.url), "utf8");
 const installationSource = await readFile(new URL("../js/src/settings/installation.js", import.meta.url), "utf8");
@@ -320,6 +321,7 @@ test("integration diagnostics separates thermostat, boiler control, OTB and CiC"
     otEnabled: { value: true },
     otLinkProblem: { value: false },
     otThermostatStatusValid: { value: true },
+    otThermostatDhwEnable: { value: false },
     otRoomTemp: { value: 20.8, uom: "°C" },
     boilerConnection: { value: "OpenTherm" },
     boilerCommandValid: { value: true },
@@ -335,6 +337,8 @@ test("integration diagnostics separates thermostat, boiler control, OTB and CiC"
     const html = renderSettingsOpenThermCicSection();
     assert.match(html, /OpenTherm thermostaat \(OTT\)/);
     assert.match(html, /Statusbericht \(ID 0\) actueel/);
+    assert.match(html, /Thermostaat tapwater/);
+    assert.match(html, /Geblokkeerd/);
     assert.match(html, /Ketelregeling/);
     assert.match(html, /OpenTherm ketel \(OTB\)/);
     assert.match(html, /CiC-feed/);
@@ -515,15 +519,22 @@ test("installation offers only R1 after OpenTherm capability is confirmed absent
   );
 });
 
-test("DHW permission stays enabled without a user-facing setting", () => {
+test("DHW permission follows a current OT thermostat status and fails open", () => {
   assert.match(boilerOpenThermYaml, /^    dhw_enable: true$/m);
-  assert.doesNotMatch(boilerOpenThermYaml, /^    dhw_enable:\n\s+id: oq_otb_dhw_enable$/m);
+  assert.match(boilerOpenThermYaml, /dhw_enable:\n\s+id: oq_otb_dhw_enable/);
+  assert.match(boilerOpenThermYaml, /restore_mode: ALWAYS_ON/);
+  assert.match(boilerOpenThermRuntime, /inline void apply_dhw_permission\(bool opentherm_selected\)/);
+  assert.match(boilerOpenThermRuntime, /compute_otb_dhw_permission/);
+  assert.match(boilerOpenThermRuntime, /id\(oq_otb_dhw_enable\)\.turn_off\(\);/);
+  assert.match(otSlaveYaml, /master_dhw_enable:\n\s+id: ot_thermostat_dhw_enable/);
+  assert.match(otSlaveCpp, /void OpenQuattOTSlave::stop_opentherm_\(\)[\s\S]*?m_lastMasterStatusMs = 0;/);
+  assert.match(otSlaveCpp, /void OpenQuattOTSlave::stop_opentherm_\(\)[\s\S]*?master_status_valid_binary_sensor->publish_state\(false\);/);
+  assert.match(boilerTransportLogic, /static_assert\(!compute_otb_dhw_permission\(true, true, false\)/);
+  assert.match(boilerTransportLogic, /static_assert\(compute_otb_dhw_permission\(true, false, false\)/);
+  assert.match(boilerTransportLogic, /static_assert\(compute_otb_dhw_permission\(false, true, false\)/);
   assert.doesNotMatch(quickStartSource, /tapwater levert/i);
-  assert.equal(Object.hasOwn(ENTITY_DEFS, "boilerProvidesDhw"), false);
-  assert.equal(INITIAL_SETTINGS_READY_KEY_MAP.installation.includes("boilerProvidesDhw"), false);
-  assert.equal(SETTINGS_GROUP_KEY_MAP.installation.includes("boilerProvidesDhw"), false);
-  assert.ok(SETTINGS_GROUP_KEY_MAP.integrations.includes("otbDhwActive"));
-  assert.ok(SETTINGS_GROUP_KEY_MAP.integrations.includes("otbDhwPresent"));
+  assert.ok(Object.hasOwn(ENTITY_DEFS, "otThermostatDhwEnable"));
+  assert.ok(SETTINGS_GROUP_KEY_MAP.integrations.includes("otThermostatDhwEnable"));
 });
 
 test("thermostat slave reports only real flame state, never HP activity as flame", () => {

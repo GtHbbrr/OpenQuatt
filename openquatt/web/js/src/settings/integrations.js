@@ -98,6 +98,7 @@ import { escapeHtml } from "../core/html.js";
       }) : "",
       renderBinaryDiagnosticItem("otThermostatStatusValid", "Statusbericht (ID 0) actueel", "Ja", "Nee"),
       renderBinaryDiagnosticItem("otThermostatChEnable", "Thermostaat CH", "Actief", "Normaal"),
+      renderBinaryDiagnosticItem("otThermostatDhwEnable", "Thermostaat tapwater", "Toegestaan", "Geblokkeerd"),
       renderBinaryDiagnosticItem("otThermostatCoolingEnable", "Thermostaat koeling", "Actief", "Normaal"),
       renderValueDiagnosticItem("otControlSetpoint", "Control setpoint"),
       renderValueDiagnosticItem("otRoomSetpoint", "Room setpoint", { fallbackKey: "roomSetpoint" }),
