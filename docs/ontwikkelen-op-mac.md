@@ -68,8 +68,8 @@ Vergelijk dezelfde releaseconfiguratie vóór en na de wijziging, vanaf een koud
 Gebruik voor ESPHome upload- en logtaken de ESPHome executable uit de lokale venv:
 
 ```bash
-.venv/bin/esphome upload configs/waveshare/duo_wifi.yaml
-.venv/bin/esphome logs configs/waveshare/duo_wifi.yaml
+.venv/bin/esphome upload configs/heatpump_controller_q/duo.yaml
+.venv/bin/esphome logs configs/heatpump_controller_q/duo.yaml
 ```
 
 Voor browser-based flashen kun je de lokale Pages preview of de gepubliceerde installer gebruiken.

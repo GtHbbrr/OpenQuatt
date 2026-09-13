@@ -15,7 +15,7 @@
 
 ## Good Scoped Prompts
 
-- `Pas alleen configs/waveshare/duo_wifi.yaml aan en draai alleen config-validatie.`
+- `Pas alleen configs/heatpump_controller_q/duo.yaml aan en draai alleen config-validatie.`
 - `Werk openquatt/oq_thermal_limits.yaml bij; lees alleen direct gekoppelde packages als dat nodig is.`
 - `Fix de web UI in openquatt/web/js/src/10-settings.js en rebuild alleen de web bundle.`
 - `Controleer docs/web-app.md op deze nieuwe instelling; lees geen lokale referenties.`

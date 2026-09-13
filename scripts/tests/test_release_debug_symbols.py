@@ -72,10 +72,10 @@ class ReleaseDebugSymbolsTests(unittest.TestCase):
     status: enabled
     hardware: heatpump_controller_q
     config: configs/heatpump_controller_q/duo.yaml
-  - id: waveshare_single
+  - id: unsupported_single
     status: enabled
-    hardware: waveshare
-    config: configs/waveshare/single_wifi.yaml
+    hardware: unsupported
+    config: configs/unsupported/single.yaml
 """,
                 encoding="utf-8",
             )
@@ -116,7 +116,7 @@ class ReleaseDebugSymbolsTests(unittest.TestCase):
                 self.assertTrue((output_dir / record["files"]["elf"]).is_file())
                 self.assertTrue((output_dir / record["files"]["map"]).is_file())
 
-            self.assertFalse((output_dir / "waveshare_single").exists())
+            self.assertFalse((output_dir / "unsupported_single").exists())
 
     def test_missing_q_mapfile_fails_packaging(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

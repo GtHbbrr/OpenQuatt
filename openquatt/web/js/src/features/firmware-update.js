@@ -63,12 +63,11 @@ import { render } from "../core/render-scheduler.js";
     const currentTopology = getInstallationTopology();
     const targetTopology = getFirmwareAlternateTopology();
     const currentConnection = getFirmwareBuildConnection();
-    const supportedConnections = hardware === "heatpump_controller_q" ? ["wifi", "eth"] : ["wifi"];
     if (
-      !["heatpump_controller_q", "heatpump_listener", "waveshare"].includes(hardware)
+      hardware !== "heatpump_controller_q"
       || (currentTopology !== "single" && currentTopology !== "duo")
       || !targetTopology
-      || !supportedConnections.includes(currentConnection)
+      || !["wifi", "eth"].includes(currentConnection)
     ) {
       return null;
     }
@@ -215,32 +214,10 @@ import { render } from "../core/render-scheduler.js";
         label: `Heatpump Controller Q ${topologyLabel} ${getFirmwareConnectionLabel(connection)}`,
       };
     }
-    const hardwareMap = {
-      waveshare: {
-        slug: "waveshare",
-        label: "Waveshare",
-      },
-      heatpump_listener: {
-        slug: "heatpump-listener",
-        label: "Heatpump Listener",
-      },
-    };
-    const profile = hardwareMap[hardware];
-    if (!profile || connection !== "wifi") {
-      return {
-        available: false,
-        label: "Onbekend target",
-        error: "Deze firmware meldt geen herkenbaar hardware-, opstelling- of verbindingsprofiel.",
-      };
-    }
-
-    const artifactName = `openquatt-${profile.slug}-${topology}-wifi`;
     return {
-      available: true,
-      artifactName,
-      otaFileName: `${artifactName}.firmware.ota.bin`,
-      manifestFileName: `${artifactName}-ota.manifest.json`,
-      label: `${profile.label} ${topologyLabel} Wi-Fi`,
+      available: false,
+      label: "Onbekend target",
+      error: "Deze firmware meldt geen herkenbaar hardware-, opstelling- of verbindingsprofiel.",
     };
   }
 

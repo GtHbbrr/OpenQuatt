@@ -20,12 +20,8 @@ This document explains the current OpenQuatt architecture as implemented in the 
 
 OpenQuatt is driven from explicit matrix entrypoints under `configs/`:
 
-- `configs/waveshare/single_wifi.yaml`
-- `configs/waveshare/duo_wifi.yaml`
-- `configs/heatpump_listener/single_wifi.yaml`
-- `configs/heatpump_listener/duo_wifi.yaml`
-- `configs/heatpump_controller_q/single_wifi.yaml`
-- `configs/heatpump_controller_q/duo_wifi.yaml`
+- `configs/heatpump_controller_q/single.yaml`
+- `configs/heatpump_controller_q/duo.yaml`
 
 Each entrypoint includes:
 
@@ -63,7 +59,7 @@ Package include order is intentional:
 21. `openquatt_incident_manager` (heat-pump incident lifecycle and availability)
 
 This order mirrors data dependencies and ownership boundaries.
-Hardware profiles add the matching room/setpoint/heating-enable source selectors. The Heatpump Controller Q profile also includes `oq_ot_slave`; it uses the ESP-IDF RMT-based OpenTherm runtime and is only supported on the Q profile.
+The Heatpump Controller Q profile includes the room/setpoint/heating-enable source selectors and `oq_ot_slave`; it uses the ESP-IDF RMT-based OpenTherm runtime.
 
 ## 2. Ownership Model
 
@@ -330,16 +326,12 @@ OpenTherm CH-enable output while the output safety guards remain unchanged.
 
 ## 9. Hardware Profiles and Pin Strategy
 
-Hardware profile substitutions are split into dedicated files:
-
-- `openquatt/profiles/waveshare.yaml` ([Waveshare ESP32-S3-Relay-1CH](https://www.waveshare.com/esp32-s3-relay-1ch.htm))
-- `openquatt/profiles/heatpump_listener.yaml` ([Electropaultje Heatpump Listener](https://electropaultje.nl/product/heatpump-listener/))
-- `openquatt/profiles/heatpump_controller_q.yaml` ([Electropaultje Heatpump Controller Q-edition](https://electropaultje.nl/product/heatpump-controller-q-edition/))
+The Heatpump Controller Q-edition profile is defined in `openquatt/profiles/heatpump_controller_q.yaml`.
 
 Shared non-hardware constants are in `openquatt/oq_substitutions_common.yaml`.
 
-Compile-time profile selection is done by choosing a matrix entrypoint from `build_targets.yaml`. Ethernet targets are enabled for the Heatpump Controller Q as separate Ethernet-only builds.
-OpenTherm thermostat support is part of the Heatpump Controller Q profile only. Waveshare and Heatpump Listener builds expose CIC, Home Assistant, and MQTT source paths instead.
+Compile-time profile selection is done by choosing a `Single` or `Duo` matrix entrypoint from `build_targets.yaml`. The Q-edition chooses Wi-Fi or Ethernet at runtime.
+OpenTherm thermostat support is part of the Heatpump Controller Q profile.
 
 ### 9.1 Memory and flash expectations
 

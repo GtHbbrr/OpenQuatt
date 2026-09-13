@@ -59,7 +59,10 @@ class ReleaseBuildWorkflowTests(unittest.TestCase):
         self.assertIn("needs: validate-release-state", RELEASE_WORKFLOW)
         self.assertIn("--draft --generate-notes", RELEASE_WORKFLOW)
         self.assertIn("name: Verify release assets", RELEASE_WORKFLOW)
-        self.assertIn("scripts/build_targets.py release-files --status enabled", RELEASE_WORKFLOW)
+        self.assertIn(
+            "scripts/build_targets.py release-files --status enabled --include-legacy-eol-manifests",
+            RELEASE_WORKFLOW,
+        )
         self.assertIn("name: Publish complete release", RELEASE_WORKFLOW)
         self.assertGreater(
             RELEASE_WORKFLOW.index("Publish complete release"),

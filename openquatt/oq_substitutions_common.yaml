@@ -89,8 +89,6 @@ usage_telemetry_topic: "openquatt/devices"            # Base topic for openquatt
 # HARDWARE
 # ----------------------------
 # Hardware-specific substitutions are provided by per-profile files:
-# - openquatt/profiles/waveshare.yaml
-# - openquatt/profiles/heatpump_listener.yaml
 # - openquatt/profiles/heatpump_controller_q.yaml
 
 # ----------------------------
