@@ -17,14 +17,14 @@ import { updateFirmwareState } from "./feature-state.js";
 import { stopLoginAuthStatusPolling } from "../features/security-actions.js";
 import { refreshSettingsStorageStateSoon, SETTINGS_STORAGE_KEYS } from "../features/storage-history.js";
 import { refreshWebServerLogHistory } from "../features/webserver-logs.js";
+import { waitForPerformanceTelemetryChoiceConfirmation } from "./performance-telemetry-domain.js";
 import { waitForUsageTelemetryChoiceConfirmation } from "./usage-telemetry-domain.js";
 
-async function commitUsageTelemetrySwitch(entity, enabled) {
-  const key = "usageTelemetryEnabled";
-  const confirmChoice = (expectedEnabled) => waitForUsageTelemetryChoiceConfirmation({
+async function commitTelemetrySwitch({ key, choiceKey, extraRefreshKeys = [], waitForChoiceConfirmation, entity, enabled }) {
+  const confirmChoice = (expectedEnabled) => waitForChoiceConfirmation({
     refresh: async () => {
-      await refreshEntities([key, "usageTelemetryChoiceConfigured", "usageTelemetryInstallationId"], "all");
-      return [getEntityValue(key), getEntityValue("usageTelemetryChoiceConfigured")];
+      await refreshEntities([key, choiceKey, ...extraRefreshKeys], "all");
+      return [getEntityValue(key), getEntityValue(choiceKey)];
     },
     expectedEnabled,
   });
@@ -73,6 +73,27 @@ async function commitUsageTelemetrySwitch(entity, enabled) {
     state.busyAction = "";
     render();
   }
+}
+
+async function commitUsageTelemetrySwitch(entity, enabled) {
+  await commitTelemetrySwitch({
+    key: "usageTelemetryEnabled",
+    choiceKey: "usageTelemetryChoiceConfigured",
+    extraRefreshKeys: ["usageTelemetryInstallationId"],
+    waitForChoiceConfirmation: waitForUsageTelemetryChoiceConfirmation,
+    entity,
+    enabled,
+  });
+}
+
+async function commitPerformanceTelemetrySwitch(entity, enabled) {
+  await commitTelemetrySwitch({
+    key: "performanceTelemetryEnabled",
+    choiceKey: "performanceTelemetryChoiceConfigured",
+    waitForChoiceConfirmation: waitForPerformanceTelemetryChoiceConfirmation,
+    entity,
+    enabled,
+  });
 }
 
 export async function commitSelect(key, option) {
@@ -220,6 +241,10 @@ export async function commitSwitch(key, enabled) {
   }
   if (key === "usageTelemetryEnabled") {
     await commitUsageTelemetrySwitch(entity, enabled);
+    return;
+  }
+  if (key === "performanceTelemetryEnabled") {
+    await commitPerformanceTelemetrySwitch(entity, enabled);
     return;
   }
 

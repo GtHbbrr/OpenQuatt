@@ -1,7 +1,8 @@
 import { hasEntity, isEntityActive } from "../core/app-shared.js";
 import { state } from "../core/state.js";
+import { renderPerformanceTelemetryConsent, renderPerformanceTelemetryDisclosure } from "../features/performance-telemetry.js";
 import { renderUsageTelemetryConsent, renderUsageTelemetryDisclosure } from "../features/usage-telemetry.js";
-import { renderSettingsCompactSwitchControl, renderSettingsSection } from "./controls.js";
+import { renderSettingsSection } from "./controls.js";
 
 export function renderSettingsPrivacySection() {
   const usageAvailable = hasEntity("usageTelemetryEnabled");
@@ -17,18 +18,10 @@ export function renderSettingsPrivacySection() {
   return renderSettingsSection(
     "Privacy",
     "Vrijwillig gegevens delen",
-    "Los en vrijwillig. Geen wifi- of inloggegevens. Onbevestigd uit.",
+    "Help OpenQuatt verbeteren door technische gegevens te delen. Beide opties staan standaard uit en kunnen onafhankelijk van elkaar worden ingeschakeld. Geen wifi- of inloggegevens. Jouw privacy blijft altijd beschermd.",
     `<div class="oq-usage-settings">
-      ${usageAvailable ? renderUsageTelemetryConsent({ enabled: usageEnabled, busy: usageBusy, settings: true }) : ""}
-      ${usageAvailable ? renderUsageTelemetryDisclosure({ collapsible: true, idPrefix: "oq-settings-usage", open: state.usageTelemetryDetailsOpen }) : ""}
-      ${performanceAvailable ? `
-        <div class="oq-usage-consent${performanceEnabled ? " is-enabled" : ""}">
-          <div class="oq-usage-consent-copy">
-            <h3>Prestatiemetingen delen</h3>
-            <p>Standaard uit. Elke 15 minuten stabiele verwarmingsmetingen voor kaartvalidatie. Geen wifi-, log-, kamer- of thermostaatsetpointgegevens; bij een stooklijn alleen de aanvoerdoelwaarde. Uitschakelen stopt direct.</p>
-          </div>
-          ${renderSettingsCompactSwitchControl("performanceTelemetryEnabled", "Prestatiemetingen delen", performanceEnabled, performanceBusy, "Delen", "Niet delen")}
-        </div>` : ""}
+      ${usageAvailable ? renderUsageTelemetryConsent({ enabled: usageEnabled, busy: usageBusy, settings: true, disclosure: renderUsageTelemetryDisclosure({ collapsible: true, idPrefix: "oq-settings-usage", open: state.usageTelemetryDetailsOpen }) }) : ""}
+      ${performanceAvailable ? renderPerformanceTelemetryConsent({ enabled: performanceEnabled, busy: performanceBusy, disclosure: renderPerformanceTelemetryDisclosure({ collapsible: true, idPrefix: "oq-settings-performance", open: state.performanceTelemetryDetailsOpen }) }) : ""}
     </div>`,
   );
 }

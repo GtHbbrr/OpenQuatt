@@ -16,6 +16,7 @@ import { renderSilentSettingsGrid } from "../settings/silent.js";
 import { renderWaterSettingsFields } from "../settings/water.js";
 import { escapeHtml } from "../core/html.js";
 import { renderUsageTelemetryConsent, renderUsageTelemetryDisclosure } from "./usage-telemetry.js";
+import { renderPerformanceTelemetryConsent, renderPerformanceTelemetryDisclosure } from "./performance-telemetry.js";
 
   export function getQuickStartSetupModel() {
     const currentTopology = getInstallationTopology();
@@ -778,6 +779,37 @@ import { renderUsageTelemetryConsent, renderUsageTelemetryDisclosure } from "./u
     `;
   }
 
+  export function renderPerformanceTelemetryWorkspace() {
+    const enabled = isEntityActive("performanceTelemetryEnabled");
+    const choiceConfigured = isEntityActive("performanceTelemetryChoiceConfigured");
+    const busy = state.loadingEntities || Boolean(state.busyAction);
+    return `
+      <section class="oq-helper-panel">
+        <p class="oq-helper-label">${escapeHtml(getQuickStepKicker("performance-telemetry"))}</p>
+        <h2 class="oq-helper-section-title">Prestatiemetingen</h2>
+        <p class="oq-helper-section-copy">Bij een nieuwe Quick Start staat het delen van prestatiemetingen standaard uit. Wil je dit wel, zet delen hier aan. Je kunt de keuze later altijd wijzigen.</p>
+        ${renderPerformanceTelemetryConsent({ enabled, busy })}
+        ${renderPerformanceTelemetryDisclosure()}
+        ${state.controlNotice ? `<p class="oq-helper-notice">${escapeHtml(state.controlNotice)}</p>` : ""}
+        ${state.controlError ? `<p class="oq-helper-error">${escapeHtml(state.controlError)}</p>` : ""}
+        ${state.controlError ? `
+          <div class="oq-helper-actions">
+            <button class="oq-helper-button" type="button" data-oq-action="retry-performance-telemetry-choice" ${busy ? "disabled" : ""}>Keuze opnieuw opslaan</button>
+          </div>
+        ` : ""}
+        ${!choiceConfigured && !busy ? `
+          <div class="oq-helper-actions">
+            <button class="oq-helper-button oq-helper-button--ghost" type="button" data-oq-action="confirm-no-performance-telemetry">Niet delen bevestigen</button>
+          </div>
+        ` : ""}
+        ${renderQuickStartStepNav({
+          nextDisabled: busy || !choiceConfigured || Boolean(state.controlError),
+          nextDisabledLabel: busy || !choiceConfigured ? "Keuze opslaan..." : "Controleer keuze",
+        })}
+      </section>
+    `;
+  }
+
   export function renderConfirmWorkspace() {
     return `
       <section class="oq-helper-panel">
@@ -845,6 +877,9 @@ import { renderUsageTelemetryConsent, renderUsageTelemetryDisclosure } from "./u
     }
     if (activeStep === "usage-telemetry") {
       return renderUsageTelemetryWorkspace();
+    }
+    if (activeStep === "performance-telemetry") {
+      return renderPerformanceTelemetryWorkspace();
     }
     if (activeStep === "confirm") {
       return renderConfirmWorkspace();
@@ -1058,6 +1093,10 @@ import { renderUsageTelemetryConsent, renderUsageTelemetryDisclosure } from "./u
       ? [["Technische gebruiksstatistieken", isEntityActive("usageTelemetryEnabled") ? "Delen" : "Niet delen"]]
       : [];
 
+    const performanceTelemetryLines = hasEntity("performanceTelemetryEnabled")
+      ? [["Prestatiemetingen delen", isEntityActive("performanceTelemetryEnabled") ? "Aan" : "Uit"]]
+      : [];
+
     const renderReviewList = (lines) => `
       <div class="oq-helper-review-list">
         ${lines
@@ -1092,6 +1131,7 @@ import { renderUsageTelemetryConsent, renderUsageTelemetryDisclosure } from "./u
         ${boilerLines.length ? renderReviewCard("CV-ketel / boiler", boilerLines) : ""}
         ${renderReviewCard("Stille uren", silentLines)}
         ${usageTelemetryLines.length ? renderReviewCard("Gebruiksstatistieken", usageTelemetryLines) : ""}
+        ${performanceTelemetryLines.length ? renderReviewCard("Prestatiemetingen", performanceTelemetryLines) : ""}
       </div>
     `;
   }

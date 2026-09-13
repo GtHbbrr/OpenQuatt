@@ -143,6 +143,7 @@ export function createSettingsState() {
     oduSettingsLastFetchAt: 0,
     oduSettingsFetchPromise: null,
     usageTelemetryDetailsOpen: false,
+    performanceTelemetryDetailsOpen: false,
     usageTelemetryPreviewPayload: null,
     usageTelemetryPreviewSurface: "",
     installationMonitoringProblemSignature: "",

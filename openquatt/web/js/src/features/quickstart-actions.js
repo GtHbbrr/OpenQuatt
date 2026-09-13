@@ -6,13 +6,14 @@ import { getEntityValue } from "../core/entity-store.js";
 import { refreshEntities } from "../core/entity-sync.js";
 import { ODU_GENERATION_DETECT_KEYS, ODU_GENERATION_KEYS } from "../core/odu-generation.js";
 import { state } from "../core/state.js";
+import { shouldInitializeQuickStartPerformanceTelemetryChoice, waitForPerformanceTelemetryChoiceConfirmation } from "../core/performance-telemetry-domain.js";
 import { shouldInitializeQuickStartUsageTelemetryChoice, waitForUsageTelemetryChoiceConfirmation } from "../core/usage-telemetry-domain.js";
 import { USAGE_TELEMETRY_PREVIEW_ENTITY_KEYS } from "../core/usage-telemetry-preview.js";
 import { getQuickStartFlowSourceModel, getQuickStartThermostatSourceModel } from "./quickstart.js";
 import { render } from "../core/render-scheduler.js";
 
   export function getQuickStartStepHydrationKeys(stepId = state.currentStep) {
-    const base = ["setupComplete", "strategy", "usageTelemetryEnabled", "usageTelemetryChoiceConfigured", ...HEADER_ENTITY_KEYS];
+    const base = ["setupComplete", "strategy", "usageTelemetryEnabled", "usageTelemetryChoiceConfigured", "performanceTelemetryEnabled", "performanceTelemetryChoiceConfigured", ...HEADER_ENTITY_KEYS];
     if (stepId === "setup") {
       return [...new Set([...base, ...FIRMWARE_MODAL_KEYS])];
     }
@@ -64,6 +65,13 @@ import { render } from "../core/render-scheduler.js";
         "usageTelemetryEnabled",
         "usageTelemetryChoiceConfigured",
         ...USAGE_TELEMETRY_PREVIEW_ENTITY_KEYS,
+      ])];
+    }
+    if (stepId === "performance-telemetry") {
+      return [...new Set([
+        ...base,
+        "performanceTelemetryEnabled",
+        "performanceTelemetryChoiceConfigured",
       ])];
     }
     if (stepId === "confirm") {
@@ -150,6 +158,46 @@ import { render } from "../core/render-scheduler.js";
       } else {
         state.controlError = `De keuze kon niet veilig worden bevestigd. Controleer de verbinding en probeer opnieuw. ${error.message}`;
       }
+    } finally {
+      state.busyAction = "";
+      render();
+    }
+  }
+
+  export async function initializeQuickStartPerformanceTelemetryChoice() {
+    if (!shouldInitializeQuickStartPerformanceTelemetryChoice({
+      stepId: state.currentStep,
+      telemetryAvailable: hasEntity("performanceTelemetryEnabled"),
+      choiceAvailable: hasEntity("performanceTelemetryChoiceConfigured"),
+      choiceValue: getEntityValue("performanceTelemetryChoiceConfigured"),
+    })) {
+      return;
+    }
+
+    state.busyAction = "switch-performanceTelemetryEnabled";
+    state.controlNotice = "";
+    state.controlError = "";
+    render();
+
+    try {
+      await setQuickStartSwitch("performanceTelemetryEnabled", false);
+      const confirmed = await waitForPerformanceTelemetryChoiceConfirmation({
+        refresh: async () => {
+          await refreshEntities([
+            "performanceTelemetryEnabled",
+            "performanceTelemetryChoiceConfigured",
+          ], "all");
+          return [getEntityValue("performanceTelemetryEnabled"), getEntityValue("performanceTelemetryChoiceConfigured")];
+        },
+        expectedEnabled: false,
+      });
+      if (!confirmed) {
+        throw new Error("De controller heeft de keuze niet bevestigd.");
+      }
+      state.controlError = "";
+      state.controlNotice = "Delen staat standaard uit. Zet delen hier aan als je prestatiemetingen wilt delen.";
+    } catch (error) {
+      state.controlError = `De keuze kon niet veilig worden bevestigd. Controleer de verbinding en probeer opnieuw. ${error.message}`;
     } finally {
       state.busyAction = "";
       render();
