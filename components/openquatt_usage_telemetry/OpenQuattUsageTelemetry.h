@@ -103,16 +103,10 @@ class OpenQuattUsageTelemetry : public switch_::Switch, public Component {
   static constexpr uint32_t SESSION_TIMEOUT_MS = 30000;
   static constexpr uint32_t RETRY_MIN_MS = 5UL * 60UL * 1000UL;
   static constexpr uint32_t RETRY_MAX_MS = 60UL * 60UL * 1000UL;
-#if defined(CONFIG_IDF_TARGET_ESP32S3)
-  // PSRAM is abundant, so keep a conservative stack until HIL watermarks
-  // demonstrate that this can safely be reduced.
+  // Q-edition workers use PSRAM-backed stacks. Keep this conservative until
+  // HIL watermarks demonstrate that it can safely be reduced.
   static constexpr uint32_t MQTT_WORKER_TASK_STACK_SIZE = 16384;
   static constexpr bool MQTT_WORKER_STACK_IN_PSRAM = true;
-#else
-  // Classic ESP32 cannot safely run Wi-Fi/ROM-using tasks from a PSRAM stack.
-  static constexpr uint32_t MQTT_WORKER_TASK_STACK_SIZE = 8192;
-  static constexpr bool MQTT_WORKER_STACK_IN_PSRAM = false;
-#endif
   static constexpr int MQTT_TASK_STACK_SIZE = 12288;
   static_assert(sizeof(StackType_t) == 1U, "ESP-IDF StaticTask stack sizes are configured in bytes");
 

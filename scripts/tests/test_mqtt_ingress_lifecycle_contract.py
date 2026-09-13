@@ -24,10 +24,9 @@ class MqttIngressLifecycleContractTest(unittest.TestCase):
     def test_worker_placement_and_lifetime_are_explicit(self) -> None:
         self.assertIn("StaticTask client_worker_task_state_", HEADER)
         self.assertIn("MQTT_WORKER_STACK_IN_PSRAM = true", HEADER)
-        self.assertIn("MQTT_WORKER_STACK_IN_PSRAM = false", HEADER)
         self.assertIn("MQTT_WORKER_TASK_STACK_SIZE = 24576", HEADER)
         self.assertIn("psram.request_external_task_stack()", CODEGEN)
-        self.assertIn("get_esp32_variant() == VARIANT_ESP32S3", CODEGEN)
+        self.assertNotIn("get_esp32_variant()", CODEGEN)
         self.assertNotIn("xTaskCreatePinnedToCore(", CPP)
         self.assertNotIn("vTaskDelete(nullptr)", CPP)
         wrong_region = CPP.index("stack_is_external != MQTT_WORKER_STACK_IN_PSRAM")
@@ -59,7 +58,6 @@ class MqttIngressLifecycleContractTest(unittest.TestCase):
             failure_cleanup.index("this->client_worker_active_.load()"),
             failure_cleanup.index("this->stop_client_()"),
         )
-        self.assertIn("this->maybe_release_classic_worker_();", failure_cleanup)
         self.assertIn("this->permanent_failure_cleanup_pending_.load()", CPP)
 
     def test_worker_config_copies_do_not_allocate_internal_heap(self) -> None:
@@ -80,28 +78,6 @@ class MqttIngressLifecycleContractTest(unittest.TestCase):
         resume = CPP.index("vTaskResume(handle)", request)
         self.assertLess(active, notify)
         self.assertLess(notify, resume)
-
-    def test_classic_worker_waits_for_notification_and_is_released_from_loop(
-        self,
-    ) -> None:
-        self.assertIn("#if !defined(CONFIG_IDF_TARGET_ESP32S3)", CPP)
-        self.assertIn("state == eBlocked || state == eSuspended", CPP)
-        self.assertIn("classic_worker_action(", CPP)
-        worker_start = CPP.index(
-            "void OpenQuattMqttConfig::client_worker_task_("
-        )
-        worker_end = CPP.index(
-            "void OpenQuattMqttConfig::set_numeric_input_topic_",
-            worker_start,
-        )
-        worker = CPP[worker_start:worker_end]
-        idle_transition = worker.index(
-            "self->client_worker_active_.store(false);"
-        )
-        self.assertNotIn(
-            "vTaskSuspend(nullptr)", worker[idle_transition:]
-        )
-        self.assertIn("client_worker_task_state_.deallocate()", CPP)
 
     def test_config_changes_close_callbacks_before_reconcile(self) -> None:
         gate = CPP.index("this->close_client_event_gate_();")
