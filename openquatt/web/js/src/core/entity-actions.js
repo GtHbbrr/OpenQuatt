@@ -15,14 +15,13 @@ import { setInterfacePanelOpen } from "./runtime.js";
 import { handleDebugRecordingAction } from "../features/debug-recording.js";
 import { handleControlReplayAction } from "../features/control-replay-actions.js";
 import { handleFirmwareAction } from "../features/firmware-actions.js";
-import { getFirmwareBuildConnection, getInstallationTopology } from "../features/device-context.js";
 import { updateFirmwareState, updateEnergyHistoryState } from "./feature-state.js";
 import { getFirmwareLatestVersion, getFirmwareTestAssetUrls, getFirmwareTestPrNumber, getFirmwareTestTargetModel, resetFirmwareManualUploadSelection, resetFirmwareTestSelection } from "../features/firmware-update.js";
 import { handleMqttAction, syncMqttDraftFromInput } from "../features/mqtt-actions.js";
 import { handleOduEepromDumpAction } from "../features/odu-eeprom-dump.js";
 import { handleOduRuntimeFrequencyAction, handleOduRuntimeFrequencyInputKeyDown, updateOduRuntimeFrequencyDraft } from "../features/odu-runtime-frequency.js";
 import { handleOduSettingsAction, updateOduSettingsDraft } from "../features/odu-settings.js";
-import { handleQuickStartAction } from "../features/quickstart-ui-actions.js";
+import { confirmQuickStartSetup, handleQuickStartAction } from "../features/quickstart-ui-actions.js";
 import { handleSecurityAction, stopLoginAuthStatusPolling } from "../features/security-actions.js";
 import { clearSettingsBackupDraft, handleSettingsBackupFileSelection, handleStorageHistoryAction, normalizeEnergyHistoryExportMode } from "../features/storage-history.js";
 import { handleSystemAction } from "../features/system-actions.js";
@@ -191,13 +190,7 @@ function updateFrequencyRangeControl(input) {
     }
 
     if (event.target.dataset.oqQuickstartSetupConfirm) {
-      const confirmed = Boolean(event.target.checked);
-      if (confirmed && !state.quickStartSetupDraft) {
-        const topology = getInstallationTopology();
-        const connection = getFirmwareBuildConnection();
-        state.quickStartSetupDraft = topology && connection ? `${topology}:${connection}` : "";
-      }
-      state.quickStartSetupConfirmed = confirmed && Boolean(state.quickStartSetupDraft);
+      confirmQuickStartSetup(Boolean(event.target.checked));
       render();
       return;
     }
