@@ -15,6 +15,7 @@ import { setInterfacePanelOpen } from "./runtime.js";
 import { handleDebugRecordingAction } from "../features/debug-recording.js";
 import { handleControlReplayAction } from "../features/control-replay-actions.js";
 import { handleFirmwareAction } from "../features/firmware-actions.js";
+import { getFirmwareBuildConnection, getInstallationTopology } from "../features/device-context.js";
 import { updateFirmwareState, updateEnergyHistoryState } from "./feature-state.js";
 import { getFirmwareLatestVersion, getFirmwareTestAssetUrls, getFirmwareTestPrNumber, getFirmwareTestTargetModel, resetFirmwareManualUploadSelection, resetFirmwareTestSelection } from "../features/firmware-update.js";
 import { handleMqttAction, syncMqttDraftFromInput } from "../features/mqtt-actions.js";
@@ -190,7 +191,13 @@ function updateFrequencyRangeControl(input) {
     }
 
     if (event.target.dataset.oqQuickstartSetupConfirm) {
-      state.quickStartSetupConfirmed = Boolean(event.target.checked);
+      const confirmed = Boolean(event.target.checked);
+      if (confirmed && !state.quickStartSetupDraft) {
+        const topology = getInstallationTopology();
+        const connection = getFirmwareBuildConnection();
+        state.quickStartSetupDraft = topology && connection ? `${topology}:${connection}` : "";
+      }
+      state.quickStartSetupConfirmed = confirmed && Boolean(state.quickStartSetupDraft);
       render();
       return;
     }
