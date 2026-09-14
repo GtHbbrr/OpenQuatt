@@ -117,7 +117,7 @@ class InternalHeapPlacementContractTest(unittest.TestCase):
         )
         self.assertNotIn("portENTER_CRITICAL", INCIDENT_CPP)
 
-    def test_s3_telemetry_worker_and_payload_use_psram(self) -> None:
+    def test_telemetry_worker_and_payload_use_psram(self) -> None:
         self.assertIn("StaticTask worker_task_state_", TELEMETRY_HEADER)
         self.assertIn(
             "MQTT_WORKER_STACK_IN_PSRAM = true",
@@ -130,23 +130,9 @@ class InternalHeapPlacementContractTest(unittest.TestCase):
         )
         self.assertNotIn("std::string payload;", TELEMETRY_CPP)
         self.assertIn("psram.request_external_task_stack()", TELEMETRY_CODEGEN)
-        self.assertIn(
-            "get_esp32_variant() == VARIANT_ESP32S3",
-            TELEMETRY_CODEGEN,
-        )
+        self.assertNotIn("get_esp32_variant()", TELEMETRY_CODEGEN)
         self.assertNotIn("xTaskCreatePinnedToCore(", TELEMETRY_CPP)
         self.assertNotIn("vTaskDelete(nullptr)", TELEMETRY_CPP)
-
-    def test_classic_esp32_worker_remains_internal(self) -> None:
-        self.assertIn(
-            "MQTT_WORKER_STACK_IN_PSRAM = false",
-            TELEMETRY_HEADER,
-        )
-        self.assertIn(
-            "this->worker_task_state_.deallocate();",
-            TELEMETRY_CPP,
-        )
-        self.assertIn("eTaskGetState(handle) != eSuspended", TELEMETRY_CPP)
 
     def test_telemetry_cleanup_and_consent_fail_closed(self) -> None:
         self.assertIn("mqtt_cleanup_decision(", TELEMETRY_POLICY)
@@ -172,22 +158,11 @@ class InternalHeapPlacementContractTest(unittest.TestCase):
             "MQTT_WORKER_STACK_IN_PSRAM = true",
             CRASH_TELEMETRY_HEADER,
         )
-        self.assertIn(
-            "MQTT_WORKER_STACK_IN_PSRAM = false",
-            CRASH_TELEMETRY_HEADER,
-        )
         self.assertIn("psram.request_external_task_stack()", CRASH_TELEMETRY_CODEGEN)
-        self.assertIn(
-            "get_esp32_variant() == VARIANT_ESP32S3",
-            CRASH_TELEMETRY_CODEGEN,
-        )
+        self.assertNotIn("get_esp32_variant()", CRASH_TELEMETRY_CODEGEN)
         self.assertNotIn("xTaskCreatePinnedToCore(", CRASH_TELEMETRY_CPP)
         self.assertNotIn("vTaskDelete(", CRASH_TELEMETRY_CPP)
-        self.assertIn(
-            "this->worker_task_state_.deallocate();",
-            CRASH_TELEMETRY_CPP,
-        )
-        self.assertIn("eTaskGetState(handle) != eSuspended", CRASH_TELEMETRY_CPP)
+        self.assertNotIn("worker_task_state_.deallocate();", CRASH_TELEMETRY_CPP)
         # Every MQTT lifecycle call exists exactly once, inside the worker
         # start/cleanup path. The main loop only notifies the worker.
         for lifecycle_call in (

@@ -95,8 +95,8 @@ DEV_VERSION="${BASE_VERSION}-dev.${DEV_STAMP}+local"
 esphome \
   -s project_version "${DEV_VERSION}" \
   -s release_channel dev \
-  -s release_manifest_url https://github.com/OpenQuatt/OpenQuatt/releases/download/dev-latest/openquatt-waveshare-duo-wifi-ota.manifest.json \
-  compile configs/waveshare/duo_wifi.yaml
+  -s release_manifest_url https://github.com/OpenQuatt/OpenQuatt/releases/download/dev-latest/openquatt-heatpump-controller-q-duo-ota.manifest.json \
+  compile configs/heatpump_controller_q/duo.yaml
 ```
 
 Use `python3 scripts/build_targets.py list-configs --status enabled` to inspect the enabled target list. This keeps the topology/hardware/connection matrix independent from release channel selection.
@@ -155,6 +155,7 @@ If you used the recommended fast-forward promotion and did not add extra `main`-
 - Enabled target configs under `configs/` are secrets-free and suitable for CI builds.
 - First-install UX now lives on the GitHub Pages installer at `https://openquatt.github.io/OpenQuatt/install/`, which builds ESP Web Tools manifests dynamically in the browser against same-origin stable factory binaries mirrored onto Pages.
 - Target-specific `*-ota.manifest.json` files are intended for OTA update flows.
+- Stable releases also publish four legacy EOL manifests. They point only to the immutable v0.50.0 Waveshare/Heatpump Listener OTA binaries, never to a Q-edition binary; `dev-latest` intentionally has no legacy bridge.
 - Each firmware reads `${release_manifest_url}` from its selected config entrypoint.
 - OTA manifests and OTA binaries remain on GitHub Releases; only first-install factory binaries are mirrored onto Pages for Web Serial/CORS compatibility.
 - Workflow files must remain directly under `.github/workflows/` (GitHub does not load workflows from nested subfolders).

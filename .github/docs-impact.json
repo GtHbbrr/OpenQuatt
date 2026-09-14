@@ -10,8 +10,7 @@
       ],
       "docs_any_of": [
         "docs/web-app.md",
-        "docs/q-edition.md",
-        "docs/installatie-en-ingebruikname.md"
+        "docs/q-edition.md"
       ]
     },
     {
@@ -69,7 +68,6 @@
       ],
       "docs_any_of": [
         "docs/install/index.html",
-        "docs/installatie-en-ingebruikname.md",
         "docs/q-edition.md",
         "docs/handmatige-installatie.md"
       ]

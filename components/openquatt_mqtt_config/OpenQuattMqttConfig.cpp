@@ -629,7 +629,6 @@ void OpenQuattMqttConfig::loop() {
       time_reached_(millis(), this->next_reconcile_attempt_ms_.load())) {
     this->request_client_reconcile_();
   }
-  this->maybe_release_classic_worker_();
   if (this->clear_session_scoped_inputs_pending_.exchange(false)) {
     this->clear_session_scoped_inputs_();
     this->force_publish_.store(true);
@@ -1344,7 +1343,6 @@ bool OpenQuattMqttConfig::process_permanent_failure_cleanup_() {
     this->force_publish_.store(true);
     return true;
   }
-  this->maybe_release_classic_worker_();
   this->permanent_failure_cleanup_pending_.store(false);
   this->mark_failed();
   return true;
@@ -1567,42 +1565,6 @@ void OpenQuattMqttConfig::close_client_event_gate_() {
   this->client_events_enabled_.store(false);
   this->connected_.store(false);
   this->resubscribe_inputs_.store(false);
-}
-
-void OpenQuattMqttConfig::maybe_release_classic_worker_() {
-#if !defined(CONFIG_IDF_TARGET_ESP32S3)
-  if (this->worker_lock_ == nullptr || xSemaphoreTake(this->worker_lock_, 0) != pdTRUE) {
-    return;
-  }
-  const TaskHandle_t handle = this->client_worker_task_state_.get_handle();
-  if (handle != nullptr) {
-    const eTaskState state = eTaskGetState(handle);
-    const bool work_pending = this->client_reconcile_pending_.load() ||
-                              this->client_requested_generation_.load() != this->client_applied_generation_.load();
-    const bool can_reconcile = this->mqtt_client_present_.load() || network::is_connected();
-    const bool retry_due = time_reached_(millis(), this->next_reconcile_attempt_ms_.load());
-    const bool waiting_or_suspended = state == eBlocked || state == eSuspended;
-    const ClassicWorkerAction action = classic_worker_action(waiting_or_suspended, this->client_worker_active_.load(),
-                                                             work_pending, can_reconcile, retry_due);
-    if (action == ClassicWorkerAction::WAKE) {
-      this->client_worker_active_.store(true);
-      if (xTaskNotifyGive(handle) == pdPASS) {
-        if (state == eSuspended) {
-          vTaskResume(handle);
-        }
-      } else {
-        this->client_worker_active_.store(false);
-        this->next_reconcile_attempt_ms_.store(millis() + MQTT_RECONCILE_RETRY_MS);
-        ESP_LOGE(TAG, "Failed to wake classic-ESP32 MQTT ingress worker");
-      }
-    } else if (action == ClassicWorkerAction::RELEASE) {
-      this->client_worker_task_state_.deallocate();
-      this->client_worker_region_valid_ = false;
-      ESP_LOGD(TAG, "Released idle classic-ESP32 MQTT ingress worker");
-    }
-  }
-  xSemaphoreGive(this->worker_lock_);
-#endif
 }
 
 void OpenQuattMqttConfig::client_worker_task_(void* arg) {

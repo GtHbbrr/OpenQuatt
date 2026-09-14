@@ -158,6 +158,7 @@
     ["waterSupplySource", DOMAIN_SELECT, "Water Supply Source"],
     ["flowSource", DOMAIN_SELECT, "Flow Source"],
     ["qFlowSource", DOMAIN_SELECT, "Q Flow Source"],
+    ["controllerFlowMeter", DOMAIN_SELECT, "Controller Flow Meter"],
     ["outdoorUnitFlowMode", DOMAIN_SELECT, "Outdoor Unit Flow Mode"],
     ["outsideTempSource", DOMAIN_SELECT, "Outside Temperature Source"],
     ["roomTempSource", DOMAIN_SELECT, "Room Temperature Source"],
@@ -239,6 +240,7 @@
     ["cicDataStale", DOMAIN_BINARY_SENSOR, "CIC - Data stale"],
     ["otEnabled", DOMAIN_SWITCH, "OpenTherm Enabled"],
     ["otThermostatChEnable", DOMAIN_BINARY_SENSOR, "OT - Thermostat CH Enable"],
+    ["otThermostatDhwEnable", DOMAIN_BINARY_SENSOR, "OT - Thermostat DHW Enable"],
     ["otThermostatStatusValid", DOMAIN_BINARY_SENSOR, "OT - Thermostat Status Valid"],
     ["otThermostatControlSetpointValid", DOMAIN_BINARY_SENSOR, "OT - Control Setpoint Valid"],
     ["otThermostatCoolingEnable", DOMAIN_BINARY_SENSOR, "OT - Thermostat Cooling Enable"],
@@ -1041,6 +1043,7 @@
   export const CIC_POLLING_SETTING_KEYS = ["cicPollingEnabled", "cicFeedUrl", "cicDataStale"];
   export const OPENTHERM_DIAGNOSTIC_KEYS = [
     "otThermostatChEnable",
+    "otThermostatDhwEnable",
     "otThermostatCoolingEnable",
     "otThermostatControlSetpointValid",
     "otControlSetpoint",
@@ -1105,6 +1108,7 @@
   export const SENSOR_SELECTION_KEYS = [
     "waterSupplySource",
     "localWaterSupplyTempSource",
+    "controllerFlowMeter",
     "flowSource",
     "qFlowSource",
     "outdoorUnitFlowMode",
@@ -1998,6 +2002,7 @@
         ...SUPPLY_CALIBRATION_BACKUP_KEYS,
         "waterSupplySource",
         "localWaterSupplyTempSource",
+        "controllerFlowMeter",
         "flowSource",
         "qFlowSource",
         "outdoorUnitFlowMode",

@@ -357,6 +357,14 @@ switch:
       name: "OTB - Central Heating Command"
       internal: true
       restore_mode: ALWAYS_OFF
+    dhw_enable:
+      id: oq_otb_dhw_enable
+      name: "OTB - Domestic Hot Water Permission"
+      internal: true
+      # The thermostat is authoritative only after a current STATUS frame.
+      # Start fail-open, so a reboot or lost thermostat link never leaves
+      # normal tap water disabled.
+      restore_mode: ALWAYS_ON
 
 # Keep Home Assistant lean: expose primary operational values by default,
 # publish secondary status as disabled-by-default, and keep service/protocol

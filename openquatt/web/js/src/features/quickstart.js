@@ -225,12 +225,6 @@ import { renderPerformanceTelemetryConsent, renderPerformanceTelemetryDisclosure
     if (normalized === "heatpump_controller_q" || normalized.includes("q-edition") || normalized.includes("controller q")) {
       return "heatpump_controller_q";
     }
-    if (normalized === "heatpump_listener" || normalized.includes("listener")) {
-      return "heatpump_listener";
-    }
-    if (normalized === "waveshare" || normalized.includes("waveshare")) {
-      return "waveshare";
-    }
     return "";
   }
 
@@ -243,26 +237,16 @@ import { renderPerformanceTelemetryConsent, renderPerformanceTelemetryDisclosure
     if (!profile && hasEntity("qFlowSource")) {
       profile = "heatpump_controller_q";
       inferred = true;
-    } else if (!profile && hasEntity("flowSource") && hasEntity("cicPollingEnabled")) {
-      profile = "remote";
-      inferred = true;
     }
 
     return {
       profile,
       inferred,
       isQEdition: profile === "heatpump_controller_q",
-      isRemoteProfile: profile === "heatpump_listener" || profile === "waveshare" || profile === "remote",
       hardwareKnown: Boolean(profile),
       hardwareLabel: profile === "heatpump_controller_q"
         ? "Heatpump Controller Q-edition"
-        : profile === "heatpump_listener"
-          ? "Heatpump Listener"
-          : profile === "waveshare"
-            ? "Waveshare"
-            : profile === "remote"
-              ? "Heatpump Listener / Waveshare"
-              : "Onbekend hardwareprofiel",
+        : "Onbekend hardwareprofiel",
     };
   }
 
@@ -270,10 +254,10 @@ import { renderPerformanceTelemetryConsent, renderPerformanceTelemetryDisclosure
     const generation = String(getEntityValue("hpGeneration") || "").trim();
     const hardware = getQuickStartHardwareProfileModel();
     const isV1 = generation === "V1";
-    const { isQEdition, isRemoteProfile, hardwareKnown } = hardware;
-    const requiresCic = isV1 && isRemoteProfile;
+    const { isQEdition, hardwareKnown } = hardware;
+    const requiresCic = false;
     const qFlowTarget = isQEdition ? (isV1 ? "Local" : "Outdoor unit") : "";
-    const flowSourceTarget = requiresCic ? "CIC" : "Outdoor unit";
+    const flowSourceTarget = "Outdoor unit";
     const currentFlowSource = String(getEntityValue("flowSource") || "").trim();
     const currentQFlowSource = String(getEntityValue("qFlowSource") || "").trim();
     const cicEnabled = isEntityActive("cicPollingEnabled");
@@ -346,7 +330,7 @@ import { renderPerformanceTelemetryConsent, renderPerformanceTelemetryDisclosure
 
   export function getQuickStartThermostatSourceModel() {
     const hardware = getQuickStartHardwareProfileModel();
-    const { isQEdition, isRemoteProfile } = hardware;
+    const { isQEdition } = hardware;
     const currentRoomTempSource = String(getEntityValue("roomTempSource") || "").trim();
     const currentRoomSetpointSource = String(getEntityValue("roomSetpointSource") || "").trim();
     const pairedCurrentSource = currentRoomTempSource === currentRoomSetpointSource
@@ -375,7 +359,7 @@ import { renderPerformanceTelemetryConsent, renderPerformanceTelemetryDisclosure
         ? isEntityActive("cicJsonFeedOk") && !isEntityActive("cicDataStale") && valuesAvailable
         : isEntityActive("roomTempHaValid") && isEntityActive("roomSetpointHaValid") && valuesAvailable;
 
-    let status = isQEdition || isRemoteProfile ? "Nog activeren" : "Hardwareprofiel niet herkend";
+    let status = isQEdition ? "Nog activeren" : "Hardwareprofiel niet herkend";
     if (configurationApplied) {
       status = sourceHealthy ? "Geldig" : selectedSource === "OT thermostat"
         ? "OpenTherm-verbinding controleren"
@@ -398,7 +382,6 @@ import { renderPerformanceTelemetryConsent, renderPerformanceTelemetryDisclosure
     return {
       hardwareLabel: hardware.hardwareLabel,
       isQEdition,
-      isRemoteProfile,
       selectedSource,
       sourceLabel,
       explanation,
@@ -408,7 +391,7 @@ import { renderPerformanceTelemetryConsent, renderPerformanceTelemetryDisclosure
       roomSetpointValue,
       valuesAvailable,
       ...cicUrl,
-      canApply: (isQEdition || isRemoteProfile)
+      canApply: isQEdition
         && hasEntity("roomTempSource")
         && hasEntity("roomSetpointSource")
         && (selectedSource !== "OT thermostat" || hasEntity("otEnabled"))
@@ -505,23 +488,6 @@ import { renderPerformanceTelemetryConsent, renderPerformanceTelemetryDisclosure
     const model = getQuickStartThermostatSourceModel();
     const busy = state.busyAction === "quickstart-thermostat-source";
     const statusClass = model.status === "Geldig" ? " is-active" : "";
-    const sourceSelector = model.isRemoteProfile ? `
-      <article class="oq-helper-surface oq-settings-field oq-settings-field--span-2" data-oq-settings-field="quickStartThermostatSource">
-        <div class="oq-settings-field-head">
-          <h3>Gegevensbron</h3>
-          ${renderSettingsInfoToggle("quickStartThermostatSource", "Gegevensbron", "Kamertemperatuur en kamer-setpoint worden bewust als gekoppeld paar ingesteld.")}
-        </div>
-        <div class="oq-settings-field-control">
-          <label class="oq-settings-control oq-settings-control--select">
-            <select data-oq-quickstart-thermostat-source ${busy ? "disabled" : ""}>
-              <option value="CIC" ${model.selectedSource === "CIC" ? "selected" : ""}>CiC JSON-feed</option>
-              <option value="HA input" ${model.selectedSource === "HA input" ? "selected" : ""}>Home Assistant</option>
-            </select>
-          </label>
-          <p class="oq-settings-action-note">Deze keuze geldt altijd voor zowel kamertemperatuur als kamer-setpoint.</p>
-        </div>
-      </article>
-    ` : "";
     const cicField = model.selectedSource === "CIC" ? renderQuickStartCicFeedUrlField(model, busy) : "";
     const haNote = model.selectedSource === "HA input" ? `
       <article class="oq-helper-surface oq-settings-field oq-settings-field--span-2">
@@ -561,7 +527,6 @@ import { renderPerformanceTelemetryConsent, renderPerformanceTelemetryDisclosure
             `,
             "oq-settings-field--span-2",
           )}
-          ${sourceSelector}
           ${cicField}
           ${haNote}
         </div>

@@ -11,7 +11,7 @@
 #include "esp_heap_caps.h"
 #include "esp_memory_utils.h"
 #include "freertos/idf_additions.h"
-#if defined(CONFIG_IDF_TARGET_ESP32S3) && __has_include("heatpump_controller_q_hardware_revision.h")
+#if __has_include("heatpump_controller_q_hardware_revision.h")
 #include "heatpump_controller_q_hardware_revision.h"
 #define OPENQUATT_HAS_Q_HARDWARE_REVISION
 #endif
@@ -243,18 +243,6 @@ void OpenQuattUsageTelemetry::loop() {
     this->start_task_running_.store(false);
   }
   if (this->cleanup_task_complete_.exchange(false)) {
-    if (!MQTT_WORKER_STACK_IN_PSRAM) {
-      const TaskHandle_t handle = this->worker_task_state_.get_handle();
-      if (handle != nullptr && eTaskGetState(handle) != eSuspended) {
-        // The classic-ESP32 worker publishes completion immediately before it
-        // parks itself. Do not free a static stack that may still be executing
-        // on the other core.
-        this->cleanup_task_complete_.store(true);
-        return;
-      }
-      this->worker_task_state_.deallocate();
-      this->worker_task_region_valid_ = false;
-    }
     this->complete_publish_session_();
   }
   if (this->finishing_session_.load()) {
@@ -660,8 +648,7 @@ void OpenQuattUsageTelemetry::start_publish_session_(SessionKind kind) {
     return;
   }
 
-  // The same worker owns both client startup and teardown. On S3 its stack is
-  // persistent in PSRAM; classic ESP32 uses a per-session internal stack.
+  // The persistent worker owns both client startup and teardown in PSRAM.
   if (!this->ensure_worker_task_()) {
     if (kind == SessionKind::USAGE) this->clear_payload_();
     this->session_kind_.store(SessionKind::NONE);
@@ -1169,9 +1156,6 @@ void OpenQuattUsageTelemetry::worker_task_(void* arg) {
       log_heap_state_("Usage telemetry MQTT cleanup complete");
       self->cleanup_task_complete_.store(true);
       App.wake_loop_threadsafe();
-      if (!MQTT_WORKER_STACK_IN_PSRAM) {
-        vTaskSuspend(nullptr);
-      }
       continue;
     }
 

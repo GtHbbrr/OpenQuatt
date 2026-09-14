@@ -70,35 +70,17 @@ INTERNAL_ENTITY_PRESENTATION_KEYS = {
 }
 
 STRICT_TOP_LEVEL_ORDER_RULES = {
-    "configs/waveshare/single_wifi.yaml": (
-        "substitutions",
-        "esphome",
-        "packages",
-    ),
-    "configs/waveshare/duo_wifi.yaml": (
-        "substitutions",
-        "esphome",
-        "packages",
-    ),
-    "configs/heatpump_listener/single_wifi.yaml": (
-        "substitutions",
-        "esphome",
-        "packages",
-    ),
-    "configs/heatpump_listener/duo_wifi.yaml": (
-        "substitutions",
-        "esphome",
-        "packages",
-    ),
     "configs/heatpump_controller_q/single.yaml": (
         "substitutions",
         "esphome",
         "packages",
+        "uart",
     ),
     "configs/heatpump_controller_q/duo.yaml": (
         "substitutions",
         "esphome",
         "packages",
+        "uart",
     ),
     "openquatt/base/common.yaml": (
         "esphome",
@@ -195,42 +177,6 @@ STRICT_TOP_LEVEL_ORDER_RULES = {
 }
 
 NESTED_KEY_ORDER_RULES = {
-    ("configs/waveshare/single_wifi.yaml", "packages"): (
-        "openquatt_substitutions_common",
-        "openquatt_topology_single_substitutions",
-        "openquatt_profile_waveshare",
-        "openquatt_base_common",
-        "openquatt_connection_wifi",
-        "openquatt_packages_common",
-    ),
-    ("configs/waveshare/duo_wifi.yaml", "packages"): (
-        "openquatt_substitutions_common",
-        "openquatt_topology_duo_substitutions",
-        "openquatt_profile_waveshare",
-        "openquatt_base_common",
-        "openquatt_connection_wifi",
-        "openquatt_packages_common",
-        "openquatt_topology_duo_packages",
-    ),
-    ("configs/heatpump_listener/single_wifi.yaml", "packages"): (
-        "openquatt_substitutions_common",
-        "openquatt_topology_single_substitutions",
-        "openquatt_profile_heatpump_listener",
-        "openquatt_base_common",
-        "openquatt_connection_wifi",
-        "oq_heatpump_listener_extras",
-        "openquatt_packages_common",
-    ),
-    ("configs/heatpump_listener/duo_wifi.yaml", "packages"): (
-        "openquatt_substitutions_common",
-        "openquatt_topology_duo_substitutions",
-        "openquatt_profile_heatpump_listener",
-        "openquatt_base_common",
-        "openquatt_connection_wifi",
-        "oq_heatpump_listener_extras",
-        "openquatt_packages_common",
-        "openquatt_topology_duo_packages",
-    ),
     ("configs/heatpump_controller_q/single.yaml", "packages"): (
         "openquatt_substitutions_common",
         "openquatt_topology_single_substitutions",

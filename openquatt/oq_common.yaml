@@ -43,15 +43,7 @@ esphome:
               return;
             }
 
-            std::string hardware_slug;
-            const std::string hardware = "${oq_hardware_profile}";
-            if (hardware == "waveshare") {
-              hardware_slug = "waveshare";
-            } else if (hardware == "heatpump_listener") {
-              hardware_slug = "heatpump-listener";
-            } else if (hardware == "heatpump_controller_q") {
-              hardware_slug = "heatpump-controller-q";
-            }
+            const std::string hardware_slug = "heatpump-controller-q";
             #if OQ_TOPOLOGY_DUO
             std::string topology = "duo";
             #else
@@ -573,26 +565,11 @@ script:
       - lambda: |-
           // Fail-closed validatie van de PR-manifest-URL. Alleen exact
           // OpenQuatt/OpenQuatt/releases/download/pr-<nr>/<manifest> voor
-          // dit hardware/topology-target wordt geaccepteerd. Voor uniforme
-          // HCQ is dat de canonieke naam zonder verbindingssuffix.
+          // dit Q-edition/topology-target wordt geaccepteerd.
           const std::string url = id(oq_firmware_test_manifest_url).state;
           const std::string prefix =
               "https://github.com/OpenQuatt/OpenQuatt/releases/download/pr-";
-          std::string hardware_slug;
-          const std::string hardware = "${oq_hardware_profile}";
-          if (hardware == "waveshare") {
-            hardware_slug = "waveshare";
-          } else if (hardware == "heatpump_listener") {
-            hardware_slug = "heatpump-listener";
-          } else if (hardware == "heatpump_controller_q") {
-            hardware_slug = "heatpump-controller-q";
-          } else {
-            ESP_LOGW("oq_fw", "Test firmware rejected: unsupported hardware profile.");
-            id(oq_firmware_target_install_active) = false;
-            id(oq_ota_phase_code) = 5;
-            id(oq_firmware_update_status).publish_state("Error");
-            return;
-          }
+          const std::string hardware_slug = "heatpump-controller-q";
           #if OQ_TOPOLOGY_DUO
           const std::string topology = "duo";
           #else
@@ -729,6 +706,8 @@ script:
                     return id(oq_fw_check_completed_generation) == id(oq_fw_check_request_generation);
                 timeout: 20s
             - lambda: |-
+                // Controleer opnieuw dat de bevestigde manifest-URL nog steeds
+                // de exact geaccepteerde PR-release en targetnaam gebruikt.
                 if (id(oq_fw_check_completed_generation) != id(oq_fw_check_request_generation)) {
                   return;
                 }
@@ -846,6 +825,7 @@ script:
                       id(oq_firmware_target_install_active) = false;
           else:
             - lambda: |-
+                // Een mislukte check mag geen installatiestatus achterlaten.
                 if (id(oq_ota_phase_code) == 5) {
                   id(oq_firmware_target_install_active) = false;
                   return;
@@ -1166,24 +1146,11 @@ button:
             condition:
               lambda: |-
                 // Fail-closed: alleen exact OpenQuatt/OpenQuatt/releases/download/pr-<nr>/
-                // met exact de manifestnaam voor hardware en topologie. Voor
-                // uniforme HCQ de canonieke naam zonder verbindingssuffix.
+                // met exact de manifestnaam voor Q-edition en topologie.
                 const std::string url = id(oq_firmware_test_manifest_url).state;
                 const std::string prefix =
                     "https://github.com/OpenQuatt/OpenQuatt/releases/download/pr-";
-                std::string hardware_slug;
-                const std::string hardware = "${oq_hardware_profile}";
-                if (hardware == "waveshare") {
-                  hardware_slug = "waveshare";
-                } else if (hardware == "heatpump_listener") {
-                  hardware_slug = "heatpump-listener";
-                } else if (hardware == "heatpump_controller_q") {
-                  hardware_slug = "heatpump-controller-q";
-                } else {
-                  ESP_LOGW("oq_fw", "Test firmware rejected: unsupported hardware profile.");
-                  id(oq_firmware_update_status).publish_state("Error");
-                  return false;
-                }
+                const std::string hardware_slug = "heatpump-controller-q";
                 #if OQ_TOPOLOGY_DUO
                 const std::string topology = "duo";
                 #else

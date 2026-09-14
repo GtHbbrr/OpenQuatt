@@ -3,7 +3,7 @@
 # ==============================================================================
 #
 # The secondary RS485 port is physically available only on the Q-edition
-# controller. Listener and Waveshare builds must not initialize dummy pins.
+# controller.
 # ==============================================================================
 substitutions:
   cic_compat_uart_tx_pin: "GPIO45"                      # Modbus 2 TX; CiC compatibility port.

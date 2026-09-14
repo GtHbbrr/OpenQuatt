@@ -98,6 +98,7 @@ import { escapeHtml } from "../core/html.js";
       }) : "",
       renderBinaryDiagnosticItem("otThermostatStatusValid", "Statusbericht (ID 0) actueel", "Ja", "Nee"),
       renderBinaryDiagnosticItem("otThermostatChEnable", "Thermostaat CH", "Actief", "Normaal"),
+      renderBinaryDiagnosticItem("otThermostatDhwEnable", "Thermostaat tapwater", "Toegestaan", "Geblokkeerd"),
       renderBinaryDiagnosticItem("otThermostatCoolingEnable", "Thermostaat koeling", "Actief", "Normaal"),
       renderValueDiagnosticItem("otControlSetpoint", "Control setpoint"),
       renderValueDiagnosticItem("otRoomSetpoint", "Room setpoint", { fallbackKey: "roomSetpoint" }),
@@ -919,6 +920,14 @@ import { escapeHtml } from "../core/html.js";
             infoId: "qFlowSource-info",
             infoCopy: "Auto behoudt het bestaande gedrag: V1 gebruikt de lokale controller-flowmeter, V1.5 gebruikt de flow uit de buitenunit via Modbus. Kies Lokaal of Buitenunit om dit expliciet vast te zetten.",
             when: currentFlowSource === "Outdoor unit" && hasEntity("qFlowSource"),
+          },
+          {
+            key: "controllerFlowMeter",
+            label: "Lokale flowmeter",
+            infoId: "controllerFlowMeter-info",
+            infoCopy: "De Huba Control 236-flowmeter wordt normaliter door Quatt geïnstalleerd en is de standaardkeuze. Kies ZJ-B10 alleen als dat type op de controller is aangesloten; zie het Q-edition I/O-overzicht in de documentatie voor aansluiting en kalibratie. Deze instelling bepaalt de omrekening van pulsen naar flow en wordt bewaard na een herstart.",
+            optionLabels: { "Huba Control": "Huba Control (door Quatt geïnstalleerd)" },
+            when: currentFlowSource === "Outdoor unit" && hasEntity("controllerFlowMeter") && currentQFlowSource !== "Outdoor unit",
           },
           {
             key: "outdoorUnitFlowMode",

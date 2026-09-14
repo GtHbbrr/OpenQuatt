@@ -99,6 +99,7 @@ function setSourceSelectionState(mqttEnabled) {
     localWaterSupplyTempSource: { value: "PT1000", option: ["PT1000", "DS18B20"] },
     flowSource: { value: "Outdoor unit", option: ["Outdoor unit", "CIC"] },
     qFlowSource: { value: "Auto", option: ["Auto", "Local", "Outdoor unit"] },
+    controllerFlowMeter: { value: "Huba Control", option: ["Huba Control", "ZJ-B10"] },
     outdoorUnitFlowMode: { value: "Local aggregate HP1/HP2", option: ["Flowmeter HP1", "Flowmeter HP2", "Local aggregate HP1/HP2"] },
     outsideTempSource: { value: "Outdoor unit", option: ["Auto", "Outdoor unit", "HA input", "API input", "MQTT"] },
     heatingEnableSource: { value: "Disabled", option: ["Disabled", "OT thermostat", "CIC", "HA input", "API input", "MQTT"] },
@@ -149,6 +150,7 @@ function setSourceSelectionState(mqttEnabled) {
     otRoomTemp: valueEntity(21.8, "°C"),
     otRoomSetpoint: valueEntity(20, "°C"),
     otThermostatChEnable: binaryEntity(true),
+    otThermostatDhwEnable: binaryEntity(true),
     otThermostatCoolingEnable: binaryEntity(false),
     roomTempHa: valueEntity(21.6, "°C"),
     roomTempHaValid: binaryEntity(true),
@@ -567,6 +569,29 @@ test("secundaire bronselecties blijven alleen zichtbaar wanneer hun hoofdkeuze z
   state.entities.flowSource.value = "CIC";
   markup = renderFocusedSource("flow-source");
   assert.doesNotMatch(getInspectorMarkup(markup), /data-oq-field="qFlowSource"|data-oq-field="outdoorUnitFlowMode"/);
+});
+
+test("lokale flowmeter toont beide modellen en volgt de beschikbare flowroute", () => {
+  setSourceSelectionState(true);
+  assert.ok(SETTINGS_GROUP_KEY_MAP.integrations.includes("controllerFlowMeter"));
+  let markup = renderFocusedSource("flow-source");
+  assert.match(getSelectMarkup(markup, "controllerFlowMeter"), /<option value="Huba Control" selected>/);
+  assert.match(getSelectMarkup(markup, "controllerFlowMeter"), /Huba Control \(door Quatt geïnstalleerd\)/);
+  assert.match(getSelectMarkup(markup, "controllerFlowMeter"), /<option value="ZJ-B10"/);
+
+  state.entities.qFlowSource.value = "Local";
+  state.entities.controllerFlowMeter.value = "ZJ-B10";
+  markup = renderFocusedSource("flow-source");
+  assert.match(getSelectMarkup(markup, "controllerFlowMeter"), /<option value="ZJ-B10" selected>/);
+
+  state.entities.qFlowSource.value = "Outdoor unit";
+  assert.doesNotMatch(getInspectorMarkup(renderFocusedSource("flow-source")), /data-oq-field="controllerFlowMeter"/);
+  state.entities.qFlowSource.value = "Local";
+  state.entities.flowSource.value = "CIC";
+  assert.doesNotMatch(getInspectorMarkup(renderFocusedSource("flow-source")), /data-oq-field="controllerFlowMeter"/);
+  state.entities.flowSource.value = "Outdoor unit";
+  delete state.entities.controllerFlowMeter;
+  assert.doesNotMatch(getInspectorMarkup(renderFocusedSource("flow-source")), /data-oq-field="controllerFlowMeter"/);
 });
 
 test("MQTT verdwijnt uit alle bronselecties en metingen wanneer de integratie uitstaat", () => {
