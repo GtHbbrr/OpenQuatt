@@ -411,7 +411,8 @@ bool OpenQuattUsageTelemetry::request_external_publish(const char* suffix, const
   if (xSemaphoreTake(this->consent_mutex_, portMAX_DELAY) != pdTRUE) {
     return false;
   }
-  if (this->external_publish_pending_.load() || this->session_kind_.load() == SessionKind::EXTERNAL) {
+  if (this->external_publish_pending_.load() || this->session_kind_.load() == SessionKind::EXTERNAL ||
+      esp_timer_get_time() < this->external_next_publish_allowed_us_) {
     xSemaphoreGive(this->consent_mutex_);
     return false;
   }
@@ -885,6 +886,9 @@ void OpenQuattUsageTelemetry::complete_publish_session_() {
   this->cleanup_succeeded_.store(false);
 
   if (completed_kind == SessionKind::EXTERNAL) {
+    // Start the cooldown after teardown: delayed offline requests, failed ACKs
+    // and cancellation must not allow two publications within fifteen minutes.
+    this->external_next_publish_allowed_us_ = esp_timer_get_time() + EXTERNAL_PUBLISH_INTERVAL_US;
     const bool cancelled = this->external_publish_blocked_.load();
     this->session_kind_.store(SessionKind::NONE);
     this->external_publish_pending_.store(false);

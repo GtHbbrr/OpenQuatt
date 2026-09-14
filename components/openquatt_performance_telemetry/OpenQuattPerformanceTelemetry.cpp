@@ -153,22 +153,23 @@ void OpenQuattPerformanceTelemetry::write_state(bool state) {
   if (!this->load_storage_(&storage)) {
     storage = {STORAGE_MAGIC, STORAGE_VERSION, static_cast<uint8_t>(current ? 1U : 0U), 0U};
   }
-  if (state == current && storage.choice_configured != 0U) {
-    this->publish_state(current);
-    return;
-  }
   storage.enabled = state ? 1U : 0U;
   storage.choice_configured = 1U;
   if (!this->save_storage_(storage)) {
     ESP_LOGE(TAG, "Could not persist performance telemetry preference");
-    if (!state) {
-      // A failed opt-out must remain fail-closed for this boot.
-      this->enabled_.store(false);
-      this->publish_state(false);
-      this->reset_collection_();
-    } else {
-      this->publish_state(current);
+    // save() may have queued an opt-in even when sync() failed. Replace it
+    // with a fail-closed value before another component can flush preferences.
+    storage.enabled = 0U;
+    storage.choice_configured = 0U;
+    if (!this->save_storage_(storage)) {
+      ESP_LOGE(TAG, "Could not persist fail-closed fallback; consent remains unconfirmed");
     }
+    this->choice_configured_.store(false);
+    if (this->choice_configured_sensor_ != nullptr) this->choice_configured_sensor_->publish_state(false);
+    if (this->transport_ != nullptr) this->transport_->cancel_external_publish();
+    this->enabled_.store(false);
+    this->publish_state(false);
+    this->reset_collection_();
     return;
   }
   this->apply_storage_(storage);

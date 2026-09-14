@@ -118,6 +118,7 @@ class OpenQuattUsageTelemetry : public switch_::Switch,
   static constexpr uint32_t RETRY_MIN_MS = 5UL * 60UL * 1000UL;
   static constexpr uint32_t RETRY_MAX_MS = 60UL * 60UL * 1000UL;
   static constexpr size_t EXTERNAL_PAYLOAD_MAX = 4096U;
+  static constexpr int64_t EXTERNAL_PUBLISH_INTERVAL_US = 15LL * 60LL * 1000000LL;
   // Q-edition workers use PSRAM-backed stacks. Keep this conservative until
   // HIL watermarks demonstrate that it can safely be reduced.
   static constexpr uint32_t MQTT_WORKER_TASK_STACK_SIZE = 16384;
@@ -255,6 +256,8 @@ class OpenQuattUsageTelemetry : public switch_::Switch,
   std::atomic<bool> external_publish_blocked_{true};
   std::atomic<bool> external_publish_pending_{false};
   std::atomic<ExternalPublishResult> external_publish_result_{ExternalPublishResult::NONE};
+  // Main-loop owned; never reset by consent changes or batch cancellation.
+  int64_t external_next_publish_allowed_us_{0};
   std::atomic<bool> choice_configured_{false};
   std::atomic<bool> session_active_{false};
   std::atomic<bool> finishing_session_{false};
