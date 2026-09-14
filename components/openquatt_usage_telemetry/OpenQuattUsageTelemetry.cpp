@@ -412,7 +412,7 @@ bool OpenQuattUsageTelemetry::ensure_installation_id_for_external() {
     ESP_LOGE(TAG, "Could not persist an anonymous installation ID for external telemetry");
     return false;
   }
-  return this->apply_storage_(storage);
+  return this->apply_external_installation_id_(storage);
 }
 
 bool OpenQuattUsageTelemetry::request_external_publish(const char* suffix, const char* payload, size_t payload_size) {
@@ -545,6 +545,24 @@ bool OpenQuattUsageTelemetry::ensure_installation_id_(Storage* storage) {
   storage->installation_id[8] = static_cast<uint8_t>((storage->installation_id[8] & 0x3FU) | 0x80U);
   storage->installation_id_present = 1U;
   return uuid_is_present_(storage->installation_id);
+}
+
+bool OpenQuattUsageTelemetry::apply_external_installation_id_(const Storage& storage) {
+  if (storage.installation_id_present == 0U || !uuid_is_present_(storage.installation_id) ||
+      this->consent_mutex_ == nullptr || xSemaphoreTake(this->consent_mutex_, portMAX_DELAY) != pdTRUE) {
+    return false;
+  }
+  // External telemetry may create the shared anonymous ID, but it must never
+  // reapply the independently managed usage-consent fields from preferences.
+  if (this->installation_id_bytes_ != storage.installation_id) {
+    this->installation_id_bytes_ = storage.installation_id;
+    this->installation_id_ = format_uuid_(storage.installation_id);
+  }
+  xSemaphoreGive(this->consent_mutex_);
+  if (this->installation_id_sensor_ != nullptr) {
+    this->installation_id_sensor_->publish_state(this->installation_id_);
+  }
+  return !this->installation_id_.empty();
 }
 
 bool OpenQuattUsageTelemetry::is_setup_complete_() const {

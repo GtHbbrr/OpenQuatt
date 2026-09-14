@@ -111,6 +111,12 @@ inline bool stable_minute(uint8_t samples, bool invalid, uint8_t active_mask) {
   return samples == PERFORMANCE_SAMPLES_PER_MINUTE && !invalid && active_mask != 0U;
 }
 
+// A zero deadline is the explicit "publish immediately" sentinel. Check it
+// before wrap-safe signed subtraction, which is ambiguous after 2^31 ms.
+inline bool retry_due(uint32_t now_ms, uint32_t target_ms) {
+  return target_ms == 0U || static_cast<int32_t>(now_ms - target_ms) >= 0;
+}
+
 // Reject the legacy estimator's near-zero fallback while a compressor reports
 // active. The low floors preserve ordinary low-load heating samples.
 inline bool valid_active_measurement(float input_power_w, float thermal_power_w, float pump_power_w) {

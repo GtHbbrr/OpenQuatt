@@ -20,7 +20,7 @@ openquatt_performance_telemetry:
   strategy_select: oq_heat_control_mode
   outside_temp_sensor: outside_temp_selected
   flow_sensor: flow_rate_selected
-  supply_target_sensor: oq_supply_target_temp
+  supply_target_sensor: oq_strategy_supply_target_temp_sensor
   system_supply_sensor: oq_system_supply_temp
   firmware_version: "${project_version}"
   topology: "${oq_topology}"

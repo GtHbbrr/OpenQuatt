@@ -168,6 +168,7 @@ class OpenQuattUsageTelemetry : public switch_::Switch,
   bool save_storage_(const Storage& storage);
   bool set_consent_publish_blocked_(bool blocked);
   bool ensure_installation_id_(Storage* storage);
+  bool apply_external_installation_id_(const Storage& storage);
   bool is_setup_complete_() const;
   bool session_permitted_() const;
   const char* active_publish_topic_() const;

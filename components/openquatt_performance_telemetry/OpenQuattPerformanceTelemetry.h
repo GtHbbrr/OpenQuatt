@@ -162,7 +162,6 @@ class OpenQuattPerformanceTelemetry : public switch_::Switch, public Component {
   void handle_transport_result_();
   void schedule_retry_();
   void clear_pending_();
-  static bool time_reached_(uint32_t now_ms, uint32_t target_ms);
   static bool valid_sensor_(const sensor::Sensor* value);
   static bool valid_binary_(const binary_sensor::BinarySensor* value);
   static int generation_code_(const select::Select* source);

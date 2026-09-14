@@ -413,7 +413,7 @@ bool OpenQuattPerformanceTelemetry::build_pending_payload_() {
 
 void OpenQuattPerformanceTelemetry::try_publish_pending_() {
   if (this->pending_record_count_ == 0U || this->publish_in_flight_.load() || this->transport_ == nullptr ||
-      !time_reached_(millis(), this->next_retry_ms_)) {
+      !retry_due(millis(), this->next_retry_ms_)) {
     return;
   }
   if (!this->build_pending_payload_()) {
@@ -461,10 +461,6 @@ void OpenQuattPerformanceTelemetry::clear_pending_() {
   this->next_retry_ms_ = 0U;
   this->consecutive_failures_ = 0U;
   this->publish_in_flight_.store(false);
-}
-
-bool OpenQuattPerformanceTelemetry::time_reached_(uint32_t now_ms, uint32_t target_ms) {
-  return static_cast<int32_t>(now_ms - target_ms) >= 0;
 }
 
 bool OpenQuattPerformanceTelemetry::valid_sensor_(const sensor::Sensor* value) {
