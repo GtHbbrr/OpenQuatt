@@ -88,21 +88,7 @@ Sluit de draden als volgt aan:
 
 Controleer de `C`-, `B`- en `E`-aansluitingen aan de hand van de datasheet van jouw BC547. De pootvolgorde kan per behuizing of fabrikant verschillen.
 
-```text
-ZJ-B10                                      Q-stekker (Molex MX3.0)
-
-rood   +5V  --------------------------------  pin 1  +5V
-
-geel   SIG  ----[ 4,7 kΩ ]---- B
-                                  BC547 NPN
-zwart  GND  ------------------- E
-          |                       C ---------  pin 3  FLOW / GPIO15
-          +---------------------------------  pin 4  GND
-
-PT1000 draad 1  -----------------------------  pin 2  PT1000
-PT1000 draad 2  -----------------------------  pin 5  PT1000
-                                                 pin 6  niet gebruikt
-```
+![Bedradingsschema ZJ-B10-flowmeter naar de Q-stekker](assets/zj-b10-q-aansluiting.svg)
 
 Isoleer na het doormeten iedere soldeerverbinding afzonderlijk. Schakel de controller daarna in, kies **ZJ-B10** als lokale flowmeter en controleer de gemeten flow terwijl de circulatiepomp draait.
 
