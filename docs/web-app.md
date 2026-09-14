@@ -47,7 +47,7 @@ De oude OpenQuatt-preference wordt bij deze firmwareversie niet gewist, maar ook
 | Plek | Gebruik je vooral voor |
 |---|---|
 | Q-edition-handleiding | Een voorgeïnstalleerde Heatpump Controller Q aansluiten, online brengen en juist configureren. |
-| Installer | Een bestaande Waveshare- of Heatpump Listener-module flashen, Wi-Fi op een nieuwe HCQ instellen of een HCQ herstellen. |
+| Installer | Wi-Fi op een nieuwe HCQ instellen of een HCQ herstellen. |
 | Web-app | Quick Start, installatiekeuzes, instellingen, updates, backup en beveiliging. |
 | Optioneel: Home Assistant | Dagelijks meekijken, dashboards, bronselectie en dynamische bronnen. |
 | Optioneel: Homey | Dagelijks meekijken, flows en OpenQuatt voeden vanuit Homey-sensoren. |
@@ -76,7 +76,7 @@ Wil je de interface eerst rustig bekijken zonder echte hardware, open dan de [we
 
 Na de eerste installatie opent de web-app Quick Start zolang de basisinstallatie nog niet is afgerond.
 
-Quick Start begint op de Heatpump Controller Q met de configuratiekeuze en software-update. Op Waveshare en Heatpump Listener wordt deze eerste stap overgeslagen, omdat `Single` of `Duo` daar al vastligt in de geïnstalleerde firmware. Daarna volgen de configuratiestappen:
+Quick Start begint met de configuratiekeuze en software-update. Daarna volgen de configuratiestappen:
 
 | Stap | Wat kies je? | Waarom? |
 |---|---|---|
@@ -92,8 +92,6 @@ Quick Start begint op de Heatpump Controller Q met de configuratiekeuze en softw
 | `Stille uren en niveaus` | Tijdvenster en compressorlimieten | Begrenst de compressor bijvoorbeeld 's nachts. |
 | `Gebruiksstatistieken` | Wel of niet beperkte technische systeemstatus en feature-instellingen delen | Tijdens een nieuwe Quick Start staat delen standaard aan en kan het hier worden uitgezet. |
 | `Bevestigen en afronden` | Je keuzes controleren | Markeert de basisconfiguratie als klaar. |
-
-Gebruik je Waveshare of Heatpump Listener? Begin dan inhoudelijk bij **Kies je Quatt Hybrid**; Quick Start toont alleen de stappen die voor jouw hardware van toepassing zijn.
 
 Je hoeft niet meteen perfecte waardes te kiezen. Het doel van Quick Start is een veilige, begrijpelijke basis. Fijnregelen kan later.
 

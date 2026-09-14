@@ -47,7 +47,6 @@ class RenderedPage:
 PAGES = [
     Page(PurePosixPath("README.md"), PurePosixPath("index.html"), "OpenQuatt", "Project", "Projectoverzicht, snelle start en hoofdroute."),
     Page(PurePosixPath("docs/q-edition.md"), PurePosixPath("q-edition.html"), "Heatpump Controller Q-edition aansluiten", "Aan de slag", "Doorlopende route voor aansluiten, netwerk instellen en Quick Start."),
-    Page(PurePosixPath("docs/installatie-en-ingebruikname.md"), PurePosixPath("installatie-en-ingebruikname.html"), "Andere modules installeren", "Andere hardware", "Een bestaande Waveshare- of Heatpump Listener-module installeren via de web installer."),
     Page(PurePosixPath("docs/web-app.md"), PurePosixPath("web-app.html"), "Web-app gebruiken", "Handleiding", "Quick Start, instellingen, updates, backup en beveiliging via openquatt.local."),
     Page(PurePosixPath("docs/dashboard/README.md"), PurePosixPath("dashboard/index.html"), "OpenQuatt in Home Assistant", "Home Assistant", "Dashboards, packages en handleidingen voor OpenQuatt in Home Assistant."),
     Page(PurePosixPath("docs/dashboard/installation.md"), PurePosixPath("dashboard/installeren.html"), "Dashboard installeren", "Home Assistant", "OpenQuatt toevoegen, kaarten installeren en het juiste dashboard importeren.", PurePosixPath("docs/installation.md")),
@@ -77,7 +76,6 @@ SIDEBAR_GROUPS = [
         [
             PurePosixPath("README.md"),
             PurePosixPath("docs/q-edition.md"),
-            PurePosixPath("docs/installatie-en-ingebruikname.md"),
             PurePosixPath("docs/web-app.md"),
         ],
     ),

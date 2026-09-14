@@ -94,7 +94,6 @@ assertEqual(
 const firefoxPolicyFiles = [
   "docs/install/index.html",
   "docs/install/install.js",
-  "docs/installatie-en-ingebruikname.md",
 ];
 for (const relativePath of firefoxPolicyFiles) {
   if (/\bFirefox\b/i.test(read(relativePath))) {

@@ -294,7 +294,6 @@ class OpenQuattMqttConfig : public Component {
   bool stop_client_();
   void clear_active_client_state_();
   void close_client_event_gate_();
-  void maybe_release_classic_worker_();
   static void client_worker_task_(void* arg);
   struct NumericInput {
     NumericInput(const char* key, const char* log_name, float min_value, float max_value)
@@ -395,11 +394,7 @@ class OpenQuattMqttConfig : public Component {
   static constexpr uint32_t SENSOR_PUBLISH_INTERVAL_MS = 10000;
   static constexpr uint32_t NON_RETAINED_STATEFUL_STALE_MS = 30UL * 60UL * 1000UL;
   static constexpr int MQTT_TASK_STACK_SIZE = 12288;
-#if defined(CONFIG_IDF_TARGET_ESP32S3)
   static constexpr bool MQTT_WORKER_STACK_IN_PSRAM = true;
-#else
-  static constexpr bool MQTT_WORKER_STACK_IN_PSRAM = false;
-#endif
   static constexpr uint32_t MQTT_WORKER_TASK_STACK_SIZE = 24576;
   static constexpr uint32_t MQTT_RECONCILE_RETRY_MS = 5000;
   static constexpr size_t MQTT_CLIENT_ID_MAX_LEN = 96;

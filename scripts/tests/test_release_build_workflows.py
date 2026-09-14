@@ -9,6 +9,7 @@ REUSABLE_BUILD_WORKFLOW = (ROOT / ".github/workflows/esphome-build.yml").read_te
 RELEASE_WORKFLOW = (ROOT / ".github/workflows/release-build.yml").read_text(encoding="utf-8")
 DEV_WORKFLOW = (ROOT / ".github/workflows/dev-build.yml").read_text(encoding="utf-8")
 PAGES_WORKFLOW = (ROOT / ".github/workflows/pages-deploy.yml").read_text(encoding="utf-8")
+PREPARE_RELEASE_ASSETS = (ROOT / "scripts/prepare_release_assets.sh").read_text(encoding="utf-8")
 
 
 class ReleaseBuildWorkflowTests(unittest.TestCase):
@@ -59,12 +60,19 @@ class ReleaseBuildWorkflowTests(unittest.TestCase):
         self.assertIn("needs: validate-release-state", RELEASE_WORKFLOW)
         self.assertIn("--draft --generate-notes", RELEASE_WORKFLOW)
         self.assertIn("name: Verify release assets", RELEASE_WORKFLOW)
-        self.assertIn("scripts/build_targets.py release-files --status enabled", RELEASE_WORKFLOW)
+        self.assertIn(
+            "scripts/build_targets.py release-files --status enabled --include-legacy-eol-manifests",
+            RELEASE_WORKFLOW,
+        )
         self.assertIn("name: Publish complete release", RELEASE_WORKFLOW)
         self.assertGreater(
             RELEASE_WORKFLOW.index("Publish complete release"),
             RELEASE_WORKFLOW.index("Verify release assets"),
         )
+
+    def test_release_asset_wrapper_forwards_the_legacy_eol_manifest_flag(self) -> None:
+        self.assertIn('"$4" != "--include-legacy-eol-manifests"', PREPARE_RELEASE_ASSETS)
+        self.assertIn('prepare-release-assets "$@"', PREPARE_RELEASE_ASSETS)
 
     def test_pages_uses_one_complete_stable_release_for_assets_and_metadata(self) -> None:
         self.assertIn("name: Resolve latest complete stable release", PAGES_WORKFLOW)

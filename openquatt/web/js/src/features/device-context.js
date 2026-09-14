@@ -170,12 +170,6 @@ import { state } from "../core/state.js";
       }
       return `Heatpump Controller Q ${topologyLabel} ${getFirmwareConnectionLabel(connection)}`;
     }
-    if (hardware === "heatpump_listener") {
-      return `Heatpump Listener ${topologyLabel} ${getFirmwareConnectionLabel(connection)}`;
-    }
-    if (hardware === "waveshare") {
-      return `Waveshare ${topologyLabel} ${getFirmwareConnectionLabel(connection)}`;
-    }
     return `${getFirmwareDeviceLabel()} ${topologyLabel} ${getFirmwareConnectionLabel(connection)}`;
   }
 
