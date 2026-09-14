@@ -261,14 +261,23 @@ jobs:
             --notes "${NOTES}" \
             --prerelease
 
+          # Backward-compatible: oudere builds genereren nog geen manifesten.
+          # Upload ze alleen indien aanwezig, zodat deze publisher zowel op
+          # main (oude generator) als op dev (nieuwe generator) werkt.
+          MANIFEST_ARGS=()
+          if compgen -G "dist/*-ota.manifest.json" > /dev/null; then
+            MANIFEST_ARGS=(dist/*-ota.manifest.json)
+          fi
+
           gh release upload "${TAG}" \
             dist/*.firmware.ota.bin \
             dist/*.firmware.ota.bin.md5 \
+            "${MANIFEST_ARGS[@]}" \
             dist/pr-firmware.json \
             --clobber
 
           EXPECTED_ASSET_COUNT="$(find dist -maxdepth 1 -type f \
-            \( -name '*.firmware.ota.bin' -o -name '*.firmware.ota.bin.md5' -o -name 'pr-firmware.json' \) \
+            \( -name '*.firmware.ota.bin' -o -name '*.firmware.ota.bin.md5' -o -name '*-ota.manifest.json' -o -name 'pr-firmware.json' \) \
             | wc -l | tr -d ' ')"
           PUBLISHED_ASSET_COUNT="$(gh release view "${TAG}" --json assets --jq '.assets | length')"
           if [[ "${PUBLISHED_ASSET_COUNT}" != "${EXPECTED_ASSET_COUNT}" ]]; then
@@ -306,5 +315,36 @@ jobs:
             echo "No PR test release ${TAG} found."
           else
             cat release-view.err >&2
+            exit 1
+          fi
+
+  remove-merged-pr-test-label:
+    runs-on: ubuntu-latest
+    if: >-
+      ${{
+        github.event_name == 'pull_request_target' &&
+        github.event.action == 'closed' &&
+        github.event.pull_request.merged == true &&
+        github.event.pull_request.base.ref == 'dev' &&
+        contains(github.event.pull_request.labels.*.name, 'test-firmware')
+      }}
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Remove test-firmware label from merged PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          gh api \
+            --method DELETE \
+            "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/labels/test-firmware" \
+            --silent || true
+
+          PR_LABELS="$(gh api \
+            "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" \
+            --jq '.labels[].name')"
+          if grep -Fxq 'test-firmware' <<< "${PR_LABELS}"; then
+            echo "Failed to remove the test-firmware label from PR #${PR_NUMBER}." >&2
             exit 1
           fi

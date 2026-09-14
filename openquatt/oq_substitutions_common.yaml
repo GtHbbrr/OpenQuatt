@@ -13,7 +13,7 @@
 device_name: "openquatt"                              # Internal ESPHome device ID / hostname base.
 friendly_name: OpenQuatt                              # Display name in Home Assistant / UI.
 project_name: "openquatt.openquatt"                   # ESPHome project identifier shown in firmware metadata.
-project_version: "v0.48.0"                            # ESPHome project version shown in firmware metadata.
+project_version: "v0.51.0"                            # ESPHome project version shown in firmware metadata.
 release_channel: "main"                               # Firmware release channel shown in diagnostics (`main` or `dev`).
 oq_firmware_initial_check_delay_s: "300"              # Stable-network delay before the first automatic manifest check [s].
 oq_firmware_periodic_check_interval: "4h"              # Automatic manifest-check cadence after the initial boot window.
@@ -25,6 +25,8 @@ oq_local_supply_temp_selector_id: "water_supply_source"     # Validation-safe pl
 oq_controller_flow_sensor_id: "hp1_flow"              # Profile-safe controller-flow source used by shared lambdas.
 oq_q_flow_source_selector_id: "flow_source"           # Validation-safe placeholder outside Q profiles.
 oq_connection: "unknown"                              # Compile-time connection profile id (`wifi` or `eth`).
+oq_connection_text_internal: "true"                   # Hide the static connection diagnostic unless a runtime manager owns it.
+oq_artifact_connection_suffix: "-${oq_connection}"    # Artifact filename suffix; empty for combined-connection firmware.
 alternate_connection: ""                              # Optional connection target used for controlled Wi-Fi/Ethernet switching.
 alternate_main_release_manifest_url: ""               # Optional main-channel OTA manifest for the alternate connection target.
 alternate_dev_release_manifest_url: ""                # Optional dev-channel OTA manifest for the alternate connection target.
@@ -65,6 +67,8 @@ mqtt_heating_enable_topic: "openquatt/${device_name}/input/thermostat/heating_en
 mqtt_heating_enable_stale_s: "0"                      # Maximum age for MQTT heating-enable [s]; 0 keeps state until a new payload, disable, or restart.
 mqtt_cooling_enable_topic: "openquatt/${device_name}/input/thermostat/cooling_enable" # Fixed MQTT input topic for external cooling enable [boolean].
 mqtt_cooling_enable_stale_s: "0"                      # Maximum age for MQTT cooling-enable [s]; 0 keeps state until a new payload, disable, or restart.
+mqtt_heating_supply_target_topic: "openquatt/${device_name}/input/heating/supply_target" # Fixed MQTT input topic for external heating supply target [degC].
+mqtt_heating_supply_target_stale_s: "900"             # Maximum age for the last valid MQTT heating supply target before it becomes invalid [s].
 api_input_cooling_dew_point_stale_s: "900"            # Maximum age for API-input cooling dew point before it becomes invalid [s].
 api_input_outside_temperature_stale_s: "1800"         # Maximum age for API-input outside temperature before it becomes invalid [s].
 api_input_room_temperature_stale_s: "600"             # Maximum age for API-input room temperature before it becomes invalid [s].
@@ -72,6 +76,8 @@ api_input_room_setpoint_stale_s: "0"                  # Maximum age for API-inpu
 api_input_heating_enable_stale_s: "0"                 # Maximum age for API-input heating-enable [s]; 0 keeps state until restart or a new payload.
 api_input_cooling_enable_stale_s: "0"                 # Maximum age for API-input cooling-enable [s]; 0 keeps state until restart or a new payload.
 api_input_external_heat_demand_stale_s: "900"         # Maximum age for API-input external heat demand before it becomes invalid [s].
+api_input_heating_supply_target_stale_s: "900"        # Maximum age for API-input heating supply target before it becomes invalid [s].
+ha_heating_supply_target_stale_s: "900"               # Maximum age for the last HA heating supply target publish before it becomes invalid [s]; publish periodically.
 usage_telemetry_broker: "mqtt.openquatt.nl"           # Central usage-statistics MQTT broker.
 usage_telemetry_port: "1883"                          # Plain MQTT port for the current central broker.
 usage_telemetry_tls: "false"                          # Temporary until the central broker exposes MQTT/TLS.
@@ -83,8 +89,6 @@ usage_telemetry_topic: "openquatt/devices"            # Base topic for openquatt
 # HARDWARE
 # ----------------------------
 # Hardware-specific substitutions are provided by per-profile files:
-# - openquatt/profiles/waveshare.yaml
-# - openquatt/profiles/heatpump_listener.yaml
 # - openquatt/profiles/heatpump_controller_q.yaml
 
 # ----------------------------
@@ -98,14 +102,16 @@ secondary_cooling_power_id: "${secondary_hp_id}_cooling_power"
 secondary_compressor_level_id: "${secondary_hp_id}_compressor_level"
 secondary_defrost_id: "${secondary_hp_id}_defrost"
 secondary_last_applied_level_id: "${secondary_hp_id}_last_applied_level"
+secondary_last_commanded_physical_level_id: "${secondary_hp_id}_last_commanded_physical_level"
+secondary_runtime_frequency_snapshot_storage_id: "${secondary_hp_id}_runtime_frequency_snapshot_storage"
 secondary_last_start_ms_id: "${secondary_hp_id}_last_start_ms"
 secondary_last_stop_ms_id: "${secondary_hp_id}_last_stop_ms"
 secondary_minutes_id: "${secondary_hp_id}_minutes"
 secondary_set_working_mode_id: "${secondary_hp_id}_set_working_mode"
 secondary_working_mode_id: "${secondary_hp_id}_working_mode"
 secondary_4_way_valve_id: "${secondary_hp_id}_4_way_valve"
-secondary_excluded_level_a_id: "${secondary_hp_id}_excluded_level_a"
-secondary_excluded_level_b_id: "${secondary_hp_id}_excluded_level_b"
+secondary_excluded_frequency_min_hz_id: "${secondary_hp_id}_excluded_frequency_min_hz"
+secondary_excluded_frequency_max_hz_id: "${secondary_hp_id}_excluded_frequency_max_hz"
 secondary_oil_return_id: "${secondary_hp_id}_prot_oil_return"
 secondary_flow_id: "${secondary_hp_id}_flow"
 secondary_pump_speed_id: "${secondary_hp_id}_pump_speed"
@@ -126,9 +132,12 @@ oq_power_peak_trip_s: "15"                            # Time above peak required
 oq_power_soft_trip_s: "300"                           # Time above soft required for a mild cap step [s].
 oq_power_recover_s: "60"                              # Time below recover required for cap recovery [s].
 oq_power_cap_max_f: "20"                              # Upper limit of demand-cap factor f.
-oq_power_cap_nan_f: "16"                              # Fail-safe cap factor for invalid power measurement.
-oq_duo_current_limit_v1_a: "16.0"                     # Duo current limit for V1/V1.5 hardware [A].
-oq_duo_current_limit_v2_a: "20.0"                     # Duo current limit for V2 hardware [A].
+oq_power_cap_nan_f: "16"                              # Duo fail-safe demand cap for invalid power measurement; Single uses half.
+oq_duo_current_limit_v1_a: "16.0"                     # Duo standard limit: official Quatt Duo max for V1/V1.5 [A].
+oq_duo_current_limit_v2_a: "20.0"                     # Duo standard limit: official Quatt Duo max for V2 [A]; also the derived per-ODU ceiling (2 x 10 A) for V1/V1.5 [A].
+oq_duo_current_limit_v2_max_a: "26.0"                 # Absolute OpenQuatt ceiling for V2: 2 x published 13 A per-ODU max [A].
+oq_electrical_current_limit_min_a: "6.0"              # Lowest configurable installation current limit [A].
+oq_power_measurement_stale_s: "60"                    # Maximum age of voltage/current measurements used by the limiter [s].
 oq_mains_voltage_v: "230.0"                           # Nominal mains voltage used to convert current limits to power thresholds [V].
 oq_cm_prepost_s: "30"                                 # Duration of CM1 pre/postflow window [s].
 oq_cm_min_flow_lph: "250.0"                           # Minimum valid flow for compressor operation [L/h].
@@ -149,10 +158,14 @@ oq_cm3_min_run_s: "300"                               # Minimum dwell time in CM
 oq_cm2_min_run_s: "120"                               # Minimum dwell time in CM2 before promotion [s].
 oq_cm3_curve_on_delta_c: "3.0"                        # Heating Curve target-minus-supply margin for CM2 -> CM3 [°C].
 oq_cm3_curve_off_delta_c: "1.0"                       # Heating Curve target-minus-supply margin for CM3 -> CM2 [°C].
+oq_hp_cold_start_min_c: "5.0"                         # Absolute minimum ODU outlet temperature for compressor start [°C].
+oq_hp_cold_start_assist_release_c: "12.0"              # End auxiliary cold-start assist at this ODU outlet temperature [°C].
+oq_hp_cold_start_boiler_target_c: "25.0"               # Conservative OpenTherm target while cold-start assist is active [°C].
 oq_cm0_sticky_wait_s: "86400"                         # Wait time in CM0 before sticky-pump run starts [s].
 oq_cm0_sticky_run_s: "60"                             # Duration of sticky-pump run in CM0 [s].
 oq_cm0_pump_stop_ipwm: "1000.0"                       # iPWM setpoint that forces pump off in CM0.
 oq_sticky_pwm: "800"                                  # Fixed iPWM fallback used during CM0 sticky circulation.
+oq_cm98_pump_ipwm: "800"                              # Fixed pump iPWM used during CM98 frost circulation.
 
 # ----------------------------
 # HEATING STRATEGY
@@ -172,10 +185,13 @@ oq_outside_temp_stale_s: "1200"                       # Ignore a local outdoor r
 oq_heat_loop_tick_s: "5"                              # Scheduler tick for heat-control loop [s].
 oq_heat_loop_curve_s: "30"                            # Effective heat-control cadence in Heating Curve mode [s].
 oq_heat_loop_powerhouse_s: "60"                       # Effective heat-control cadence in Power House mode [s].
+oq_ph_demand_loop_s: "10"                             # Power House demand and dispatch cadence [s].
+oq_cooling_minimum_off_min_s: "240"                   # Production floor for the user-configurable cooling restart delay [s].
 oq_cooling_limiter_stop_confirm_s: "30"               # Confirm time before soft-stop and dew hard-stop take effect [s].
 oq_cooling_oil_return_hold_s: "1200"                  # Maximum oil-return recovery window; floor-guard modes clear earlier after recovery [s].
 oq_cop_min_input_w: "10.0"                            # Minimum electrical input for a valid COP calculation [W].
 oq_hp_min_off_s: "240"                                # Minimum per-HP off-time before any restart [s].
+oq_hp_min_runtime_min_s: "300"                        # Build-time floor for the user-configurable compressor runtime [s].
 oq_optimizer_penalty_per_w: "5.0"                     # Cost factor above soft limit [cost/W].
 oq_optimizer_topology_power_margin_w: "150.0"         # Required power delta before a single<->duo topology switch counts as a meaningful efficiency gain [W].
 oq_optimizer_topology_heat_advantage_w: "450.0"       # Required heat-match advantage before a less-efficient topology may override the efficiency-first choice [W].
@@ -277,6 +293,8 @@ ha_cooling_dew_point_entity_id: "sensor.openquatt_ext_cooling_dew_point" # HA ag
 ha_cooling_dew_point_valid_entity_id: "binary_sensor.openquatt_ext_cooling_dew_point_valid" # HA validity flag for aggregate cooling dew point.
 ha_external_heat_demand_entity_id: "sensor.openquatt_ext_heat_demand"       # HA proxy entity for external Power House heat demand [W].
 ha_external_heat_demand_valid_entity_id: "binary_sensor.openquatt_ext_heat_demand_valid"  # HA validity flag for external heat demand.
+ha_heating_supply_target_entity_id: "sensor.openquatt_ext_heating_supply_target" # HA proxy entity for external heating supply target [degC].
+ha_heating_supply_target_valid_entity_id: "binary_sensor.openquatt_ext_heating_supply_target_valid" # HA validity flag for external heating supply target.
 
 # ----------------------------
 # HP IO (MODBUS POLLING)

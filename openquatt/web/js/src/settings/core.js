@@ -1,17 +1,18 @@
-import { getEntityStateText, hasEntity, isEntityActive } from "../core/app-shared.js";
+import { getEntityStateText, isEntityActive } from "../core/app-shared.js";
 import { renderOqIcon, SETTINGS_GROUP_IDS, SETTINGS_GROUPS } from "../core/config.js";
 import { isCurveMode } from "../core/domain-helpers.js";
 import { getInputDraftValue } from "../core/control-drafts.js";
-import { formatValue, getEntityValue, normalizeNumber } from "../core/entity-store.js";
+import { formatValue, getEntityValue, normalizeNumber, toTimeInputValue } from "../core/entity-store.js";
 import { state } from "../core/state.js";
 import { setSettingsRenderControls } from "../core/settings-render-controls.js";
 import { formatDiagnosticsDateTime, formatUptimeFromMeta, getDeviceIpAddress, getInstallationLabel } from "../features/device-context.js";
 import { getUpdateStatus } from "../features/firmware-update.js";
 import { getEspTemperatureLabel } from "../features/header-status.js";
 import { getWebAuthStatusDetail, getWebAuthStatusLabel } from "../features/security-access.js";
-import { getCommissioningStatusValue, getSelectEntityOptions, renderSettingsSection } from "./controls.js";
+import { getCommissioningStatusValue, patchSettingsChoiceOption, patchSettingsSelectControl, renderSettingsSection } from "./controls.js";
 import { renderSettingsCoolingSection } from "./cooling.js";
 import { renderSettingsFlowSection, renderSettingsHeatingSection } from "./heating.js";
+import { renderSettingsElectricalCurrentLimitSection } from "./electrical-limit.js";
 import { renderSettingsAuxRelaySection, renderSettingsBoilerCvSection, renderSettingsCompressorSection, renderSettingsDiagnosticsSection, renderSettingsGenerationSection, renderSettingsInstallationMonitoringSection, renderSettingsOduRuntimeFrequencySection, renderSettingsQuickStartSection } from "./installation.js";
 import { renderSettingsMqttSection, renderSettingsOpenThermCicSection, renderSettingsSensorSelectionSection } from "./integrations.js";
 import { renderSettingsPrivacySection } from "./privacy.js";
@@ -21,6 +22,34 @@ import { renderSettingsSilentSection } from "./silent.js";
 import { renderSettingsBackupSection, renderSettingsTrendSection } from "./storage.js";
 import { renderSettingsWaterSection } from "./water.js";
 import { escapeHtml } from "../core/html.js";
+import { getSettingsSelectModel, getSettingsSwitchModel } from "./field-models.js";
+
+function syncFrequencyRangeControl(control) {
+  const minInput = control?.querySelector('[data-oq-range-role="min"]');
+  const maxInput = control?.querySelector('[data-oq-range-role="max"]');
+  if (!minInput || !maxInput) {
+    return;
+  }
+  let minValue = Number(minInput.value);
+  let maxValue = Number(maxInput.value);
+  const scaleMin = Number(minInput.min);
+  const scaleMax = Number(minInput.max);
+  const span = Math.max(1, scaleMax - scaleMin);
+  const disabled = minValue === 0 || maxValue === 0;
+  if (disabled) {
+    minValue = maxValue = 0;
+    minInput.value = maxInput.value = "0";
+  }
+  const invalid = !disabled && minValue > maxValue;
+  control.classList.toggle("is-disabled", disabled);
+  control.classList.toggle("is-invalid", invalid);
+  control.style.setProperty("--oq-range-start", `${((minValue - scaleMin) / span) * 100}%`);
+  control.style.setProperty("--oq-range-end", `${((maxValue - scaleMin) / span) * 100}%`);
+  const value = control.querySelector("[data-oq-range-value]");
+  if (value) {
+    value.textContent = disabled ? "Geen uitsluiting" : invalid ? "Ongeldig bereik" : `${minValue}–${maxValue} Hz`;
+  }
+}
 
 
 
@@ -55,6 +84,7 @@ import { escapeHtml } from "../core/html.js";
           renderSettingsSilentSection(),
           renderSettingsWaterSection(),
           renderSettingsCompressorSection(),
+          renderSettingsElectricalCurrentLimitSection(),
           renderSettingsOduRuntimeFrequencySection(),
         ]
       : activeGroup === "service"
@@ -101,7 +131,7 @@ import { escapeHtml } from "../core/html.js";
     }
 
     const activeGroup = SETTINGS_GROUP_IDS.has(state.settingsGroup) ? state.settingsGroup : SETTINGS_GROUPS[0].id;
-    if (activeGroup === "service") {
+    if (activeGroup === "service" || (activeGroup === "integrations" && state.focusedField)) {
       return false;
     }
 
@@ -131,6 +161,13 @@ import { escapeHtml } from "../core/html.js";
       }
     });
 
+    // One snapshot per field keeps dropdowns and cards on the same live state.
+    const selectModels = new Map();
+    const selectModel = (key) => {
+      if (!selectModels.has(key)) selectModels.set(key, getSettingsSelectModel(key));
+      return selectModels.get(key);
+    };
+
     stack.querySelectorAll("[data-oq-settings-field]").forEach((card) => {
       const key = String(card.dataset.oqSettingsField || "");
       if (!key) {
@@ -147,19 +184,26 @@ import { escapeHtml } from "../core/html.js";
 
       card.querySelectorAll('select[data-oq-field]').forEach((select) => {
         const fieldKey = String(select.dataset.oqField || key);
-        const value = String(getEntityValue(fieldKey) || "");
-        if (select.value !== value) {
-          select.value = value;
-        }
+        patchSettingsSelectControl(select, selectModel(fieldKey));
       });
 
       card.querySelectorAll('input[data-oq-field]').forEach((input) => {
         const fieldKey = String(input.dataset.oqField || key);
-        const value = String(getInputDraftValue(fieldKey) || "");
+        if (input.type === "time" && input === document.activeElement) return;
+        const value = input.type === "time"
+          ? toTimeInputValue(getInputDraftValue(fieldKey))
+          : String(getInputDraftValue(fieldKey) ?? "");
+        if (input.type === "time") input.disabled = state.loadingEntities || state.savingTimeFields.has(fieldKey);
         if (input.value !== value) {
           input.value = value;
         }
       });
+
+      const frequencyRange = card.querySelector('[data-oq-dual-range="true"]');
+      if (frequencyRange) {
+        syncFrequencyRangeControl(frequencyRange);
+        return;
+      }
 
       const sliderValue = card.querySelector(".oq-helper-slider-meta strong");
       const rangeInput = card.querySelector('input[type="range"][data-oq-field]');
@@ -173,25 +217,7 @@ import { escapeHtml } from "../core/html.js";
 
     stack.querySelectorAll('[data-select-key]').forEach((button) => {
       const key = String(button.dataset.selectKey || "");
-      const option = String(button.dataset.selectOption || "");
-      const currentValue = String(getEntityValue(key) || "");
-      const active = option === currentValue;
-      button.classList.toggle("is-active", active);
-      button.setAttribute("aria-pressed", active ? "true" : "false");
-      if (key === "strategy") {
-        button.disabled = state.loadingEntities || state.busyAction === "save-strategy";
-      } else if (key === "hpGeneration") {
-        button.disabled = state.loadingEntities || state.busyAction === "save-hpGeneration";
-      } else if (key === "curveControlProfile") {
-        button.disabled = state.loadingEntities || state.busyAction === "save-curveControlProfile";
-      } else if (key === "phResponseProfile") {
-        button.disabled = state.loadingEntities || state.busyAction === "save-phResponseProfile";
-      }
-
-      const shell = button.closest(".oq-settings-choice-card-shell");
-      if (shell) {
-        shell.classList.toggle("is-active", active);
-      }
+      patchSettingsChoiceOption(button, selectModel(key));
     });
 
     const customProfileCard = stack.querySelector(".oq-settings-choice-card--static.oq-settings-choice-card--custom");
@@ -210,24 +236,22 @@ import { escapeHtml } from "../core/html.js";
 
     stack.querySelectorAll('[data-oq-action="toggle-overview-control"][data-control-key]').forEach((button) => {
       const key = String(button.dataset.controlKey || "");
-      const current = Boolean(getEntityValue(key));
       const onLabel = String(button.dataset.onLabel || "Aan");
       const offLabel = String(button.dataset.offLabel || "Uit");
       const title = String(button.dataset.switchTitle || key);
-      const stateLabel = current ? onLabel : offLabel;
-      button.dataset.controlState = current ? "off" : "on";
-      button.classList.toggle("is-on", current);
-      button.setAttribute("aria-checked", current ? "true" : "false");
-      button.setAttribute("aria-label", `${title}: ${stateLabel}`);
-      button.disabled = state.loadingEntities || state.busyAction === `switch-${key}`;
+      const model = getSettingsSwitchModel(key, { title, onLabel, offLabel });
+      button.dataset.controlState = model.nextState;
+      button.classList.toggle("is-on", model.enabled);
+      button.setAttribute("aria-checked", model.enabled ? "true" : "false");
+      button.setAttribute("aria-label", model.ariaLabel);
+      button.disabled = model.busy;
     });
 
     stack.querySelectorAll("[data-oq-switch-pill]").forEach((pill) => {
       const key = String(pill.dataset.oqSwitchPill || "");
-      const enabled = Boolean(getEntityValue(key));
       const onLabel = String(pill.dataset.onLabel || "Aan");
       const offLabel = String(pill.dataset.offLabel || "Uit");
-      const label = enabled ? onLabel : offLabel;
+      const { enabled, label } = getSettingsSwitchModel(key, { onLabel, offLabel });
       pill.classList.toggle("is-on", enabled);
       if (pill.textContent !== label) {
         pill.textContent = label;
@@ -252,8 +276,8 @@ import { escapeHtml } from "../core/html.js";
       const copyNode = generationStatus.querySelector(".oq-settings-quickstart-status-copy");
       const button = generationStatus.querySelector('button[data-oq-action="open-generation-modal"]');
       const currentLabel = getInstallationLabel();
-      const entity = state.entities.hpGeneration || {};
-      const canEdit = hasEntity("hpGeneration") && getSelectEntityOptions(entity).length > 0;
+      const model = selectModel("hpGeneration");
+      const canEdit = model.available && model.options.length > 0;
       if (valueNode) {
         const value = currentLabel || "Onbekend";
         if (valueNode.textContent !== value) {
@@ -267,7 +291,7 @@ import { escapeHtml } from "../core/html.js";
         }
       }
       if (button) {
-        button.disabled = !canEdit || state.loadingEntities || state.busyAction === "save-hpGeneration";
+        button.disabled = !canEdit || model.busy;
       }
     }
 
@@ -382,6 +406,12 @@ import { escapeHtml } from "../core/html.js";
         const busyRestart = state.busyAction === "restartAction";
         restartButton.disabled = busyRestart;
         restartButton.textContent = busyRestart ? "Herstarten..." : "Herstarten";
+      }
+      const factoryResetButton = systemSummary.querySelector('button[data-oq-action="open-factory-reset-confirm"]');
+      if (factoryResetButton) {
+        const busyFactoryReset = state.busyAction === "factoryResetButton";
+        factoryResetButton.disabled = busyFactoryReset;
+        factoryResetButton.textContent = busyFactoryReset ? "Resetten..." : "Factory reset";
       }
     }
 

@@ -12,11 +12,16 @@ const FIRMWARE_ENTITY_PACKAGES = [
   "../../oq_installation_monitoring.yaml",
   "../../oq_boiler_control.yaml",
   "../../oq_boiler_opentherm.yaml",
+  "../../oq_boiler_test.yaml",
+  "../../oq_commissioning.yaml",
   "../../oq_heating_curve_strategy.yaml",
   "../../oq_sensor_sources.yaml",
   "../../oq_sensor_source_selects_opentherm.yaml",
   "../../oq_ot_slave.yaml",
   "../../oq_power_house_strategy.yaml",
+  "../../oq_cooling_strategy.yaml",
+  "../../oq_thermal_request_control.yaml",
+  "../../oq_supervisory_controlmode.yaml",
 ];
 
 const OBSERVABILITY_KEYS = [
@@ -32,23 +37,25 @@ const OBSERVABILITY_KEYS = [
   "boilerActive",
   "boilerCommandValid",
   "boilerCommandActive",
-  "boilerCommandAge",
   "boilerCommandSource",
   "boilerCommandTargetTemperature",
   "boilerBlockReason",
   "otbLinkAvailable",
   "otbChCommand",
   "otbControlSetpointCommand",
-  "otbChActive",
   "otbFlameOn",
   "otbLastResponseAge",
-  "otbResponseCount",
   "otbTransportErrorCount",
-  "otbResponseTimeoutCount",
   "otbMaxCapacity",
   "otbMinModulation",
 ];
 const ODU_GENERATION_KEYS = ["hp1Generation", "hp2Generation"];
+const ODU_FINGERPRINT_KEYS = [
+  "hp1GenerationVariant",
+  "hp2GenerationVariant",
+  "hp1CustomerModelCode",
+  "hp2CustomerModelCode",
+];
 
 const ISSUE_473_OBSERVABILITY_KEYS = [
   "curveRestartBlockedByRoom",
@@ -65,17 +72,120 @@ const ISSUE_489_OBSERVABILITY_KEYS = [
   "powerHouseDemandSource",
 ];
 
+const COOLING_MIN_OFF_OBSERVABILITY_KEYS = [
+  "coolingRestartMode",
+  "coolingMinimumOffTime",
+  "coolingMinimumOffTimeRemaining",
+];
+
+const ISSUE_516_OBSERVABILITY_KEYS = [
+  "boilerPowerTestStatus",
+  "boilerCommandRequestedPower",
+  "boilerHeatPower",
+  "otbFaultIndication",
+  "otbDhwActive",
+  "otbRelativeModulation",
+  "otbBoilerWaterTemp",
+  "otbReturnWaterTemp",
+  "otbStartHandshakeDetail",
+];
+
+const ISSUE_536_WARM_START_OBSERVABILITY_KEYS = [
+  "boilerStartThermalGuard",
+  "boilerStartThermalSafeCeiling",
+];
+
+const ISSUE_536_EMPIRICAL_APPLY_OBSERVABILITY_KEYS = [
+  "boilerPowerTestResultQuality",
+];
+
+const ISSUE_649_OBSERVABILITY_KEYS = [
+  "heatingSupplyTargetSource",
+  "heatingSupplyTargetSelected",
+  "heatingSupplyTargetActiveSource",
+];
+
+const V2_CHAIN_KEYS = [
+  "hp1RequestedControlLevel",
+  "hp1AppliedControlLevel",
+  "hp1TableFrequency",
+  "hp2RequestedControlLevel",
+  "hp2AppliedControlLevel",
+  "hp2TableFrequency",
+  "phFastIntentCode",
+  "lowLoadLatch",
+  "lowLoadPminW",
+  "lowLoadOffW",
+  "lowLoadOnW",
+  "debugStaticSnapshot",
+];
+
+const ISSUE_642_OBSERVABILITY_KEYS = [
+  "coolingStartBlockReason",
+  "coolingStartBlockRemaining",
+];
+
+// Bestaande ODU-registervelden (geen nieuwe firmware-entities): gevraagde
+// compressorfrequentie (register 2102) en aangestuurde silent-status
+// (register 2006). Namen zijn getemplatet via ${prefix} in oq_HP_io.yaml,
+// dus de generieke firmware-naamcheck hieronder slaat ze over; zie de
+// dedicated test verderop.
+const ODU_REGISTER_KEYS = [
+  "hp1CompressorFrequencyDemand",
+  "hp2CompressorFrequencyDemand",
+  "hp1LowNoiseMode",
+  "hp2LowNoiseMode",
+];
+
+const POWER_INPUT_KEYS = [
+  "hp1PowerInputQuality",
+  "hp1AcVoltage",
+  "hp1AcCurrent",
+  "hp1FanSpeed",
+  "hp1PumpPower",
+  "hp1PumpRelay",
+  "hp1BottomPlate",
+  "hp1Crankcase",
+  "hp2PowerInputQuality",
+  "hp2AcVoltage",
+  "hp2AcCurrent",
+  "hp2FanSpeed",
+  "hp2PumpPower",
+  "hp2PumpRelay",
+  "hp2BottomPlate",
+  "hp2Crankcase",
+];
+
 const ADDED_OBSERVABILITY_KEYS = [
   ...OBSERVABILITY_KEYS,
   ...ISSUE_473_OBSERVABILITY_KEYS,
   ...ISSUE_489_OBSERVABILITY_KEYS,
+  ...COOLING_MIN_OFF_OBSERVABILITY_KEYS,
+  ...ISSUE_516_OBSERVABILITY_KEYS,
+  ...ISSUE_536_WARM_START_OBSERVABILITY_KEYS,
+  ...ISSUE_536_EMPIRICAL_APPLY_OBSERVABILITY_KEYS,
+  ...ISSUE_649_OBSERVABILITY_KEYS,
+  ...ISSUE_642_OBSERVABILITY_KEYS,
+  ...V2_CHAIN_KEYS,
+  ...ODU_REGISTER_KEYS,
+  ...POWER_INPUT_KEYS,
 ];
 
-test("debugobservability wordt additief achter het bestaande opnamecontract geplaatst", () => {
+test("debugobservability wordt additief achter het bestaande opnamecontract geplaatst", async () => {
   const legacyTailIndex = DEBUG_RECORDING_KEYS.indexOf("otLinkProblem");
   const observabilityEndIndex = legacyTailIndex + 1 + OBSERVABILITY_KEYS.length;
   const issue473EndIndex = observabilityEndIndex + ISSUE_473_OBSERVABILITY_KEYS.length;
   const oduEndIndex = issue473EndIndex + ODU_GENERATION_KEYS.length;
+  const fingerprintEndIndex = oduEndIndex + ODU_FINGERPRINT_KEYS.length;
+  const issue489EndIndex = fingerprintEndIndex + ISSUE_489_OBSERVABILITY_KEYS.length;
+  const coolingMinOffEndIndex = issue489EndIndex + COOLING_MIN_OFF_OBSERVABILITY_KEYS.length;
+  const issue516EndIndex = coolingMinOffEndIndex + ISSUE_516_OBSERVABILITY_KEYS.length;
+  const issue536WarmStartEndIndex = issue516EndIndex + ISSUE_536_WARM_START_OBSERVABILITY_KEYS.length;
+  const issue536EmpiricalEndIndex = issue536WarmStartEndIndex + ISSUE_536_EMPIRICAL_APPLY_OBSERVABILITY_KEYS.length;
+  const issue649EndIndex = issue536EmpiricalEndIndex + ISSUE_649_OBSERVABILITY_KEYS.length;
+  const issue642EndIndex = issue649EndIndex + ISSUE_642_OBSERVABILITY_KEYS.length;
+  const v2ChainEndIndex = issue642EndIndex + V2_CHAIN_KEYS.length;
+  const oduRegisterEndIndex = v2ChainEndIndex + ODU_REGISTER_KEYS.length;
 
   assert.equal(legacyTailIndex, 134);
   assert.deepEqual(
@@ -84,9 +194,62 @@ test("debugobservability wordt additief achter het bestaande opnamecontract gepl
   );
   assert.deepEqual(DEBUG_RECORDING_KEYS.slice(observabilityEndIndex, issue473EndIndex), ISSUE_473_OBSERVABILITY_KEYS);
   assert.deepEqual(DEBUG_RECORDING_KEYS.slice(issue473EndIndex, oduEndIndex), ODU_GENERATION_KEYS);
-  assert.deepEqual(DEBUG_RECORDING_KEYS.slice(oduEndIndex), ISSUE_489_OBSERVABILITY_KEYS);
+  assert.deepEqual(DEBUG_RECORDING_KEYS.slice(oduEndIndex, fingerprintEndIndex), ODU_FINGERPRINT_KEYS);
+  assert.deepEqual(DEBUG_RECORDING_KEYS.slice(fingerprintEndIndex, issue489EndIndex), ISSUE_489_OBSERVABILITY_KEYS);
+  assert.deepEqual(
+    DEBUG_RECORDING_KEYS.slice(issue489EndIndex, coolingMinOffEndIndex),
+    COOLING_MIN_OFF_OBSERVABILITY_KEYS,
+  );
+  assert.deepEqual(DEBUG_RECORDING_KEYS.slice(coolingMinOffEndIndex, issue516EndIndex), ISSUE_516_OBSERVABILITY_KEYS);
+  assert.deepEqual(
+    DEBUG_RECORDING_KEYS.slice(issue516EndIndex, issue536WarmStartEndIndex),
+    ISSUE_536_WARM_START_OBSERVABILITY_KEYS,
+  );
+  assert.deepEqual(
+    DEBUG_RECORDING_KEYS.slice(issue536WarmStartEndIndex, issue536EmpiricalEndIndex),
+    ISSUE_536_EMPIRICAL_APPLY_OBSERVABILITY_KEYS,
+  );
+  assert.deepEqual(
+    DEBUG_RECORDING_KEYS.slice(issue536EmpiricalEndIndex, issue649EndIndex),
+    ISSUE_649_OBSERVABILITY_KEYS,
+  );
+  assert.deepEqual(
+    DEBUG_RECORDING_KEYS.slice(issue649EndIndex, issue642EndIndex),
+    ISSUE_642_OBSERVABILITY_KEYS,
+  );
+  assert.deepEqual(DEBUG_RECORDING_KEYS.slice(issue642EndIndex, v2ChainEndIndex), V2_CHAIN_KEYS);
+  assert.deepEqual(DEBUG_RECORDING_KEYS.slice(v2ChainEndIndex, oduRegisterEndIndex), ODU_REGISTER_KEYS);
+  assert.deepEqual(DEBUG_RECORDING_KEYS.slice(oduRegisterEndIndex), POWER_INPUT_KEYS);
   assert.equal(new Set(DEBUG_RECORDING_KEYS).size, DEBUG_RECORDING_KEYS.length);
-  assert.ok(DEBUG_RECORDING_KEYS.length <= 188, "debugrecorder heeft maximaal 188 entityvelden naast 4 systeemvelden");
+  const recorderHeader = await readFile(
+    new URL("../../../components/openquatt_debug_recorder/OpenQuattDebugRecorder.h", import.meta.url),
+    "utf8",
+  );
+  const fieldCapacity = Number(recorderHeader.match(/FIELD_CAPACITY = (\d+)/)?.[1]);
+  const systemFieldCount = Number(recorderHeader.match(/SYSTEM_FIELD_COUNT = (\d+)/)?.[1]);
+  assert.equal(systemFieldCount, 5);
+  assert.equal(fieldCapacity, 243);
+  assert.ok(DEBUG_RECORDING_KEYS.length <= fieldCapacity - systemFieldCount);
+  assert.ok(
+    fieldCapacity - systemFieldCount - DEBUG_RECORDING_KEYS.length >= 12,
+    "debugrecorder houdt minimaal 12 entityvelden groeiruimte",
+  );
+});
+
+test("OpenTherm-opname bewaart signalen zonder afleidbare doublures", () => {
+  assert.ok(DEBUG_RECORDING_KEYS.includes("boilerActive"));
+  assert.ok(DEBUG_RECORDING_KEYS.includes("otbLinkAvailable"));
+  assert.ok(DEBUG_RECORDING_KEYS.includes("otbLastResponseAge"));
+  assert.ok(DEBUG_RECORDING_KEYS.includes("otbTransportErrorCount"));
+  assert.ok(DEBUG_RECORDING_KEYS.includes("otbStartHandshakeDetail"));
+  assert.ok(!DEBUG_RECORDING_KEYS.includes("otbChActive"));
+  assert.ok(!DEBUG_RECORDING_KEYS.includes("otbResponseCount"));
+  assert.ok(!DEBUG_RECORDING_KEYS.includes("otbResponseTimeoutCount"));
+  assert.ok(!DEBUG_RECORDING_KEYS.includes("boilerCommandAge"));
+  assert.ok(!DEBUG_RECORDING_KEYS.includes("commissioningStatus"));
+  assert.ok(!DEBUG_RECORDING_KEYS.includes("otbDiagnosticIndication"));
+  assert.ok(!DEBUG_RECORDING_KEYS.includes("otbServiceRequest"));
+  assert.ok(!DEBUG_RECORDING_KEYS.includes("otbStartHandshakeState"));
 });
 
 test("ODU-generaties worden achter het bestaande debugcontract toegevoegd", async () => {
@@ -103,9 +266,20 @@ test("ODU-generaties worden achter het bestaande debugcontract toegevoegd", asyn
     });
     assert.match(recorderSource, new RegExp(`std::strcmp\\(field\\.key, "${key}"\\)`));
   }
+  for (const [index, key] of ODU_FINGERPRINT_KEYS.entries()) {
+    const hp = (index % 2) + 1;
+    const suffix = index < 2 ? "ODU generation variant" : "ODU customer model code";
+    assert.deepEqual(ENTITY_DEFS[key], {
+      domain: "text_sensor",
+      name: `HP${hp} - ${suffix}`,
+      optional: true,
+    });
+  }
   assert.match(hpPackage, /id: \$\{hp_id\}_control_board_item/);
   assert.match(hpPackage, /id: \$\{hp_id\}_generation/);
   assert.match(hpPackage, /name: "\$\{prefix\}ODU generation"/);
+  assert.match(hpPackage, /name: "\$\{prefix\}ODU generation variant"/);
+  assert.match(hpPackage, /name: "\$\{prefix\}ODU customer model code"/);
 });
 
 test("elk nieuw debugveld heeft een opneembare entitydefinitie", () => {
@@ -124,12 +298,50 @@ test("elk nieuw debugveld verwijst naar een echte firmware-entity", async () => 
   const firmwareSource = packages.join("\n");
 
   for (const key of ADDED_OBSERVABILITY_KEYS) {
+    if ([...ODU_REGISTER_KEYS, ...POWER_INPUT_KEYS].includes(key)) continue;
     assert.ok(firmwareSource.includes(`name: "${ENTITY_DEFS[key].name}"`), `firmware-entity ontbreekt voor ${key}`);
   }
 });
 
+test("ODU-registervelden verwijzen naar bestaande getemplatete HP-entities", async () => {
+  const hpPackage = await readFile(new URL("../../oq_HP_io.yaml", import.meta.url), "utf8");
+
+  assert.deepEqual(ENTITY_DEFS.hp1CompressorFrequencyDemand, {
+    domain: "sensor",
+    name: "HP1 - Compressor frequency demand",
+    optional: true,
+  });
+  assert.deepEqual(ENTITY_DEFS.hp2CompressorFrequencyDemand, {
+    domain: "sensor",
+    name: "HP2 - Compressor frequency demand",
+    optional: true,
+  });
+  assert.deepEqual(ENTITY_DEFS.hp1LowNoiseMode, {
+    domain: "select",
+    name: "HP1 - Silent Mode",
+    optional: true,
+  });
+  assert.deepEqual(ENTITY_DEFS.hp2LowNoiseMode, {
+    domain: "select",
+    name: "HP2 - Silent Mode",
+    optional: true,
+  });
+  assert.match(hpPackage, /id: \$\{hp_id\}_compressor_frequency_demand/);
+  assert.match(hpPackage, /name: "\$\{prefix\}Compressor frequency demand"/);
+  assert.match(hpPackage, /address: 2102/);
+  assert.match(hpPackage, /id: \$\{hp_id\}_low_noise_mode/);
+  assert.match(hpPackage, /name: "\$\{prefix\}Silent Mode"/);
+  assert.match(hpPackage, /address: 2006/);
+});
+
 test("flowOutputIpwm publiceert de bestaande actuatoruitgang zonder tweede regelstate", async () => {
-  const flowPackage = await readFile(new URL("../../oq_flow_control.yaml", import.meta.url), "utf8");
+  const flowPackageRaw = await readFile(new URL("../../oq_flow_control.yaml", import.meta.url), "utf8");
+  const flowRuntimeRaw = await readFile(
+    new URL("../../includes/control/oq_flow_runtime.h", import.meta.url),
+    "utf8",
+  );
+  const flowPackage = flowPackageRaw.replace(/\r\n/g, "\n");
+  const flowRuntime = flowRuntimeRaw.replace(/\r\n/g, "\n");
   const flowOutputSensor = flowPackage.match(
     /  - platform: template\n    id: oq_flow_output_ipwm\n[\s\S]*?(?=\n  - platform: template\n)/,
   )?.[0];
@@ -139,12 +351,11 @@ test("flowOutputIpwm publiceert de bestaande actuatoruitgang zonder tweede regel
   assert.match(flowOutputSensor, /internal: true/);
   assert.match(flowOutputSensor, /update_interval: never/);
   assert.doesNotMatch(flowOutputSensor, /update_interval: 1s/);
-  assert.equal((flowPackage.match(/id\(oq_flow_last_pwm\) = value;/g) || []).length, 2);
-  assert.equal((flowPackage.match(/id\(oq_flow_output_ipwm\)\.publish_state\(\(float\) value\);/g) || []).length, 2);
-  for (const value of ["service_pwm", "start_pwm", "at_pwm", "purge_pwm", "test_pwm", "pwm"]) {
-    assert.ok(flowPackage.includes(`set_flow_output_pwm(${value});`), `eventpublicatie ontbreekt voor ${value}`);
-    assert.ok(!flowPackage.includes(`id(oq_flow_last_pwm) = ${value};`), `directe niet-gepubliceerde write voor ${value}`);
-  }
+  assert.equal((flowRuntime.match(/id\(oq_flow_last_pwm\) = pwm;/g) || []).length, 1);
+  assert.equal((flowRuntime.match(/id\(oq_flow_output_ipwm\)\.publish_state\(\(float\)pwm\);/g) || []).length, 1);
+  assert.equal((flowRuntime.match(/set_output_pwm_\(/g) || []).length, 7);
+  assert.doesNotMatch(flowPackage, /id\(oq_flow_last_pwm\)\s*=/);
+  assert.doesNotMatch(flowPackage, /id\(oq_flow_output_ipwm\)\.publish_state/);
   assert.equal(ENTITY_DEFS.flowOutputIpwm.domain, "sensor");
   assert.equal(ENTITY_DEFS.flowOutputIpwm.name, "Flow Output iPWM");
 });

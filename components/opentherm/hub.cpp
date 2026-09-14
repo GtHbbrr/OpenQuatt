@@ -6,7 +6,7 @@
 
 namespace esphome::opentherm {
 
-static const char* const TAG = "opentherm";
+static const char* const TAG = "oq.ot.boiler";
 static constexpr uint32_t MIN_CONVERSATION_GAP_US = 100000;
 static constexpr uint32_t MAX_CONVERSATION_CADENCE_US = 1150000;
 static constexpr uint32_t SLOW_PHASE_US = 50000;
@@ -171,6 +171,7 @@ void OpenthermHub::prioritize_messages(MessageId first, MessageId second) {
   // still be on the bus. start_conversation_() installs the sequence as soon
   // as the current exchange reaches IDLE.
   this->deferred_priority_pending_ = false;
+  this->deferred_priority_activated_ = false;
   if (!this->polling_enabled_) {
     this->urgent_priority_pending_ = false;
     return;
@@ -187,11 +188,20 @@ void OpenthermHub::defer_priority_messages(MessageId first, MessageId second) {
   // has completed.
   if (!this->polling_enabled_) {
     this->deferred_priority_pending_ = false;
+    this->deferred_priority_activated_ = false;
     return;
   }
+  this->deferred_priority_activated_ = false;
   this->deferred_priority_first_ = first;
   this->deferred_priority_second_ = second;
   this->deferred_priority_pending_ = true;
+}
+
+bool OpenthermHub::consume_deferred_priority_activation(MessageId first, MessageId second) {
+  const bool matches = this->deferred_priority_activated_ && this->deferred_priority_first_ == first &&
+                       this->deferred_priority_second_ == second;
+  this->deferred_priority_activated_ = false;
+  return matches;
 }
 
 void OpenthermHub::start_priority_polling(MessageId first, MessageId second) {
@@ -202,8 +212,10 @@ void OpenthermHub::start_priority_polling(MessageId first, MessageId second) {
 
 void OpenthermHub::resume_polling() {
   this->polling_enabled_ = true;
+  this->no_response_expected_ = false;
   this->urgent_priority_pending_ = false;
   this->deferred_priority_pending_ = false;
+  this->deferred_priority_activated_ = false;
   this->opentherm_->stop();
   this->sending_initial_ = true;
   this->priority_sequence_active_ = false;
@@ -217,8 +229,10 @@ void OpenthermHub::resume_polling() {
 
 void OpenthermHub::suspend_polling() {
   this->polling_enabled_ = false;
+  this->no_response_expected_ = false;
   this->urgent_priority_pending_ = false;
   this->deferred_priority_pending_ = false;
+  this->deferred_priority_activated_ = false;
   if (this->opentherm_ != nullptr) {
     this->opentherm_->stop();
   }
@@ -254,9 +268,13 @@ void OpenthermHub::loop() {
   if (!this->polling_enabled_) {
     return;
   }
+  const OperationMode transport_mode_before = this->opentherm_->get_mode();
   const uint32_t transport_started_us = micros();
-  this->opentherm_->process();
-  this->warn_if_slow_("RMT completion processing", transport_started_us);
+  const transport_diagnostics::PollResult transport_result = this->opentherm_->process();
+  const uint32_t transport_finished_us = micros();
+  const OperationMode transport_mode_after = this->opentherm_->get_mode();
+  this->record_transport_poll_(transport_result, transport_mode_before, transport_mode_after,
+                               timing::elapsed_us(transport_finished_us, transport_started_us));
   if (this->sync_mode_) {
     this->sync_loop_();
     return;
@@ -428,17 +446,42 @@ void OpenthermHub::warn_if_slow_(const char* phase, uint32_t started_us) const {
   }
 }
 
+void OpenthermHub::record_transport_poll_(transport_diagnostics::PollResult result, OperationMode mode_before,
+                                          OperationMode mode_after, uint32_t elapsed_us) {
+  if (!transport_diagnostics::record_slow_poll(this->slow_transport_poll_stats_, result, elapsed_us)) {
+    return;
+  }
+  this->last_slow_transport_mode_before_ = mode_before;
+  this->last_slow_transport_mode_after_ = mode_after;
+}
+
 void OpenthermHub::log_transport_diagnostics_() const {
   ESP_LOGD(TAG,
            "OpenTherm transport: requests=%u tx_completed=%u rx_captured=%u rx_accepted=%u rx_rejected=%u "
            "tx_timeouts=%u response_timeouts=%u late_timeouts=%u max_wire_response=%u ms "
-           "max_processing_latency=%u ms",
+           "max_processing_latency=%u ms slow_polls=%u max_poll_wall=%u ms "
+           "slow_outcomes(no_work=%u tx_timeout=%u rx_timeout_no_frame=%u rx_frame_after_deadline=%u "
+           "rx_frame_accepted=%u rx_frame_rejected=%u) last_slow=%s mode=%s->%s; slow poll wall time may "
+           "include task preemption and is not OpenTherm wire wait time",
            static_cast<unsigned>(this->requests_started_), static_cast<unsigned>(this->tx_completed_),
            static_cast<unsigned>(this->rx_captured_), static_cast<unsigned>(this->rx_accepted_),
            static_cast<unsigned>(this->rx_rejected_), static_cast<unsigned>(this->tx_timeouts_),
            static_cast<unsigned>(this->response_timeouts_), static_cast<unsigned>(this->late_response_timeouts_),
            static_cast<unsigned>(this->max_wire_response_us_ / 1000U),
-           static_cast<unsigned>(this->max_processing_latency_us_ / 1000U));
+           static_cast<unsigned>(this->max_processing_latency_us_ / 1000U),
+           static_cast<unsigned>(this->slow_transport_poll_stats_.count),
+           static_cast<unsigned>(this->slow_transport_poll_stats_.max_elapsed_us / 1000U),
+           static_cast<unsigned>(this->slow_transport_poll_stats_.no_work),
+           static_cast<unsigned>(this->slow_transport_poll_stats_.tx_timeout),
+           static_cast<unsigned>(this->slow_transport_poll_stats_.rx_timeout_no_frame),
+           static_cast<unsigned>(this->slow_transport_poll_stats_.rx_frame_after_deadline),
+           static_cast<unsigned>(this->slow_transport_poll_stats_.rx_frame_accepted),
+           static_cast<unsigned>(this->slow_transport_poll_stats_.rx_frame_rejected),
+           this->slow_transport_poll_stats_.count > 0
+               ? transport_diagnostics::poll_result_to_str(this->slow_transport_poll_stats_.last_result)
+               : "none",
+           this->opentherm_->operation_mode_to_str(this->last_slow_transport_mode_before_),
+           this->opentherm_->operation_mode_to_str(this->last_slow_transport_mode_after_));
 }
 
 void OpenthermHub::activate_priority_sequence_(MessageId first, MessageId second) {
@@ -467,8 +510,11 @@ void OpenthermHub::apply_deferred_priority_() {
     return;
   }
 
-  this->activate_priority_sequence_(this->deferred_priority_first_, this->deferred_priority_second_);
+  const MessageId first = this->deferred_priority_first_;
+  const MessageId second = this->deferred_priority_second_;
+  this->activate_priority_sequence_(first, second);
   this->deferred_priority_pending_ = false;
+  this->deferred_priority_activated_ = true;
 }
 
 void OpenthermHub::start_conversation_() {
@@ -624,7 +670,16 @@ void OpenthermHub::handle_timeout_error_() {
   } else if (has_wire_timing && conversation_timing.response_captured) {
     ESP_LOGW(TAG, "Timeout while waiting for response from device: frame was captured after the receive deadline");
   } else if (has_wire_timing) {
-    ESP_LOGW(TAG, "Timeout while waiting for response from device: no frame captured before the receive deadline");
+    // TX succeeded but no boiler responded. During the controlled R1 startup
+    // verification probe this is expected (no boiler on the bus) and stays
+    // below WARN; transport counters in stop_opentherm_() are unaffected.
+    if (!this->no_response_expected_) {
+      ESP_LOGW(TAG, "Timeout while waiting for response from device: no frame captured before the receive deadline");
+    } else {
+      ESP_LOGD(TAG,
+               "Timeout while waiting for response from device: no frame captured before the receive deadline "
+               "(expected during startup verification)");
+    }
   } else {
     ESP_LOGW(TAG, "Timeout while waiting for response from device");
   }
@@ -634,6 +689,8 @@ void OpenthermHub::handle_timeout_error_() {
 void OpenthermHub::handle_timer_error_() {
   this->urgent_priority_pending_ = false;
   this->deferred_priority_pending_ = false;
+  this->deferred_priority_activated_ = false;
+  this->no_response_expected_ = false;
   this->opentherm_->report_and_reset_timer_error();
   this->stop_opentherm_();
   // Timer error is critical, there is no point in retrying.

@@ -6,10 +6,11 @@ import { createScrollKeeper } from "../core/scroll-keeper.js";
 import { renderModalShell } from "../core/modal-shell.js";
 import { state } from "../core/state.js";
 import { getDeviceMeta, getFirmwareBuildConnection, getInstallationTopology } from "./device-context.js";
-import { getFirmwareBuildSwitchModel, getFirmwareProgressModel } from "./firmware-update.js";
+import { getFirmwareBuildSwitchModel, getFirmwareChannelLabel, getFirmwareCurrentVersion, getFirmwareLatestVersion, getFirmwareProgressModel, getFirmwareUpdateEntity, isFirmwareEntityAlignedWithChannel, isFirmwareUpdateEntityForBuild, isQuickStartSetupFirmwareCurrent, reconcileStoredQuickStartSetupInstall } from "./firmware-update.js";
 import { getOduGenerationDetectionModel } from "./odu-generation-ui.js";
 import { formatSettingsOptionLabel, renderSettingsFieldCard, renderSettingsInfoToggle } from "../settings/controls.js";
 import { renderCurveGraph, renderFlowSettingsFields, renderHeatingCurveProfileField, renderHeatingStrategyExplainCards, renderPowerHouseAdvancedField, renderPowerHouseBaseFields, renderSettingsCurveInputs, renderStrategySelectionFields } from "../settings/heating.js";
+import { getHeatingEnableAdvice, getHeatingEnableCurrent, getHeatingEnableRecommendation } from "../core/heating-strategy-matrix.js";
 import { renderBoilerCvFields, renderHpGenerationField } from "../settings/installation.js";
 import { renderSilentSettingsGrid } from "../settings/silent.js";
 import { renderWaterSettingsFields } from "../settings/water.js";
@@ -18,13 +19,14 @@ import { renderUsageTelemetryConsent, renderUsageTelemetryDisclosure } from "./u
 
   export function getQuickStartSetupModel() {
     const currentTopology = getInstallationTopology();
-    const currentConnection = getFirmwareBuildConnection();
+    const currentConnection = getFirmwareBuildConnection() || (hasEntity("preferredConnection") ? "wifi" : "");
     const currentKey = `${currentTopology}:${currentConnection}`;
     const selectedKey = state.quickStartSetupDraft || currentKey;
     const [targetTopology, targetConnection] = selectedKey.split(":");
     const switchModel = getFirmwareBuildSwitchModel(targetTopology, targetConnection);
     return {
       ...switchModel,
+      currentConnection,
       currentKey,
       selectedKey,
       changes: selectedKey !== currentKey,
@@ -37,22 +39,35 @@ import { renderUsageTelemetryConsent, renderUsageTelemetryDisclosure } from "./u
     const model = getQuickStartSetupModel();
     const progress = getFirmwareProgressModel();
     const busy = Boolean(progress || state.updateInstallBusy);
+    const firmwareEntity = getFirmwareUpdateEntity() || {};
+    const mainManifestReady = getFirmwareChannelLabel().toLowerCase() === "main"
+      && isFirmwareEntityAlignedWithChannel(firmwareEntity, "main")
+      && isFirmwareUpdateEntityForBuild(model.targetBuildLabel, firmwareEntity);
+    const currentVersion = getFirmwareCurrentVersion(firmwareEntity) || "Onbekend";
+    const mainVersion = mainManifestReady ? getFirmwareLatestVersion(firmwareEntity) || "Onbekend" : "Wordt na bevestigen gecontroleerd";
+    const firmwareCurrent = mainManifestReady && isQuickStartSetupFirmwareCurrent(model);
+    const unifiedNetworkBuild = hasEntity("preferredConnection");
     const options = [
-      ["single:wifi", "Single · Wi-Fi", "Eén warmtepomp via het draadloze netwerk."],
-      ["single:eth", "Single · Ethernet", "Eén warmtepomp via een vaste netwerkkabel."],
-      ["duo:wifi", "Duo · Wi-Fi", "Twee warmtepompen via het draadloze netwerk."],
-      ["duo:eth", "Duo · Ethernet", "Twee warmtepompen via een vaste netwerkkabel."],
-    ];
+        ["single:wifi", "Single · Wi-Fi", "Eén warmtepomp via het draadloze netwerk."],
+        ["single:eth", "Single · Ethernet", "Eén warmtepomp via een vaste netwerkkabel."],
+        ["duo:wifi", "Duo · Wi-Fi", "Twee warmtepompen via het draadloze netwerk."],
+        ["duo:eth", "Duo · Ethernet", "Twee warmtepompen via een vaste netwerkkabel."],
+      ].filter(([key]) => !unifiedNetworkBuild || key.endsWith(`:${model.currentConnection}`));
     const requirements = [
       model.targetIsDuo ? "De tweede warmtepomp is aangesloten en hoort bij deze controller." : "Deze controller wordt voor één warmtepomp gebruikt.",
       model.targetIsEthernet ? "De netwerkkabel is aangesloten." : "De Wi-Fi-gegevens zijn beschikbaar op de controller.",
+      firmwareCurrent
+        ? "Configuratie en main-release zijn actueel; er is geen OTA nodig."
+        : "Zo nodig wordt de stabiele main-release geïnstalleerd en vervangt deze een dev- of testbuild.",
     ];
 
     return `
       <section class="oq-helper-panel">
         <p class="oq-helper-label">${escapeHtml(getQuickStepKicker("setup"))}</p>
-        <h2 class="oq-helper-section-title">Kies je setup</h2>
-        <p class="oq-helper-section-copy">De gemarkeerde setup is de configuratie die nu op je Q-edition actief is. Kies alleen een andere setup als je installatie anders is opgebouwd of een andere netwerkverbinding moet gebruiken.</p>
+        <h2 class="oq-helper-section-title">Configuratie en software-update</h2>
+        <p class="oq-helper-section-copy">${escapeHtml(unifiedNetworkBuild
+          ? "Kies de opstelling. De verbindingsmodus wijzig je via Connectiviteit."
+          : "Kies de configuratie van je Q-edition. OpenQuatt controleert daarna de nieuwste stabiele main-release en installeert deze alleen als de versie of configuratie afwijkt.")}</p>
         <div class="oq-helper-fields">
           ${options.map(([key, title, copy]) => {
             const selected = model.selectedKey === key;
@@ -75,8 +90,7 @@ import { renderUsageTelemetryConsent, renderUsageTelemetryDisclosure } from "./u
             `;
           }).join("")}
         </div>
-        ${model.changes ? `
-          <div class="oq-firmware-advanced-detail">
+        <div class="oq-firmware-advanced-detail">
             ${progress ? `
               <div class="oq-helper-modal-progress" aria-live="polite">
                 <div class="oq-helper-modal-progress-head">
@@ -91,25 +105,28 @@ import { renderUsageTelemetryConsent, renderUsageTelemetryDisclosure } from "./u
             ` : ""}
             <div class="oq-helper-modal-grid">
               <div class="oq-helper-modal-row"><span class="oq-helper-modal-label">Huidige build</span><strong class="oq-helper-modal-value">${escapeHtml(model.currentBuildLabel)}</strong></div>
-              <div class="oq-helper-modal-row"><span class="oq-helper-modal-label">Nieuwe build</span><strong class="oq-helper-modal-value">${escapeHtml(model.targetBuildLabel)}</strong></div>
+              <div class="oq-helper-modal-row"><span class="oq-helper-modal-label">Gekozen build</span><strong class="oq-helper-modal-value">${escapeHtml(model.targetBuildLabel)}</strong></div>
+              <div class="oq-helper-modal-row"><span class="oq-helper-modal-label">Huidige versie</span><strong class="oq-helper-modal-value">${escapeHtml(currentVersion)}</strong></div>
+              <div class="oq-helper-modal-row"><span class="oq-helper-modal-label">Nieuwste main-versie</span><strong class="oq-helper-modal-value">${escapeHtml(mainVersion)}</strong></div>
             </div>
-            <p class="oq-helper-modal-note">Voor deze wijziging installeert OpenQuatt de passende firmware en start de controller opnieuw op. Bestaande OpenQuatt-instellingen blijven behouden.</p>
+            <p class="oq-helper-modal-note">${firmwareCurrent
+              ? "Softwareversie en configuratie kloppen. Na bevestigen gaat Quick Start zonder OTA verder."
+              : "OpenQuatt controleert de stabiele softwareversie en gekozen configuratie. Alleen bij een afwijking volgt OTA en herstart. Instellingen blijven behouden."}</p>
             <label class="oq-helper-modal-check">
               <input type="checkbox" data-oq-quickstart-setup-confirm="true" ${state.quickStartSetupConfirmed ? "checked" : ""} ${busy ? "disabled" : ""}>
               <span>${escapeHtml(requirements.join(" "))}</span>
             </label>
             <div class="oq-firmware-advanced-footer">
-              <button class="oq-helper-button oq-helper-button--primary" type="button" data-oq-action="install-quickstart-setup" ${busy || !state.quickStartSetupConfirmed || !model.canSwitch ? "disabled" : ""}>
-                ${busy ? "Setupwissel uitvoeren..." : "Nieuwe setup installeren"}
+              <button class="oq-helper-button oq-helper-button--primary" type="button" data-oq-action="install-quickstart-setup" ${busy || !state.quickStartSetupConfirmed || !model.canInstall ? "disabled" : ""}>
+                ${busy ? "Configuratie en software controleren..." : firmwareCurrent ? "Configuratie bevestigen" : "Configuratie bevestigen en software controleren"}
               </button>
             </div>
-            ${!model.canSwitch && !busy ? `<p class="oq-helper-modal-note oq-helper-modal-note--muted">${escapeHtml(
-              !model.targetEntityAvailable || !model.installActionAvailable
+            ${!model.canInstall && !busy ? `<p class="oq-helper-modal-note oq-helper-modal-note--muted">${escapeHtml(
+              !model.targetEntityAvailable || !model.installActionAvailable || !model.mainChannelAvailable
                 ? "De firmwarebediening wordt nog geladen. Wacht een moment en probeer opnieuw."
-                : "Deze firmware mist nog het vereiste OTA-target. Werk eerst bij naar een build die setupwissels ondersteunt.",
+                : "Deze firmware mist nog het vereiste OTA-target voor de gekozen configuratie.",
             )}</p>` : ""}
-          </div>
-        ` : renderQuickStartStepNav()}
+        </div>
         ${state.controlNotice ? `<p class="oq-helper-notice">${escapeHtml(state.controlNotice)}</p>` : ""}
         ${state.controlError ? `<p class="oq-helper-error">${escapeHtml(state.controlError)}</p>` : ""}
       </section>
@@ -207,12 +224,6 @@ import { renderUsageTelemetryConsent, renderUsageTelemetryDisclosure } from "./u
     if (normalized === "heatpump_controller_q" || normalized.includes("q-edition") || normalized.includes("controller q")) {
       return "heatpump_controller_q";
     }
-    if (normalized === "heatpump_listener" || normalized.includes("listener")) {
-      return "heatpump_listener";
-    }
-    if (normalized === "waveshare" || normalized.includes("waveshare")) {
-      return "waveshare";
-    }
     return "";
   }
 
@@ -225,26 +236,16 @@ import { renderUsageTelemetryConsent, renderUsageTelemetryDisclosure } from "./u
     if (!profile && hasEntity("qFlowSource")) {
       profile = "heatpump_controller_q";
       inferred = true;
-    } else if (!profile && hasEntity("flowSource") && hasEntity("cicPollingEnabled")) {
-      profile = "remote";
-      inferred = true;
     }
 
     return {
       profile,
       inferred,
       isQEdition: profile === "heatpump_controller_q",
-      isRemoteProfile: profile === "heatpump_listener" || profile === "waveshare" || profile === "remote",
       hardwareKnown: Boolean(profile),
       hardwareLabel: profile === "heatpump_controller_q"
         ? "Heatpump Controller Q-edition"
-        : profile === "heatpump_listener"
-          ? "Heatpump Listener"
-          : profile === "waveshare"
-            ? "Waveshare"
-            : profile === "remote"
-              ? "Heatpump Listener / Waveshare"
-              : "Onbekend hardwareprofiel",
+        : "Onbekend hardwareprofiel",
     };
   }
 
@@ -252,10 +253,10 @@ import { renderUsageTelemetryConsent, renderUsageTelemetryDisclosure } from "./u
     const generation = String(getEntityValue("hpGeneration") || "").trim();
     const hardware = getQuickStartHardwareProfileModel();
     const isV1 = generation === "V1";
-    const { isQEdition, isRemoteProfile, hardwareKnown } = hardware;
-    const requiresCic = isV1 && isRemoteProfile;
+    const { isQEdition, hardwareKnown } = hardware;
+    const requiresCic = false;
     const qFlowTarget = isQEdition ? (isV1 ? "Local" : "Outdoor unit") : "";
-    const flowSourceTarget = requiresCic ? "CIC" : "Outdoor unit";
+    const flowSourceTarget = "Outdoor unit";
     const currentFlowSource = String(getEntityValue("flowSource") || "").trim();
     const currentQFlowSource = String(getEntityValue("qFlowSource") || "").trim();
     const cicEnabled = isEntityActive("cicPollingEnabled");
@@ -328,7 +329,7 @@ import { renderUsageTelemetryConsent, renderUsageTelemetryDisclosure } from "./u
 
   export function getQuickStartThermostatSourceModel() {
     const hardware = getQuickStartHardwareProfileModel();
-    const { isQEdition, isRemoteProfile } = hardware;
+    const { isQEdition } = hardware;
     const currentRoomTempSource = String(getEntityValue("roomTempSource") || "").trim();
     const currentRoomSetpointSource = String(getEntityValue("roomSetpointSource") || "").trim();
     const pairedCurrentSource = currentRoomTempSource === currentRoomSetpointSource
@@ -357,7 +358,7 @@ import { renderUsageTelemetryConsent, renderUsageTelemetryDisclosure } from "./u
         ? isEntityActive("cicJsonFeedOk") && !isEntityActive("cicDataStale") && valuesAvailable
         : isEntityActive("roomTempHaValid") && isEntityActive("roomSetpointHaValid") && valuesAvailable;
 
-    let status = isQEdition || isRemoteProfile ? "Nog activeren" : "Hardwareprofiel niet herkend";
+    let status = isQEdition ? "Nog activeren" : "Hardwareprofiel niet herkend";
     if (configurationApplied) {
       status = sourceHealthy ? "Geldig" : selectedSource === "OT thermostat"
         ? "OpenTherm-verbinding controleren"
@@ -380,7 +381,6 @@ import { renderUsageTelemetryConsent, renderUsageTelemetryDisclosure } from "./u
     return {
       hardwareLabel: hardware.hardwareLabel,
       isQEdition,
-      isRemoteProfile,
       selectedSource,
       sourceLabel,
       explanation,
@@ -390,7 +390,7 @@ import { renderUsageTelemetryConsent, renderUsageTelemetryDisclosure } from "./u
       roomSetpointValue,
       valuesAvailable,
       ...cicUrl,
-      canApply: (isQEdition || isRemoteProfile)
+      canApply: isQEdition
         && hasEntity("roomTempSource")
         && hasEntity("roomSetpointSource")
         && (selectedSource !== "OT thermostat" || hasEntity("otEnabled"))
@@ -487,23 +487,6 @@ import { renderUsageTelemetryConsent, renderUsageTelemetryDisclosure } from "./u
     const model = getQuickStartThermostatSourceModel();
     const busy = state.busyAction === "quickstart-thermostat-source";
     const statusClass = model.status === "Geldig" ? " is-active" : "";
-    const sourceSelector = model.isRemoteProfile ? `
-      <article class="oq-helper-surface oq-settings-field oq-settings-field--span-2" data-oq-settings-field="quickStartThermostatSource">
-        <div class="oq-settings-field-head">
-          <h3>Gegevensbron</h3>
-          ${renderSettingsInfoToggle("quickStartThermostatSource", "Gegevensbron", "Kamertemperatuur en kamer-setpoint worden bewust als gekoppeld paar ingesteld.")}
-        </div>
-        <div class="oq-settings-field-control">
-          <label class="oq-settings-control oq-settings-control--select">
-            <select data-oq-quickstart-thermostat-source ${busy ? "disabled" : ""}>
-              <option value="CIC" ${model.selectedSource === "CIC" ? "selected" : ""}>CiC JSON-feed</option>
-              <option value="HA input" ${model.selectedSource === "HA input" ? "selected" : ""}>Home Assistant</option>
-            </select>
-          </label>
-          <p class="oq-settings-action-note">Deze keuze geldt altijd voor zowel kamertemperatuur als kamer-setpoint.</p>
-        </div>
-      </article>
-    ` : "";
     const cicField = model.selectedSource === "CIC" ? renderQuickStartCicFeedUrlField(model, busy) : "";
     const haNote = model.selectedSource === "HA input" ? `
       <article class="oq-helper-surface oq-settings-field oq-settings-field--span-2">
@@ -543,7 +526,6 @@ import { renderUsageTelemetryConsent, renderUsageTelemetryDisclosure } from "./u
             `,
             "oq-settings-field--span-2",
           )}
-          ${sourceSelector}
           ${cicField}
           ${haNote}
         </div>
@@ -587,7 +569,7 @@ import { renderUsageTelemetryConsent, renderUsageTelemetryDisclosure } from "./u
       titleId: "oq-quickstart-modal-title",
       kicker: "Quick Start",
       title: "Rond eerst de Quick Start af",
-      copy: "Controleer eerst je setup en loop daarna stap voor stap door de basisinstellingen.",
+      copy: "Bevestig eerst je configuratie en laat de stabiele main-release controleren en zo nodig installeren. Loop daarna stap voor stap door de basisinstellingen.",
       copyInHeader: true,
       backdropClass: "oq-helper-modal-backdrop--quickstart",
       className: "oq-helper-modal--wide oq-helper-modal--quickstart",
@@ -618,6 +600,25 @@ import { renderUsageTelemetryConsent, renderUsageTelemetryDisclosure } from "./u
   export const captureQuickStartScrollState = quickStartScrollKeeper.capture;
   export const queueQuickStartScrollRestore = quickStartScrollKeeper.queue;
 
+  export function renderHeatingEnableQuickStartAdvice() {
+    if (!hasEntity("heatingEnableSource")) {
+      return "";
+    }
+    const advice = getHeatingEnableAdvice();
+    const deviant = Boolean(advice.deviant);
+    return `
+      <div class="oq-helper-surface oq-settings-field oq-settings-field--span-2${deviant ? " is-warning" : ""}">
+        <div class="oq-settings-field-head">
+          <h3>Warmtevraag bepalen</h3>
+          <p class="oq-settings-action-note" style="margin:0">Bekijk welke warmtetoestemming logisch past bij je gekozen strategie. De gekoppelde en actieve thermostaatbron is het advies.</p>
+        </div>
+        <div class="oq-settings-field-control">
+          <button class="oq-helper-button ${deviant ? "oq-helper-button--warning-soft" : "oq-helper-button--ghost"}" type="button" data-oq-action="open-heating-strategy-advice-modal">${deviant ? '<span class="oq-advice-warn-icon"><svg viewBox="0 0 20 18" aria-hidden="true"><path d="M10 1.6 L18.2 16.4 H1.8 Z"/><rect x="9.1" y="5.4" width="1.8" height="5.8" rx="0.9"/><circle cx="10" cy="13.6" r="1.1"/></svg></span> Advies per strategie bekijken' : "Advies per strategie bekijken"}</button>
+        </div>
+      </div>
+    `;
+  }
+
   export function renderStrategyWorkspace() {
     return `
       <section class="oq-helper-panel">
@@ -636,8 +637,8 @@ import { renderUsageTelemetryConsent, renderUsageTelemetryDisclosure } from "./u
     return `
       <section class="oq-helper-panel">
         <p class="oq-helper-label">${escapeHtml(getQuickStepKicker("boiler"))}</p>
-        <h2 class="oq-helper-section-title">CV-ketel of boiler</h2>
-        <p class="oq-helper-section-copy">Geef aan of er een ketel aanwezig is, hoe die is aangesloten en of deze automatisch mag overnemen wanneer alle warmtepompen door een storing uitvallen.</p>
+        <h2 class="oq-helper-section-title">Aanvullende warmtebron</h2>
+        <p class="oq-helper-section-copy">Dit kan bijvoorbeeld een cv-ketel, elektrische cv-ketel (e-cv) of doorstroomverwarmer zijn. Kies of de warmtebron hybride meeverwarmt bij een vermogenstekort en of deze mag overnemen wanneer geen warmtepomp beschikbaar is.</p>
         ${renderBoilerCvFields("oq-settings-grid oq-settings-grid--quickstart oq-settings-boiler-simple-grid", true)}
         ${renderQuickStartStepNav({
           nextDisabled: boilerConnectionMismatch,
@@ -749,9 +750,14 @@ import { renderUsageTelemetryConsent, renderUsageTelemetryDisclosure } from "./u
         <h2 class="oq-helper-section-title">Bevestigen en afronden</h2>
         <p class="oq-helper-section-copy">Controleer nog één keer je keuzes. Met afronden markeer je Quick Start als voltooid.</p>
         ${renderConfirmReviewCards()}
-        <section class="oq-helper-surface oq-helper-surface--muted" aria-label="Lokale historie">
-          <h3>Lokale historie</h3>
-          <p>Energiegegevens en belangrijke regelgebeurtenissen worden lokaal bewaard zodat Resultaten en diagnose ook na een herstart beschikbaar blijven. Dit kan later worden aangepast onder Instellingen → Gegevens bewaren.</p>
+        <section class="oq-quickstart-history" aria-label="Lokale historie">
+          <div>
+            <p class="oq-quickstart-history-label">Lokale historie</p>
+            <p class="oq-quickstart-history-copy">Energiegegevens en belangrijke regelgebeurtenissen blijven ook na een herstart beschikbaar in Resultaten en Diagnose.</p>
+          </div>
+          <button class="oq-helper-button oq-helper-button--ghost" type="button" data-oq-action="open-history-storage-modal">
+            Gegevens bewaren
+          </button>
         </section>
         ${state.controlNotice ? `<p class="oq-helper-notice">${escapeHtml(state.controlNotice)}</p>` : ""}
         ${state.controlError ? `<p class="oq-helper-error">${escapeHtml(state.controlError)}</p>` : ""}
@@ -773,6 +779,7 @@ import { renderUsageTelemetryConsent, renderUsageTelemetryDisclosure } from "./u
   }
 
   export function renderActiveStep() {
+    reconcileStoredQuickStartSetupInstall();
     const activeStep = getCurrentQuickStep().id;
     if (activeStep === "setup") {
       return renderSetupWorkspace();
@@ -789,11 +796,11 @@ import { renderUsageTelemetryConsent, renderUsageTelemetryDisclosure } from "./u
     if (activeStep === "thermostat-source") {
       return renderThermostatSourceWorkspace();
     }
-    if (activeStep === "flow") {
-      return renderFlowWorkspace();
-    }
     if (activeStep === "heating") {
       return renderHeatingWorkspace();
+    }
+    if (activeStep === "flow") {
+      return renderFlowWorkspace();
     }
     if (activeStep === "water") {
       return renderWaterWorkspace();
@@ -815,6 +822,14 @@ import { renderUsageTelemetryConsent, renderUsageTelemetryDisclosure } from "./u
     return QUICK_STEPS.filter((step) => (step.id !== "setup" || isQEdition) && (!step.optionalEntity || hasEntity(step.optionalEntity)));
   }
 
+  export function isQuickStartStepSelectionAllowed(stepId) {
+    const steps = getQuickSteps();
+    const setupIndex = steps.findIndex((step) => step.id === "setup");
+    const targetIndex = steps.findIndex((step) => step.id === stepId);
+    return targetIndex !== -1
+      && (setupIndex === -1 || state.complete === true || state.quickStartSetupUpdateComplete || targetIndex <= setupIndex);
+  }
+
   export function getQuickStepKicker(stepId) {
     const index = getQuickSteps().findIndex((step) => step.id === stepId);
     return `Stap ${Math.max(0, index) + 1}`;
@@ -834,6 +849,7 @@ import { renderUsageTelemetryConsent, renderUsageTelemetryDisclosure } from "./u
   export function renderStepOverview(compact = false) {
     return getQuickSteps().map((step, index) => {
       const stepStatus = getQuickStepStatus(index);
+      const selectionAllowed = isQuickStartStepSelectionAllowed(step.id);
       return `
         <button
           class="oq-helper-field oq-helper-field--step${compact ? " oq-helper-field--compact" : ""} is-${stepStatus.tone}"
@@ -841,6 +857,7 @@ import { renderUsageTelemetryConsent, renderUsageTelemetryDisclosure } from "./u
           data-oq-action="select-step"
           data-step-id="${escapeHtml(step.id)}"
           aria-current="${stepStatus.current ? "step" : "false"}"
+          ${selectionAllowed ? "" : "disabled"}
         >
           <div class="oq-helper-field-step-head">
             <h3>${String(index + 1).padStart(2, "0")}. ${escapeHtml(step.title)}</h3>
@@ -864,7 +881,12 @@ import { renderUsageTelemetryConsent, renderUsageTelemetryDisclosure } from "./u
   export function selectQuickStepByOffset(offset) {
     const steps = getQuickSteps();
     const nextIndex = Math.min(steps.length - 1, Math.max(0, getCurrentQuickStepIndex() + offset));
-    state.currentStep = steps[nextIndex]?.id || QUICK_STEPS[0].id;
+    const nextStepId = steps[nextIndex]?.id || QUICK_STEPS[0].id;
+    if (!isQuickStartStepSelectionAllowed(nextStepId)) {
+      return false;
+    }
+    state.currentStep = nextStepId;
+    return true;
   }
 
   export function renderQuickStartStepNav(options = {}) {
@@ -963,17 +985,23 @@ import { renderUsageTelemetryConsent, renderUsageTelemetryDisclosure } from "./u
         : ["Gewenste flow", formatValue("flowSetpoint")],
     ];
 
-    const boilerLines = hasEntity("boilerCvAssistEnabled")
+    const sourcePresent = hasEntity("auxHeatSourcePresent")
+      ? isEntityActive("auxHeatSourcePresent")
+      : isEntityActive("boilerCvAssistEnabled");
+    const boilerLines = hasEntity("auxHeatSourcePresent") || hasEntity("boilerCvAssistEnabled")
       ? [
-          ["CV-ketel/boiler aanwezig", isEntityActive("boilerCvAssistEnabled") ? "Ja" : "Nee"],
-          ...(isEntityActive("boilerCvAssistEnabled")
+          ["Warmtebron aangesloten", sourcePresent ? "Ja" : "Nee"],
+          ...(sourcePresent
             ? [
                 ...(hasEntity("boilerConnection")
-                  ? [["Ketelaansluiting", String(getEntityValue("boilerConnection") || "R1") === "OpenTherm" ? "OpenTherm (OTB)" : "Aan/uit (R1)"]]
+                  ? [["Aansturing warmtebron", String(getEntityValue("boilerConnection") || "R1") === "OpenTherm" ? "OpenTherm (OTB)" : "Aan/uit (R1)"]]
                   : []),
-                ["Ingesteld ketelvermogen", formatValue("boilerRatedHeatPower")],
+                ["Beschikbaar verwarmingsvermogen", formatValue("boilerRatedHeatPower")],
+                ...(hasEntity("boilerCvAssistEnabled")
+                  ? [["Hybride verwarmen bij vermogenstekort", isEntityActive("boilerCvAssistEnabled") ? "Aan" : "Uit"]]
+                  : []),
                 ...(hasEntity("boilerFaultFallbackEnabled")
-                  ? [["Automatische ketelovername bij warmtepompstoring", isEntityActive("boilerFaultFallbackEnabled") ? "Aan" : "Uit"]]
+                  ? [["Overnemen wanneer de warmtepomp niet beschikbaar is", isEntityActive("boilerFaultFallbackEnabled") ? "Aan" : "Uit"]]
                   : []),
               ]
             : []),
@@ -987,8 +1015,8 @@ import { renderUsageTelemetryConsent, renderUsageTelemetryDisclosure } from "./u
     const silentLines = [
       ["Start stille uren", toTimeInputValue(getEntityValue("silentStartTime")) || "—"],
       ["Einde stille uren", toTimeInputValue(getEntityValue("silentEndTime")) || "—"],
-      ["Maximaal niveau tijdens stille uren", formatValue("silentMax")],
-      ["Maximaal niveau overdag", formatValue("dayMax")],
+      ["Maximaal tijdens stille uren", formatValue("silentMaxHz")],
+      ["Maximaal overdag", formatValue("dayMaxHz")],
     ];
 
     const usageTelemetryLines = hasEntity("usageTelemetryEnabled")

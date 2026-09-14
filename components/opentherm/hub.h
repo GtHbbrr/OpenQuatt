@@ -68,10 +68,15 @@ class OpenthermHub final : public Component {
   MessageId urgent_priority_first_ = MessageId::STATUS;
   MessageId urgent_priority_second_ = MessageId::STATUS;
   bool deferred_priority_pending_ = false;
+  bool deferred_priority_activated_ = false;
   MessageId deferred_priority_first_ = MessageId::STATUS;
   MessageId deferred_priority_second_ = MessageId::STATUS;
   // The OpenQuatt transport owner explicitly starts polling after restore.
   bool polling_enabled_ = false;
+  // Controlled startup probe (R1 verification): the absence of a boiler
+  // response is expected and must not warn. All other timeout classes
+  // (TX failure, late frame, unclassifiable) always warn.
+  bool no_response_expected_ = false;
   std::unordered_map<MessageId, uint8_t> configured_messages_;
   std::vector<MessageId> messages_;
   std::vector<MessageId>::const_iterator message_iterator_;
@@ -93,6 +98,9 @@ class OpenthermHub final : public Component {
   uint32_t late_response_timeouts_ = 0;
   uint32_t max_wire_response_us_ = 0;
   uint32_t max_processing_latency_us_ = 0;
+  transport_diagnostics::SlowPollStats slow_transport_poll_stats_;
+  OperationMode last_slow_transport_mode_before_ = IDLE;
+  OperationMode last_slow_transport_mode_after_ = IDLE;
   OperationMode last_mode_ = IDLE;
   OpenthermData last_request_;
 
@@ -119,6 +127,8 @@ class OpenthermHub final : public Component {
   void check_cadence_(uint32_t started_us) const;
   bool should_skip_loop_(uint32_t cur_time_us) const;
   void warn_if_slow_(const char* phase, uint32_t started_us) const;
+  void record_transport_poll_(transport_diagnostics::PollResult result, OperationMode mode_before,
+                              OperationMode mode_after, uint32_t elapsed_us);
   void log_transport_diagnostics_() const;
   void sync_loop_();
 
@@ -191,10 +201,13 @@ class OpenthermHub final : public Component {
 
   void prioritize_messages(MessageId first, MessageId second);
   void defer_priority_messages(MessageId first, MessageId second);
+  bool consume_deferred_priority_activation(MessageId first, MessageId second);
   void start_priority_polling(MessageId first, MessageId second);
   void resume_polling();
   void suspend_polling();
   bool is_polling_enabled() const { return this->polling_enabled_; }
+  void set_no_response_expected(bool expected) { this->no_response_expected_ = expected; }
+  bool no_response_expected() const { return this->no_response_expected_; }
 
   template <typename F>
   void add_on_before_send_callback(F&& callback) {

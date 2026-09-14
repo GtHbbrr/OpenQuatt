@@ -1,7 +1,9 @@
 import { getEntityNumericValue, getEntityStateText, hasEntity, isEntityActive } from "../core/app-shared.js";
-import { formatValue } from "../core/entity-store.js";
-import { formatSettingsOptionLabel, renderSettingsAdvancedDisclosure, renderSettingsFieldCard, renderSettingsNumberField, renderSettingsOptionCardsField, renderSettingsSection, renderSettingsSliderField, renderSettingsSwitchField } from "./controls.js";
+import { COOLING_SCHEDULE_EFFECTIVE_SOURCE_KEY, COOLING_SCHEDULE_SOURCE_KEY, COOLING_SCHEDULE_TIME_KEYS, COOLING_SCHEDULE_VALID_KEY } from "../core/config.js";
+import { formatValue, toTimeInputValue } from "../core/entity-store.js";
+import { formatSettingsOptionLabel, renderSettingsAdvancedDisclosure, renderSettingsFieldCard, renderSettingsNumberField, renderSettingsOptionCardsField, renderSettingsSection, renderSettingsSelectField, renderSettingsSliderField, renderSettingsSwitchField, renderSettingsTimeField } from "./controls.js";
 import { escapeHtml } from "../core/html.js";
+import { state } from "../core/state.js";
 
   export function renderSettingsCoolingFact(label, value) {
     return `
@@ -19,7 +21,7 @@ import { escapeHtml } from "../core/html.js";
     }
 
     const labels = {
-      Ready: "Gereed",
+      Ready: "Gereed om te koelen",
       "Waiting for room request": "Koeling toegestaan, wacht op kamertemperatuur boven koel-setpoint",
       "Cooling enabled, waiting for room temperature above cooling setpoint": "Koeling toegestaan, wacht op kamertemperatuur boven koel-setpoint",
       "No dew point source": "Geen dauwpuntbron",
@@ -35,27 +37,189 @@ import { escapeHtml } from "../core/html.js";
       "Fallback cooling active": "Dauwpuntsbenadering actief",
       "Fallback corrected by warm night": "Dauwpuntsbenadering gecorrigeerd door warme nacht",
       "Fallback blocked by tropical night": "Dauwpuntsbenadering geblokkeerd door tropische nacht",
+      ...COOLING_START_BLOCK_LABELS,
     };
 
     return labels[value] || value;
   }
 
+  export const COOLING_START_BLOCK_REASON_READY = "Ready";
+  export const COOLING_START_BLOCK_LABELS = {
+    Ready: "Gereed om te koelen",
+    "Cooling minimum off-time": "Wachten op koel-herstartbeveiliging",
+    "Waiting for confirmed cooling stop": "Wachten op bevestigde koelstop",
+    "Compressor restart protection": "Wachten op compressor-herstartbeveiliging",
+    "Startup inhibit after reboot": "Wachten op opstartvrijgave na herstart",
+    "Compressor start limit (6/hour)": "Startlimiet bereikt (6/uur)",
+    "Compressor start blocked": "Compressorstart geblokkeerd",
+  };
+
+  export function formatCoolingStartBlockCountdown(seconds) {
+    const total = Math.max(0, Math.ceil(Number(seconds) || 0));
+    const minutes = Math.floor(total / 60);
+    const rest = total % 60;
+    return `${minutes}:${String(rest).padStart(2, "0")}`;
+  }
+
+  // Redenen die een afteltijd mogen tonen. De firmware garandeert al dat
+  // alleen tijdgebonden redenen remaining_s > 0 dragen, maar reason en timer
+  // zijn losse entities met eigen poll-moment. Deze tabel voorkomt dat een
+  // oude timer bij een niet-tijdgebonden reden belandt; tussen twee
+  // tijdgebonden redenen kan bij een overgang kort een oude timer staan.
+  const COOLING_START_BLOCK_COUNTDOWN_REASONS = new Set([
+    "Cooling minimum off-time",
+    "Compressor restart protection",
+    "Startup inhibit after reboot",
+    "Compressor start limit (6/hour)",
+  ]);
+
+  export function formatCoolingStartBlockReason(reason, remainingS) {
+    const value = String(reason || "").trim();
+    if (!value) {
+      return "";
+    }
+    const label = COOLING_START_BLOCK_LABELS[value] || value;
+    // Firmwarecontract: tijdgebonden redenen dragen altijd remaining_s > 0,
+    // de overige altijd 0. De tabel hierboven houdt bovendien een oude timer
+    // weg bij niet-tijdgebonden redenen.
+    const remaining = Math.ceil(Number(remainingS) || 0);
+    if (remaining > 0 && COOLING_START_BLOCK_COUNTDOWN_REASONS.has(value)) {
+      return `${label} — nog ${formatCoolingStartBlockCountdown(remaining)}`;
+    }
+    return label;
+  }
+
+  export function getCoolingCompressorRunning() {
+    // De toegepaste compressorstand is leidend: niveau > 0 betekent draaien.
+    for (const key of ["hp1Compressor", "hp2Compressor"]) {
+      const level = getEntityNumericValue(key);
+      if (!Number.isNaN(level) && level > 0) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  export function getCoolingStartBlockModel() {
+    if (!hasEntity("coolingStartBlockReason")) {
+      return { available: false, blocked: false, reasonRaw: "", remainingS: 0, hasCountdown: false, display: "" };
+    }
+    const reasonRaw = String(getEntityStateText("coolingStartBlockReason", "") || "").trim();
+    if (!reasonRaw) {
+      return { available: true, blocked: false, reasonRaw: "", remainingS: 0, hasCountdown: false, display: "" };
+    }
+    const remainingRaw = hasEntity("coolingStartBlockRemaining")
+      ? getEntityNumericValue("coolingStartBlockRemaining")
+      : Number.NaN;
+    const remainingS = Number.isFinite(remainingRaw) && remainingRaw > 0 ? Math.ceil(remainingRaw) : 0;
+    const blocked = reasonRaw !== COOLING_START_BLOCK_REASON_READY;
+    const hasCountdown = blocked && remainingS > 0 &&
+      COOLING_START_BLOCK_COUNTDOWN_REASONS.has(reasonRaw);
+    return {
+      available: true,
+      blocked,
+      reasonRaw,
+      remainingS: hasCountdown ? remainingS : 0,
+      hasCountdown,
+      display: blocked ? formatCoolingStartBlockReason(reasonRaw, remainingS) : formatCoolingBlockReason(reasonRaw),
+    };
+  }
+
+  export function getCoolingScheduleStatus() {
+    const start = toTimeInputValue(getEntityStateText(COOLING_SCHEDULE_TIME_KEYS[0], ""));
+    const end = toTimeInputValue(getEntityStateText(COOLING_SCHEDULE_TIME_KEYS[1], ""));
+    const effective = getEntityStateText(COOLING_SCHEDULE_EFFECTIVE_SOURCE_KEY, "");
+    return !start || !end ? "Niet beschikbaar"
+      : start === end ? "Uitgeschakeld"
+      : getEntityStateText(COOLING_SCHEDULE_SOURCE_KEY, "") !== "Schedule" ? "Niet geselecteerd"
+      : !isEntityActive(COOLING_SCHEDULE_VALID_KEY) ? "Tijd ongeldig"
+      : !effective || /unknown|unavailable/i.test(effective) ? "Niet beschikbaar"
+      : effective.includes("Schedule") ? "Open" : "Gesloten";
+  }
+
+  function getCoolingScheduleStatusCopy(status, start, end) {
+    if (status === "Open") {
+      return `Open van ${start} tot ${end}; koeltoestemming is nu actief.`;
+    }
+    if (status === "Gesloten") {
+      return `Open van ${start} tot ${end}; koeltoestemming is nu niet actief.`;
+    }
+    if (status === "Uitgeschakeld") {
+      return "Start en einde zijn gelijk. Kies verschillende tijden om een venster te openen.";
+    }
+    return status === "Tijd ongeldig"
+      ? "De lokale klok is nog niet geldig; koeltoestemming blijft uit."
+      : "Het koelvenster is nog niet beschikbaar; koeltoestemming blijft uit.";
+  }
+
+  export function renderCoolingScheduleSettingsFields(gridClass = "oq-settings-grid") {
+    if (!hasEntity(COOLING_SCHEDULE_SOURCE_KEY) || !COOLING_SCHEDULE_TIME_KEYS.every((key) => hasEntity(key))) {
+      return "";
+    }
+    const source = getEntityStateText(COOLING_SCHEDULE_SOURCE_KEY, "Disabled");
+    const enabled = source === "Schedule";
+    const start = toTimeInputValue(getEntityStateText(COOLING_SCHEDULE_TIME_KEYS[0], ""));
+    const end = toTimeInputValue(getEntityStateText(COOLING_SCHEDULE_TIME_KEYS[1], ""));
+    const status = getCoolingScheduleStatus();
+    const busy = state.loadingEntities || state.busyAction === `save-${COOLING_SCHEDULE_SOURCE_KEY}`;
+    const stateLabel = enabled ? "Aan" : "Uit";
+    return `
+      <section class="oq-settings-cooling-schedule${enabled ? " is-enabled" : ""}">
+        <div class="oq-settings-subpanel-head oq-settings-cooling-schedule-head">
+          <div>
+            <p class="oq-helper-label">Koeltoestemming</p>
+            <h4>Dagelijks koelvenster</h4>
+            <p>Laat OpenQuatt alleen binnen dit lokale tijdvenster koelen. Kamerinstelling en koelbeveiligingen blijven altijd gelden.</p>
+          </div>
+          <div class="oq-settings-compact-switch-row">
+            <span class="oq-settings-toggle-state${enabled ? " is-on" : ""}">${stateLabel}</span>
+            <button
+              class="oq-settings-toggle-switch${enabled ? " is-on" : ""}"
+              type="button"
+              role="switch"
+              data-oq-action="select-overview-control-option"
+              data-control-key="${escapeHtml(COOLING_SCHEDULE_SOURCE_KEY)}"
+              data-control-option="${enabled ? "Disabled" : "Schedule"}"
+              aria-checked="${enabled ? "true" : "false"}"
+              aria-label="Dagelijks koelvenster: ${stateLabel}"
+              ${busy ? "disabled" : ""}
+            >
+              <span class="oq-settings-toggle-switch-track" aria-hidden="true"><span class="oq-settings-toggle-switch-knob"></span></span>
+            </button>
+          </div>
+        </div>
+        ${enabled ? `
+          <div class="${escapeHtml(gridClass)}">
+            ${renderSettingsTimeField(COOLING_SCHEDULE_TIME_KEYS[0], "Start koelvenster", "De starttijd is inbegrepen.")}
+            ${renderSettingsTimeField(COOLING_SCHEDULE_TIME_KEYS[1], "Einde koelvenster", "De eindtijd is niet inbegrepen. Een nachtvenster mag over middernacht lopen.")}
+          </div>
+          <p class="oq-settings-cooling-schedule-status"><strong>${escapeHtml(status)}</strong><span>${escapeHtml(getCoolingScheduleStatusCopy(status, start, end))}</span></p>
+        ` : ""}
+      </section>
+    `;
+  }
+
   function renderCoolingSilentLimitWarning() {
-    const coolingDemandMax = getEntityNumericValue("coolingDemandMax");
-    const silentMax = getEntityNumericValue("silentMax");
     const silentModeOverride = getEntityStateText("silentModeOverride", "").trim().toLowerCase();
-    if (!hasEntity("silentMax") || !Number.isFinite(coolingDemandMax) || !Number.isFinite(silentMax) || coolingDemandMax <= silentMax || silentModeOverride === "off") {
+    if (silentModeOverride === "off") {
       return "";
     }
 
+    const silentMaxHz = getEntityNumericValue("silentMaxHz");
+    if (!hasEntity("silentMaxHz") || !Number.isFinite(silentMaxHz) || silentMaxHz >= 120) {
+      return "";
+    }
     const prefix = isEntityActive("silentActive")
       ? "Stille modus is nu actief. Koelen wordt"
       : "Tijdens stille modus wordt koelen";
-    return `<p class="oq-settings-cooling-limit-warning"><span class="oq-settings-cooling-limit-warning-icon" aria-hidden="true">!</span><span>${prefix} begrensd op niveau ${escapeHtml(formatValue("silentMax"))}. Deze maximale koelsterkte wordt dan niet volledig gebruikt.</span></p>`;
+    return `<p class="oq-settings-cooling-limit-warning"><span class="oq-settings-cooling-limit-warning-icon" aria-hidden="true">!</span><span>${prefix} begrensd op een compressorfrequentie van ${escapeHtml(formatValue("silentMaxHz"))}.</span></p>`;
   }
 
   export function renderSettingsCoolingSection() {
     const roomRequestRequired = !hasEntity("coolingRoomRequestRequired") || isEntityActive("coolingRoomRequestRequired");
+    const restartByMinimumOffTime = hasEntity("coolingRestartMode") &&
+      getEntityStateText("coolingRestartMode", "Water temperature") === "Minimum off time";
+    const scheduleFields = renderCoolingScheduleSettingsFields();
     const tuningFields = [
       renderSettingsNumberField("coolingMinimumSupplyTemp", "Minimale koel-aanvoer", "Ondergrens voor het koeldoel. OpenQuatt gebruikt de hoogste waarde van deze instelling en de dauwpuntveilige grens."),
       renderSettingsSliderField("coolingDemandMax", "Maximale koelsterkte", "Bepaalt hoe krachtig OpenQuatt mag koelen. Lager geeft langere, rustigere runs; hoger geeft meer koelvermogen bij warm weer.", "", {
@@ -64,7 +228,10 @@ import { escapeHtml } from "../core/html.js";
         valueLabel: `${formatValue("coolingDemandMax")} max`,
         footerMarkup: renderCoolingSilentLimitWarning(),
       }),
-      renderSettingsNumberField("coolingRestartDelta", "Herstartmarge watertemperatuur", "Na het bereiken van het koel-aanvoerdoel start de watercyclus pas opnieuw zodra de aanvoer deze marge boven het doel ligt."),
+      hasEntity("coolingRestartMode") ? renderSettingsSelectField("coolingRestartMode", "Herstartvoorwaarde", "Kies of koeling herstart nadat het water voldoende is opgewarmd of na een vaste minimale uit-tijd. Een minimale uit-tijd remt snelle opeenvolgende koelstarts af en helpt zo pendelgedrag te verminderen. De vaste minimale uit-tijd van iedere compressor (4 minuten) blijft in beide modi altijd gelden.") : "",
+      restartByMinimumOffTime
+        ? renderSettingsNumberField("coolingMinimumOffTime", "Minimale uit-tijd koelen", "Na een werkelijke koelstop blijft de warmtepomp gedurende deze tijd uit. Bij Duo geldt dit voor beide warmtepompen. OpenQuatt start pas wanneer ook de vaste minimale compressor-uit-tijd (4 minuten) voorbij is.")
+        : renderSettingsNumberField("coolingRestartDelta", "Herstartmarge watertemperatuur", "Na het bereiken van het koel-aanvoerdoel start de watercyclus pas opnieuw zodra de aanvoer deze marge boven het doel ligt."),
       renderSettingsNumberField("coolingSafetyMargin", "Dauwpunt veiligheidsmarge", "Extra marge boven het geselecteerde dauwpunt voor de minimale veilige watertemperatuur."),
     ].filter(Boolean);
     const roomRequestFields = [
@@ -113,7 +280,7 @@ import { escapeHtml } from "../core/html.js";
       pidFields ? `<div class="oq-settings-grid oq-settings-grid--pid">${pidFields}</div>` : "",
     );
 
-    if (!tuningFields.length && !hasRoomRequestSettings && !hasFallbackSettings && !guardStatusPanel && !hasFallbackDetails && !advancedPidMarkup) {
+    if (!scheduleFields && !tuningFields.length && !hasRoomRequestSettings && !hasFallbackSettings && !guardStatusPanel && !hasFallbackDetails && !advancedPidMarkup) {
       return "";
     }
 
@@ -128,8 +295,9 @@ import { escapeHtml } from "../core/html.js";
     return renderSettingsSection(
       "Koeling",
       "Koelingsinstellingen",
-      "Stel hier in wanneer koelvraag ontstaat, hoe koud het water mag worden en hoeveel het water mag opwarmen voor herstart.",
+      "Stel hier in wanneer koelvraag ontstaat, hoe koud het water mag worden en wanneer een gestopte koelcyclus opnieuw mag starten.",
       `
+        ${scheduleFields}
         ${tuningFields.length ? `
           <div class="oq-settings-grid">
             ${tuningFields.join("")}

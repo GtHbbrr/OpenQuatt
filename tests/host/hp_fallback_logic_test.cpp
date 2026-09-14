@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <string.h>
 
 #include "../../openquatt/includes/control/oq_boiler_control_logic.h"
 #include "../../openquatt/includes/control/oq_boiler_output_logic.h"
@@ -208,6 +209,7 @@ void test_boiler_role_and_log_classification() {
   const auto codes = boiler_log_codes();
   assert(boiler_role_for_source(oq_boiler::COMMAND_SOURCE_POWER_HOUSE) == BoilerRole::ASSIST_CM3);
   assert(boiler_role_for_source(oq_boiler::COMMAND_SOURCE_HEATING_CURVE) == BoilerRole::ASSIST_CM3);
+  assert(boiler_role_for_source(oq_boiler::COMMAND_SOURCE_COLD_START) == BoilerRole::ASSIST_CM3);
   assert(boiler_role_for_source(oq_boiler::COMMAND_SOURCE_FALLBACK) == BoilerRole::FALLBACK_CM4);
   assert(boiler_role_for_source(oq_boiler::COMMAND_SOURCE_COMMISSIONING) == BoilerRole::COMMISSIONING_CM100);
   assert(boiler_role_for_source(oq_boiler::COMMAND_SOURCE_NONE) == BoilerRole::OFF);
@@ -233,6 +235,16 @@ void test_boiler_role_and_log_classification() {
   log = classify_boiler_controller_log(inputs, codes);
   assert(log.reason == BoilerLogReason::SOFT_GUARD);
   assert(log.reason_code == 12);
+
+  inputs.controller_block_reason = oq_boiler::BLOCK_BOILER_TOO_HOT_FOR_START;
+  log = classify_boiler_controller_log(inputs, codes);
+  assert(log.reason == BoilerLogReason::SOFT_GUARD);
+  assert(log.reason_code == 12);
+
+  inputs.controller_block_reason = oq_boiler::BLOCK_BOILER_TEMPERATURE_UNAVAILABLE;
+  log = classify_boiler_controller_log(inputs, codes);
+  assert(log.reason == BoilerLogReason::SENSOR_FALLBACK);
+  assert(log.reason_code == 13);
 
   inputs.controller_block_reason = oq_boiler::BLOCK_MIN_OFF_TIME;
   log = classify_boiler_controller_log(inputs, codes);
@@ -294,6 +306,16 @@ void test_boiler_stop_reason_preserves_safety_cause() {
   assert(log.severity == 30);
 }
 
+void test_boiler_diagnostic_helpers_are_bounded() {
+  assert(strcmp(oq_boiler::command_source_text(oq_boiler::COMMAND_SOURCE_POWER_HOUSE), "Power House") == 0);
+  assert(strcmp(oq_boiler::command_source_text(oq_boiler::COMMAND_SOURCE_COLD_START), "Cold start") == 0);
+  assert(strcmp(oq_boiler::command_source_text(99), "None") == 0);
+  assert(oq_boiler::estimate_boiler_heat_power(false, 30.0f, 40.0f, 720.0f, 4180.0f) == 0.0f);
+  assert(oq_boiler::estimate_boiler_heat_power(true, 40.0f, 30.0f, 720.0f, 4180.0f) == 0.0f);
+  const float power = oq_boiler::estimate_boiler_heat_power(true, 30.0f, 40.0f, 720.0f, 4180.0f);
+  assert(power > 8359.0f && power < 8361.0f);
+}
+
 }  // namespace
 
 int main() {
@@ -303,5 +325,6 @@ int main() {
   test_off_role_fails_safe_even_with_heat_requested();
   test_boiler_role_and_log_classification();
   test_boiler_stop_reason_preserves_safety_cause();
+  test_boiler_diagnostic_helpers_are_bounded();
   return 0;
 }

@@ -9,6 +9,8 @@ import { state } from "../core/state.js";
 import { setTrendWindowHours } from "../core/trend-window.js";
 import { setEnergyHistoryPeriodToNow, setEnergyHistoryView, shiftEnergyHistoryPeriod } from "../views/energy.js";
 import { refreshTrendHistoryData } from "./storage-history.js";
+import { refreshOduRuntimeFrequencyStatuses } from "./odu-runtime-frequency.js";
+import { refreshOduSettingsStatuses } from "./odu-settings.js";
 
 function openServiceSettings() {
   state.systemModal = "";
@@ -90,6 +92,43 @@ const viewActionHandlers = {
     render();
     void syncEntities({ forceFast: true });
   },
+  "select-settings-source": (button) => {
+    const key = String(button.dataset.sourceKey || "").trim().replace(/[^a-z0-9_-]/gi, "");
+    if (!key) {
+      return;
+    }
+    state.settingsSourceFocusKey = key;
+    state.settingsSourceDetailOpen = true;
+    state.settingsInfoOpen = "";
+    render();
+    state.settingsPageScrollRestoreToken = (state.settingsPageScrollRestoreToken || 0) + 1;
+    window.requestAnimationFrame(() => {
+      const inspector = state.root?.querySelector("[data-oq-source-inspector]");
+      const backButton = inspector?.querySelector('[data-oq-action="close-settings-source-detail"]');
+      if (inspector && backButton && backButton.offsetParent !== null) {
+        inspector.scrollIntoView({ block: "start", behavior: "auto" });
+        backButton.focus({ preventScroll: true });
+        return;
+      }
+      state.root?.querySelector(`[data-source-key="${key}"]`)?.focus({ preventScroll: true });
+    });
+  },
+  "close-settings-source-detail": () => {
+    const key = String(state.settingsSourceFocusKey || "").trim();
+    const safeKey = key.replace(/[^a-z0-9_-]/gi, "");
+    state.settingsSourceDetailOpen = false;
+    state.settingsInfoOpen = "";
+    render();
+    state.settingsPageScrollRestoreToken = (state.settingsPageScrollRestoreToken || 0) + 1;
+    if (!safeKey) {
+      return;
+    }
+    window.requestAnimationFrame(() => {
+      const signal = state.root?.querySelector(`[data-source-key="${safeKey}"]`);
+      signal?.focus({ preventScroll: true });
+      signal?.scrollIntoView({ block: "nearest", behavior: "auto" });
+    });
+  },
   "toggle-overview-theme": () => {
     setOverviewTheme(state.overviewTheme === "light" ? "dark" : "light");
     render();
@@ -112,8 +151,20 @@ const viewActionHandlers = {
   "toggle-integration-diagnostics": (button, event) => {
     toggleDetails(event, button, ".oq-settings-integration-diagnostics", "integrationDiagnosticsOpen");
   },
-  "toggle-odu-runtime-frequency-details": (button, event) => {
-    toggleDetails(event, button, ".oq-settings-odu-runtime-details", "oduRuntimeFrequencyDetailsOpen");
+  "open-odu-bottom-plate-settings": () => {
+    state.controlNotice = "";
+    state.systemModal = "odu-bottom-plate-settings";
+    render();
+    void refreshOduSettingsStatuses({ force: true });
+  },
+  "open-odu-frequency-settings": () => {
+    state.controlNotice = "";
+    state.systemModal = "odu-frequency-settings";
+    render();
+    void refreshOduRuntimeFrequencyStatuses({ force: true });
+  },
+  "toggle-odu-frequency-technical-details": (button, event) => {
+    toggleDetails(event, button, ".oq-settings-odu-technical", "oduRuntimeFrequencyTechnicalDetailsOpen");
   },
   "toggle-usage-telemetry-details": (button, event) => {
     toggleDetails(event, button, ".oq-usage-disclosure--collapsible", "usageTelemetryDetailsOpen");

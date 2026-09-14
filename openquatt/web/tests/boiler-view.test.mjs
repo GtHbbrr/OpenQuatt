@@ -26,8 +26,21 @@ const {
 const { INITIAL_SETTINGS_READY_KEY_MAP, SETTINGS_GROUP_KEY_MAP } = await import("../js/src/core/entity-sync.js");
 const heatPumpCss = await readFile(new URL("../css/src/40-heatpump.css", import.meta.url), "utf8");
 const boilerOpenThermYaml = await readFile(new URL("../../oq_boiler_opentherm.yaml", import.meta.url), "utf8");
-const heatPumpQProfileYaml = await readFile(new URL("../../profiles/heatpump_controller_q.yaml", import.meta.url), "utf8");
+const boilerOpenThermRuntime = await readFile(
+  new URL("../../includes/boiler/oq_boiler_otb_runtime.h", import.meta.url),
+  "utf8",
+);
 const otSlaveYaml = await readFile(new URL("../../oq_ot_slave.yaml", import.meta.url), "utf8");
+const otSlaveCpp = await readFile(
+  new URL("../../../components/openquatt_ot_slave/OpenQuattOTSlave.cpp", import.meta.url),
+  "utf8",
+);
+const otSlaveHeader = await readFile(
+  new URL("../../../components/openquatt_ot_slave/OpenQuattOTSlave.h", import.meta.url),
+  "utf8",
+);
+const commonSubstitutionsYaml = await readFile(new URL("../../oq_substitutions_common.yaml", import.meta.url), "utf8");
+const boilerTransportLogic = await readFile(new URL("../../includes/boiler/oq_boiler_transport_logic.h", import.meta.url), "utf8");
 const quickStartSource = await readFile(new URL("../js/src/features/quickstart.js", import.meta.url), "utf8");
 const quickStartActionsSource = await readFile(new URL("../js/src/features/quickstart-actions.js", import.meta.url), "utf8");
 const installationSource = await readFile(new URL("../js/src/settings/installation.js", import.meta.url), "utf8");
@@ -308,6 +321,7 @@ test("integration diagnostics separates thermostat, boiler control, OTB and CiC"
     otEnabled: { value: true },
     otLinkProblem: { value: false },
     otThermostatStatusValid: { value: true },
+    otThermostatDhwEnable: { value: false },
     otRoomTemp: { value: 20.8, uom: "°C" },
     boilerConnection: { value: "OpenTherm" },
     boilerCommandValid: { value: true },
@@ -323,6 +337,8 @@ test("integration diagnostics separates thermostat, boiler control, OTB and CiC"
     const html = renderSettingsOpenThermCicSection();
     assert.match(html, /OpenTherm thermostaat \(OTT\)/);
     assert.match(html, /Statusbericht \(ID 0\) actueel/);
+    assert.match(html, /Thermostaat tapwater/);
+    assert.match(html, /Geblokkeerd/);
     assert.match(html, /Ketelregeling/);
     assert.match(html, /OpenTherm ketel \(OTB\)/);
     assert.match(html, /CiC-feed/);
@@ -336,11 +352,13 @@ test("integration diagnostics separates thermostat, boiler control, OTB and CiC"
 });
 
 test("settings hydration loads boiler setup and diagnostics before rendering", () => {
+  assert.ok(FAST_OVERVIEW_KEYS.includes("auxHeatSourcePresent"));
   assert.ok(FAST_OVERVIEW_KEYS.includes("boilerCvAssistEnabled"));
   assert.ok(FAST_OVERVIEW_KEYS.includes("boilerRatedHeatPower"));
   assert.ok(FAST_OVERVIEW_KEYS.includes("boilerConnection"));
   assert.ok(FAST_OVERVIEW_KEYS.includes("boilerFaultFallbackEnabled"));
   assert.ok(INITIAL_SETTINGS_READY_KEY_MAP.installation.includes("boilerConnection"));
+  assert.ok(INITIAL_SETTINGS_READY_KEY_MAP.installation.includes("auxHeatSourcePresent"));
   assert.ok(INITIAL_SETTINGS_READY_KEY_MAP.installation.includes("boilerRatedHeatPower"));
   assert.ok(INITIAL_SETTINGS_READY_KEY_MAP.installation.includes("boilerFaultFallbackEnabled"));
   assert.ok(INITIAL_SETTINGS_READY_KEY_MAP.installation.includes("otbLinkAvailable"));
@@ -369,11 +387,36 @@ test("settings hydration loads boiler setup and diagnostics before rendering", (
   );
 });
 
-test("fault fallback setting explains the consequence of both switch states", () => {
-  assert.match(installationSource, /Automatische ketelovername bij warmtepompstoring/);
-  assert.match(installationSource, /OpenQuatt stelt dit zelf vast/);
-  assert.match(installationSource, /je hoeft niets te bevestigen/);
-  assert.match(installationSource, /Een korte communicatiedip telt niet als storing/);
+test("auxiliary heat source setting remains editable on legacy firmware", () => {
+  assert.match(
+    installationSource,
+    /const sourcePresenceKey = separateSourcePolicyAvailable[\s\S]*?"auxHeatSourcePresent"[\s\S]*?: "boilerCvAssistEnabled"/,
+  );
+  assert.match(
+    installationSource,
+    /renderSettingsCompactSwitchControl\(sourcePresenceKey, "Warmtebron aangesloten"/,
+  );
+  assert.match(
+    installationSource,
+    /sourcePresent && separateSourcePolicyAvailable && assistSettingAvailable/,
+  );
+});
+
+test("fallback heating setting explains its guarded scope", () => {
+  assert.match(installationSource, /Overnemen wanneer de warmtepomp niet beschikbaar is/);
+  assert.match(installationSource, /wanneer geen warmtepomp veilig beschikbaar is/);
+  assert.match(installationSource, /koude opstart onder 5 °C/);
+  assert.match(installationSource, /koude opstart van 5 tot 12 °C/);
+  assert.match(commonSubstitutionsYaml, /oq_hp_cold_start_min_c: "5\.0"/);
+  assert.match(commonSubstitutionsYaml, /oq_hp_cold_start_assist_release_c: "12\.0"/);
+  assert.match(installationSource, /na een veilige stop/);
+  assert.match(installationSource, /Een korte communicatiedip telt niet als uitval/);
+});
+
+test("auxiliary heat source copy names common examples and explains hybrid heating", () => {
+  assert.match(installationSource, /cv-ketel, elektrische cv-ketel \(e-cv\) of doorstroomverwarmer/);
+  assert.match(installationSource, /Hybride verwarmen bij vermogenstekort/);
+  assert.match(installationSource, /het beschikbare warmtepompvermogen niet genoeg is/);
 });
 
 test("fault fallback is editable in Installation and the shared Quick Start boiler fields", () => {
@@ -394,7 +437,7 @@ test("fault fallback is editable in Installation and the shared Quick Start boil
   );
   assert.match(
     quickStartSource,
-    /\["Automatische ketelovername bij warmtepompstoring", isEntityActive\("boilerFaultFallbackEnabled"\) \? "Aan" : "Uit"\]/,
+    /\["Overnemen wanneer de warmtepomp niet beschikbaar is", isEntityActive\("boilerFaultFallbackEnabled"\) \? "Aan" : "Uit"\]/,
   );
   assert.match(servicePanelSource, /renderInstallationMonitoringStatusRow/);
   assert.doesNotMatch(servicePanelSource, /boilerFaultFallbackEnabled/);
@@ -420,7 +463,7 @@ test("onboarding auto-selects a detected OpenTherm boiler and explains the choic
   assert.match(installationSource, /automatisch als ketelaansluiting geselecteerd/);
   assert.match(
     installationSource,
-    /boilerPresent \|\| boilerConnectionMismatch \|\| boilerConnectionAutoSelected/,
+    /sourcePresent \|\| boilerConnectionMismatch \|\| boilerConnectionAutoSelected/,
   );
 });
 
@@ -434,15 +477,15 @@ test("firmware publishes boiler connection mismatch transitions immediately", ()
     /oq_boiler_connection_mismatch_state\) = false;\s+id\(oq_boiler_connection_mismatch\)\.publish_state\(false\);/,
   );
   assert.match(
-    heatPumpQProfileYaml,
+    boilerOpenThermRuntime,
     /oq_boiler_connection_mismatch_state\) = false;\s+id\(oq_boiler_connection_mismatch\)\.publish_state\(false\);/,
   );
 });
 
-test("Quick Start keeps the mismatch remedy visible when boiler assist is off", () => {
+test("Quick Start keeps the mismatch remedy visible when the source is disconnected", () => {
   assert.match(
     installationSource,
-    /\(boilerPresent \|\| boilerConnectionMismatch \|\| boilerConnectionAutoSelected\) && boilerConnectionAvailable \? renderSettingsFieldCard/,
+    /\(sourcePresent \|\| boilerConnectionMismatch \|\| boilerConnectionAutoSelected\) && boilerConnectionAvailable \? renderSettingsFieldCard/,
   );
   assert.match(installationSource, /OpenTherm-ketel gevonden/);
 });
@@ -476,21 +519,94 @@ test("installation offers only R1 after OpenTherm capability is confirmed absent
   );
 });
 
-test("DHW permission stays enabled without a user-facing setting", () => {
+test("DHW permission follows a current OT thermostat status and fails open", () => {
   assert.match(boilerOpenThermYaml, /^    dhw_enable: true$/m);
-  assert.doesNotMatch(boilerOpenThermYaml, /^    dhw_enable:\n\s+id: oq_otb_dhw_enable$/m);
+  assert.match(boilerOpenThermYaml, /dhw_enable:\n\s+id: oq_otb_dhw_enable/);
+  assert.match(boilerOpenThermYaml, /restore_mode: ALWAYS_ON/);
+  assert.match(boilerOpenThermRuntime, /inline void apply_dhw_permission\(bool opentherm_selected\)/);
+  assert.match(boilerOpenThermRuntime, /compute_otb_dhw_permission/);
+  assert.match(boilerOpenThermRuntime, /id\(oq_otb_dhw_enable\)\.turn_off\(\);/);
+  assert.match(otSlaveYaml, /master_dhw_enable:\n\s+id: ot_thermostat_dhw_enable/);
+  assert.match(otSlaveCpp, /void OpenQuattOTSlave::stop_opentherm_\(\)[\s\S]*?m_lastMasterStatusMs = 0;/);
+  assert.match(otSlaveCpp, /if \(this->master_status_valid_binary_sensor != nullptr\)/);
+  assert.match(otSlaveCpp, /void OpenQuattOTSlave::stop_opentherm_\(\)[\s\S]*?master_status_valid_binary_sensor->publish_state\(false\);/);
+  assert.match(boilerTransportLogic, /static_assert\(!compute_otb_dhw_permission\(true, true, false\)/);
+  assert.match(boilerTransportLogic, /static_assert\(compute_otb_dhw_permission\(true, false, false\)/);
+  assert.match(boilerTransportLogic, /static_assert\(compute_otb_dhw_permission\(false, true, false\)/);
   assert.doesNotMatch(quickStartSource, /tapwater levert/i);
-  assert.equal(Object.hasOwn(ENTITY_DEFS, "boilerProvidesDhw"), false);
-  assert.equal(INITIAL_SETTINGS_READY_KEY_MAP.installation.includes("boilerProvidesDhw"), false);
-  assert.equal(SETTINGS_GROUP_KEY_MAP.installation.includes("boilerProvidesDhw"), false);
-  assert.ok(SETTINGS_GROUP_KEY_MAP.integrations.includes("otbDhwActive"));
-  assert.ok(SETTINGS_GROUP_KEY_MAP.integrations.includes("otbDhwPresent"));
+  assert.ok(Object.hasOwn(ENTITY_DEFS, "otThermostatDhwEnable"));
+  assert.ok(SETTINGS_GROUP_KEY_MAP.integrations.includes("otThermostatDhwEnable"));
 });
 
-test("thermostat slave uses real OTB flame state without changing R1 compatibility", () => {
+test("thermostat slave reports only real flame state, never HP activity as flame", () => {
   assert.match(
     otSlaveYaml,
-    /const bool slave_flame_on\s*=\s*\n\s*otb_selected \? boiler_flame_on : ch_active;/,
+    /const bool slave_flame_on\s*=\s*\n\s*otb_selected \? boiler_flame_on : false;/,
   );
   assert.match(otSlaveYaml, /set_slave_flame_on\(slave_flame_on\);/);
+  assert.doesNotMatch(otSlaveYaml, /otb_selected \? boiler_flame_on : ch_active/);
+});
+
+test("issue 668: R1 thermostat path reports no invented telemetry", () => {
+  assert.match(otSlaveYaml, /set_slave_rel_mod_level\(NAN\)/);
+  assert.match(otSlaveYaml, /set_slave_ch_pressure\(NAN\)/);
+  assert.match(otSlaveYaml, /set_slave_t_dhw\(NAN\)/);
+  assert.match(otSlaveYaml, /set_slave_max_capacity\(NAN\)/);
+  assert.match(otSlaveYaml, /set_slave_min_modulation\(NAN\)/);
+  assert.doesNotMatch(otSlaveYaml, /set_slave_ch_pressure\(1\.5f\)/);
+  assert.doesNotMatch(otSlaveYaml, /set_slave_t_dhw\(40\.0f\)/);
+  assert.doesNotMatch(otSlaveYaml, /oq_demand_filtered\) \* 5\.0f/);
+  assert.doesNotMatch(otSlaveYaml, /: 20\.0f;/);
+  assert.match(
+    otSlaveYaml,
+    /id\(water_supply_temp_selected\)\.state\s*\n?\s*: NAN/,
+  );
+  assert.match(
+    otSlaveYaml,
+    /id\(hp1_water_in_temp\)\.has_state\(\)[\s\S]*?: NAN/,
+  );
+});
+
+test("issue 668: thermostat forwards real OTB capacity and handles stale links as invalid", () => {
+  assert.match(otSlaveYaml, /id\(otb_max_capacity\)\.state\s*\n?\s*: NAN/);
+  assert.match(otSlaveYaml, /id\(otb_min_modulation\)\.state\s*\n?\s*: NAN/);
+  assert.match(otSlaveYaml, /set_slave_max_capacity\(/);
+  assert.match(otSlaveYaml, /set_slave_min_modulation\(/);
+  assert.match(otSlaveYaml, /set_slave_max_t_set\(NAN\)/);
+  assert.match(otSlaveYaml, /set_slave_t_outside\(NAN\)/);
+  assert.doesNotMatch(otSlaveCpp, /responseData = 0x1400;/);
+  assert.match(otSlaveCpp, /m_slave_state\.max_capacity_valid/);
+  assert.match(otSlaveCpp, /m_slave_state\.min_modulation_valid/);
+});
+
+test("issue 668: missing thermostat telemetry answers DATA_INVALID with real bounds", () => {
+  for (const flag of [
+    "t_boiler_valid",
+    "t_ret_valid",
+    "rel_mod_level_valid",
+    "ch_pressure_valid",
+    "t_dhw_valid",
+    "t_dhw_set_valid",
+    "max_t_set_valid",
+  ]) {
+    assert.match(otSlaveCpp, new RegExp(`!m_slave_state\\.${flag}`));
+  }
+  assert.match(otSlaveCpp, /case OpenThermMessageID::TdhwSetUBTdhwSetLB:[\s\S]*?DATA_INVALID/);
+  assert.match(otSlaveCpp, /case OpenThermMessageID::TdhwSet:[\s\S]*?DATA_INVALID/);
+  assert.match(otSlaveCpp, /case OpenThermMessageID::MaxCapacityMinModLevel:[\s\S]*?DATA_INVALID/);
+  assert.match(otSlaveCpp, /case OpenThermMessageID::MaxTSet:[\s\S]*?DATA_INVALID/);
+  assert.doesNotMatch(otSlaveCpp, /responseData = 0x3C0A;/);
+  assert.doesNotMatch(otSlaveCpp, /responseData = 0x500A;/);
+  assert.match(otSlaveCpp, /responseData = 0x4B19;/);
+  assert.match(otSlaveHeader, /float max_t_set = NAN;/);
+  assert.match(otSlaveHeader, /float t_dhw_set = NAN;/);
+  assert.match(otSlaveHeader, /bool max_t_set_valid = false;/);
+  assert.match(otSlaveHeader, /bool t_dhw_set_valid = false;/);
+});
+
+test("issue 668: OTB link recovery re-polls init-only capacity fields", () => {
+  assert.match(
+    boilerOpenThermRuntime,
+    /inline void link_watch[\s\S]*?if \(available\)[\s\S]*?id\(oq_otb_hub\)\.resume_polling\(\);/,
+  );
 });

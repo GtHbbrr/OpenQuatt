@@ -1,5 +1,5 @@
 import { hasEntity, isEntityActive } from "../core/app-shared.js";
-import { CURVE_SETTING_KEYS, ENTITY_DEFS, FAST_VIEW_ENTITY_REFRESH_CONCURRENCY, FIRMWARE_MODAL_KEYS, FLOW_SETTING_KEYS, FLOW_TUNING_KEYS, HEADER_ENTITY_KEYS, POWER_HOUSE_KEYS, QUICK_START_FLOW_SOURCE_KEYS, QUICK_START_THERMOSTAT_SOURCE_KEYS, SILENT_SETTING_KEYS, TOPOLOGY_HINT_KEYS } from "../core/config.js";
+import { CURVE_SETTING_KEYS, ENTITY_DEFS, FAST_VIEW_ENTITY_REFRESH_CONCURRENCY, FIRMWARE_MODAL_KEYS, FLOW_SETTING_KEYS, FLOW_TUNING_KEYS, FREQUENCY_CAP_KEYS, HEADER_ENTITY_KEYS, POWER_HOUSE_KEYS, QUICK_START_FLOW_SOURCE_KEYS, QUICK_START_THERMOSTAT_SOURCE_KEYS, SILENT_SETTING_KEYS, TOPOLOGY_HINT_KEYS } from "../core/config.js";
 import { buildEntityPath } from "../core/domain-helpers.js";
 import { setEntityBackupValue } from "../core/entity-backup.js";
 import { getEntityValue } from "../core/entity-store.js";
@@ -7,6 +7,7 @@ import { refreshEntities } from "../core/entity-sync.js";
 import { ODU_GENERATION_DETECT_KEYS, ODU_GENERATION_KEYS } from "../core/odu-generation.js";
 import { state } from "../core/state.js";
 import { shouldInitializeQuickStartUsageTelemetryChoice, waitForUsageTelemetryChoiceConfirmation } from "../core/usage-telemetry-domain.js";
+import { USAGE_TELEMETRY_PREVIEW_ENTITY_KEYS } from "../core/usage-telemetry-preview.js";
 import { getQuickStartFlowSourceModel, getQuickStartThermostatSourceModel } from "./quickstart.js";
 import { render } from "../core/render-scheduler.js";
 
@@ -34,6 +35,7 @@ import { render } from "../core/render-scheduler.js";
     if (stepId === "boiler") {
       return [...new Set([
         ...base,
+        "auxHeatSourcePresent",
         "boilerCvAssistEnabled",
         "boilerFaultFallbackEnabled",
         "boilerConnection",
@@ -45,7 +47,7 @@ import { render } from "../core/render-scheduler.js";
       return [...new Set([...base, "strategy"])];
     }
     if (stepId === "heating") {
-      return [...new Set([...base, ...POWER_HOUSE_KEYS, ...CURVE_SETTING_KEYS, "dayMax", "silentMax"])];
+      return [...new Set([...base, ...POWER_HOUSE_KEYS, ...CURVE_SETTING_KEYS, ...FREQUENCY_CAP_KEYS])];
     }
     if (stepId === "flow") {
       return [...new Set([...base, ...FLOW_SETTING_KEYS, ...FLOW_TUNING_KEYS])];
@@ -57,7 +59,12 @@ import { render } from "../core/render-scheduler.js";
       return [...new Set([...base, ...SILENT_SETTING_KEYS])];
     }
     if (stepId === "usage-telemetry") {
-      return [...new Set([...base, "usageTelemetryEnabled", "usageTelemetryChoiceConfigured"])];
+      return [...new Set([
+        ...base,
+        "usageTelemetryEnabled",
+        "usageTelemetryChoiceConfigured",
+        ...USAGE_TELEMETRY_PREVIEW_ENTITY_KEYS,
+      ])];
     }
     if (stepId === "confirm") {
       return [...new Set([
@@ -66,6 +73,7 @@ import { render } from "../core/render-scheduler.js";
         "hpGeneration",
         ...ODU_GENERATION_KEYS,
         ...ODU_GENERATION_DETECT_KEYS,
+        "auxHeatSourcePresent",
         "boilerCvAssistEnabled",
         "boilerFaultFallbackEnabled",
         "boilerConnection",
@@ -112,7 +120,11 @@ import { render } from "../core/render-scheduler.js";
 
     const confirmChoice = (expectedEnabled) => waitForUsageTelemetryChoiceConfirmation({
       refresh: async () => {
-        await refreshEntities(["usageTelemetryEnabled", "usageTelemetryChoiceConfigured"], "all");
+        await refreshEntities([
+          "usageTelemetryEnabled",
+          "usageTelemetryChoiceConfigured",
+          "usageTelemetryInstallationId",
+        ], "all");
         return [getEntityValue("usageTelemetryEnabled"), getEntityValue("usageTelemetryChoiceConfigured")];
       },
       expectedEnabled,
@@ -354,7 +366,44 @@ import { render } from "../core/render-scheduler.js";
     }
   }
 
-  export async function applyQuickStartThermostatSourceConfiguration() {
+  export async function applyQuickStartHeatingEnableSource(targetValue = null) {
+  const desired = targetValue ? String(targetValue).trim() : String(getEntityValue("heatingEnableSource") || "").trim();
+  // Fallback to recommendation when called without explicit target (e.g. from advice button data attribute)
+  const { getHeatingEnableRecommendation } = await import("../core/heating-strategy-matrix.js");
+  const recommended = getHeatingEnableRecommendation();
+  const value = desired && desired !== "—" ? desired : recommended;
+  if (!hasEntity("heatingEnableSource")) {
+    state.controlError = "Heating Enable-bron niet beschikbaar in deze firmware.";
+    render();
+    return;
+  }
+  state.busyAction = "quickstart-heating-enable";
+  state.controlNotice = "";
+  state.controlError = "";
+  render();
+  try {
+    const current = getEntityValue("heatingEnableSource");
+    if (String(current) !== String(value)) {
+      const applied = await setEntityBackupValue("heatingEnableSource", value);
+      state.entities.heatingEnableSource = {
+        ...(state.entities.heatingEnableSource || {}),
+        value: applied,
+        state: applied,
+      };
+    }
+    state.controlNotice = value === "Disabled"
+      ? "Warmtetoestemming op Niet gebruiken gezet: de strategie bepaalt zelf wanneer warmte nodig is."
+      : `Warmtetoestemming op ${value} gezet.`;
+    await refreshEntities(["heatingEnableSource", "heatingEnableValid", "heatingEnableSelected", "heatingBlockedByThermostat"], "all");
+  } catch (error) {
+    state.controlError = `Warmtetoestemming kon niet worden opgeslagen. ${error.message}`;
+  } finally {
+    state.busyAction = "";
+    render();
+  }
+}
+
+export async function applyQuickStartThermostatSourceConfiguration() {
     const model = getQuickStartThermostatSourceModel();
     if (!model.canApply) {
       state.controlError = model.selectedSource === "CIC"

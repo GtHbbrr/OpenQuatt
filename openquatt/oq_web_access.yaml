@@ -9,7 +9,7 @@ external_components:
   - source:
       type: local
       path: ${external_components_path}
-    components: [openquatt_web_auth, openquatt_trends, openquatt_energy_history, openquatt_log_history, openquatt_debug_recorder, openquatt_entities, openquatt_service_status, openquatt_mqtt_config, openquatt_decision_log, openquatt_incident_manager, openquatt_odu_eeprom_dump]
+    components: [openquatt_web_auth, openquatt_trends, openquatt_energy_history, openquatt_log_history, openquatt_debug_recorder, openquatt_entities, openquatt_service_status, openquatt_mqtt_config, openquatt_decision_log, openquatt_incident_manager, openquatt_odu_eeprom_dump, openquatt_odu_runtime_frequency, openquatt_odu_settings]
 
 openquatt_web_auth:
   id: oq_web_auth_store
@@ -19,7 +19,6 @@ openquatt_web_auth:
 
 openquatt_log_history:
   id: oq_log_history
-  enabled_switch: oq_ram_log_history_switch
   clock: oq_time
 
 openquatt_debug_recorder:
@@ -40,6 +39,8 @@ openquatt_decision_log:
 
 openquatt_incident_manager:
   id: oq_incident_manager
+  minimum_off_time: ${oq_hp_min_off_s}s
+  polling_paused: oq_runtime_polling_paused
   clock: oq_time
   control_mode_code: oq_control_mode_code
   decision_log: oq_decision_log
@@ -53,6 +54,7 @@ openquatt_service_status:
   commissioning_status: oq_commissioning_status_value
   boiler_result_w: oq_commissioning_result_w
   boiler_confidence: oq_commissioning_result_confidence
+  boiler_quality: oq_boiler_power_test_result_quality_value
   boiler_status: oq_boiler_power_test_status_value
   flow_autotune_status: oq_flow_autotune_status_value
   flow_kp_suggested: oq_flow_kp_suggested_value
@@ -86,23 +88,6 @@ openquatt_service_status:
   hp_water_calibration_result_supply_raw_avg: oq_hp_water_calibration_result_supply_raw_avg_c
   hp_water_calibration_result_supply_offset: oq_hp_water_calibration_result_supply_offset_c
   hp_water_calibration_result_supply_source: oq_hp_water_calibration_result_supply_source
-
-switch:
-  - platform: template
-    id: oq_ram_log_history_switch
-    name: RAM log history
-    internal: true
-    disabled_by_default: true
-    icon: mdi:memory
-    entity_category: config
-    optimistic: true
-    restore_mode: RESTORE_DEFAULT_ON
-    turn_on_action:
-      - lambda: |-
-          id(oq_log_history).set_enabled(true);
-    turn_off_action:
-      - lambda: |-
-          id(oq_log_history).set_enabled(false);
 
 binary_sensor:
   - platform: gpio

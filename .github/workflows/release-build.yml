@@ -8,12 +8,36 @@ on:
 
 permissions:
   contents: write
+  actions: write
 
 jobs:
+  validate-release-state:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate release ref and publication state
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [[ "${GITHUB_REF_TYPE}" != "tag" || ! "${GITHUB_REF_NAME}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z]+)*$ ]]; then
+            echo "Release Build must run from a semantic-version tag, not ${GITHUB_REF}." >&2
+            exit 1
+          fi
+
+          if [[ "${GITHUB_EVENT_NAME}" == "push" && "${GITHUB_RUN_ATTEMPT}" == "1" ]] && \
+             gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
+            echo "Release ${GITHUB_REF_NAME} was already published before its compile gate ran." >&2
+            echo "Delete the premature release and rerun this workflow; push only the tag next time." >&2
+            exit 1
+          fi
+
   compile-profiles:
+    needs: validate-release-state
     uses: ./.github/workflows/esphome-build.yml
     with:
       artifact_suffix: release
+      include_debug_symbols: true
+      # Release artifacts must come from a compiler-cache-free matrix.
+      enable_ccache: false
 
   publish-release:
     runs-on: ubuntu-latest
@@ -29,20 +53,74 @@ jobs:
           pattern: openquatt-*-release
           path: dist
 
+      - name: Download Q debug symbol staging artifacts
+        uses: actions/download-artifact@v7
+        with:
+          pattern: q-debug-stage-*-release
+          path: q-debug-symbols-staging
+          merge-multiple: true
+
       - name: Prepare release assets and manifests
         run: |
           TAG="${GITHUB_REF_NAME}"
           REPO="${GITHUB_REPOSITORY}"
           BASE_URL="https://github.com/${REPO}/releases/download/${TAG}"
           RELEASE_URL="https://github.com/${REPO}/releases/tag/${TAG}"
-          ./scripts/prepare_release_assets.sh "${TAG}" "${BASE_URL}" "${RELEASE_URL}"
+          ./scripts/prepare_release_assets.sh "${TAG}" "${BASE_URL}" "${RELEASE_URL}" --include-legacy-eol-manifests
 
-      - name: Create release if needed
+      - name: Prepare Q debug symbol artifact
+        run: |
+          ESPHOME_VERSION="$(sed -n 's/^esphome==//p' .github/requirements-esphome.txt)"
+          SOURCE_COMMIT="$(git rev-parse HEAD)"
+          if [[ -z "${ESPHOME_VERSION}" ]]; then
+            echo "Could not resolve ESPHome version from .github/requirements-esphome.txt" >&2
+            exit 1
+          fi
+          python3 scripts/prepare_q_debug_symbols.py \
+            "${GITHUB_REF_NAME}" \
+            "${SOURCE_COMMIT}" \
+            "${ESPHOME_VERSION}" \
+            --artifact-root q-debug-symbols-staging \
+            --output-dir q-debug-symbols
+
+      # Keep symbols out of GitHub Release assets. This Actions artifact is retained
+      # for 90 days so field crashes can be decoded against the exact release ELF.
+      - name: Upload Q debug symbol artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: openquatt-q-debug-symbols-${{ github.ref_name }}
+          if-no-files-found: error
+          retention-days: 90
+          path: q-debug-symbols
+
+      - name: Delete Q debug symbol staging artifacts
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if ! gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
-            gh release create "${GITHUB_REF_NAME}" --generate-notes
+          mapfile -t artifact_ids < <(
+            gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/artifacts" \
+              --paginate \
+              --jq '.artifacts[] | select(.name | startswith("q-debug-stage-")) | .id'
+          )
+          for artifact_id in "${artifact_ids[@]}"; do
+            gh api --method DELETE "repos/${GITHUB_REPOSITORY}/actions/artifacts/${artifact_id}"
+          done
+
+      - name: Create draft release if needed
+        id: release_state
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
+            IS_DRAFT="$(gh release view "${GITHUB_REF_NAME}" --json isDraft --jq .isDraft)"
+            if [[ "${GITHUB_EVENT_NAME}" == "push" && "${GITHUB_RUN_ATTEMPT}" == "1" && "${IS_DRAFT}" != "true" ]]; then
+              echo "Release ${GITHUB_REF_NAME} became public before its compile gate completed." >&2
+              exit 1
+            fi
+            echo "publish=${IS_DRAFT}" >> "${GITHUB_OUTPUT}"
+          else
+            gh release create "${GITHUB_REF_NAME}" --draft --generate-notes
+            echo "publish=true" >> "${GITHUB_OUTPUT}"
           fi
 
       - name: Upload release assets
@@ -54,3 +132,25 @@ jobs:
             dist/*.firmware.ota.bin \
             dist/*.firmware.factory.bin \
             --clobber
+
+      - name: Verify release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mapfile -t expected < <(python3 scripts/build_targets.py release-files --status enabled --include-legacy-eol-manifests)
+          published="$(gh release view "${GITHUB_REF_NAME}" --json assets --jq '[.assets[].name]')"
+          missing="$(jq -nr \
+            --argjson expected "$(printf '%s\n' "${expected[@]}" | jq -R . | jq -s .)" \
+            --argjson published "${published}" \
+            '$expected - $published | .[]')"
+          if [[ -n "${missing}" ]]; then
+            echo "Release is missing expected assets:" >&2
+            echo "${missing}" >&2
+            exit 1
+          fi
+
+      - name: Publish complete release
+        if: ${{ steps.release_state.outputs.publish == 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release edit "${GITHUB_REF_NAME}" --draft=false

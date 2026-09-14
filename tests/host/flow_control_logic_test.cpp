@@ -1,5 +1,6 @@
 #include <assert.h>
 #include <math.h>
+#include <string.h>
 
 #include "../../openquatt/includes/control/oq_flow_control_logic.h"
 
@@ -117,20 +118,86 @@ void test_nan_flow_failsafe() {
 
 void test_compute_start_pwm() {
   // CM100 commissioning always uses commissioning PWM (400), not last_good
-  int start = compute_start_pwm(true, 400, 440, 440, false, 460);
+  int start = compute_start_pwm(true, 400, 440, false, 460);
   assert(start == 400);
-  int start_cooling = compute_start_pwm(true, 400, 440, 440, true, 460);
+  int start_cooling = compute_start_pwm(true, 400, 440, true, 460);
   assert(start_cooling == 400);
   // Outside CM100 uses last_good per bank
-  int start_auto = compute_start_pwm(false, 400, 440, 440, false, 460);
+  int start_auto = compute_start_pwm(false, 400, 440, false, 460);
   assert(start_auto == 440);
-  int start_auto_cooling = compute_start_pwm(false, 400, 440, 440, true, 460);
+  int start_auto_cooling = compute_start_pwm(false, 400, 440, true, 460);
   assert(start_auto_cooling == 460);
-  // Invalid last_good falls back to fallback
-  int start_fallback = compute_start_pwm(false, 400, 0, 440, false, 460);
-  assert(start_fallback == 440);
-  int start_fallback_comm = compute_start_pwm(true, 400, 0, 440, false, 460);
+  // Invalid last_good falls back to the fixed C++ default.
+  int start_fallback = compute_start_pwm(false, 400, 0, false, 460);
+  assert(start_fallback == kAutoStartFallbackIpwm);
+  int start_fallback_cooling = compute_start_pwm(false, 400, 440, true, 900);
+  assert(start_fallback_cooling == kAutoStartFallbackIpwm);
+  int start_fallback_comm = compute_start_pwm(true, 400, 0, false, 460);
   assert(start_fallback_comm == 400);
+}
+
+void test_local_flow_selection() {
+  assert(select_local_flow(false, 720.0f, 400.0f, 150.0f) == 720.0f);
+  assert(isnan(select_local_flow(false, NAN, 400.0f, 150.0f)));
+  assert(select_local_flow(true, 700.0f, 720.0f, 150.0f) == 710.0f);
+  assert(select_local_flow(true, 0.0f, 720.0f, 150.0f) == 720.0f);
+  assert(select_local_flow(true, NAN, 720.0f, 150.0f) == 720.0f);
+  assert(select_local_flow(true, 700.0f, NAN, 150.0f) == 700.0f);
+  assert(isnan(select_local_flow(true, NAN, NAN, 150.0f)));
+}
+
+void test_normal_cooling_and_manual_flow_setpoint_selection() {
+  assert(!uses_cooling_setpoint(2, false, 0, 0));
+  assert(uses_cooling_setpoint(5, false, 0, 0));
+  assert(uses_cooling_setpoint(100, true, 1, 0));
+  assert(uses_cooling_setpoint(100, true, 0, 1));
+  assert(!uses_cooling_setpoint(100, true, 2, 2));
+
+  assert(select_flow_setpoint(false, 500.0f, false, 900.0f, 800.0f) == 800.0f);
+  assert(select_flow_setpoint(false, 500.0f, true, 900.0f, 800.0f) == 900.0f);
+  assert(select_flow_setpoint(true, 500.0f, true, 900.0f, 800.0f) == 500.0f);
+}
+
+void test_flow_mismatch_hold_hysteresis_and_pump_gate() {
+  const oq_flow::PumpRelayState running{true, true};
+  const oq_flow::PumpRelayState stopped{true, false};
+  MismatchState state;
+  MismatchInputs inputs{true, running, running, 500.0f, 800.0f, 150.0f, 25.0f, 1000, 30000};
+
+  assert(!update_mismatch(state, inputs));
+  inputs.now_ms = 30999;
+  assert(!update_mismatch(state, inputs));
+  inputs.now_ms = 31000;
+  assert(update_mismatch(state, inputs));
+
+  inputs.hp2_flow_lph = 630.0f;  // Difference 130: above off threshold 125.
+  assert(update_mismatch(state, inputs));
+  inputs.hp2_flow_lph = 620.0f;  // Difference 120: below off threshold.
+  assert(!update_mismatch(state, inputs));
+
+  inputs.hp1_pump = stopped;
+  inputs.hp2_pump = stopped;
+  inputs.hp2_flow_lph = 800.0f;
+  assert(!update_mismatch(state, inputs));
+  assert(!state.timer_running);
+}
+
+void test_flow_mismatch_hold_is_rollover_safe() {
+  const oq_flow::PumpRelayState running{true, true};
+  MismatchState state;
+  MismatchInputs inputs{true, running, running, 500.0f, 800.0f, 150.0f, 25.0f, 0xFFFFFF00UL, 1000};
+  assert(!update_mismatch(state, inputs));
+  inputs.now_ms = 0x000002E7UL;
+  assert(!update_mismatch(state, inputs));
+  inputs.now_ms = 0x000002E8UL;
+  assert(update_mismatch(state, inputs));
+}
+
+void test_execution_mode_labels_are_stable() {
+  assert(strcmp(execution_mode_text(ExecutionMode::AUTO), "AUTO") == 0);
+  assert(strcmp(execution_mode_text(ExecutionMode::AUTO_FAILSAFE), "AUTO (failsafe)") == 0);
+  assert(strcmp(execution_mode_text(ExecutionMode::MANUAL_FLOW), "MANUAL FLOW") == 0);
+  assert(strcmp(execution_mode_text(ExecutionMode::CM100_IDLE), "CM100 idle") == 0);
 }
 
 }  // namespace
@@ -141,5 +208,10 @@ int main() {
   test_pv_around_target_no_big_step();
   test_nan_flow_failsafe();
   test_compute_start_pwm();
+  test_local_flow_selection();
+  test_normal_cooling_and_manual_flow_setpoint_selection();
+  test_flow_mismatch_hold_hysteresis_and_pump_gate();
+  test_flow_mismatch_hold_is_rollover_safe();
+  test_execution_mode_labels_are_stable();
   return 0;
 }

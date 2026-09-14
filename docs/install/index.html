@@ -59,7 +59,7 @@
           <section class="sidebar-overview">
             <p class="sidebar-kicker">Installatiehulp</p>
             <p class="sidebar-copy">
-              Nieuwe HCQ: Wi-Fi instellen. Bestaande Waveshare of Listener: firmware installeren.
+              Heatpump Controller Q-edition verbinden, herstellen of installeren.
             </p>
             <a class="sidebar-utility" href="../q-edition.html">Open aansluithulp</a>
             <p class="docs-version" data-docs-version>Docs vanaf main</p>
@@ -99,9 +99,9 @@
       <main class="docs-main" id="main-content" tabindex="-1">
         <section class="doc-header">
           <p class="doc-kicker">Installatiehulp</p>
-          <h1>HCQ verbinden of bestaande module installeren</h1>
+          <h1>Heatpump Controller Q-edition verbinden</h1>
           <p class="doc-lead">
-            Stel Wi-Fi in op een voorgeïnstalleerde Heatpump Controller Q-edition, of flash een bestaande Waveshare- of Heatpump Listener-module. Kies de HCQ alleen bij zelf installeren als herstelroute.
+            Stel Wi-Fi in op een voorgeïnstalleerde Heatpump Controller Q-edition, of installeer de firmware opnieuw via USB als herstelroute.
           </p>
           <p class="install-warning-inline">
             <span>Let op</span>
@@ -125,9 +125,10 @@
                 <p class="install-section-label">Voorgeïnstalleerde Heatpump Controller Q-edition</p>
                 <h2>Alleen Wi-Fi instellen op je HCQ</h2>
                 <p>
-                  Gebruik dit bij een nieuwe HCQ waarop OpenQuatt al staat. Deze stap zet alleen je Wi-Fi-gegevens op de controller en flasht niets.
+                  Gebruik dit bij een nieuwe HCQ waarop OpenQuatt al staat. Deze stap zet alleen je Wi-Fi-gegevens op de controller en flasht niets. Ook bij normaal Ethernetgebruik zijn deze gegevens nodig voor Wi-Fi-fallback.
                 </p>
                 <ol class="install-provision-list">
+                  <li>Laat een eventuele Ethernetkabel tijdens het instellen tijdelijk los.</li>
                   <li>Sluit de HCQ met USB aan op deze computer.</li>
                   <li>Klik op <strong>Configureer Wi-Fi</strong> en kies de juiste USB-poort.</li>
                   <li>Vul je Wi-Fi-netwerk in en open daarna <code>http://openquatt.local</code>.</li>
@@ -166,8 +167,8 @@
             <div class="install-route-panel" id="route-install-panel" role="tabpanel" aria-labelledby="route-install-tab" data-install-route-panel="install" hidden>
               <div class="install-layout">
                 <section class="install-card install-flow">
-                  <p class="install-section-label">Bestaande module installeren of HCQ herstellen</p>
-                  <p class="install-step-copy">Gebruik deze route voor een bestaande Waveshare of Heatpump Listener. Kies de HCQ hier alleen als OpenQuatt opnieuw moet worden geïnstalleerd of de normale herstelroute dat vraagt.</p>
+                  <p class="install-section-label">HCQ herstellen of opnieuw installeren</p>
+                  <p class="install-step-copy">Gebruik deze route alleen als OpenQuatt opnieuw moet worden geïnstalleerd of de normale herstelroute dat vraagt.</p>
                   <section class="install-step" id="topology-step">
                     <div class="install-step-head">
                       <p class="install-step-number">1</p>
@@ -202,19 +203,9 @@
 
                     <div class="choice-grid" id="hardware-grid">
                       <label class="choice-card">
-                        <input type="radio" name="hardware" value="waveshare" />
-                        <span class="choice-title">Waveshare</span>
-                        <span class="choice-body">Waveshare ESP32-S3-Relay-1CH voor OpenQuatt.</span>
-                      </label>
-                      <label class="choice-card">
-                        <input type="radio" name="hardware" value="heatpump_listener" />
-                        <span class="choice-title">Heatpump Listener</span>
-                        <span class="choice-body">Electropaultje Heatpump Listener voor OpenQuatt.</span>
-                      </label>
-                      <label class="choice-card">
                         <input type="radio" name="hardware" value="heatpump_controller_q" />
-                        <span class="choice-title">Heatpump Controller Q · herstel</span>
-                        <span class="choice-body">Alleen voor herinstallatie of herstel. Een nieuwe HCQ is al voorzien van OpenQuatt.</span>
+                        <span class="choice-title">Heatpump Controller Q-edition</span>
+                        <span class="choice-body">De gecombineerde firmware kiest bij opstart automatisch Ethernet of Wi-Fi.</span>
                       </label>
                     </div>
                     <p class="install-step-copy">De Heatpump Controller Q-edition is verkrijgbaar via de <a href="https://electropaultje.nl/product/heatpump-controller-q-edition/">productpagina van Electropaultje</a>.</p>
@@ -238,7 +229,7 @@
                       <label class="choice-card" data-unavailable>
                         <input type="radio" name="connection" value="eth" disabled />
                         <span class="choice-title">Ethernet</span>
-                        <span class="choice-body">Voor Heatpump Controller Q met netwerkkabel. Ethernet-builds hebben geen Wi-Fi fallback.</span>
+                        <span class="choice-body">Alleen beschikbaar voor modules met een afzonderlijke Ethernetbuild.</span>
                       </label>
                     </div>
                   </section>
@@ -313,7 +304,7 @@
             <div class="install-follow-up-grid">
               <article class="install-follow-up-item">
                 <h3>Netwerk afronden</h3>
-                <p>Bij een nieuwe HCQ stel je eerst Wi-Fi in; Quick Start wisselt zo nodig naar Ethernet. Bij Waveshare of Listener rond je Wi-Fi na het flashen af.</p>
+                <p>Stel bij een HCQ Wi-Fi altijd eenmalig in, ook als je Ethernet gebruikt. Laat de netwerkkabel tijdens het instellen los; zonder opgeslagen Wi-Fi-gegevens kan de controller bij kabeluitval niet naar Wi-Fi terugvallen.</p>
               </article>
               <article class="install-follow-up-item">
                 <h3>Web-app openen</h3>
@@ -321,7 +312,7 @@
               </article>
               <article class="install-follow-up-item">
                 <h3>Fallback route</h3>
-                <p>Lukt Wi-Fi instellen via USB niet, verbind dan met het OpenQuatt access point en stel Wi-Fi handmatig in. Ethernet-builds zijn Ethernet-only.</p>
+                <p>Lukt Wi-Fi instellen via USB niet, laat Ethernet los, verbind met het OpenQuatt access point en stel Wi-Fi daar in. Sluit daarna Ethernet weer aan en herstart om de automatische keuze opnieuw uit te voeren.</p>
               </article>
             </div>
           </section>

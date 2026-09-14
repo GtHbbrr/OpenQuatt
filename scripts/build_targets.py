@@ -14,6 +14,37 @@ from typing import Sequence
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 TARGETS_FILE = REPO_ROOT / "build_targets.yaml"
+LEGACY_EOL_RELEASE_TAG = "v0.50.0"
+LEGACY_EOL_TARGETS = (
+    {
+        "artifact_name": "openquatt-waveshare-single-wifi",
+        "display_name": "OpenQuatt Waveshare Single Wi-Fi",
+        "chip_family": "ESP32-S3",
+        "connection": "wifi",
+        "md5": "b454437984d1c0725ee1b1127ae2f22c",
+    },
+    {
+        "artifact_name": "openquatt-waveshare-duo-wifi",
+        "display_name": "OpenQuatt Waveshare Duo Wi-Fi",
+        "chip_family": "ESP32-S3",
+        "connection": "wifi",
+        "md5": "66671daa453777b3efb77b43911a30a1",
+    },
+    {
+        "artifact_name": "openquatt-heatpump-listener-single-wifi",
+        "display_name": "OpenQuatt Heatpump Listener Single Wi-Fi",
+        "chip_family": "ESP32",
+        "connection": "wifi",
+        "md5": "9ab6b82865d495c3d66befd41e4501b8",
+    },
+    {
+        "artifact_name": "openquatt-heatpump-listener-duo-wifi",
+        "display_name": "OpenQuatt Heatpump Listener Duo Wi-Fi",
+        "chip_family": "ESP32",
+        "connection": "wifi",
+        "md5": "c6d8e8746201341c0a19766046297df1",
+    },
+)
 
 
 def _parse_scalar(value: str) -> str:
@@ -69,6 +100,53 @@ def filter_targets(targets: list[dict[str, str]], status: str) -> list[dict[str,
     return [target for target in targets if target.get("status") == status]
 
 
+def artifact_names(target: dict[str, str]) -> list[str]:
+    """Return the canonical artifact name followed by compatibility aliases."""
+    names = [target["artifact_name"]]
+    aliases = target.get("artifact_aliases", "")
+    names.extend(alias.strip() for alias in aliases.split(",") if alias.strip())
+    if len(names) != len(set(names)):
+        raise SystemExit(f"Duplicate artifact name or alias for target {target['id']}")
+    return names
+
+
+def manifest_name_for_artifact(target: dict[str, str], artifact_name: str) -> str:
+    if artifact_name == target["artifact_name"]:
+        return target.get("manifest_name") or f"{artifact_name}-ota.manifest.json"
+    return f"{artifact_name}-ota.manifest.json"
+
+
+def connection_for_artifact(target: dict[str, str], artifact_name: str) -> str:
+    if artifact_name.endswith("-wifi"):
+        return "wifi"
+    if artifact_name.endswith("-eth"):
+        return "eth"
+    return target["connection"]
+
+
+def display_name_for_artifact(target: dict[str, str], artifact_name: str) -> str:
+    connection = connection_for_artifact(target, artifact_name)
+    if target["connection"] == "auto" and connection == "wifi":
+        return f"{target['display_name']} Wi-Fi"
+    if target["connection"] == "auto" and connection == "eth":
+        return f"{target['display_name']} Ethernet"
+    return target["display_name"]
+
+
+def release_asset_names(target: dict[str, str]) -> list[str]:
+    """Return every file name that should exist on a release for this target."""
+    artifact_name = target["artifact_name"]
+    names = [
+        f"{artifact_name}.firmware.ota.bin",
+        f"{artifact_name}.firmware.factory.bin",
+    ]
+    for published_name in artifact_names(target):
+        if published_name != artifact_name:
+            names.append(f"{published_name}.firmware.ota.bin")
+        names.append(manifest_name_for_artifact(target, published_name))
+    return names
+
+
 def md5sum(path: Path) -> str:
     digest = hashlib.md5()
     with path.open("rb") as handle:
@@ -77,7 +155,11 @@ def md5sum(path: Path) -> str:
     return digest.hexdigest()
 
 
-def find_artifact_dir(dist_dir: Path, artifact_name: str) -> Path:
+def find_artifact_dir(
+    dist_dir: Path,
+    artifact_name: str,
+    excluded_artifact_names: Sequence[str] = (),
+) -> Path:
     direct = dist_dir / artifact_name
     if direct.is_dir():
         if direct.is_symlink():
@@ -85,7 +167,14 @@ def find_artifact_dir(dist_dir: Path, artifact_name: str) -> Path:
         return direct
 
     matches = sorted(
-        path for path in dist_dir.glob(f"{artifact_name}-*") if path.is_dir() and not path.is_symlink()
+        path
+        for path in dist_dir.glob(f"{artifact_name}-*")
+        if path.is_dir()
+        and not path.is_symlink()
+        and not any(
+            path.name == excluded_name or path.name.startswith(f"{excluded_name}-")
+            for excluded_name in excluded_artifact_names
+        )
     )
     if len(matches) == 1:
         return matches[0]
@@ -95,13 +184,44 @@ def find_artifact_dir(dist_dir: Path, artifact_name: str) -> Path:
     raise SystemExit(f"Ambiguous artifact directories for {artifact_name}: {names}")
 
 
-def prepare_release_assets(version: str, base_url: str, release_url: str) -> None:
+def build_ota_manifest(
+    target: dict[str, str],
+    published_name: str,
+    version: str,
+    base_url: str,
+    release_url: str,
+    ota_name: str,
+    ota_md5: str,
+) -> dict:
+    """Build a standard ESPHome OTA manifest with the main/dev schema."""
+    published_display_name = display_name_for_artifact(target, published_name)
+    chip_family = target.get("chip_family") or "ESP32-S3"
+    return {
+        "name": published_display_name,
+        "version": version,
+        "builds": [
+            {
+                "chipFamily": chip_family,
+                "ota": {
+                    "path": f"{base_url}/{ota_name}",
+                    "md5": ota_md5,
+                    "release_url": release_url,
+                    "summary": f"{published_display_name} firmware {version}",
+                },
+            },
+        ],
+    }
+
+
+def prepare_release_assets(
+    version: str, base_url: str, release_url: str, include_legacy_eol_manifests: bool = False
+) -> None:
     dist_dir = REPO_ROOT / "dist"
     dist_dir.mkdir(parents=True, exist_ok=True)
 
     for target in filter_targets(load_targets(), "enabled"):
         artifact_name = target["artifact_name"]
-        artifact_dir = find_artifact_dir(dist_dir, artifact_name)
+        artifact_dir = find_artifact_dir(dist_dir, artifact_name, artifact_names(target)[1:])
 
         ota_source = artifact_dir / "firmware.ota.bin"
         factory_source = artifact_dir / "firmware.factory.bin"
@@ -114,24 +234,43 @@ def prepare_release_assets(version: str, base_url: str, release_url: str) -> Non
         factory_dest = dist_dir / factory_name
         shutil.copy2(ota_source, ota_dest)
         shutil.copy2(factory_source, factory_dest)
+        ota_md5 = md5sum(ota_dest)
 
-        manifest = {
-            "name": target["display_name"],
-            "version": version,
-            "builds": [
-                {
-                    "chipFamily": target["chip_family"],
-                    "ota": {
-                        "path": f"{base_url}/{ota_name}",
-                        "md5": md5sum(ota_dest),
-                        "release_url": release_url,
-                        "summary": f"{target['display_name']} firmware {version}",
-                    },
-                }
-            ],
-        }
-        manifest_path = REPO_ROOT / target["manifest_name"]
-        manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+        for published_name in artifact_names(target):
+            published_ota_name = f"{published_name}.firmware.ota.bin"
+            if published_name != artifact_name:
+                # Legacy firmware validates the OTA filename suffix before install.
+                # Keep byte-identical alias binaries beside compatibility manifests.
+                shutil.copy2(ota_dest, dist_dir / published_ota_name)
+            manifest = build_ota_manifest(
+                target,
+                published_name,
+                version,
+                base_url,
+                release_url,
+                published_ota_name,
+                ota_md5,
+            )
+            manifest_path = REPO_ROOT / manifest_name_for_artifact(target, published_name)
+            manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+
+    if include_legacy_eol_manifests:
+        legacy_base_url = base_url.rsplit("/", 1)[0] + f"/{LEGACY_EOL_RELEASE_TAG}"
+        legacy_release_url = release_url.rsplit("/", 1)[0] + f"/{LEGACY_EOL_RELEASE_TAG}"
+        for target in LEGACY_EOL_TARGETS:
+            artifact_name = target["artifact_name"]
+            manifest = build_ota_manifest(
+                target,
+                artifact_name,
+                LEGACY_EOL_RELEASE_TAG,
+                legacy_base_url,
+                legacy_release_url,
+                f"{artifact_name}.firmware.ota.bin",
+                target["md5"],
+            )
+            (REPO_ROOT / f"{artifact_name}-ota.manifest.json").write_text(
+                json.dumps(manifest, indent=2) + "\n", encoding="utf-8"
+            )
 
 
 def prepare_pr_test_assets(
@@ -150,11 +289,14 @@ def prepare_pr_test_assets(
 
     for target in filter_targets(load_targets(), "enabled"):
         artifact_name = target["artifact_name"]
-        artifact_dir = find_artifact_dir(artifact_root, artifact_name)
+        artifact_dir = find_artifact_dir(artifact_root, artifact_name, artifact_names(target)[1:])
         ota_source = artifact_dir / "firmware.ota.bin"
         if ota_source.is_symlink() or not ota_source.is_file():
             raise SystemExit(f"Artifact {artifact_name} is missing firmware.ota.bin")
 
+        # Eén keer canoniek bouwen; voor legacy-firmware zonder
+        # manifest-capability ook wifi/eth copies met MD5 publiceren.
+        # Alle manifesten (canoniek + alias) wijzen naar de canonieke binary.
         ota_name = f"{artifact_name}.firmware.ota.bin"
         ota_dest = dist_dir / ota_name
         shutil.copy2(ota_source, ota_dest)
@@ -162,20 +304,45 @@ def prepare_pr_test_assets(
         md5_name = f"{ota_name}.md5"
         (dist_dir / md5_name).write_text(f"{digest}\n", encoding="utf-8")
 
-        assets.append(
-            {
-                "target": target["id"],
-                "hardware": target["hardware"],
-                "topology": target["topology"],
-                "connection": target["connection"],
-                "display_name": target["display_name"],
-                "ota_file": ota_name,
-                "ota_url": f"{base_url}/{ota_name}",
-                "md5_file": md5_name,
-                "md5_url": f"{base_url}/{md5_name}",
-                "md5": digest,
-            }
-        )
+        for published_name in artifact_names(target):
+            manifest = build_ota_manifest(
+                target,
+                published_name,
+                version,
+                base_url,
+                release_url,
+                ota_name,
+                digest,
+            )
+            manifest_name = manifest_name_for_artifact(target, published_name)
+            (dist_dir / manifest_name).write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+
+            if published_name != artifact_name:
+                alias_ota_name = f"{published_name}.firmware.ota.bin"
+                shutil.copy2(ota_dest, dist_dir / alias_ota_name)
+                (dist_dir / f"{alias_ota_name}.md5").write_text(f"{digest}\n", encoding="utf-8")
+
+            published_display_name = display_name_for_artifact(target, published_name)
+            alias_ota_file = (
+                ota_name if published_name == artifact_name
+                else f"{published_name}.firmware.ota.bin"
+            )
+            assets.append(
+                {
+                    "target": target["id"],
+                    "hardware": target["hardware"],
+                    "topology": target["topology"],
+                    "connection": connection_for_artifact(target, published_name),
+                    "display_name": published_display_name,
+                    "ota_file": alias_ota_file,
+                    "ota_url": f"{base_url}/{alias_ota_file}",
+                    "md5_file": f"{alias_ota_file}.md5",
+                    "md5_url": f"{base_url}/{alias_ota_file}.md5",
+                    "md5": digest,
+                    "manifest_file": manifest_name_for_artifact(target, published_name),
+                    "manifest_url": f"{base_url}/{manifest_name_for_artifact(target, published_name)}",
+                }
+            )
 
     catalog = {
         "pr": str(pr_number),
@@ -200,6 +367,17 @@ def command_factory_files(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_release_files(args: argparse.Namespace) -> int:
+    names: list[str] = []
+    for target in filter_targets(load_targets(), args.status):
+        names.extend(release_asset_names(target))
+    if args.include_legacy_eol_manifests and args.status in ("enabled", "all"):
+        names.extend(f"{target['artifact_name']}-ota.manifest.json" for target in LEGACY_EOL_TARGETS)
+    for name in sorted(set(names)):
+        print(name)
+    return 0
+
+
 def command_github_matrix(args: argparse.Namespace) -> int:
     targets = filter_targets(load_targets(), args.status)
     print(json.dumps({"target": targets}, separators=(",", ":")))
@@ -207,7 +385,12 @@ def command_github_matrix(args: argparse.Namespace) -> int:
 
 
 def command_prepare_release_assets(args: argparse.Namespace) -> int:
-    prepare_release_assets(args.version, args.base_url, args.release_url)
+    prepare_release_assets(
+        args.version,
+        args.base_url,
+        args.release_url,
+        include_legacy_eol_manifests=args.include_legacy_eol_manifests,
+    )
     return 0
 
 
@@ -243,6 +426,11 @@ def create_parser() -> argparse.ArgumentParser:
     add_status_argument(factory_files_parser)
     factory_files_parser.set_defaults(func=command_factory_files)
 
+    release_files_parser = subparsers.add_parser("release-files", help="Print expected release asset filenames.")
+    add_status_argument(release_files_parser)
+    release_files_parser.add_argument("--include-legacy-eol-manifests", action="store_true")
+    release_files_parser.set_defaults(func=command_release_files)
+
     github_matrix_parser = subparsers.add_parser("github-matrix", help="Print a GitHub Actions matrix JSON.")
     add_status_argument(github_matrix_parser)
     github_matrix_parser.set_defaults(func=command_github_matrix)
@@ -251,6 +439,7 @@ def create_parser() -> argparse.ArgumentParser:
     prepare_parser.add_argument("version")
     prepare_parser.add_argument("base_url")
     prepare_parser.add_argument("release_url")
+    prepare_parser.add_argument("--include-legacy-eol-manifests", action="store_true")
     prepare_parser.set_defaults(func=command_prepare_release_assets)
 
     pr_prepare_parser = subparsers.add_parser("prepare-pr-test-assets", help="Prepare PR test OTA assets.")

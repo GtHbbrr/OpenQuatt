@@ -5,12 +5,11 @@ const FALLBACK_RELEASE_URL = "https://github.com/OpenQuatt/OpenQuatt/releases/la
 const FALLBACK_DEVICE_URL = "http://openquatt.local";
 
 const HARDWARE_LABELS = {
-  waveshare: "Waveshare ESP32-S3-Relay-1CH",
-  heatpump_listener: "Electropaultje Heatpump Listener",
   heatpump_controller_q: "Electropaultje Heatpump Controller Q-edition",
 };
 
 const CONNECTION_LABELS = {
+  auto: "Automatisch",
   wifi: "Wi-Fi",
   eth: "Ethernet",
 };
@@ -18,85 +17,29 @@ const CONNECTION_LABELS = {
 const PROFILES = {
   duo: {
     label: "Duo",
-    waveshare: {
-      wifi: {
-        title: "OpenQuatt Duo / Waveshare / Wi-Fi",
-        chipFamily: "ESP32-S3",
-        hardwareLabel: HARDWARE_LABELS.waveshare,
-        connectionLabel: CONNECTION_LABELS.wifi,
-        fileName: "openquatt-waveshare-duo-wifi.firmware.factory.bin",
-        legacyFileNames: ["openquatt-duo-waveshare.firmware.factory.bin"],
-        releaseFallback: true,
-      },
-    },
-    heatpump_listener: {
-      wifi: {
-        title: "OpenQuatt Duo / Heatpump Listener / Wi-Fi",
-        chipFamily: "ESP32",
-        hardwareLabel: HARDWARE_LABELS.heatpump_listener,
-        connectionLabel: CONNECTION_LABELS.wifi,
-        fileName: "openquatt-heatpump-listener-duo-wifi.firmware.factory.bin",
-        legacyFileNames: ["openquatt-duo-heatpump-listener.firmware.factory.bin"],
-        releaseFallback: true,
-      },
-    },
     heatpump_controller_q: {
-      wifi: {
-        title: "OpenQuatt Duo / Heatpump Controller Q / Wi-Fi",
+      auto: {
+        title: "OpenQuatt Duo / Heatpump Controller Q / Automatisch",
         chipFamily: "ESP32-S3",
         hardwareLabel: HARDWARE_LABELS.heatpump_controller_q,
-        connectionLabel: CONNECTION_LABELS.wifi,
-        fileName: "openquatt-heatpump-controller-q-duo-wifi.firmware.factory.bin",
+        connectionLabel: CONNECTION_LABELS.auto,
+        fileName: "openquatt-heatpump-controller-q-duo.firmware.factory.bin",
         releaseFallback: true,
-      },
-      eth: {
-        title: "OpenQuatt Duo / Heatpump Controller Q / Ethernet",
-        chipFamily: "ESP32-S3",
-        hardwareLabel: HARDWARE_LABELS.heatpump_controller_q,
-        connectionLabel: CONNECTION_LABELS.eth,
-        fileName: "openquatt-heatpump-controller-q-duo-eth.firmware.factory.bin",
+        wifiProvisioning: true,
       },
     },
   },
   single: {
     label: "Single",
-    waveshare: {
-      wifi: {
-        title: "OpenQuatt Single / Waveshare / Wi-Fi",
-        chipFamily: "ESP32-S3",
-        hardwareLabel: HARDWARE_LABELS.waveshare,
-        connectionLabel: CONNECTION_LABELS.wifi,
-        fileName: "openquatt-waveshare-single-wifi.firmware.factory.bin",
-        legacyFileNames: ["openquatt-single-waveshare.firmware.factory.bin"],
-        releaseFallback: true,
-      },
-    },
-    heatpump_listener: {
-      wifi: {
-        title: "OpenQuatt Single / Heatpump Listener / Wi-Fi",
-        chipFamily: "ESP32",
-        hardwareLabel: HARDWARE_LABELS.heatpump_listener,
-        connectionLabel: CONNECTION_LABELS.wifi,
-        fileName: "openquatt-heatpump-listener-single-wifi.firmware.factory.bin",
-        legacyFileNames: ["openquatt-single-heatpump-listener.firmware.factory.bin"],
-        releaseFallback: true,
-      },
-    },
     heatpump_controller_q: {
-      wifi: {
-        title: "OpenQuatt Single / Heatpump Controller Q / Wi-Fi",
+      auto: {
+        title: "OpenQuatt Single / Heatpump Controller Q / Automatisch",
         chipFamily: "ESP32-S3",
         hardwareLabel: HARDWARE_LABELS.heatpump_controller_q,
-        connectionLabel: CONNECTION_LABELS.wifi,
-        fileName: "openquatt-heatpump-controller-q-single-wifi.firmware.factory.bin",
+        connectionLabel: CONNECTION_LABELS.auto,
+        fileName: "openquatt-heatpump-controller-q-single.firmware.factory.bin",
         releaseFallback: true,
-      },
-      eth: {
-        title: "OpenQuatt Single / Heatpump Controller Q / Ethernet",
-        chipFamily: "ESP32-S3",
-        hardwareLabel: HARDWARE_LABELS.heatpump_controller_q,
-        connectionLabel: CONNECTION_LABELS.eth,
-        fileName: "openquatt-heatpump-controller-q-single-eth.firmware.factory.bin",
+        wifiProvisioning: true,
       },
     },
   },
@@ -114,6 +57,7 @@ const releaseLink = document.getElementById("release-link");
 const installPanel = document.getElementById("install-panel");
 const installState = document.getElementById("install-state");
 const installButton = document.getElementById("install-button");
+const connectionStep = document.getElementById("connection-step");
 const provisionPanel = document.getElementById("wifi-provision-panel");
 const provisionState = document.getElementById("wifi-provision-state");
 const provisionDevice = document.getElementById("wifi-provision-device");
@@ -717,10 +661,14 @@ function getStableVersionLabel() {
 }
 
 function getSelectedValues() {
+  const topology = document.querySelector('input[name="topology"]:checked')?.value || "";
+  const hardware = document.querySelector('input[name="hardware"]:checked')?.value || "";
   return {
-    topology: document.querySelector('input[name="topology"]:checked')?.value || "",
-    hardware: document.querySelector('input[name="hardware"]:checked')?.value || "",
-    connection: document.querySelector('input[name="connection"]:checked')?.value || "",
+    topology,
+    hardware,
+    connection: hardware === "heatpump_controller_q"
+      ? "auto"
+      : document.querySelector('input[name="connection"]:checked')?.value || "",
   };
 }
 
@@ -779,7 +727,7 @@ function buildManifest(profile) {
     ],
   };
 
-  manifest.new_install_improv_wait_time = profile.connection === "wifi" ? 30 : 0;
+  manifest.new_install_improv_wait_time = profile.wifiProvisioning || profile.connection === "wifi" ? 30 : 0;
 
   return manifest;
 }
@@ -816,6 +764,9 @@ function updateEmptySummary() {
 }
 
 function getReadyStateText(profile) {
+  if (profile.connection === "auto") {
+    return "Klaar om te flashen. Laat Ethernet tijdens de eerste start los en stel Wi-Fi via USB in. Sluit daarna de kabel aan en herstart; zonder opgeslagen Wi-Fi-gegevens is er geen Wi-Fi-fallback.";
+  }
   if (profile.connection === "eth") {
     return "Klaar om te flashen. Sluit na de herstart Ethernet aan en open daarna http://openquatt.local voor de Quick Start.";
   }
@@ -855,8 +806,9 @@ function updateSummary() {
   updateInstallManifest(profile);
 
   selectionTitle.textContent = profile.title;
-  selectionCopy.textContent =
-    `Deze installatiehulp wijst naar de stabiele versie ${stableVersionLabel} die voor dit profiel op deze site beschikbaar is.`;
+  selectionCopy.textContent = profile.connection === "auto"
+    ? `Deze Q-build bevat Wi-Fi en Ethernet. Ethernet krijgt bij opstart voorrang; stel Wi-Fi vooraf in om bij kabeluitval te kunnen terugvallen. Stabiele versie: ${stableVersionLabel}.`
+    : `Deze installatiehulp wijst naar de stabiele versie ${stableVersionLabel} die voor dit profiel op deze site beschikbaar is.`;
   selectionVersion.textContent = stableVersionLabel;
   selectionTopology.textContent = PROFILES[profile.topology].label;
   selectionHardware.textContent = profile.hardwareLabel;
@@ -932,6 +884,11 @@ function updateHardwareAvailability() {
 function updateConnectionAvailability() {
   const { topology, hardware } = getSelectedValues();
   const connectionOptions = document.querySelectorAll('input[name="connection"]');
+  const automaticQProfile = topology && hardware === "heatpump_controller_q"
+    ? getProfile(topology, hardware, "auto")
+    : null;
+
+  connectionStep.hidden = Boolean(automaticQProfile);
 
   connectionOptions.forEach((input) => {
     const profile = topology && hardware ? getProfile(topology, hardware, input.value) : null;

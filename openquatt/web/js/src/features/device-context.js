@@ -1,6 +1,6 @@
-import { hasEntity, isEntityActive } from "../core/app-shared.js";
+import { hasEntity } from "../core/app-shared.js";
 import { TOPOLOGY_HINT_KEYS } from "../core/config.js";
-import { getEntityValue } from "../core/entity-store.js";
+import { getEntityValue, isDeviceTimeValid } from "../core/entity-store.js";
 import { formatDurationFromMinutes } from "../core/formatting.js";
 import { state } from "../core/state.js";
 
@@ -134,7 +134,9 @@ import { state } from "../core/state.js";
   }
 
   export function getFirmwareBuildConnection() {
-    return normalizeFirmwareConnection(getEntityValue("connectionText") || getDeviceMeta().connection);
+    return normalizeFirmwareConnection(getEntityValue("preferredConnection"))
+      || normalizeFirmwareConnection(getEntityValue("connectionText"))
+      || normalizeFirmwareConnection(getDeviceMeta().connection);
   }
 
   export function getFirmwareAlternateConnection() {
@@ -163,24 +165,20 @@ import { state } from "../core/state.js";
     const topologyLabel = getFirmwareTopologyLabel(topology);
     const hardware = getFirmwareHardwareProfile();
     if (hardware === "heatpump_controller_q") {
+      if (hasEntity("preferredConnection")) {
+        return `Heatpump Controller Q ${topologyLabel}`;
+      }
       return `Heatpump Controller Q ${topologyLabel} ${getFirmwareConnectionLabel(connection)}`;
-    }
-    if (hardware === "heatpump_listener") {
-      return `Heatpump Listener ${topologyLabel} ${getFirmwareConnectionLabel(connection)}`;
-    }
-    if (hardware === "waveshare") {
-      return `Waveshare ${topologyLabel} ${getFirmwareConnectionLabel(connection)}`;
     }
     return `${getFirmwareDeviceLabel()} ${topologyLabel} ${getFirmwareConnectionLabel(connection)}`;
   }
 
   export function formatDeviceClock() {
-    const timeValid = isEntityActive("timeValid");
     const deviceClock = String(getEntityValue("timeNowHhmm") || "").trim();
-    if (deviceClock && deviceClock !== "invalid") {
+    if (isDeviceTimeValid(deviceClock)) {
       return deviceClock;
     }
-    if (hasEntity("timeValid") && !timeValid) {
+    if (hasEntity("timeNowHhmm")) {
       return "Geen tijdsync";
     }
     try {
@@ -194,7 +192,7 @@ import { state } from "../core/state.js";
   }
 
   export function formatDiagnosticsDateTime() {
-    if (hasEntity("timeValid") && !isEntityActive("timeValid")) {
+    if (hasEntity("timeNowHhmm") && !isDeviceTimeValid(getEntityValue("timeNowHhmm"))) {
       return "Geen tijdsync";
     }
 
@@ -256,11 +254,11 @@ import { state } from "../core/state.js";
 
   export function getDeviceIpAddress() {
     const entityText = String(state.entities.ipAddress?.state ?? state.entities.ipAddress?.value ?? "").trim();
-    if (entityText) {
+    if (entityText && entityText !== "0.0.0.0" && entityText !== "::") {
       return entityText;
     }
     const explicit = String(getDeviceMeta().ipAddress || "").trim();
-    if (explicit) {
+    if (explicit && explicit !== "0.0.0.0" && explicit !== "::") {
       return explicit;
     }
     const host = typeof window !== "undefined" ? String(window.location.hostname || "").trim() : "";

@@ -37,40 +37,14 @@ globals:
     restore_value: false
     initial_value: '"IDLE"'
 
+  - id: oq_boiler_power_test_result_quality_value
+    type: std::string
+    restore_value: false
+    initial_value: '"not available"'
+
 # ----------------------------
 # CONTROL INPUTS
 # ----------------------------
-button:
-  - platform: template
-    id: oq_boiler_power_test_start
-    name: "Boiler Power Test Start"
-    internal: true
-    icon: mdi:play-circle-outline
-    entity_category: config
-    on_press:
-      - lambda: |-
-          oq_boiler_task::runtime().start(oq_boiler_task::default_config(), (uint32_t) millis());
-
-  - platform: template
-    id: oq_boiler_power_test_abort
-    name: "Boiler Power Test Abort"
-    internal: true
-    icon: mdi:stop-circle-outline
-    entity_category: config
-    on_press:
-      - lambda: |-
-          oq_boiler_task::runtime().abort_or_clear();
-
-  - platform: template
-    id: oq_boiler_power_test_apply
-    name: "Boiler Power Test Apply"
-    internal: true
-    icon: mdi:check-circle-outline
-    entity_category: config
-    on_press:
-      - lambda: |-
-          oq_boiler_task::runtime().apply_result();
-
 number:
   - platform: template
     id: oq_boiler_rated_heat_power
@@ -86,6 +60,48 @@ number:
     initial_value: 6000
     entity_category: config
 
+button:
+  - platform: template
+    id: oq_boiler_power_test_start
+    name: "Boiler Power Test Start"
+    internal: true
+    on_press:
+      - lambda: |-
+          oq_boiler_task::runtime().start(oq_boiler_task::default_config(), (uint32_t) millis());
+
+  - platform: template
+    id: oq_boiler_power_test_abort
+    name: "Boiler Power Test Abort"
+    internal: true
+    on_press:
+      - lambda: |-
+          oq_boiler_task::runtime().abort_or_clear();
+
+  - platform: template
+    id: oq_boiler_power_test_apply
+    name: "Boiler Power Test Apply"
+    internal: true
+    on_press:
+      - lambda: |-
+          oq_boiler_task::runtime().apply_result((uint32_t) millis());
+
+text_sensor:
+  - platform: template
+    id: oq_boiler_power_test_status
+    name: "Boiler power test status"
+    internal: true
+    update_interval: 1s
+    lambda: |-
+      return {id(oq_boiler_power_test_status_value)};
+
+  - platform: template
+    id: oq_boiler_power_test_result_quality
+    name: "Boiler power test result quality"
+    internal: true
+    update_interval: 1s
+    lambda: |-
+      return {id(oq_boiler_power_test_result_quality_value)};
+
 # ----------------------------
 # MAIN LOOP
 # ----------------------------
@@ -96,4 +112,7 @@ interval:
       - lambda: |-
           // BoilerPowerTestRuntime is the single owner of the CM100 boiler-test state machine,
           // including flow reachability, boiler settle, measurement, failure cleanup and cooldown.
-          oq_boiler_task::runtime().tick(oq_boiler_task::default_config(), (uint32_t) millis());
+          oq_boiler_task::runtime().tick(
+              oq_boiler_task::default_config(),
+              (uint32_t) millis(),
+              (uint32_t) (${oq_otb_field_timeout_s} * 1000UL));

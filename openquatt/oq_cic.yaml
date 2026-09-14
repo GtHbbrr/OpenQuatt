@@ -75,6 +75,17 @@ sensor:
     update_interval: never
 
   - platform: template
+    id: cic_boiler_water_pressure
+    name: "CIC - Boiler Water Pressure"
+    unit_of_measurement: "bar"
+    device_class: pressure
+    state_class: measurement
+    accuracy_decimals: 2
+    icon: mdi:gauge
+    disabled_by_default: true
+    update_interval: never
+
+  - platform: template
     id: cic_control_setpoint
     name: "CIC - Control setpoint"
     unit_of_measurement: "°C"
@@ -120,11 +131,8 @@ sensor:
     name: "CIC - Polling interval"
     internal: true
     unit_of_measurement: "s"
-    device_class: duration
     state_class: measurement
     accuracy_decimals: 0
-    icon: mdi:timer-sand
-    disabled_by_default: true
     update_interval: never
 
   - platform: template
@@ -132,11 +140,8 @@ sensor:
     name: "CIC - Last success age"
     internal: true
     unit_of_measurement: "s"
-    device_class: duration
     state_class: measurement
     accuracy_decimals: 0
-    disabled_by_default: true
-    icon: mdi:timeline-clock-outline
     update_interval: never
 
 binary_sensor:
@@ -150,8 +155,6 @@ binary_sensor:
   - platform: template
     id: cic_ch_enable_valid
     name: "CIC - CH enable valid"
-    icon: mdi:check-decagram
-    entity_category: diagnostic
     internal: true
 
   - platform: template
@@ -192,6 +195,7 @@ openquatt_cic:
   response_buffer_size: 2048
   water_supply_temp: water_supply_temp_cic
   flow_rate: flow_rate_cic
+  cic_boiler_water_pressure: cic_boiler_water_pressure
   cic_control_setpoint: cic_control_setpoint
   cic_room_setpoint: cic_room_setpoint
   cic_room_temp: cic_room_temp

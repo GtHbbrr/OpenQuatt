@@ -46,6 +46,8 @@ class OpenQuattUsageTelemetry : public switch_::Switch, public Component {
   void set_hardware_profile(const std::string& profile) { this->hardware_profile_ = profile; }
   void set_topology(const std::string& topology) { this->topology_ = topology; }
   void set_connection(const std::string& connection) { this->connection_ = connection; }
+  void set_active_connection_sensor(text_sensor::TextSensor* sensor) { this->active_connection_sensor_ = sensor; }
+  void set_connection_preference_select(select::Select* source) { this->connection_preference_select_ = source; }
   void set_quatt_hybrid_generation_select(select::Select* source) { this->quatt_hybrid_generation_select_ = source; }
   void set_flow_source_select(select::Select* source) { this->flow_source_select_ = source; }
   void set_q_flow_source_select(select::Select* source) { this->q_flow_source_select_ = source; }
@@ -60,6 +62,9 @@ class OpenQuattUsageTelemetry : public switch_::Switch, public Component {
   void set_cooling_dew_point_source_select(select::Select* source) { this->cooling_dew_point_source_select_ = source; }
   void set_external_heat_demand_source_select(select::Select* source) {
     this->external_heat_demand_source_select_ = source;
+  }
+  void set_heating_supply_target_source_select(select::Select* source) {
+    this->heating_supply_target_source_select_ = source;
   }
   void set_loop_time_sensor(sensor::Sensor* sensor) { this->loop_time_sensor_ = sensor; }
   void set_internal_temperature_sensor(sensor::Sensor* sensor) { this->internal_temperature_sensor_ = sensor; }
@@ -82,8 +87,6 @@ class OpenQuattUsageTelemetry : public switch_::Switch, public Component {
   void set_energy_history_flash_switch(switch_::Switch* feature_switch) {
     this->energy_history_flash_switch_ = feature_switch;
   }
-  void set_ram_log_history_switch(switch_::Switch* feature_switch) { this->ram_log_history_switch_ = feature_switch; }
-
   void setup() override;
   void loop() override;
   void dump_config() override;
@@ -100,16 +103,10 @@ class OpenQuattUsageTelemetry : public switch_::Switch, public Component {
   static constexpr uint32_t SESSION_TIMEOUT_MS = 30000;
   static constexpr uint32_t RETRY_MIN_MS = 5UL * 60UL * 1000UL;
   static constexpr uint32_t RETRY_MAX_MS = 60UL * 60UL * 1000UL;
-#if defined(CONFIG_IDF_TARGET_ESP32S3)
-  // PSRAM is abundant, so keep a conservative stack until HIL watermarks
-  // demonstrate that this can safely be reduced.
+  // Q-edition workers use PSRAM-backed stacks. Keep this conservative until
+  // HIL watermarks demonstrate that it can safely be reduced.
   static constexpr uint32_t MQTT_WORKER_TASK_STACK_SIZE = 16384;
   static constexpr bool MQTT_WORKER_STACK_IN_PSRAM = true;
-#else
-  // Classic ESP32 cannot safely run Wi-Fi/ROM-using tasks from a PSRAM stack.
-  static constexpr uint32_t MQTT_WORKER_TASK_STACK_SIZE = 8192;
-  static constexpr bool MQTT_WORKER_STACK_IN_PSRAM = false;
-#endif
   static constexpr int MQTT_TASK_STACK_SIZE = 12288;
   static_assert(sizeof(StackType_t) == 1U, "ESP-IDF StaticTask stack sizes are configured in bytes");
 
@@ -182,6 +179,8 @@ class OpenQuattUsageTelemetry : public switch_::Switch, public Component {
   std::string hardware_profile_;
   std::string topology_;
   std::string connection_;
+  text_sensor::TextSensor* active_connection_sensor_{nullptr};
+  select::Select* connection_preference_select_{nullptr};
   select::Select* quatt_hybrid_generation_select_{nullptr};
   select::Select* flow_source_select_{nullptr};
   select::Select* q_flow_source_select_{nullptr};
@@ -193,6 +192,7 @@ class OpenQuattUsageTelemetry : public switch_::Switch, public Component {
   select::Select* cooling_enable_source_select_{nullptr};
   select::Select* cooling_dew_point_source_select_{nullptr};
   select::Select* external_heat_demand_source_select_{nullptr};
+  select::Select* heating_supply_target_source_select_{nullptr};
   sensor::Sensor* loop_time_sensor_{nullptr};
   sensor::Sensor* internal_temperature_sensor_{nullptr};
   sensor::Sensor* wifi_signal_sensor_{nullptr};
@@ -206,8 +206,6 @@ class OpenQuattUsageTelemetry : public switch_::Switch, public Component {
   switch_::Switch* trend_flash_switch_{nullptr};
   switch_::Switch* decision_log_flash_switch_{nullptr};
   switch_::Switch* energy_history_flash_switch_{nullptr};
-  switch_::Switch* ram_log_history_switch_{nullptr};
-
   ESPPreferenceObject pref_;
   std::array<uint8_t, 16> installation_id_bytes_{};
   std::string installation_id_;

@@ -156,15 +156,21 @@ test("onboarding toont Duo per HP en onderscheidt geselecteerd van aanbevolen zo
   assert.doesNotMatch(markup, /data-oq-button-key="hp1GenerationDetect"/);
   assert.equal(getOduGenerationChoiceMeta("V1", "V1.5", "V1"), "Aanbevolen");
   assert.equal(getOduGenerationChoiceMeta("V1.5", "V1.5", "V1"), "Geselecteerd");
-  assert.match(installationSource, /meta: getOduGenerationChoiceMeta\(option, currentValue, detectionModel\.recommendation\)/);
+  assert.match(installationSource, /meta: getOduGenerationChoiceMeta\(option, model\.value, detectionModel\.recommendation\)/);
   assert.match(quickStartSource, /renderHpGenerationField\(\)/);
   assert.equal(state.entities.hpGeneration.value, "V1.5");
   assert.deepEqual(state.drafts, {});
 
   state.busyAction = "hp1GenerationDetect";
-  assert.match(renderOduGenerationDetectionStatus(), /Detecteren…/);
+  const singlePendingMarkup = renderOduGenerationDetectionStatus();
+  assert.match(singlePendingMarkup, /Detectie bezig/);
+  assert.match(singlePendingMarkup, /Even geduld/);
+  assert.match(singlePendingMarkup, /Detecteren…/);
+  assert.doesNotMatch(singlePendingMarkup, /Detectie onvolledig/);
   state.busyAction = "odu-generation-detect-all";
-  assert.match(renderOduGenerationDetectionStatus(), /Detecteren…/);
+  const groupPendingMarkup = renderOduGenerationDetectionStatus();
+  assert.match(groupPendingMarkup, /OpenQuatt leest de buitenunits opnieuw uit/);
+  assert.doesNotMatch(groupPendingMarkup, />Unknown</);
 });
 
 test("Unknown blijft zichtbaar, toont geen aanbevolen badge en behoudt handmatige fallback", () => {
@@ -193,6 +199,10 @@ test("onboarding en installatiehydratie laden status en optionele detectieknoppe
   for (const [key, name] of [
     ["hp1Generation", "HP1 - ODU generation"],
     ["hp2Generation", "HP2 - ODU generation"],
+    ["hp1GenerationVariant", "HP1 - ODU generation variant"],
+    ["hp2GenerationVariant", "HP2 - ODU generation variant"],
+    ["hp1CustomerModelCode", "HP1 - ODU customer model code"],
+    ["hp2CustomerModelCode", "HP2 - ODU customer model code"],
     ["hp1GenerationDetect", "HP1 - Detect ODU generation"],
     ["hp2GenerationDetect", "HP2 - Detect ODU generation"],
   ]) {
@@ -204,6 +214,11 @@ test("onboarding en installatiehydratie laden status en optionele detectieknoppe
   assert.match(entitySyncSource, /installation:\s*\[[\s\S]*\.\.\.ODU_GENERATION_KEYS[\s\S]*\.\.\.ODU_GENERATION_DETECT_KEYS/);
   assert.match(entitySyncSource, /state\.currentStep === "generation" \|\| state\.currentStep === "confirm"/);
   assert.match(entitySyncSource, /\.\.\.quickStartGenerationKeys/);
-  assert.match(namedButtonActionsSource, /ODU_GENERATION_DETECT_KEYS\.indexOf\(buttonKey\)/);
-  assert.match(namedButtonActionsSource, /refreshKeys: \[ODU_GENERATION_KEYS\[generationDetectIndex\]\]/);
+  assert.match(namedButtonActionsSource, /ODU_GENERATION_DETECT_KEYS\.includes\(buttonKey\)/);
+  assert.match(namedButtonActionsSource, /triggerNamedButtonGroup\(detectKeys/);
+  assert.match(namedButtonActionsSource, /refreshUntil:/);
+  assert.match(namedButtonActionsSource, /refreshTimeoutMs: 33000/);
+  assert.match(namedButtonActionsSource, /ODU_GENERATION_VARIANT_KEYS\[index\]/);
+  assert.match(namedButtonActionsSource, /ODU_CUSTOMER_MODEL_CODE_KEYS\[index\]/);
+  assert.match(namedButtonActionsSource, /busyAction: "odu-generation-detect-all"/);
 });

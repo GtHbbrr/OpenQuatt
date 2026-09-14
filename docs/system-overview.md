@@ -20,12 +20,8 @@ This document explains the current OpenQuatt architecture as implemented in the 
 
 OpenQuatt is driven from explicit matrix entrypoints under `configs/`:
 
-- `configs/waveshare/single_wifi.yaml`
-- `configs/waveshare/duo_wifi.yaml`
-- `configs/heatpump_listener/single_wifi.yaml`
-- `configs/heatpump_listener/duo_wifi.yaml`
-- `configs/heatpump_controller_q/single_wifi.yaml`
-- `configs/heatpump_controller_q/duo_wifi.yaml`
+- `configs/heatpump_controller_q/single.yaml`
+- `configs/heatpump_controller_q/duo.yaml`
 
 Each entrypoint includes:
 
@@ -63,7 +59,7 @@ Package include order is intentional:
 21. `openquatt_incident_manager` (heat-pump incident lifecycle and availability)
 
 This order mirrors data dependencies and ownership boundaries.
-Hardware profiles add the matching room/setpoint/heating-enable source selectors. The Heatpump Controller Q profile also includes `oq_ot_slave`; it uses the ESP-IDF RMT-based OpenTherm runtime and is only supported on the Q profile.
+The Heatpump Controller Q profile includes the room/setpoint/heating-enable source selectors and `oq_ot_slave`; it uses the ESP-IDF RMT-based OpenTherm runtime.
 
 ## 2. Ownership Model
 
@@ -95,9 +91,9 @@ This prevents hidden control coupling and keeps debugging deterministic.
 | Supervisory | `${oq_supervisory_loop_s}` (default 5s) | Mode decisions, flow interlock, frost logic, power-cap safety net |
 | Strategy manager | `${oq_strategy_loop_s}` (default 5s) | Active strategy selection plus shared `oq_strategy_*` interface state |
 | Heating curve | `${oq_strategy_loop_s}` plus `${oq_heat_loop_tick_s}` | Curve target generation, PID demand, and curve compressor requests |
-| Power House | `${oq_heat_loop_tick_s}` with effective cadence `${oq_heat_loop_powerhouse_s}` | Power model, filtered demand, and Power House compressor requests |
+| Power House | `${oq_heat_loop_tick_s}` with effective cadence `${oq_ph_demand_loop_s}` | Power model, demand regulation, first-start intent, and Power House compressor requests |
 | Cooling | `${oq_heat_loop_tick_s}` | Cooling target, PI demand, and cooling compressor requests |
-| Thermal request control | Tick `${oq_heat_loop_tick_s}` (default 5s), effective cadence `${oq_heat_loop_curve_s}` (Curve) / `${oq_heat_loop_powerhouse_s}` (Power House) | Shared request control, guards, and actuator input |
+| Thermal request control | Tick `${oq_heat_loop_tick_s}` (default 5s), effective cadence `${oq_heat_loop_curve_s}` (Curve) / `${oq_heat_loop_powerhouse_s}` (Power House), with immediate evaluation on mode or strategy-request changes | Shared request control, guards, and actuator input |
 | Flow control | `${oq_flow_loop_s}` (default 5s) | Pump iPWM control (AUTO/MANUAL/FROST/CM100 autotune override) |
 | Boiler control | `${oq_boiler_loop_s}` (default 5s) | CM3 assist, CM4 fault fallback and CM100 boiler test under shared safety guards |
 | HP incident manager | component loop plus fresh HP observations | Debounce, incident lifecycle, HP availability, start/stop confirmation and CM4 eligibility |
@@ -118,6 +114,12 @@ Configured startup delays are relative to the ESPHome scheduler becoming active.
 | Firmware manifest | `${oq_firmware_initial_check_delay_s}` (default 300s) of continuously available network without an active OTA, sampled every 5s | Automatic checks every `${oq_firmware_periodic_check_interval}` (default 4h); manual checks and real runtime channel/target changes remain immediate |
 
 These offsets spread network and bus work; they are not readiness guarantees. A successful Modbus or OpenTherm exchange can only occur once the corresponding external equipment is connected and responsive.
+
+De compressorbeveiliging telt per HP `${oq_hp_min_off_s}` (standaard 240 seconden) vanaf bevestigde stilstand: verse compressorfrequentie en standby-modus moeten de stop bevestigen. Via **Restart** kan reeds bewezen uit-tijd eenmalig worden meegenomen bij een gecontroleerde herstart van dezelfde firmware. Na de herstart zijn opnieuw verse stopmetingen nodig; de tijd zonder metingen wordt niet meegerekend. Een HP die draaide, verouderde metingen, een crash, stroomuitval of een firmwarewissel geven geen verkorting. De afzonderlijke minimale koel-uit-tijd blijft gelden.
+
+Het herstartrecord wordt vóór safe mode en OTA-toegang uit NVS verbruikt. Als dat niet aantoonbaar lukt, herstart de controller zonder HP-starts of OTA-toegang vrij te geven; alleen extra wachten zou hergebruik van oude uit-tijd niet voorkomen. Deze opslagfout vereist herstel voordat normaal bedrijf kan hervatten.
+
+Daarnaast houdt de thermal actuator per compressor de laatste zes vrijgegeven startopdrachten bij in een vaste RAM-ringbuffer. Bij zes starts in de laatste 60 minuten wordt alleen een nieuwe start uitgesteld tot de oudste start verloopt. Doorlopen, moduleren en stoppen blijven mogelijk. Dit geldt voor verwarmen, koelen en handmatige HP-bediening. De startgeschiedenis vervalt bij iedere reboot en telt OQ-opdrachten, niet autonome ODU-herstarts; de bestaande gemeten startdiagnostiek blijft afzonderlijk beschikbaar.
 
 ## 4. Data Pipeline
 
@@ -200,6 +202,9 @@ occurrence, recovery condition, user action and affected HP.
 - firmware update entities, runtime update-channel select, and manual check trigger
 - runtime logger level controls
 - runtime balancing service entities from thermal request control (`Runtime lead HP`, runtime counter reset)
+- a bounded, two-client SSE log stream for the local web UI
+
+The log stream is a local UI diagnostic interface, not a public API contract. It sends only new records after a cursor (`since` or `Last-Event-ID`); `/openquatt/logs/recent` remains the bounded backfill source after reconnect. Each client has a preallocated PSRAM frame buffer. Slow clients never create an unbounded queue and are closed after sustained send backpressure.
 
 ## 5. Heating Strategy Mechanics
 
@@ -250,7 +255,7 @@ Heating-curve stability guards around zero-demand edge:
 
 `oq_thermal_request_control` enforces, in order:
 
-1. demand filter and clamp
+1. demand normalization and clamp
 2. power cap clamp (`oq_power_cap_f`)
 3. Control Mode gating (CM2/CM3 only; CM4 always requests zero HP output)
 4. strategy-specific level logic
@@ -258,10 +263,20 @@ Heating-curve stability guards around zero-demand edge:
 6. min-runtime stop blocking (all strategies)
 7. write-on-change application and runtime counters
 
-Demand filter behavior is asymmetric:
+Power House uses `Power House demand rise time` as its single upward rate limiter. A validated room-demand or
+thermostat-raise first start may temporarily request the lowest viable capacity; normal watt regulation resumes after
+the compressor starts.
 
-- downward path follows demand immediately
-- upward path is rate-limited by runtime control `Demand filter ramp up` (step/min, Power House path)
+For both heating strategies, the 30 s CM1 preflow window starts with the first heating request and overlaps
+flow establishment, Power House demand confirmation and the cold-start water check. Once flow is sufficient,
+each online ODU receives a targeted read of holding register `2134` (water outlet temperature), using the existing
+sensor filters and calibration. One persistent reader per HP permits at most one pending request and retries
+at most once per 10 s. Flow loss, cancelled demand, OTA pause or service control cancels pending probe ownership;
+callbacks for those detached requests cannot refresh a later circulation session. Normal polling remains unchanged.
+
+An expired preflow window stays in CM1 until fresh water samples, flow and the other start guards permit CM2;
+it does not start another 30 s window. No compressor is released solely because a read was queued or preflow
+elapsed. The per-HP 240 s minimum-off gate and the Heating Curve 5/8/10-minute water re-entry blocks still apply.
 
 Power House duo request selection works in simple steps:
 
@@ -311,16 +326,12 @@ OpenTherm CH-enable output while the output safety guards remain unchanged.
 
 ## 9. Hardware Profiles and Pin Strategy
 
-Hardware profile substitutions are split into dedicated files:
-
-- `openquatt/profiles/waveshare.yaml` ([Waveshare ESP32-S3-Relay-1CH](https://www.waveshare.com/esp32-s3-relay-1ch.htm))
-- `openquatt/profiles/heatpump_listener.yaml` ([Electropaultje Heatpump Listener](https://electropaultje.nl/product/heatpump-listener/))
-- `openquatt/profiles/heatpump_controller_q.yaml` ([Electropaultje Heatpump Controller Q-edition](https://electropaultje.nl/product/heatpump-controller-q-edition/))
+The Heatpump Controller Q-edition profile is defined in `openquatt/profiles/heatpump_controller_q.yaml`.
 
 Shared non-hardware constants are in `openquatt/oq_substitutions_common.yaml`.
 
-Compile-time profile selection is done by choosing a matrix entrypoint from `build_targets.yaml`. Ethernet targets are enabled for the Heatpump Controller Q as separate Ethernet-only builds.
-OpenTherm thermostat support is part of the Heatpump Controller Q profile only. Waveshare and Heatpump Listener builds expose CIC, Home Assistant, and MQTT source paths instead.
+Compile-time profile selection is done by choosing a `Single` or `Duo` matrix entrypoint from `build_targets.yaml`. The Q-edition chooses Wi-Fi or Ethernet at runtime.
+OpenTherm thermostat support is part of the Heatpump Controller Q profile.
 
 ### 9.1 Memory and flash expectations
 

@@ -1,4 +1,5 @@
 #include "OpenQuattCrashTelemetry.h"
+#include "OpenQuattAbortDetails.h"
 #include "OpenQuattCrashTelemetryAnsi.h"
 #include "OpenQuattCrashTelemetryHelpers.h"
 
@@ -59,13 +60,6 @@ bool OpenQuattCrashTelemetry::copy_text_(char* destination, size_t destination_s
   return true;
 }
 
-bool OpenQuattCrashTelemetry::valid_record_(const CrashRecord& record) {
-  return record.magic == CRASH_RECORD_MAGIC && record.version == CRASH_RECORD_VERSION && record.pending <= 1U &&
-         record.truncated <= 1U && record.captured_by_reporting_build <= 1U && record.sequence != 0U &&
-         record.report_length < CRASH_REPORT_CAPACITY && record.report[record.report_length] == '\0' &&
-         record.checksum == checksum_(&record, offsetof(CrashRecord, checksum));
-}
-
 void OpenQuattCrashTelemetry::random_uuid_(char* destination, size_t destination_size) {
   if (destination == nullptr || destination_size < 37U) return;
   std::array<uint8_t, 16U> bytes{};
@@ -98,7 +92,7 @@ bool OpenQuattCrashTelemetry::load_record_() {
     const size_t offset = openquatt_common::OpenQuattFlashLayout::CRASH_TELEMETRY_OFFSET +
                           (static_cast<size_t>(slot) * openquatt_common::OpenQuattFlashLayout::SECTOR_SIZE);
     if (esp_partition_read(this->flash_partition_, offset, this->record_.data(), sizeof(CrashRecord)) != ESP_OK ||
-        !valid_record_(*this->record_.data())) {
+        !detail::valid_stored_crash_record(*this->record_.data())) {
       continue;
     }
     if (!found || flash_sequence_is_newer(this->record_.data()->sequence, newest_sequence)) {
@@ -115,7 +109,7 @@ bool OpenQuattCrashTelemetry::load_record_() {
   const size_t newest_offset = openquatt_common::OpenQuattFlashLayout::CRASH_TELEMETRY_OFFSET +
                                (static_cast<size_t>(newest_slot) * openquatt_common::OpenQuattFlashLayout::SECTOR_SIZE);
   if (esp_partition_read(this->flash_partition_, newest_offset, this->record_.data(), sizeof(CrashRecord)) != ESP_OK ||
-      !valid_record_(*this->record_.data())) {
+      !detail::migrate_crash_record(this->record_.data())) {
     std::memset(this->record_.data(), 0, sizeof(CrashRecord));
     this->active_record_slot_ = -1;
     return false;
@@ -131,8 +125,8 @@ bool OpenQuattCrashTelemetry::save_record_() {
   const uint32_t previous_sequence = record->sequence;
   record->sequence++;
   if (record->sequence == 0U) record->sequence = 1U;
-  record->magic = CRASH_RECORD_MAGIC;
-  record->version = CRASH_RECORD_VERSION;
+  record->magic = detail::CRASH_RECORD_MAGIC;
+  record->version = detail::CRASH_RECORD_VERSION;
   record->checksum = 0U;
   record->checksum = checksum_(record, offsetof(CrashRecord, checksum));
   const int8_t previous_slot = this->active_record_slot_;
@@ -229,6 +223,12 @@ bool OpenQuattCrashTelemetry::save_state_() {
 }
 
 void OpenQuattCrashTelemetry::setup() {
+  this->time_sync_deadline_ms_ = millis() + TIME_SYNC_WAIT_MS;
+  if (this->clock_ != nullptr) {
+    // A sane epoch may be stale RTC state. Only a sync event proves that the
+    // reporting clock was refreshed during this boot.
+    this->clock_->add_on_time_sync_callback([this]() { this->on_time_synchronized_(); });
+  }
   this->gate_mutex_ = xSemaphoreCreateMutexStatic(&this->gate_mutex_storage_);
   if (this->gate_mutex_ == nullptr) {
     ESP_LOGE(TAG, "Could not initialize crash telemetry publish gate");
@@ -294,7 +294,14 @@ void OpenQuattCrashTelemetry::setup() {
 
 void OpenQuattCrashTelemetry::capture_pending_crash_() {
 #ifdef USE_ESP32_CRASH_HANDLER
-  if (!esp32::crash_handler_has_data() || logger::global_logger == nullptr || !this->record_) return;
+  if (!esp32::crash_handler_has_data()) {
+    openquatt_log_history::invalidate_crash_time_breadcrumb();
+    return;
+  }
+  if (logger::global_logger == nullptr || !this->record_) return;
+
+  openquatt_log_history::CrashTimeBreadcrumbSnapshot crash_time{};
+  const bool crash_time_valid = openquatt_log_history::consume_crash_time_breadcrumb(&crash_time);
 
   CrashRecord* record = this->record_.data();
   const uint32_t previous_sequence = record->sequence;
@@ -302,6 +309,9 @@ void OpenQuattCrashTelemetry::capture_pending_crash_() {
   record->sequence = previous_sequence;
   record->pending = 1U;
   record->captured_by_reporting_build = 1U;
+  record->crash_time_valid = crash_time_valid ? 1U : 0U;
+  record->crash_timestamp = crash_time_valid ? crash_time.epoch_s : 0U;
+  record->crash_uptime_s = crash_time_valid ? crash_time.uptime_s : 0U;
   record->build_epoch = static_cast<uint32_t>(ESPHOME_BUILD_TIME);
   record->config_hash = static_cast<uint32_t>(ESPHOME_CONFIG_HASH);
   record->reset_reason = static_cast<uint32_t>(esp_reset_reason());
@@ -319,7 +329,11 @@ void OpenQuattCrashTelemetry::capture_pending_crash_() {
   copy_text_(record->connection, sizeof(record->connection), this->connection_);
 
   this->capture_active_ = true;
+  this->capture_context_ = {};
   esp32::crash_handler_log();
+  if (this->capture_context_.is_abort && record->captured_by_reporting_build != 0U) {
+    log_abort_details(this->capture_context_.core);
+  }
   this->capture_active_ = false;
 
   if (record->report_length == 0U) {
@@ -335,7 +349,7 @@ void OpenQuattCrashTelemetry::capture_pending_crash_() {
   // OpenQuattLogHistory can still replay this record during the current boot:
   // ESPHome intentionally keeps its in-RAM valid flag after clearing the NOINIT marker.
   esp32::crash_handler_clear();
-  ESP_LOGI(TAG, "Stored crash %s for retained publication", record->crash_id);
+  ESP_LOGI(TAG, "Stored crash %s for publication", record->crash_id);
 #endif
 }
 
@@ -352,6 +366,7 @@ void OpenQuattCrashTelemetry::on_log_(const char* tag, const char* message, size
     record->captured_by_reporting_build = 0U;
   }
 
+  const size_t line_start = record->report_length;
   detail::AnsiSequenceFilter ansi_filter;
   for (const char* cursor = body; *cursor != '\0'; ++cursor) {
     const unsigned char c = static_cast<unsigned char>(*cursor);
@@ -366,6 +381,7 @@ void OpenQuattCrashTelemetry::on_log_(const char* tag, const char* message, size
   if (record->report_length + 2U < CRASH_REPORT_CAPACITY) {
     record->report[record->report_length++] = '\n';
     record->report[record->report_length] = '\0';
+    this->capture_context_.observe(record->report + line_start);
   } else {
     record->truncated = 1U;
   }
@@ -389,8 +405,14 @@ void OpenQuattCrashTelemetry::on_setup_complete_(bool complete) {
   this->setup_complete_.store(complete);
   this->unlock_gate_();
   if (complete && this->consent_enabled_.load() && this->record_ && this->record_.data()->pending != 0U) {
-    this->next_attempt_ms_ = millis() + INITIAL_PUBLISH_DELAY_MS;
+    this->next_attempt_ms_ = millis() + CRASH_INITIAL_PUBLISH_DELAY_MS;
   }
+}
+
+void OpenQuattCrashTelemetry::on_time_synchronized_() {
+  // Keep the existing initial delay or transport retry backoff intact. Once its
+  // deadline passes, loop() observes this flag and can publish immediately.
+  this->time_synchronized_.store(true);
 }
 
 void OpenQuattCrashTelemetry::on_consent_state_(bool enabled) {
@@ -435,7 +457,7 @@ void OpenQuattCrashTelemetry::on_consent_state_(bool enabled) {
   }
 
   if (this->setup_complete_.load() && this->record_ && this->record_.data()->pending != 0U) {
-    this->next_attempt_ms_ = millis() + INITIAL_PUBLISH_DELAY_MS;
+    this->next_attempt_ms_ = millis() + CRASH_INITIAL_PUBLISH_DELAY_MS;
   }
 }
 

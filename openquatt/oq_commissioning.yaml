@@ -71,8 +71,6 @@ button:
     id: oq_commissioning_cm100_start
     name: "CM100 Start"
     internal: true
-    icon: mdi:play-circle-outline
-    entity_category: config
     on_press:
       - lambda: |-
           // Request CM100 as a neutral service state with no task yet.
@@ -99,10 +97,17 @@ button:
     id: oq_commissioning_cm100_stop
     name: "CM100 Stop"
     internal: true
-    icon: mdi:stop-circle-outline
-    entity_category: config
     on_press:
       - lambda: |-
           // Stop CM100 immediately when no task is active; otherwise abort the running task.
           if (oq_commissioning::request_running_task_abort()) return;
           oq_commissioning::stop_neutral_cm100();
+
+text_sensor:
+  - platform: template
+    id: oq_commissioning_status
+    name: "Commissioning status"
+    internal: true
+    update_interval: 1s
+    lambda: |-
+      return {id(oq_commissioning_status_value)};

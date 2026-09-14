@@ -31,13 +31,11 @@ openquatt_usage_telemetry:
     id: oq_usage_telemetry_installation_id
     name: "Usage statistics installation ID"
     internal: true
-    entity_category: diagnostic
   setup_complete_sensor: oq_setup_complete_sensor
   choice_configured:
     id: oq_usage_telemetry_choice_configured
     name: "Usage statistics choice configured"
     internal: true
-    entity_category: diagnostic
   interval: 1h
   firmware_version: "${project_version}"
   release_channel: "${release_channel}"
@@ -54,6 +52,7 @@ openquatt_usage_telemetry:
   cooling_enable_source_select: cooling_enable_source
   cooling_dew_point_source_select: cooling_dew_point_source
   external_heat_demand_source_select: external_heat_demand_source
+  heating_supply_target_source_select: heating_supply_target_source
   loop_time_sensor: oq_loop_time
   internal_temperature_sensor: oq_esp_internal_temperature
   cic_polling_switch: cic_enable
@@ -63,7 +62,6 @@ openquatt_usage_telemetry:
   trend_flash_switch: oq_trend_history_flash_switch
   decision_log_flash_switch: oq_decision_log_flash_switch
   energy_history_flash_switch: oq_lifetime_energy_history_switch
-  ram_log_history_switch: oq_ram_log_history_switch
 
 openquatt_crash_telemetry:
   id: oq_crash_telemetry
@@ -76,6 +74,7 @@ openquatt_crash_telemetry:
   usage_switch: oq_usage_telemetry
   installation_id_sensor: oq_usage_telemetry_installation_id
   setup_complete_sensor: oq_setup_complete_sensor
+  clock: oq_time
   source_repository: "${build_source_repository}"
   source_commit: "${build_source_commit}"
   build_target: "${build_target}"

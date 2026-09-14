@@ -11,7 +11,7 @@
 #include "esp_heap_caps.h"
 #include "esp_memory_utils.h"
 #include "freertos/idf_additions.h"
-#if defined(CONFIG_IDF_TARGET_ESP32S3) && __has_include("heatpump_controller_q_hardware_revision.h")
+#if __has_include("heatpump_controller_q_hardware_revision.h")
 #include "heatpump_controller_q_hardware_revision.h"
 #define OPENQUATT_HAS_Q_HARDWARE_REVISION
 #endif
@@ -243,18 +243,6 @@ void OpenQuattUsageTelemetry::loop() {
     this->start_task_running_.store(false);
   }
   if (this->cleanup_task_complete_.exchange(false)) {
-    if (!MQTT_WORKER_STACK_IN_PSRAM) {
-      const TaskHandle_t handle = this->worker_task_state_.get_handle();
-      if (handle != nullptr && eTaskGetState(handle) != eSuspended) {
-        // The classic-ESP32 worker publishes completion immediately before it
-        // parks itself. Do not free a static stack that may still be executing
-        // on the other core.
-        this->cleanup_task_complete_.store(true);
-        return;
-      }
-      this->worker_task_state_.deallocate();
-      this->worker_task_region_valid_ = false;
-    }
     this->complete_publish_session_();
   }
   if (this->finishing_session_.load()) {
@@ -303,9 +291,6 @@ void OpenQuattUsageTelemetry::dump_config() {
   ESP_LOGCONFIG(TAG, "  Broker configured: %s", YESNO(this->is_configured()));
   ESP_LOGCONFIG(TAG, "  Transport: %s", this->tls_ ? "MQTT/TLS" : "MQTT");
   ESP_LOGCONFIG(TAG, "  Port: %u", this->port_);
-  if (!this->tls_ && this->is_configured()) {
-    ESP_LOGW(TAG, "Usage statistics transport is not encrypted");
-  }
   ESP_LOGCONFIG(TAG, "  Choice configured: %s", YESNO(this->choice_configured_.load()));
   ESP_LOGCONFIG(TAG, "  Quick Start complete: %s", YESNO(this->is_setup_complete_()));
   ESP_LOGCONFIG(TAG, "  Publish interval: %" PRIu32 " seconds", this->interval_ms_ / 1000U);
@@ -522,8 +507,7 @@ void OpenQuattUsageTelemetry::start_publish_session_() {
     return;
   }
 
-  // The same worker owns both client startup and teardown. On S3 its stack is
-  // persistent in PSRAM; classic ESP32 uses a per-session internal stack.
+  // The persistent worker owns both client startup and teardown in PSRAM.
   if (!this->ensure_worker_task_()) {
     this->clear_payload_();
     this->start_task_running_.store(false);
@@ -670,8 +654,9 @@ bool OpenQuattUsageTelemetry::cleanup_client_() {
     }
     if (error != ESP_OK) {
       ++this->cleanup_stop_failures_;
-      const MqttCleanupDecision decision = mqtt_cleanup_decision(
-          false, this->mqtt_connected_seen_.load(), this->mqtt_disconnected_seen_.load(), this->cleanup_stop_failures_);
+      const MqttCleanupDecision decision =
+          mqtt_cleanup_decision(false, this->mqtt_connected_seen_.load(), this->mqtt_disconnected_seen_.load(),
+                                this->cleanup_stop_failures_, this->cleanup_disconnect_requested_);
       if (decision == MqttCleanupDecision::FORCE_DISCONNECT) {
         // A connected client may fail to construct its graceful DISCONNECT
         // packet under memory pressure. Its own task handles DISCONNECT_BIT by
@@ -827,7 +812,36 @@ bool OpenQuattUsageTelemetry::build_payload_() {
   payload += R"(,"topology":")";
   append_json_escaped(payload, this->topology_);
   payload += R"(","connection":")";
-  append_json_escaped(payload, this->connection_);
+  if (this->active_connection_sensor_ != nullptr && this->active_connection_sensor_->has_state()) {
+    const std::string& active_connection = this->active_connection_sensor_->state;
+    if (active_connection == "WiFi") {
+      payload += "wifi";
+    } else if (active_connection == "Ethernet") {
+      payload += "eth";
+    } else if (active_connection == "Not connected") {
+      payload += "none";
+    } else {
+      append_json_escaped(payload, this->connection_);
+    }
+  } else {
+    append_json_escaped(payload, this->connection_);
+  }
+  payload += '"';
+  payload += R"(,"connection_preference":")";
+  if (this->connection_preference_select_ != nullptr && this->connection_preference_select_->has_state()) {
+    const auto connection_preference = this->connection_preference_select_->current_option();
+    if (connection_preference == "Automatic") {
+      payload += "auto";
+    } else if (connection_preference == "WiFi") {
+      payload += "wifi";
+    } else if (connection_preference == "Ethernet") {
+      payload += "eth";
+    } else {
+      append_json_escaped(payload, this->connection_);
+    }
+  } else {
+    append_json_escaped(payload, this->connection_);
+  }
   payload += '"';
   append_json_optional_select_(payload, "quatt_hybrid_generation_config", this->quatt_hybrid_generation_select_,
                                quatt_hybrid_generation_wire_value);
@@ -847,6 +861,8 @@ bool OpenQuattUsageTelemetry::build_payload_() {
   append_json_optional_select_(payload, "cooling_dew_point_source", this->cooling_dew_point_source_select_,
                                configured_source_wire_value);
   append_json_optional_select_(payload, "external_heat_demand_source", this->external_heat_demand_source_select_,
+                               configured_source_wire_value);
+  append_json_optional_select_(payload, "heating_supply_target_source", this->heating_supply_target_source_select_,
                                configured_source_wire_value);
   append_json_uint_(payload, "heap_free_b", heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
   append_json_uint_(payload, "heap_min_free_b", heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL));
@@ -870,7 +886,7 @@ bool OpenQuattUsageTelemetry::build_payload_() {
   append_json_optional_bool_(payload, "trend_flash_enabled", this->trend_flash_switch_);
   append_json_optional_bool_(payload, "decision_log_flash_enabled", this->decision_log_flash_switch_);
   append_json_optional_bool_(payload, "energy_history_flash_enabled", this->energy_history_flash_switch_);
-  append_json_optional_bool_(payload, "ram_log_history_enabled", this->ram_log_history_switch_);
+  append_json_optional_bool_(payload, "ram_log_history_enabled", true, true);
   payload += '}';
 
   if (!payload.ok()) {
@@ -962,9 +978,6 @@ void OpenQuattUsageTelemetry::worker_task_(void* arg) {
       log_heap_state_("Usage telemetry MQTT cleanup complete");
       self->cleanup_task_complete_.store(true);
       App.wake_loop_threadsafe();
-      if (!MQTT_WORKER_STACK_IN_PSRAM) {
-        vTaskSuspend(nullptr);
-      }
       continue;
     }
 

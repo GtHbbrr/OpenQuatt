@@ -52,50 +52,35 @@ BUILTIN_YAML_PATTERNS = (
     "docs/templates/**/*.yaml",
     "openquatt/**/*.yaml",
 )
+ENTITY_YAML_PATTERNS = (
+    "components/**/*.yaml",
+    "configs/**/*.yaml",
+    "openquatt/**/*.yaml",
+)
 BUILTIN_WEB_SORTING_KEY_RE = re.compile(
     r"""(?:^|[,{]\s*)["']?(?:sorting_groups|sorting_group_id|sorting_weight)["']?\s*:"""
 )
+INTERNAL_TRUE_RE = re.compile(r"^(?P<indent>\s*)internal:\s*true\s*(?:#.*)?$")
+YAML_MAPPING_KEY_RE = re.compile(r"^(?P<indent>\s*)(?P<key>[A-Za-z_][\w]*):")
+INTERNAL_ENTITY_PRESENTATION_KEYS = {
+    "device_class",
+    "disabled_by_default",
+    "entity_category",
+    "icon",
+}
 
 STRICT_TOP_LEVEL_ORDER_RULES = {
-    "configs/waveshare/single_wifi.yaml": (
+    "configs/heatpump_controller_q/single.yaml": (
         "substitutions",
         "esphome",
         "packages",
+        "uart",
     ),
-    "configs/waveshare/duo_wifi.yaml": (
+    "configs/heatpump_controller_q/duo.yaml": (
         "substitutions",
         "esphome",
         "packages",
-    ),
-    "configs/heatpump_listener/single_wifi.yaml": (
-        "substitutions",
-        "esphome",
-        "packages",
-    ),
-    "configs/heatpump_listener/duo_wifi.yaml": (
-        "substitutions",
-        "esphome",
-        "packages",
-    ),
-    "configs/heatpump_controller_q/single_wifi.yaml": (
-        "substitutions",
-        "esphome",
-        "packages",
-    ),
-    "configs/heatpump_controller_q/duo_wifi.yaml": (
-        "substitutions",
-        "esphome",
-        "packages",
-    ),
-    "configs/heatpump_controller_q/single_eth.yaml": (
-        "substitutions",
-        "esphome",
-        "packages",
-    ),
-    "configs/heatpump_controller_q/duo_eth.yaml": (
-        "substitutions",
-        "esphome",
-        "packages",
+        "uart",
     ),
     "openquatt/base/common.yaml": (
         "esphome",
@@ -192,77 +177,21 @@ STRICT_TOP_LEVEL_ORDER_RULES = {
 }
 
 NESTED_KEY_ORDER_RULES = {
-    ("configs/waveshare/single_wifi.yaml", "packages"): (
-        "openquatt_substitutions_common",
-        "openquatt_topology_single_substitutions",
-        "openquatt_profile_waveshare",
-        "openquatt_base_common",
-        "openquatt_connection_wifi",
-        "openquatt_packages_common",
-    ),
-    ("configs/waveshare/duo_wifi.yaml", "packages"): (
-        "openquatt_substitutions_common",
-        "openquatt_topology_duo_substitutions",
-        "openquatt_profile_waveshare",
-        "openquatt_base_common",
-        "openquatt_connection_wifi",
-        "openquatt_packages_common",
-        "openquatt_topology_duo_packages",
-    ),
-    ("configs/heatpump_listener/single_wifi.yaml", "packages"): (
-        "openquatt_substitutions_common",
-        "openquatt_topology_single_substitutions",
-        "openquatt_profile_heatpump_listener",
-        "openquatt_base_common",
-        "openquatt_connection_wifi",
-        "oq_heatpump_listener_extras",
-        "openquatt_packages_common",
-    ),
-    ("configs/heatpump_listener/duo_wifi.yaml", "packages"): (
-        "openquatt_substitutions_common",
-        "openquatt_topology_duo_substitutions",
-        "openquatt_profile_heatpump_listener",
-        "openquatt_base_common",
-        "openquatt_connection_wifi",
-        "oq_heatpump_listener_extras",
-        "openquatt_packages_common",
-        "openquatt_topology_duo_packages",
-    ),
-    ("configs/heatpump_controller_q/single_wifi.yaml", "packages"): (
+    ("configs/heatpump_controller_q/single.yaml", "packages"): (
         "openquatt_substitutions_common",
         "openquatt_topology_single_substitutions",
         "openquatt_profile_heatpump_controller_q",
         "openquatt_base_common",
-        "openquatt_connection_wifi",
-        "openquatt_connection_wifi_w5500_power_down",
+        "openquatt_connection_wifi_eth",
         "openquatt_packages_common",
     ),
-    ("configs/heatpump_controller_q/single_eth.yaml", "packages"): (
-        "openquatt_substitutions_common",
-        "openquatt_topology_single_substitutions",
-        "openquatt_profile_heatpump_controller_q",
-        "openquatt_base_common",
-        "openquatt_connection_eth",
-        "openquatt_packages_common",
-    ),
-    ("configs/heatpump_controller_q/duo_wifi.yaml", "packages"): (
+    ("configs/heatpump_controller_q/duo.yaml", "packages"): (
         "openquatt_substitutions_common",
         "openquatt_topology_duo_substitutions",
         "openquatt_profile_heatpump_controller_q",
         "openquatt_profile_heatpump_controller_q_cic_compatibility_duo",
         "openquatt_base_common",
-        "openquatt_connection_wifi",
-        "openquatt_connection_wifi_w5500_power_down",
-        "openquatt_packages_common",
-        "openquatt_topology_duo_packages",
-    ),
-    ("configs/heatpump_controller_q/duo_eth.yaml", "packages"): (
-        "openquatt_substitutions_common",
-        "openquatt_topology_duo_substitutions",
-        "openquatt_profile_heatpump_controller_q",
-        "openquatt_profile_heatpump_controller_q_cic_compatibility_duo",
-        "openquatt_base_common",
-        "openquatt_connection_eth",
+        "openquatt_connection_wifi_eth",
         "openquatt_packages_common",
         "openquatt_topology_duo_packages",
     ),
@@ -443,6 +372,60 @@ def check_no_builtin_web_sorting(path: Path, findings: list[Finding]) -> None:
                 rel,
                 idx,
                 "ESPHome web sorting metadata allocates internal heap; keep layout in the OpenQuatt SPA.",
+            )
+
+
+def check_no_internal_entity_presentation_metadata(path: Path, findings: list[Finding]) -> None:
+    rel = path.relative_to(REPO_ROOT).as_posix()
+    lines = read_lines(path)
+    reported_lines: set[int] = set()
+
+    for marker_index, line in enumerate(lines):
+        internal_match = INTERNAL_TRUE_RE.match(line)
+        if not internal_match:
+            continue
+
+        property_indent = len(internal_match.group("indent"))
+        mapping_start = marker_index
+        while mapping_start > 0:
+            candidate = lines[mapping_start - 1]
+            if not candidate.strip():
+                mapping_start -= 1
+                continue
+            candidate_indent = len(candidate) - len(candidate.lstrip())
+            if candidate_indent < property_indent or (
+                candidate_indent == property_indent and candidate.lstrip().startswith("- ")
+            ):
+                break
+            mapping_start -= 1
+
+        mapping_end = marker_index + 1
+        while mapping_end < len(lines):
+            candidate = lines[mapping_end]
+            if not candidate.strip():
+                mapping_end += 1
+                continue
+            candidate_indent = len(candidate) - len(candidate.lstrip())
+            if candidate_indent < property_indent or (
+                candidate_indent == property_indent and candidate.lstrip().startswith("- ")
+            ):
+                break
+            mapping_end += 1
+
+        for sibling_index in range(mapping_start, mapping_end):
+            sibling_match = YAML_MAPPING_KEY_RE.match(lines[sibling_index])
+            if not sibling_match or len(sibling_match.group("indent")) != property_indent:
+                continue
+            key = sibling_match.group("key")
+            line_number = sibling_index + 1
+            if key not in INTERNAL_ENTITY_PRESENTATION_KEYS or line_number in reported_lines:
+                continue
+            reported_lines.add(line_number)
+            add(
+                findings,
+                rel,
+                line_number,
+                f"`{key}:` is unused presentation metadata on a literal `internal: true` entity.",
             )
 
 
@@ -721,6 +704,9 @@ def main() -> int:
 
     for path in expand_patterns(BUILTIN_YAML_PATTERNS):
         check_no_builtin_web_sorting(path, findings)
+
+    for path in expand_patterns(ENTITY_YAML_PATTERNS):
+        check_no_internal_entity_presentation_metadata(path, findings)
 
     for path in expand_patterns(YAML_BANNER_PATTERNS):
         check_yaml_banner(path, findings)

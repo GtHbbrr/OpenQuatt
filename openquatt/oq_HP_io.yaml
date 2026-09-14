@@ -35,7 +35,26 @@ esphome:
           id(${hp_id}_odu_generation_detection_complete) = false;
           id(${hp_id}_odu_generation_request_pending) = false;
           id(${hp_id}_odu_generation_request_token) = 0U;
+          id(${hp_id}_odu_generation_revalidation_required) = true;
+          id(${hp_id}_runtime_frequency_revalidation_required) = true;
+          id(${hp_id}_validated_control_board_item) = 0U;
           id(${hp_id}_generation).publish_state("Unknown");
+          id(${hp_id}_generation_variant_code) =
+              static_cast<int>(oq_odu::Variant::UNKNOWN);
+          id(${hp_id}_power_input_status_code) =
+              static_cast<int>(oq_energy::HpInputPowerStatus::UNKNOWN_VARIANT);
+          id(${hp_id}_runtime_frequency_snapshot_storage) = {};
+          id(${hp_id}_odu_runtime_frequency)->reset_runtime_state();
+          id(${hp_id}_odu_settings)->notify_odu_offline();
+          id(${hp_id}_compressor_level_profile_request_pending) = false;
+          id(${hp_id}_compressor_level_profile_request_token) = 0U;
+          id(${hp_id}_runtime_frequency_retry_ms) = 0U;
+          id(${hp_id}_compressor_level_profile).publish_state(
+              oq_odu::compressor_level_profile_label(
+                  oq_odu::CompressorLevelProfile::UNKNOWN));
+          id(${hp_id}_generation_variant).publish_state("Unknown");
+          id(${hp_id}_customer_model_code).publish_state("Unknown");
+      - script.execute: ${hp_id}_detect_odu_generation_once
 
 # ----------------------------
 # MODBUS CONTROLLER
@@ -52,6 +71,34 @@ modbus_controller:
       then:
         - lambda: |-
             id(${hp_id}_is_online) = false;
+            // Preserve validated control metadata; the incident manager decides
+            // whether a transport interruption requires a stop.
+            id(${hp_id}_odu_generation_request_token) =
+                oq_odu::next_request_token(
+                    id(${hp_id}_odu_generation_request_token));
+            id(${hp_id}_odu_generation_request_pending) = false;
+            id(${hp_id}_odu_generation_revalidation_required) = true;
+            id(${hp_id}_odu_runtime_frequency)->reset_runtime_state(
+                "Verification failed: ODU disconnected during write");
+            if (id(${hp_id}_odu_runtime_frequency)
+                    ->runtime_reload_blocked_after_write()) {
+              id(oq_incident_manager).observe_runtime_frequency_mapping(
+                  ${hp_index}, false, millis());
+            }
+            id(${hp_id}_odu_settings)->notify_odu_offline();
+            id(${hp_id}_compressor_level_profile_request_token) =
+                oq_odu::next_request_token(
+                    id(${hp_id}_compressor_level_profile_request_token));
+            id(${hp_id}_compressor_level_profile_request_pending) = false;
+            id(${hp_id}_runtime_frequency_revalidation_required) = true;
+            id(${hp_id}_runtime_frequency_retry_ms) = 0U;
+            id(${hp_id}_voltage_last_update_ms) = 0U;
+            id(${hp_id}_current_last_update_ms) = 0U;
+            id(${hp_id}_fan_speed_last_update_ms) = 0U;
+            id(${hp_id}_status_2108_last_update_ms) = 0U;
+            id(${hp_id}_pump_feedback_last_update_ms) = 0U;
+            id(${hp_id}_power_input_status_code) =
+                static_cast<int>(oq_energy::HpInputPowerStatus::INVALID_OR_STALE);
             id(${hp_id}_pump_relay).invalidate_state();
             id(${hp_id}_status_2108_raw).publish_state(NAN);
             id(${hp_id}_status_2115_raw).publish_state(NAN);
@@ -64,6 +111,7 @@ modbus_controller:
             id(${hp_id}_is_online) = true;
             id(oq_incident_manager).observe_transport(${hp_index}, true, millis());
             ESP_LOGI("quatt", "%sModbus ONLINE", "${prefix}");
+        - script.execute: ${hp_id}_detect_odu_generation_once
 
 openquatt_odu_eeprom_dump:
   - id: ${hp_id}_odu_eeprom_dump
@@ -72,6 +120,13 @@ openquatt_odu_eeprom_dump:
     web_auth: oq_web_auth_store
     hp_index: ${hp_index}
     device_address: ${device_address}
+
+openquatt_odu_settings:
+  - id: ${hp_id}_odu_settings
+    controller: ${hp_id}
+    eeprom_dump: ${hp_id}_odu_eeprom_dump
+    web_auth: oq_web_auth_store
+    hp_index: ${hp_index}
 
 # ----------------------------
 # GLOBALS
@@ -101,6 +156,13 @@ globals:
     restore_value: false
     initial_value: '0'
 
+  # Last physical F-level written to register 1999. Control bookkeeping above
+  # deliberately remains in the independent 0..10 model-level domain.
+  - id: ${hp_id}_last_commanded_physical_level
+    type: int
+    restore_value: false
+    initial_value: '0'
+
   - id: ${hp_id}_outside_temp_last_change_ms
     type: uint32_t
     restore_value: false
@@ -116,6 +178,36 @@ globals:
     restore_value: false
     initial_value: '0'
 
+  - id: ${hp_id}_voltage_last_update_ms
+    type: uint32_t
+    restore_value: false
+    initial_value: '0'
+
+  - id: ${hp_id}_current_last_update_ms
+    type: uint32_t
+    restore_value: false
+    initial_value: '0'
+
+  - id: ${hp_id}_fan_speed_last_update_ms
+    type: uint32_t
+    restore_value: false
+    initial_value: '0'
+
+  - id: ${hp_id}_status_2108_last_update_ms
+    type: uint32_t
+    restore_value: false
+    initial_value: '0'
+
+  - id: ${hp_id}_pump_feedback_last_update_ms
+    type: uint32_t
+    restore_value: false
+    initial_value: '0'
+
+  - id: ${hp_id}_power_input_status_code
+    type: int
+    restore_value: false
+    initial_value: '3'
+
   # Modbus controller online/offline
   - id: ${hp_id}_is_online
     type: bool
@@ -128,7 +220,7 @@ globals:
     initial_value: '0'
 
   # ODU generation is sampled once per boot or explicit detection request.
-  # It is diagnostic-only and never enables generation-dependent behavior.
+  # Generation alone never enables generation-dependent behavior.
   - id: ${hp_id}_odu_generation_detection_complete
     type: bool
     restore_value: no
@@ -144,6 +236,50 @@ globals:
     restore_value: no
     initial_value: '0'
 
+  # Re-read identity after a transport interruption without withdrawing metadata.
+  - id: ${hp_id}_odu_generation_revalidation_required
+    type: bool
+    restore_value: no
+    initial_value: 'true'
+
+  - id: ${hp_id}_validated_control_board_item
+    type: uint16_t
+    restore_value: no
+    initial_value: '0'
+
+  - id: ${hp_id}_generation_variant_code
+    type: int
+    restore_value: no
+    initial_value: '0'
+
+  # Immutable control snapshot built from the read-only runtime frequency
+  # table. It is never restored across boots, but survives transport flaps.
+  - id: ${hp_id}_runtime_frequency_snapshot_storage
+    type: std::array<uint8_t, 46>
+    restore_value: no
+    initial_value: 'std::array<uint8_t, 46>{}'
+
+  # Replace the active snapshot only after every required table is valid.
+  - id: ${hp_id}_runtime_frequency_revalidation_required
+    type: bool
+    restore_value: no
+    initial_value: 'true'
+
+  - id: ${hp_id}_compressor_level_profile_request_pending
+    type: bool
+    restore_value: no
+    initial_value: 'false'
+
+  - id: ${hp_id}_compressor_level_profile_request_token
+    type: uint32_t
+    restore_value: no
+    initial_value: '0'
+
+  - id: ${hp_id}_runtime_frequency_retry_ms
+    type: uint32_t
+    restore_value: no
+    initial_value: '0'
+
 # ----------------------------
 # ODU GENERATION DETECTION
 # ----------------------------
@@ -155,36 +291,134 @@ script:
           const uint32_t request_token =
               oq_odu::next_request_token(id(${hp_id}_odu_generation_request_token));
           id(${hp_id}_odu_generation_request_token) = request_token;
-          id(${hp_id}_odu_generation_detection_complete) = false;
+          id(${hp_id}_runtime_frequency_retry_ms) =
+              millis() == 0U ? 1U : millis();
           id(${hp_id}_odu_generation_request_pending) = true;
-          id(${hp_id}_generation).publish_state("Unknown");
 
           // Do not interleave an identity request with an operation that owns the Modbus bus.
           if (id(${hp_id}_odu_eeprom_dump).is_active() || id(oq_runtime_polling_paused).state) {
             id(${hp_id}_odu_generation_request_pending) = false;
-            id(${hp_id}_odu_generation_detection_complete) = true;
-            ESP_LOGW("quatt.odu", "%sODU generation detection blocked while runtime polling is paused", "${prefix}");
+            ESP_LOGW("quatt.odu", "%sODU generation revalidation blocked while runtime polling is paused; keeping last validated metadata", "${prefix}");
             return;
           }
 
           auto command = esphome::modbus_controller::ModbusCommandItem::create_read_command(
               id(${hp_id}), esphome::modbus::EntityType::HOLDING,
-              oq_odu::CONTROL_BOARD_ITEM_REGISTER, 1,
-              [=](esphome::modbus::EntityType, uint16_t start_address, std::span<const uint8_t> data) {
+              oq_odu::CORE_IDENTITY_REGISTER,
+              oq_odu::CORE_IDENTITY_REGISTER_COUNT,
+              [=](esphome::modbus::EntityType, uint16_t start_address,
+                  std::span<const uint8_t> data) {
                 if (request_token != id(${hp_id}_odu_generation_request_token) ||
                     !id(${hp_id}_odu_generation_request_pending) ||
-                    start_address != oq_odu::CONTROL_BOARD_ITEM_REGISTER) {
+                    start_address != oq_odu::CORE_IDENTITY_REGISTER) {
                   return;
                 }
 
-                const auto detection = oq_odu::detect_control_board_item_response(data.data(), data.size());
-                if (detection.control_board_item_available) {
-                  // Keep the raw diagnostic entity coherent with the explicit one-shot read.
-                  id(${hp_id}_control_board_item).publish_state(detection.control_board_item);
+                const auto core = oq_odu::parse_core_identity_response(
+                    data.data(), data.size());
+                if (!core.available) {
+                  id(${hp_id}_odu_generation_request_pending) = false;
+                  ESP_LOGW("quatt.odu", "%sODU core identity response incomplete; keeping last validated metadata", "${prefix}");
+                  return;
                 }
-                id(${hp_id}_odu_generation_detection_complete) = true;
-                id(${hp_id}_odu_generation_request_pending) = false;
-                id(${hp_id}_generation).publish_state(oq_odu::generation_label(detection.generation));
+
+                auto apply_validated_identity = [=](const oq_odu::Detection& detection) {
+                  auto invalidate_runtime_frequency_reload = [=]() {
+                    id(${hp_id}_compressor_level_profile_request_token) =
+                        oq_odu::next_request_token(
+                            id(${hp_id}_compressor_level_profile_request_token));
+                    id(${hp_id}_compressor_level_profile_request_pending) = false;
+                    id(${hp_id}_runtime_frequency_revalidation_required) = true;
+                  };
+                  if (detection.variant == oq_odu::Variant::UNKNOWN) {
+                    invalidate_runtime_frequency_reload();
+                    id(${hp_id}_odu_generation_detection_complete) = false;
+                    id(oq_incident_manager).observe_runtime_frequency_mapping(
+                        ${hp_index}, false, millis());
+                    ESP_LOGW("quatt.odu", "%sODU identity is unsupported; keeping last validated metadata", "${prefix}");
+                    return false;
+                  }
+
+                  // Publish only validated identity; keep the frequency snapshot
+                  // active until its separate complete reload succeeds.
+                  const auto previous_variant = static_cast<oq_odu::Variant>(
+                      id(${hp_id}_generation_variant_code));
+                  const bool identity_changed =
+                      id(${hp_id}_validated_control_board_item) != 0U &&
+                      (id(${hp_id}_validated_control_board_item) != core.control_board_item ||
+                       previous_variant != detection.variant);
+                  if (identity_changed) {
+                    invalidate_runtime_frequency_reload();
+                    id(oq_incident_manager).observe_runtime_frequency_mapping(
+                        ${hp_index}, false, millis());
+                    ESP_LOGW("quatt.odu", "%sODU identity changed; incident manager requires mapping revalidation", "${prefix}");
+                  }
+                  id(${hp_id}_pcb_firmware_raw).publish_state(core.pcb_program);
+                  id(${hp_id}_control_board_item).publish_state(core.control_board_item);
+                  id(${hp_id}_odu_runtime_frequency)->set_extended_layout(
+                      detection.variant == oq_odu::Variant::V2_NEW_MODEL);
+                  id(${hp_id}_odu_settings)->set_odu_identity(
+                      core.control_board_item, detection.variant);
+                  id(${hp_id}_generation_variant_code) =
+                      static_cast<int>(detection.variant);
+                  id(${hp_id}_validated_control_board_item) = core.control_board_item;
+                  id(${hp_id}_generation_variant).publish_state(
+                      oq_odu::variant_label(detection.variant));
+                  id(${hp_id}_generation).publish_state(
+                      oq_odu::generation_label(detection.generation));
+                  id(${hp_id}_odu_generation_detection_complete) = true;
+                  id(${hp_id}_odu_generation_revalidation_required) = false;
+                  id(${hp_id}_runtime_frequency_revalidation_required) = true;
+                  return true;
+                };
+
+                if (!oq_odu::requires_customer_model(core)) {
+                  const auto detection = oq_odu::detect_generation(core);
+                  if (!apply_validated_identity(detection)) {
+                    id(${hp_id}_odu_generation_request_pending) = false;
+                    return;
+                  }
+                  id(${hp_id}_customer_model_code).publish_state("Not read");
+                  id(${hp_id}_odu_generation_request_pending) = false;
+                  id(${hp_id}_load_runtime_frequency_table_once).execute();
+                  return;
+                }
+
+                auto customer_model_command =
+                    esphome::modbus_controller::ModbusCommandItem::create_read_command(
+                        id(${hp_id}), esphome::modbus::EntityType::HOLDING,
+                        oq_odu::CUSTOMER_MODEL_REGISTER,
+                        oq_odu::CUSTOMER_MODEL_REGISTER_COUNT,
+                        [=](esphome::modbus::EntityType,
+                            uint16_t customer_model_start_address,
+                            std::span<const uint8_t> customer_model_data) {
+                          if (request_token !=
+                                  id(${hp_id}_odu_generation_request_token) ||
+                              !id(${hp_id}_odu_generation_request_pending) ||
+                              customer_model_start_address !=
+                                  oq_odu::CUSTOMER_MODEL_REGISTER) {
+                            return;
+                          }
+
+                          const auto customer_model =
+                              oq_odu::parse_customer_model_response(
+                                  customer_model_data.data(),
+                                  customer_model_data.size());
+                          const auto detection =
+                              oq_odu::detect_generation(core, customer_model);
+                          id(${hp_id}_odu_generation_request_pending) = false;
+                          if (!customer_model.available ||
+                              !apply_validated_identity(detection)) {
+                            ESP_LOGW("quatt.odu",
+                                     "%sODU customer model response incomplete or unsupported; keeping last validated metadata",
+                                     "${prefix}");
+                            return;
+                          }
+                          id(${hp_id}_customer_model_code).publish_state(
+                              oq_odu::customer_model_label(customer_model));
+                          id(${hp_id}_load_runtime_frequency_table_once).execute();
+                        });
+                id(${hp_id}).queue_command(std::move(customer_model_command));
               });
           id(${hp_id}).queue_command(std::move(command));
       - delay: 30s
@@ -195,17 +429,140 @@ script:
           id(${hp_id}_odu_generation_request_token) =
               oq_odu::next_request_token(id(${hp_id}_odu_generation_request_token));
           id(${hp_id}_odu_generation_request_pending) = false;
-          id(${hp_id}_odu_generation_detection_complete) = true;
-          ESP_LOGW("quatt.odu", "%sODU generation detection timed out", "${prefix}");
+          ESP_LOGW("quatt.odu", "%sODU generation revalidation timed out; keeping last validated metadata", "${prefix}");
+
+  - id: ${hp_id}_load_runtime_frequency_table_once
+    mode: restart
+    then:
+      - lambda: |-
+          if (id(${hp_id}_odu_runtime_frequency)
+                  ->runtime_reload_blocked_after_write()) {
+            ESP_LOGW("quatt.odu", "%sRuntime frequency table reload blocked until experimental write verification succeeds", "${prefix}");
+            return;
+          }
+          const uint32_t request_token =
+              oq_odu::next_request_token(
+                  id(${hp_id}_compressor_level_profile_request_token));
+          id(${hp_id}_compressor_level_profile_request_token) = request_token;
+          id(${hp_id}_runtime_frequency_retry_ms) =
+              millis() == 0U ? 1U : millis();
+          id(${hp_id}_compressor_level_profile_request_pending) = true;
+          const auto variant = static_cast<oq_odu::Variant>(
+              id(${hp_id}_generation_variant_code));
+
+          // Keep runtime table loading read-only and do not interleave it with
+          // a task that temporarily owns the Modbus bus.
+          if (id(${hp_id}_odu_eeprom_dump).is_active() ||
+              id(oq_runtime_polling_paused).state) {
+            id(${hp_id}_compressor_level_profile_request_pending) = false;
+            ESP_LOGW("quatt.odu", "%sRuntime frequency table load blocked while runtime polling is paused", "${prefix}");
+            return;
+          }
+          auto command =
+              esphome::modbus_controller::ModbusCommandItem::create_read_command(
+                  id(${hp_id}), esphome::modbus::EntityType::HOLDING,
+                  oq_odu::BASE_FREQUENCY_TABLE_REGISTER,
+                  oq_odu::BASE_FREQUENCY_TABLE_REGISTER_COUNT,
+                  [=](esphome::modbus::EntityType, uint16_t start_address,
+                      std::span<const uint8_t> data) {
+                    if (request_token !=
+                            id(${hp_id}_compressor_level_profile_request_token) ||
+                        !id(${hp_id}_compressor_level_profile_request_pending) ||
+                        start_address !=
+                            oq_odu::BASE_FREQUENCY_TABLE_REGISTER) {
+                      return;
+                    }
+
+                    auto snapshot = oq_odu::parse_base_frequency_table_response(
+                        data.data(), data.size(), variant);
+                    if (!snapshot.heating.valid || !snapshot.cooling.valid) {
+                      id(${hp_id}_compressor_level_profile_request_pending) = false;
+                      ESP_LOGW("quatt.odu", "%sRuntime frequency base table incomplete; keeping previous snapshot", "${prefix}");
+                      return;
+                    }
+
+                    if (variant != oq_odu::Variant::V2_NEW_MODEL) {
+                      id(${hp_id}_runtime_frequency_snapshot_storage) =
+                          oq_odu::encode_runtime_frequency_snapshot(snapshot);
+                      const auto profile =
+                          oq_odu::compressor_level_profile(snapshot);
+                      id(${hp_id}_compressor_level_profile).publish_state(
+                          oq_odu::compressor_level_profile_label(profile));
+                      id(${hp_id}_runtime_frequency_revalidation_required) = false;
+                      id(oq_incident_manager).observe_runtime_frequency_mapping(
+                          ${hp_index}, true, millis());
+                      id(${hp_id}_compressor_level_profile_request_pending) = false;
+                      return;
+                    }
+
+                    auto extension_command =
+                        esphome::modbus_controller::ModbusCommandItem::create_read_command(
+                            id(${hp_id}), esphome::modbus::EntityType::HOLDING,
+                            oq_odu::EXTENDED_FREQUENCY_TABLE_REGISTER,
+                            oq_odu::EXTENDED_FREQUENCY_TABLE_REGISTER_COUNT,
+                            [=](esphome::modbus::EntityType,
+                                uint16_t extension_start_address,
+                                std::span<const uint8_t> extension_data) {
+                              if (request_token !=
+                                      id(${hp_id}_compressor_level_profile_request_token) ||
+                                  !id(${hp_id}_compressor_level_profile_request_pending) ||
+                                  extension_start_address !=
+                                      oq_odu::EXTENDED_FREQUENCY_TABLE_REGISTER) {
+                                return;
+                              }
+
+                              auto extended_snapshot = snapshot;
+                              const auto extension_result =
+                                  oq_odu::apply_v2_extension_frequency_table_response(
+                                      extended_snapshot,
+                                      extension_data.data(),
+                                      extension_data.size());
+                              if (!extension_result.response_complete) {
+                                id(${hp_id}_compressor_level_profile_request_pending) =
+                                    false;
+                                ESP_LOGW("quatt.odu", "%sV2 runtime frequency extension response incomplete; keeping previous snapshot", "${prefix}");
+                                return;
+                              }
+                              if (!extension_result.heating_valid ||
+                                  !extension_result.cooling_valid) {
+                                id(${hp_id}_compressor_level_profile_request_pending) =
+                                    false;
+                                ESP_LOGW("quatt.odu", "%sV2 runtime frequency extension invalid; keeping previous snapshot", "${prefix}");
+                                return;
+                              }
+                              id(${hp_id}_runtime_frequency_snapshot_storage) =
+                                  oq_odu::encode_runtime_frequency_snapshot(
+                                      extended_snapshot);
+                              const auto extended_profile =
+                                  oq_odu::compressor_level_profile(
+                                      extended_snapshot);
+                              id(${hp_id}_compressor_level_profile).publish_state(
+                                  oq_odu::compressor_level_profile_label(
+                                      extended_profile));
+                              id(${hp_id}_runtime_frequency_revalidation_required) = false;
+                              id(oq_incident_manager).observe_runtime_frequency_mapping(
+                                  ${hp_index}, true, millis());
+                              id(${hp_id}_compressor_level_profile_request_pending) =
+                                  false;
+                            });
+                    id(${hp_id}).queue_command(std::move(extension_command));
+                  });
+          id(${hp_id}).queue_command(std::move(command));
+      - delay: 30s
+      - lambda: |-
+          if (!id(${hp_id}_compressor_level_profile_request_pending)) return;
+
+          id(${hp_id}_compressor_level_profile_request_token) =
+              oq_odu::next_request_token(
+                  id(${hp_id}_compressor_level_profile_request_token));
+          id(${hp_id}_compressor_level_profile_request_pending) = false;
+          ESP_LOGW("quatt.odu", "%sRuntime frequency table load timed out; keeping last validated snapshot", "${prefix}");
 
 button:
   - platform: template
     id: ${hp_id}_detect_odu_generation
     name: "${prefix}Detect ODU generation"
     internal: true
-    disabled_by_default: true
-    icon: mdi:refresh
-    entity_category: diagnostic
     on_press:
       - if:
           condition:
@@ -223,8 +580,6 @@ select:
     id: ${hp_id}_set_working_mode
     name: "${prefix}Set Working Mode"
     internal: true
-    disabled_by_default: true
-    icon: "mdi:heat-pump-outline"
     address: 3999
     value_type: U_WORD
     optimistic: true
@@ -239,8 +594,6 @@ select:
     id: ${hp_id}_compressor_level
     name: "${prefix}Set Compressor Level"
     internal: true
-    disabled_by_default: true
-    icon: "mdi:sine-wave"
     address: 1999
     value_type: U_WORD
     optimistic: true
@@ -256,6 +609,16 @@ select:
       "8": 8
       "9": 9
       "10": 10
+      "11": 11
+      "12": 12
+      "13": 13
+      "14": 14
+      "15": 15
+      "16": 16
+      "17": 17
+      "18": 18
+      "19": 19
+      "20": 20
     skip_updates: ${oq_modbus_control_readback_skip}
 
   - platform: modbus_controller
@@ -263,8 +626,6 @@ select:
     id: ${hp_id}_low_noise_mode
     name: "${prefix}Silent Mode"
     internal: true
-    disabled_by_default: true
-    icon: mdi:weather-night
     address: 2006
     value_type: U_WORD
     optimistic: true
@@ -278,8 +639,6 @@ select:
     id: ${hp_id}_set_pump_mode
     name: "${prefix}Set Pump Mode"
     internal: true
-    disabled_by_default: true
-    icon: "mdi:pump"
     address: 2010
     value_type: U_WORD
     optimistic: true
@@ -288,61 +647,44 @@ select:
       "On": 4096
     skip_updates: ${oq_modbus_control_readback_skip}
 
-# Per-HP compressor level exclusions are modeled as up to two explicit blocked levels.
+# One shared range applies to heating and cooling. A zero boundary disables it.
+number:
   - platform: template
-    id: ${hp_id}_excluded_level_a
-    name: "${prefix}Excluded compressor level A"
+    id: ${hp_id}_excluded_frequency_min_hz
+    name: "${prefix}Excluded frequency minimum"
+    unit_of_measurement: "Hz"
     icon: mdi:speedometer-slow
-    entity_category: config
-    disabled_by_default: true
+    min_value: 0
+    max_value: 120
+    step: 1
     optimistic: true
     restore_value: true
-    initial_option: "None"
-    options:
-      - "None"
-      - "L1 (H30/C30)"
-      - "L2 (H39/C36)"
-      - "L3 (H49/C42)"
-      - "L4 (H55/C47)"
-      - "L5 (H61/C52)"
-      - "L6 (H67/C56)"
-      - "L7 (H72/C61)"
-      - "L8 (H79/C66)"
-      - "L9 (H85/C71)"
-      - "L10 (H90/C74)"
+    initial_value: 0
+    disabled_by_default: true
+    entity_category: config
 
   - platform: template
-    id: ${hp_id}_excluded_level_b
-    name: "${prefix}Excluded compressor level B"
+    id: ${hp_id}_excluded_frequency_max_hz
+    name: "${prefix}Excluded frequency maximum"
+    unit_of_measurement: "Hz"
     icon: mdi:speedometer-slow
-    entity_category: config
-    disabled_by_default: true
+    min_value: 0
+    max_value: 120
+    step: 1
     optimistic: true
     restore_value: true
-    initial_option: "None"
-    options:
-      - "None"
-      - "L1 (H30/C30)"
-      - "L2 (H39/C36)"
-      - "L3 (H49/C42)"
-      - "L4 (H55/C47)"
-      - "L5 (H61/C52)"
-      - "L6 (H67/C56)"
-      - "L7 (H72/C61)"
-      - "L8 (H79/C66)"
-      - "L9 (H85/C71)"
-      - "L10 (H90/C74)"
+    initial_value: 0
+    disabled_by_default: true
+    entity_category: config
 
 # ----------------------------
 # NUMBER
 # ----------------------------
-number:
   - platform: modbus_controller
     modbus_controller_id: ${hp_id}
     id: ${hp_id}_pump_speed
     name: "${prefix}Set Pump Speed"
     internal: true
-    icon: "mdi:speedometer"
     register_type: holding
     address: 2015
     value_type: U_WORD
@@ -404,6 +746,10 @@ sensor:
           max_value: 300
           ignore_out_of_range: true
     skip_updates: ${oq_modbus_telemetry_skip}
+    on_value:
+      then:
+        - lambda: |-
+            id(${hp_id}_voltage_last_update_ms) = millis();
 
   - platform: modbus_controller
     modbus_controller_id: ${hp_id}
@@ -424,6 +770,42 @@ sensor:
           max_value: 16
           ignore_out_of_range: true
     skip_updates: ${oq_modbus_telemetry_skip}
+    on_value:
+      then:
+        - lambda: |-
+            id(${hp_id}_current_last_update_ms) = millis();
+
+  - platform: template
+    id: ${hp_id}_minimum_heating_frequency
+    name: "${prefix}Minimum heating frequency"
+    unit_of_measurement: "Hz"
+    accuracy_decimals: 0
+    entity_category: diagnostic
+    disabled_by_default: true
+    update_interval: 5s
+    lambda: |-
+      // Report the actual automatic mapping; an unavailable table stays unknown.
+      if (!id(hp_generation).has_state()) return NAN;
+      const auto snapshot = oq_odu::decode_runtime_frequency_snapshot(id(${hp_id}_runtime_frequency_snapshot_storage));
+      const int hz = oq_frequency_policy::minimum_automatic_frequency_hz(
+          id(hp_generation).current_option() == "V2", snapshot, 2);
+      return hz > 0 ? static_cast<float>(hz) : NAN;
+
+  - platform: template
+    id: ${hp_id}_minimum_cooling_frequency
+    name: "${prefix}Minimum cooling frequency"
+    unit_of_measurement: "Hz"
+    accuracy_decimals: 0
+    entity_category: diagnostic
+    disabled_by_default: true
+    update_interval: 5s
+    lambda: |-
+      // Cooling can have a different minimum from heating on the same unit.
+      if (!id(hp_generation).has_state()) return NAN;
+      const auto snapshot = oq_odu::decode_runtime_frequency_snapshot(id(${hp_id}_runtime_frequency_snapshot_storage));
+      const int hz = oq_frequency_policy::minimum_automatic_frequency_hz(
+          id(hp_generation).current_option() == "V2", snapshot, 1);
+      return hz > 0 ? static_cast<float>(hz) : NAN;
 
   - platform: modbus_controller
     modbus_controller_id: ${hp_id}
@@ -440,7 +822,7 @@ sensor:
       - multiply: 1
       - clamp:
           min_value: 0
-          max_value: 100
+          max_value: 120
           ignore_out_of_range: true
     skip_updates: ${oq_modbus_telemetry_skip}
 
@@ -459,7 +841,7 @@ sensor:
       - multiply: 1
       - clamp:
           min_value: 0
-          max_value: 100
+          max_value: 120
           ignore_out_of_range: true
     skip_updates: ${oq_modbus_telemetry_skip}
     on_value:
@@ -510,6 +892,10 @@ sensor:
           max_value: 1000
           ignore_out_of_range: true
     skip_updates: ${oq_modbus_telemetry_skip}
+    on_value:
+      then:
+        - lambda: |-
+            id(${hp_id}_fan_speed_last_update_ms) = millis();
 
   - platform: modbus_controller
     modbus_controller_id: ${hp_id}
@@ -669,8 +1055,6 @@ sensor:
     modbus_controller_id: ${hp_id}
     name: "${prefix}Firmware EEPROM"
     internal: true
-    disabled_by_default: true
-    icon: mdi:memory
     register_type: holding
     register_count: 4  # 2123 - 2127
     address: 2123
@@ -681,8 +1065,6 @@ sensor:
     id: ${hp_id}_control_board_item
     name: "${prefix}Control board item number"
     internal: true
-    disabled_by_default: true
-    icon: mdi:identifier
     register_type: holding
     # Read span 2127-2130 to keep the Modbus range contiguous with 2131.
     # Only register 2127 is decoded as this U_WORD diagnostic value.
@@ -690,17 +1072,6 @@ sensor:
     address: 2127
     skip_updates: ${oq_modbus_telemetry_skip}
     value_type: U_WORD
-    on_value:
-      then:
-        - lambda: |-
-            if (id(${hp_id}_odu_generation_detection_complete) ||
-                id(${hp_id}_odu_generation_request_pending)) {
-              return;
-            }
-
-            const auto detection = oq_odu::detect_control_board_item(true, x);
-            id(${hp_id}_odu_generation_detection_complete) = true;
-            id(${hp_id}_generation).publish_state(oq_odu::generation_label(detection.generation));
 
   - platform: modbus_controller
     modbus_controller_id: ${hp_id}
@@ -748,16 +1119,12 @@ sensor:
     id: ${hp_id}_water_in_temp_raw
     name: "${prefix}Water in temperature raw"
     internal: true
-    disabled_by_default: true
-    icon: mdi:thermometer-water
     register_type: holding
     address: 2133
     #skip_updates: 0
     unit_of_measurement: "°C"
-    device_class: "temperature"
     state_class: "measurement"
     accuracy_decimals: 2
-    entity_category: diagnostic
     filters:
       - offset: -3000
       - multiply: 0.01
@@ -772,16 +1139,12 @@ sensor:
     id: ${hp_id}_water_out_temp_raw
     name: "${prefix}Water out temperature raw"
     internal: true
-    disabled_by_default: true
-    icon: mdi:thermometer-water
     register_type: holding
     address: 2134
     #skip_updates: 0
     unit_of_measurement: "°C"
-    device_class: "temperature"
     state_class: "measurement"
     accuracy_decimals: 2
-    entity_category: diagnostic
     filters:
       - offset: -3000
       - multiply: 0.01
@@ -851,14 +1214,15 @@ sensor:
     id: ${hp_id}_pump_ipwm_feedback_raw
     name: "${prefix}Pump iPWM feedback raw"
     internal: true
-    icon: mdi:pump
-    disabled_by_default: true
-    entity_category: diagnostic
     register_type: holding
     address: 2137
     value_type: U_WORD
     accuracy_decimals: 0
     skip_updates: ${oq_modbus_telemetry_skip}
+    on_value:
+      then:
+        - lambda: |-
+            id(${hp_id}_pump_feedback_last_update_ms) = millis();
 
   - platform: template
     id: ${hp_id}_pump_power
@@ -918,36 +1282,46 @@ sensor:
     accuracy_decimals: 2
     update_interval: 10s
     lambda: |-
-      // Keep model coefficients exactly as before; only readability/safety is improved.
-      const float standby_power_w = 5.150232354845286f;
-      const float compressor_calibration = 1.1240096401010435f;
-      const float fan_calibration = -0.04858859969715763f;
-      const float bottom_plate_heater_w = 150.06430841218332f;
-      const float crankcase_heater_w = 40.0f;
-
-      auto nz = [](float value) -> float { return isnan(value) ? 0.0f : value; };
-
-      const float voltage_v = nz(id(${hp_id}_voltage).state);
-      const float current_a = nz(id(${hp_id}_current).state);
-      const float fan_speed = nz(id(${hp_id}_fan_speed).state);
-
-      float pump_power_w = 0.0f;
-      if (id(${hp_id}_pump_relay).has_state() && id(${hp_id}_pump_relay).state) {
-        pump_power_w = nz(id(${hp_id}_pump_power).state);
+      // Select the estimator only after per-ODU identity and input quality are known.
+      // Decode R2137 from the same raw sample whose timestamp qualifies it.
+      // The separately published pump-power entity updates on its own schedule
+      // and must not make an older derived value appear fresh after a fault.
+      const float pump_feedback_raw = id(${hp_id}_pump_ipwm_feedback_raw).state;
+      float pump_power_w = NAN;
+      if (id(${hp_id}_is_online) && isfinite(pump_feedback_raw)) {
+        const auto pump_feedback =
+            oq_pump_ipwm::decode(static_cast<uint16_t>(lroundf(pump_feedback_raw)));
+        if (pump_feedback.power_valid) pump_power_w = pump_feedback.power_w;
       }
-
-      const float bottom_plate_w = id(${hp_id}_bottom_plate_heater).state ? bottom_plate_heater_w : 0.0f;
-      const float crankcase_w = id(${hp_id}_crankcase_heater).state ? crankcase_heater_w : 0.0f;
-
-      const float p_input_w = standby_power_w
-                            + (voltage_v * current_a * compressor_calibration)
-                            + (fan_speed * fan_calibration)
-                            + pump_power_w
-                            + bottom_plate_w
-                            + crankcase_w;
-
-      // Physical lower bound: electrical input power cannot be negative.
-      return (p_input_w < 0.0f) ? 0.0f : p_input_w;
+      const oq_energy::HpElectricalInputs inputs{
+          id(${hp_id}_voltage).state,
+          id(${hp_id}_current).state,
+          id(${hp_id}_fan_speed).state,
+          id(${hp_id}_pump_relay).has_state(),
+          id(${hp_id}_pump_relay).state,
+          pump_power_w,
+          id(${hp_id}_bottom_plate_heater).state,
+          id(${hp_id}_crankcase_heater).state,
+      };
+      const auto variant = oq_odu::confirmed_variant(
+          id(${hp_id}_odu_generation_detection_complete),
+          id(${hp_id}_generation_variant_code));
+      const uint32_t now_ms = millis();
+      const bool v2_fresh = oq_energy::v2_input_telemetry_fresh(
+          {
+              id(${hp_id}_is_online),
+              now_ms,
+              static_cast<uint32_t>(${oq_power_measurement_stale_s}) * 1000UL,
+              id(${hp_id}_voltage_last_update_ms),
+              id(${hp_id}_current_last_update_ms),
+              id(${hp_id}_fan_speed_last_update_ms),
+              id(${hp_id}_status_2108_last_update_ms),
+              id(${hp_id}_pump_feedback_last_update_ms),
+          },
+          inputs.pump_relay_running);
+      const auto estimate = oq_energy::hp_input_power_for_variant(variant, inputs, v2_fresh);
+      id(${hp_id}_power_input_status_code) = static_cast<int>(estimate.status);
+      return estimate.watts;
 
   - platform: template
     id: ${hp_id}_heat_power
@@ -959,20 +1333,7 @@ sensor:
     accuracy_decimals: 0
     update_interval: 10s
     lambda: |-
-      // Heat power follows measured HP working mode (2 = Heating), not supervisory CM.
-      const float working_mode = id(${hp_id}_working_mode).state;
-      if (working_mode != 2.0f) return 0.0f;
-
-      const float t_in_c = id(${hp_id}_water_in_temp).state;
-      const float t_out_c = id(${hp_id}_water_out_temp).state;
-      const float flow_lph = id(flow_rate_selected).state;
-
-      if (isnan(t_in_c) || isnan(t_out_c) || isnan(flow_lph)) return 0.0f;
-
-      const float water_cp_j_per_kgk = ${oq_water_cp_j_per_kgk};  // J/(kg·K)
-      const float mass_flow_kgps = flow_lph / 3600.0f;  // kg/s (≈ L/h)
-      const float delta_t_k = t_out_c - t_in_c;         // K
-      return mass_flow_kgps * water_cp_j_per_kgk * delta_t_k;
+      return oq_energy::hp_heating_power(id(${hp_id}_working_mode).state, id(${hp_id}_water_in_temp).state, id(${hp_id}_water_out_temp).state, id(flow_rate_selected).state, ${oq_water_cp_j_per_kgk});
 
   - platform: template
     id: ${hp_id}_cooling_power
@@ -984,24 +1345,7 @@ sensor:
     accuracy_decimals: 0
     update_interval: 10s
     lambda: |-
-      // Cooling power follows measured HP working mode (1 = Cooling), not supervisory CM.
-      const float working_mode = id(${hp_id}_working_mode).state;
-      if (working_mode != 1.0f) return 0.0f;
-
-      const float t_in_c = id(${hp_id}_water_in_temp).state;
-      const float t_out_c = id(${hp_id}_water_out_temp).state;
-      const float flow_lph = id(flow_rate_selected).state;
-
-      if (isnan(t_in_c) || isnan(t_out_c) || isnan(flow_lph)) return 0.0f;
-
-      const float water_cp_j_per_kgk = ${oq_water_cp_j_per_kgk};  // J/(kg·K)
-      const float mass_flow_kgps = flow_lph / 3600.0f;            // kg/s (≈ L/h)
-      const float delta_t_k = t_in_c - t_out_c;                   // K, positive while cooling
-      const float cooling_power_w = mass_flow_kgps * water_cp_j_per_kgk * delta_t_k;
-
-      // During startup the water outlet can briefly still be warmer than the inlet.
-      // That is not cooling output, so do not expose or integrate it as negative power.
-      return (cooling_power_w < 0.0f) ? 0.0f : cooling_power_w;
+      return oq_energy::hp_cooling_power(id(${hp_id}_working_mode).state, id(${hp_id}_water_in_temp).state, id(${hp_id}_water_out_temp).state, id(flow_rate_selected).state, ${oq_water_cp_j_per_kgk});
 
   - platform: template
     id: ${hp_id}_cop
@@ -1011,16 +1355,7 @@ sensor:
     accuracy_decimals: 2
     update_interval: 10s
     lambda: |-
-      const float p_el_w = id(${hp_id}_power_input).state;
-      const float p_th_w = id(${hp_id}_heat_power).state;
-      const float min_valid_input_w = 5.0f;
-
-      if (isnan(p_el_w) || isnan(p_th_w)) return NAN;
-
-      // Avoid extreme COP values at (near) 0 W electrical input.
-      if (fabsf(p_el_w) < min_valid_input_w) return NAN;
-
-      return p_th_w / p_el_w;
+      return oq_energy::instant_ratio_or_nan(id(${hp_id}_heat_power).state, id(${hp_id}_power_input).state, 5.0f);
 
   - platform: template
     id: ${hp_id}_eer
@@ -1030,16 +1365,7 @@ sensor:
     accuracy_decimals: 2
     update_interval: 10s
     lambda: |-
-      const float p_el_w = id(${hp_id}_power_input).state;
-      const float p_cool_w = id(${hp_id}_cooling_power).state;
-      const float min_valid_input_w = 5.0f;
-
-      if (isnan(p_el_w) || isnan(p_cool_w)) return NAN;
-
-      // Avoid extreme EER values at (near) 0 W electrical input.
-      if (fabsf(p_el_w) < min_valid_input_w) return NAN;
-
-      return p_cool_w / p_el_w;
+      return oq_energy::instant_ratio_or_nan(id(${hp_id}_cooling_power).state, id(${hp_id}_power_input).state, 5.0f);
 
   # Internal raw diagnostic words. We keep these hidden and derive the compact
   # diagnostics we actually use from them instead of exposing dozens of
@@ -1057,6 +1383,7 @@ sensor:
       then:
         - lambda: |-
             if (isnan(x)) return;
+            id(${hp_id}_status_2108_last_update_ms) = millis();
             const uint16_t status = static_cast<uint16_t>(lroundf(x));
             id(${hp_id}_fan_low_speed_mode).publish_state((status & 0x0001u) != 0u);
             id(${hp_id}_bottom_plate_heater).publish_state((status & 0x0004u) != 0u);
@@ -1119,6 +1446,7 @@ sensor:
     on_value:
       then:
         - lambda: |-
+            // Capture pump evidence only while the ODU reports its pump-related fault bit.
             if (isnan(x)) return;
             const uint32_t now_ms = millis();
             const uint16_t fault_word = static_cast<uint16_t>(lroundf(x));
@@ -1155,9 +1483,6 @@ binary_sensor:
     id: ${hp_id}_fan_low_speed_mode
     name: "${prefix}Fan Low Speed Mode"
     internal: true
-    disabled_by_default: true
-    icon: mdi:fan-speed-1
-    device_class: running
 
   - platform: template
     id: ${hp_id}_bottom_plate_heater
@@ -1176,17 +1501,11 @@ binary_sensor:
     id: ${hp_id}_fan_defrost_mode
     name: "${prefix}Fan Defrost Mode"
     internal: true
-    disabled_by_default: true
-    icon: mdi:snowflake-melt
-    device_class: running
 
   - platform: template
     id: ${hp_id}_fan_high_speed_mode
     name: "${prefix}Fan High Speed Mode"
     internal: true
-    disabled_by_default: true
-    icon: mdi:fan-speed-3
-    device_class: running
 
   - platform: template
     id: ${hp_id}_4_way_valve
@@ -1239,9 +1558,9 @@ binary_sensor:
     id: ${hp_id}_ot_fault_active
     name: "${prefix}OT fault active"
     internal: true
-    device_class: problem
     lambda: |-
       // OT fault should only reflect explicit failure bits, not protection or cycle states.
+      // R2121.b13 is raw-only diagnostics: some pumps assert it in standby.
       auto has_bit = [](float raw, uint16_t bitmask) -> bool {
         return !isnan(raw) && ((static_cast<uint16_t>(lroundf(raw)) & bitmask) != 0);
       };
@@ -1276,19 +1595,46 @@ binary_sensor:
           has_bit(status_2121, 0x0200u) ||
           has_bit(status_2121, 0x0400u) ||
           has_bit(status_2121, 0x0800u) ||
-          has_bit(status_2121, 0x1000u) ||
-          has_bit(status_2121, 0x2000u);
+          has_bit(status_2121, 0x1000u);
 
   # ----------------------------
   # TEXT SENSOR
   # ----------------------------
 text_sensor:
   - platform: template
+    id: ${hp_id}_power_input_quality
+    name: "${prefix}Power Input quality"
+    internal: true
+    update_interval: 10s
+    lambda: |-
+      // Expose estimator validity to the existing debug recorder only.
+      return std::string(oq_energy::hp_input_power_status_name(
+          static_cast<oq_energy::HpInputPowerStatus>(
+              id(${hp_id}_power_input_status_code))));
+
+  - platform: template
     id: ${hp_id}_generation
     name: "${prefix}ODU generation"
     internal: true
-    icon: mdi:heat-pump-outline
+    update_interval: never
+
+  - platform: template
+    id: ${hp_id}_compressor_level_profile
+    name: "${prefix}Compressor level profile"
+    icon: mdi:speedometer
     entity_category: diagnostic
+    update_interval: never
+
+  - platform: template
+    id: ${hp_id}_generation_variant
+    name: "${prefix}ODU generation variant"
+    internal: true
+    update_interval: never
+
+  - platform: template
+    id: ${hp_id}_customer_model_code
+    name: "${prefix}ODU customer model code"
+    internal: true
     update_interval: never
 
   - platform: template
@@ -1319,29 +1665,32 @@ text_sensor:
       }
 
   - platform: template
-    id: ${hp_id}_excluded_levels_summary
-    name: "${prefix}Excluded compressor levels"
+    id: ${hp_id}_excluded_frequency_range_summary
+    name: "${prefix}Excluded compressor frequency range"
     icon: mdi:speedometer-slow
     update_interval: 10s
     lambda: |-
-      // Summarize the two exclusion selectors into one compact diagnostic label.
-      const std::string a = id(${hp_id}_excluded_level_a).has_state()
-                                ? id(${hp_id}_excluded_level_a).current_option()
-                                : std::string("None");
-      const std::string b = id(${hp_id}_excluded_level_b).has_state()
-                                ? id(${hp_id}_excluded_level_b).current_option()
-                                : std::string("None");
-
-      if (a == "None" && b == "None") {
+      // Publish the effective shared exclusion as one diagnostic value.
+      auto read_hz = [](auto* number) -> int {
+        return number->has_state() && !isnan(number->state)
+                   ? (int) lroundf(number->state)
+                   : -1;
+      };
+      const oq_frequency_policy::FrequencyRange range{
+          read_hz(id(${hp_id}_excluded_frequency_min_hz)),
+          read_hz(id(${hp_id}_excluded_frequency_max_hz))};
+      if (!oq_frequency_policy::valid_frequency_range(range))
+        return std::string("Invalid");
+      if (oq_frequency_policy::frequency_range_disabled(range))
         return std::string("None");
+      char value[24];
+      if (range.min_hz == range.max_hz) {
+        snprintf(value, sizeof(value), "%d Hz", range.min_hz);
+      } else {
+        snprintf(value, sizeof(value), "%d-%d Hz", range.min_hz,
+                 range.max_hz);
       }
-      if (a == "None") {
-        return b;
-      }
-      if (b == "None" || a == b) {
-        return a;
-      }
-      return a + ", " + b;
+      return std::string(value);
 
   - platform: template
     id: ${hp_id}_active_failures_list
@@ -1421,7 +1770,7 @@ text_sensor:
       if (has_bit(status_2121, 0x0400u)) add("Outlet water temp sensor failure");
       if (has_bit(status_2121, 0x0800u)) add("Inner coil temp sensor failure");
       if (has_bit(status_2121, 0x1000u)) add("Reserved temp sensor failure");
-      if (has_bit(status_2121, 0x2000u)) add("DC water pump failure");
+      // R2121.b13 remains available in the raw register, not as a failure message.
 
       return std::string(used == 0 ? "None" : s);
 
@@ -1430,9 +1779,6 @@ text_sensor:
     id: ${hp_id}_pcb_firmware_version
     name: "${prefix}ODU PCB firmware version"
     internal: true
-    icon: mdi:chip
-    entity_category: diagnostic
-    disabled_by_default: true
     lambda: |-
       if (!id(${hp_id}_pcb_firmware_raw).has_state()) {
         return {};
@@ -1461,6 +1807,37 @@ interval:
 
           // A confirmed online HP keeps the normal full-register polling cadence.
           if (id(${hp_id}_is_online)) {
+            const uint32_t now = millis();
+            const uint32_t last_retry = id(${hp_id}_runtime_frequency_retry_ms);
+            const bool retry_due = last_retry == 0U ||
+                now - last_retry >= 60000UL;
+            if (retry_due &&
+                id(${hp_id}_odu_generation_revalidation_required) &&
+                !id(${hp_id}_odu_generation_request_pending)) {
+              id(${hp_id}_runtime_frequency_retry_ms) = now == 0U ? 1U : now;
+              id(${hp_id}_detect_odu_generation_once).execute();
+              return;
+            }
+
+            const auto snapshot = oq_odu::decode_runtime_frequency_snapshot(
+                id(${hp_id}_runtime_frequency_snapshot_storage));
+            const bool table_incomplete =
+                !snapshot.cooling.valid || !snapshot.heating.valid ||
+                (snapshot.variant == oq_odu::Variant::V2_NEW_MODEL &&
+                 (!oq_odu::has_extended_frequency_table(snapshot, 1) ||
+                  !oq_odu::has_extended_frequency_table(snapshot, 2)));
+            if (retry_due &&
+                (table_incomplete || id(${hp_id}_runtime_frequency_revalidation_required)) &&
+                id(${hp_id}_odu_generation_detection_complete) &&
+                !id(${hp_id}_odu_generation_request_pending) &&
+                !id(${hp_id}_compressor_level_profile_request_pending) &&
+                !id(${hp_id}_odu_runtime_frequency)
+                     ->runtime_reload_blocked_after_write()) {
+              id(${hp_id}_runtime_frequency_retry_ms) = now == 0U ? 1U : now;
+              id(${hp_id}_load_runtime_frequency_table_once).execute();
+              return;
+            }
+
             id(${hp_id}).update();
             return;
           }
@@ -1484,5 +1861,8 @@ interval:
                 id(${hp_id}_is_online) = true;
                 id(oq_incident_manager).observe_transport(
                     ${hp_index}, true, millis());
+                if (!id(${hp_id}_odu_generation_request_pending)) {
+                  id(${hp_id}_detect_odu_generation_once).execute();
+                }
               });
           id(${hp_id}).queue_command(std::move(probe));

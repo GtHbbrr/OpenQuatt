@@ -15,17 +15,17 @@ Firmware should expose its channel explicitly via `release_channel` so Home Assi
 ## Workflows
 
 - `/.github/workflows/ci-build.yml`
-  - Trigger: push to `main` or `dev`, pull requests
+  - Trigger: push to `main`, pull requests
   - Actions:
     - validate and compile every enabled target from `build_targets.yaml`
     - upload compiled firmware artifacts per enabled target
 - `/.github/workflows/release-build.yml`
-  - Trigger: tag push `v*` and manual dispatch
+  - Trigger: tag push `v*`, or manual dispatch from an existing semantic-version tag
   - Actions:
-    - validate + compile every enabled target from `build_targets.yaml`
+    - validate + compile every enabled target from `build_targets.yaml` without compiler cache
     - publish target-specific OTA/factory release assets
     - generate target-specific `*-ota.manifest.json` files for OTA update checks
-    - create/update GitHub Release
+    - create the GitHub Release as a draft and publish it only after every expected asset is present
     - attach release firmware binaries and OTA manifests to the release
 - `/.github/workflows/dev-build.yml`
   - Trigger: push to `dev`, manual dispatch
@@ -95,8 +95,8 @@ DEV_VERSION="${BASE_VERSION}-dev.${DEV_STAMP}+local"
 esphome \
   -s project_version "${DEV_VERSION}" \
   -s release_channel dev \
-  -s release_manifest_url https://github.com/OpenQuatt/OpenQuatt/releases/download/dev-latest/openquatt-waveshare-duo-wifi-ota.manifest.json \
-  compile configs/waveshare/duo_wifi.yaml
+  -s release_manifest_url https://github.com/OpenQuatt/OpenQuatt/releases/download/dev-latest/openquatt-heatpump-controller-q-duo-ota.manifest.json \
+  compile configs/heatpump_controller_q/duo.yaml
 ```
 
 Use `python3 scripts/build_targets.py list-configs --status enabled` to inspect the enabled target list. This keeps the topology/hardware/connection matrix independent from release channel selection.
@@ -106,7 +106,7 @@ The repository now backs that URL with `/.github/workflows/dev-build.yml`, which
 ## How To Cut a Release
 
 1. Update `project_version` in `openquatt/oq_substitutions_common.yaml` on `dev`.
-2. Push `dev` and wait for `CI` and `Dev Build` to go green.
+2. Push `dev` and wait for `Dev Build` to go green. `CI` runs on pull requests and `main`, not on direct pushes to `dev`.
 3. Promote the validated `dev` commit to `main`. Recommended path: fast-forward `main` to `origin/dev`:
 
 ```bash
@@ -120,7 +120,7 @@ git push origin main
 You may still use a release PR when you want a reviewed release summary on GitHub, but the ruleset no longer requires that path.
 
 4. Wait for `CI` on `main` to go green.
-5. Create and push a tag from the merged `main` commit:
+5. Create and push a tag from the merged `main` commit. Do not create the GitHub Release manually; `Release Build` owns publication after its cache-free compile gate:
 
 ```bash
 git fetch origin
@@ -128,14 +128,16 @@ git tag v0.13.0 origin/main
 git push origin v0.13.0
 ```
 
-6. Check GitHub Actions:
+6. Wait for `Release Build` to finish. It creates a draft, uploads and verifies all expected assets, and only then publishes the GitHub Release. Add the prepared release notes after successful publication.
+7. Check GitHub Actions:
    - CI should be green.
    - Release workflow should publish artifacts.
-7. Verify GitHub Release contains:
+   - Pages Deploy should succeed after Release Build.
+8. Verify GitHub Release contains:
    - one `*-ota.manifest.json` per enabled target
    - one `*.firmware.ota.bin` per enabled target
    - one `*.firmware.factory.bin` per enabled target
-8. If `main` and `dev` no longer point to the same release content, realign `dev` with the released `main` commit before bumping to the next development version:
+9. If `main` and `dev` no longer point to the same release content, realign `dev` with the released `main` commit before bumping to the next development version:
 
 ```bash
 git fetch origin
@@ -153,6 +155,7 @@ If you used the recommended fast-forward promotion and did not add extra `main`-
 - Enabled target configs under `configs/` are secrets-free and suitable for CI builds.
 - First-install UX now lives on the GitHub Pages installer at `https://openquatt.github.io/OpenQuatt/install/`, which builds ESP Web Tools manifests dynamically in the browser against same-origin stable factory binaries mirrored onto Pages.
 - Target-specific `*-ota.manifest.json` files are intended for OTA update flows.
+- Stable releases also publish four legacy EOL manifests. They point only to the immutable v0.50.0 Waveshare/Heatpump Listener OTA binaries, never to a Q-edition binary; `dev-latest` intentionally has no legacy bridge.
 - Each firmware reads `${release_manifest_url}` from its selected config entrypoint.
 - OTA manifests and OTA binaries remain on GitHub Releases; only first-install factory binaries are mirrored onto Pages for Web Serial/CORS compatibility.
 - Workflow files must remain directly under `.github/workflows/` (GitHub does not load workflows from nested subfolders).

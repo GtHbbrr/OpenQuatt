@@ -87,6 +87,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
+      - name: Test HIL harness without hardware
+        run: npm run check:hil
+
       - name: Compile and run host regression tests
         run: ./scripts/run_host_regression_tests.sh
 

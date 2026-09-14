@@ -7,7 +7,7 @@ Van nieuwe controller naar een werkende OpenQuatt-installatie. De Heatpump Contr
 1. Maak de CiC en Quatt-buitenunit(s) spanningsloos, verplaats de kabels en voer de eindcontrole uit.
 2. Voed de HCQ, schakel de Quatt-buitenunit(s) weer in en stel Wi-Fi in.
 3. Open `openquatt.local` en controleer de basisverbinding.
-4. Kies in **Quick Start → Kies je setup** de juiste configuratie en rond Quick Start af.
+4. Kies in **Quick Start → Configuratie en software-update** de juiste configuratie, laat de software controleren en rond Quick Start af.
 
 Daarna werkt OpenQuatt zelfstandig via de web-app. Home Assistant is een optionele vervolgstap voor dashboards en automatisering.
 
@@ -41,6 +41,9 @@ Draadkleuren in de schema's en stappenhulp zijn illustratief. De klemmarkeringen
 
 > [!NOTE]
 > Bij de OpenTherm-verbindingen (`OTT` en `OTB`) en het aan/uit-contact (`R1`: `COM` + `NO`) maakt de polariteit of volgorde van de twee aders niet uit. Gebruik wel de genoemde aansluitklemmen.
+
+> [!WARNING]
+> Een ZJ-B10-flowmeter kan niet rechtstreeks op `Q` worden aangesloten. Voor deze vervanging moet de kabel worden aangepast met een BC547-transistor en een weerstand van 4,7 kΩ. Volg hiervoor de [ZJ-B10-aansluithandleiding en pinbezetting](hcq-io-overzicht.md#zj-b10-aansluiten).
 
 > [!IMPORTANT]
 > Kies voor de CV-ketel óf `OTB` óf `R1`; gebruik beide routes niet tegelijk.
@@ -133,7 +136,7 @@ Zie [Web-app gebruiken](web-app.md) voor bediening, updates, backups en beveilig
 
 ## 4. Quick Start afronden
 
-Quick Start verschijnt zolang de basisinstellingen nog niet zijn afgerond. De eerste stap heet in de web-app **Kies je setup**. De gemarkeerde kaart toont welke configuratie nu actief is; bij levering is dat normaal `Single · Wi-Fi`.
+Quick Start verschijnt zolang de basisinstellingen nog niet zijn afgerond. De eerste stap heet in de web-app **Configuratie en software-update**. De gemarkeerde kaart toont welke configuratie nu actief is; bij levering is dat normaal `Single · Wi-Fi`.
 
 Kies hier direct de combinatie die bij je installatie hoort:
 
@@ -142,7 +145,7 @@ Kies hier direct de combinatie die bij je installatie hoort:
 
 Sluit bij Ethernet eerst de netwerkkabel aan. Kies alleen `Duo` als de installatie daadwerkelijk twee warmtepompen heeft.
 
-Is je keuze anders dan de actieve configuratie, dan begeleidt de web-app de benodigde firmwarewissel vanuit Quick Start. Daarbij kan de controller andere firmware installeren en opnieuw opstarten. **Bestaande OpenQuatt-instellingen blijven bij een firmware-update of firmwarewissel behouden.** Je hoeft bij de eerste ingebruikname dus niet via **Instellingen → Systeem → Updates** te wisselen. Open na een herstart zo nodig opnieuw `http://openquatt.local` en ga verder met Quick Start.
+Na bevestiging controleert OpenQuatt de nieuwste stabiele release voor de gekozen configuratie. Alleen als de softwareversie of configuratie afwijkt, installeert OpenQuatt de juiste stabiele release en start de controller opnieuw op. Een aanwezige dev- of testbuild wordt daarmee vervangen. Zijn versie en configuratie al correct, dan gaat Quick Start zonder OTA verder. **Bestaande OpenQuatt-instellingen blijven bij een software-update of configuratiewissel behouden.** Je hoeft bij de eerste ingebruikname dus niet via **Instellingen → Systeem → Updates** te wisselen. Open na een herstart zo nodig opnieuw `http://openquatt.local` en ga verder met Quick Start.
 
 Daarna geef je aan welke Quatt Hybrid en installatie je hebt. V1, V1.5 en V2 beschrijven de generatie van de warmtepomp en staan los van de keuze voor `Single` of `Duo`.
 
@@ -152,11 +155,11 @@ Daarna geef je aan welke Quatt Hybrid en installatie je hebt. V1, V1.5 en V2 bes
 
 Volg de route die de web-app voor jouw installatie toont. De basisstappen zijn:
 
-1. **Kies je setup:** `Single` of `Duo` en Wi-Fi of Ethernet.
+1. **Configuratie en software-update:** `Single` of `Duo` en Wi-Fi of Ethernet; daarna controleert OpenQuatt de stabiele main-release en installeert deze alleen als dat nodig is.
 2. **Kies je Quatt Hybrid:** V1, V1.5 of V2.
 3. **Flowmeting configureren:** controleer en activeer de juiste flowbron.
 4. **Thermostaatgegevens configureren:** kies waar kamertemperatuur en kamer-setpoint vandaan komen.
-5. **CV-ketel of boiler:** geef aan of OpenQuatt deze als ondersteuning mag gebruiken.
+5. **Aanvullende warmtebron:** leg vast of een warmtebron is aangesloten, of deze hybride mag meeverwarmen bij een vermogenstekort en of deze mag overnemen wanneer geen warmtepomp beschikbaar is.
 6. **Kies de verwarmingsstrategie:** kies hoe OpenQuatt de verwarming regelt.
 7. **Werk de regeling uit:** stel Power House of de stooklijn verder in.
 8. **Flowregeling en afstelling:** leg vast hoe de pomp geregeld moet worden en welke waarden daarbij horen.
@@ -164,6 +167,8 @@ Volg de route die de web-app voor jouw installatie toont. De basisstappen zijn:
 10. **Stille uren en niveaus:** stel het stille venster en de compressorlimieten voor dag en nacht in.
 11. **Gebruiksstatistieken:** controleer of OpenQuatt beperkte technische systeemstatus, aan/uit-statussen van functies en configuratiekeuzes zoals Quatt Hybrid-versie, verwarmingsstrategie, flowbron en regelbronnen mag delen; tijdens een nieuwe Quick Start staat dit standaard aan en kan het hier worden uitgezet. Gemeten of ingestelde temperaturen, wifi-gegevens, gebruikersnamen en wachtwoorden worden nooit meegestuurd.
 12. **Bevestigen en afronden:** controleer je keuzes en markeer Quick Start als voltooid.
+
+Bij een koude verwarmingsstart circuleert OpenQuatt eerst water en controleert daarna de uitgaande temperatuur van iedere aangesloten ODU. Onder `5 °C` blijven de compressoren uit; met `Overnemen wanneer de warmtepomp niet beschikbaar is` kan de aanvullende warmtebron voorverwarmen. Tussen `5 en 12 °C` starten de warmtepompen zelfstandig; met `Hybride verwarmen bij vermogenstekort` helpt de aanvullende warmtebron tijdelijk mee. Vanaf `12 °C` geldt de normale warmteregeling. Een algemene startgrens van `18 °C` wordt niet toegepast.
 
 ## Je installatie is klaar wanneer
 

@@ -1,22 +1,82 @@
-# Retained crashtelemetrie
+# Crashtelemetrie
 
 Wanneer gebruiksstatistieken zijn ingeschakeld, bewaart OpenQuatt na een echte
 ESP32/ESPHome-crash één begrensd technisch crashrapport. Dit rapport wordt na de
-herstart met QoS 1 en retain gepubliceerd op:
+herstart met QoS 1 en zonder retain gepubliceerd op:
 
 ```text
 <usage_telemetry_topic>/<installation-id>/crash
 ```
 
-Het topic representeert bewust alleen de laatste crash. Een volgende crash
-vervangt de vorige retained waarde. Er is geen crashqueue.
+Na een MQTT PUBACK wordt de lokale crashkopie gewist. Tot dat moment blijft het
+begrensde record in flash beschikbaar voor een retry. MQTT QoS 1 kan dezelfde
+crash opnieuw afleveren wanneer een acknowledgement verloren gaat. Een ontvanger
+moet daarom dedupliceren op de combinatie van `installation_id` en `message_id`.
+
+De MQTT-client voor crashpublicatie wordt door een geïsoleerde worker beheerd.
+De normale ESPHome-hoofdloop bouwt alleen de begrensde payload op en verwerkt
+het resultaat. Een trage of vastlopende MQTT-start of -cleanup mag daardoor de
+verwarmingsregeling of controllerhoofdloop niet blokkeren. Het lokale
+crashrecord wordt pas gewist nadat de PUBACK is ontvangen én de client volledig
+is opgeruimd; blijft de cleanup hangen, dan blijft het record behouden voor een
+retry onder hetzelfde `message_id`.
 
 De payload bevat geen gewone runtime-logs, metingen of regelwaarden. Wel bevat
 hij de regels uit het ESPHome-crashrapport, het resettype, firmwareversie,
 releasekanaal, ESPHome-versie, bronrepository, volledige commit-SHA, exact
 buildtarget, release-manifest-URL indien van toepassing, hardwareprofiel,
-topologie, verbinding, buildtijd en de volledige ELF-SHA256 van de firmware die
-het rapport verstuurt.
+topologie, verbinding, verbindingsvoorkeur, buildtijd en de volledige ELF-SHA256
+van de firmware die het rapport verstuurt. Bij een gecombineerde WiFi- en
+Ethernetfirmware is `connection` de actuele verbinding (`wifi`, `eth` of `none`)
+en `connection_preference` de ingestelde voorkeur (`auto`, `wifi` of `eth`).
+
+Bij een abort/assert bevat het rapport ook `Abort details`, wanneer de tekst
+veilig beschikbaar was. Een assert is een interne controle die de firmware
+stopt wanneer een verwachte toestand niet klopt. De detailregel kan de functie,
+het bronbestand, de regel en de gefaalde controle bevatten. Dit helpt wanneer
+meerdere controles hetzelfde backtrace-adres delen; het bewijst niet vanzelf
+de onderliggende oorzaak.
+
+OpenQuatt bewaart daarvoor maximaal 255 tekens per core in vaste buffers in
+intern RAM die een softwareherstart overleven (284 bytes per core inclusief
+metadata; 568 bytes op de dual-core ESP32-S3). Iedere core schrijft zijn eigen
+buffer, zodat gelijktijdige aborts geen gedeelde schrijfbuffer nodig hebben.
+Bij de volgende boot wordt hiervan een onveranderlijke kopie gemaakt voor het
+rapport; een nieuwe crash kan de tekst van het vorige rapport zo niet wijzigen.
+Die kopie kost nogmaals 568 bytes op de ESP32-S3, plus enkele statusbytes.
+Langere teksten krijgen `[truncated]`;
+onleesbare, lege of niet bij deze build/core passende details worden weggelaten.
+Tijdens de abort worden alleen bytes uit intern DRAM gelezen, zonder
+geheugenallocatie, locks of flashschrijfacties. Tekst in flash of PSRAM wordt
+overgeslagen. Na de herstart loopt de detailregel mee in hetzelfde begrensde
+crashrecord, met dezelfde toestemming, publicatie- en retryregels. Er wordt
+geen gewone logbuffer meegestuurd; abortteksten kunnen wel door de betreffende
+software ingevulde technische waarden bevatten.
+
+Deze uitbreiding helpt alleen bij toekomstige aborts/asserts. Oude rapporten,
+een stroomonderbreking en crashes zonder beschikbare aborttekst krijgen geen
+extra detailregel. De firmware verwijdert de RAM-geldigheidsmarkering vroeg bij
+de volgende boot om details van een eerdere crash niet opnieuw te gebruiken.
+Bij falende flashopslag gevolgd door nog een herstart kan de detailregel daarom
+verloren gaan; het bestaande ESPHome-crashrecord houdt zijn eigen levenscyclus.
+
+De tijdvelden hebben bewust verschillende betekenissen:
+
+- `crash_timestamp` is de laatste geldige UTC Unix-tijd die vóór de reset in een
+  RTC-breadcrumb is vastgelegd. Deze wordt normaal iedere 15 seconden vernieuwd,
+  maar kan bij een vastgelopen controllerloop ouder zijn. Het veld is `null`
+  wanneer geen geldige breadcrumb beschikbaar is.
+- `crash_uptime_s` is de uptime die bij dezelfde breadcrumb hoorde en is eveneens
+  `null` wanneer de breadcrumb ontbreekt.
+- `reported_at` is de geldige UTC Unix-tijd waarop de MQTT-payload na de herstart
+  is opgebouwd. OpenQuatt wacht hiervoor maximaal 60 seconden op een tijdsync
+  tijdens de huidige boot. Het veld is `null` zonder zo'n sync of wanneer de
+  gesynchroniseerde tijd vóór `crash_timestamp` ligt.
+- `reporting_build_epoch` is uitsluitend de compileertijd van de rapporterende
+  firmware en mag niet als crash- of ontvangsttijd worden gebruikt.
+
+Een server-`received_at` kan bij retries of een opnieuw afgeleverde MQTT-message
+veranderen en is daarom evenmin het crashmoment.
 
 ESPHome geeft in zijn replay aan wanneer de adressen bij een andere firmwarebuild
 horen. In dat geval staat `captured_by_reporting_build` op `false` en mogen de
@@ -26,22 +86,35 @@ Voor normale crashes na een herstart in dezelfde firmware kan een kandidaat-ELF
 opnieuw worden gebouwd vanuit de opgenomen bronrepository, commit en het exacte
 target, met de opgenomen ESPHome-versie en buildtijd als aanvullende invoer.
 Gebruik dit ELF uitsluitend wanneer zijn SHA256 exact gelijk is aan
-`reporting_build_id`. De firmware bewaart of publiceert niet standaard bij
-iedere build een ELF-bestand.
+`reporting_build_id`.
 
-Na een MQTT PUBACK wordt de lokale crashkopie gewist. Tot dat moment blijft het
-begrensde record in flash beschikbaar voor een retry. Bij opt-out bewaart
-OpenQuatt alleen een kleine pending-tombstone status en publiceert het een lege
-retained payload zodra de broker bereikbaar is.
+Voor Heatpump Controller Q-builds bewaart GitHub Actions de exacte symbolen uit
+dezelfde build als de firmware. Getagde releases krijgen 90 dagen één artifact
+`openquatt-q-debug-symbols-<tag>`. Dev-builds krijgen 7 dagen een uniek artifact
+`openquatt-q-debug-symbols-<dev-versie>`, zodat oudere symbolen beschikbaar
+blijven wanneer `dev-latest` naar een nieuwere build verschuift.
+
+Deze symbolen zijn geen GitHub Release-assets. Ieder artifact bevat per Q-target
+de exacte `firmware.elf`, `openquatt.map` en een `index.json`. Het indexbestand
+koppelt de bestanden via de ELF-SHA256 rechtstreeks aan `reporting_build_id`,
+plus het buildtarget, de broncommit en de gebruikte ESPHome-versie. Andere
+hardwareprofielen krijgen geen debug-symbolenartifact.
+
+Bij opt-out bewaart OpenQuatt alleen een kleine pending-tombstone status en
+publiceert het een lege retained payload zodra de broker bereikbaar is. Deze
+tombstone verwijdert ook crashwaarden die door oudere firmware retained zijn
+gepubliceerd; gewone crashberichten zijn niet retained. Alleen een firmware-
+upgrade verstuurt geen opruimtombstone; bestaande retained waarden worden
+server-side afgehandeld.
 
 ## Bewuste begrenzingen van deze eerste versie
 
-- Er wordt één crash bewaard; een nieuwere crash vervangt een nog niet
-  verwerkte oudere crash.
+- Er wordt lokaal één crash bewaard; een nieuwere crash vervangt een nog niet
+  gepubliceerde oudere crash.
 - Een pending tombstone gebruikt de op dat moment geconfigureerde broker en
   topicbasis. Migratie over meerdere oude endpoints valt buiten deze versie.
-- De opgenomen buildvelden maken een gerichte rebuild en SHA-controle mogelijk,
-  maar vormen geen garantie dat iedere oude toolchain later nog byte-identiek
-  beschikbaar is.
+- Voor Q-releasebuilds zijn de exacte symbolen 90 dagen beschikbaar en voor
+  Q-dev-builds 7 dagen; daarna blijft reconstructie afhankelijk van de opgenomen
+  buildmetadata.
 - Wanneer een opnieuw gebouwd ELF niet exact dezelfde SHA256 heeft, blijven de
   adressen ruwe diagnose-informatie en worden ze niet gesymboliseerd.
