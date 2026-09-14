@@ -922,6 +922,14 @@ import { escapeHtml } from "../core/html.js";
             when: currentFlowSource === "Outdoor unit" && hasEntity("qFlowSource"),
           },
           {
+            key: "controllerFlowMeter",
+            label: "Lokale flowmeter",
+            infoId: "controllerFlowMeter-info",
+            infoCopy: "De Huba Control 236-flowmeter wordt normaliter door Quatt geïnstalleerd en is de standaardkeuze. Kies ZJ-B10 alleen als dat type op de controller is aangesloten; zie het Q-edition I/O-overzicht in de documentatie voor aansluiting en kalibratie. Deze instelling bepaalt de omrekening van pulsen naar flow en wordt bewaard na een herstart.",
+            optionLabels: { "Huba Control": "Huba Control (door Quatt geïnstalleerd)" },
+            when: currentFlowSource === "Outdoor unit" && hasEntity("controllerFlowMeter") && currentQFlowSource !== "Outdoor unit",
+          },
+          {
             key: "outdoorUnitFlowMode",
             label: "Meterkeuze",
             infoId: "outdoorUnitFlowMode-info",

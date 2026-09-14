@@ -155,6 +155,7 @@
     ["waterSupplySource", DOMAIN_SELECT, "Water Supply Source"],
     ["flowSource", DOMAIN_SELECT, "Flow Source"],
     ["qFlowSource", DOMAIN_SELECT, "Q Flow Source"],
+    ["controllerFlowMeter", DOMAIN_SELECT, "Controller Flow Meter"],
     ["outdoorUnitFlowMode", DOMAIN_SELECT, "Outdoor Unit Flow Mode"],
     ["outsideTempSource", DOMAIN_SELECT, "Outside Temperature Source"],
     ["roomTempSource", DOMAIN_SELECT, "Room Temperature Source"],
@@ -1101,6 +1102,7 @@
   export const SENSOR_SELECTION_KEYS = [
     "waterSupplySource",
     "localWaterSupplyTempSource",
+    "controllerFlowMeter",
     "flowSource",
     "qFlowSource",
     "outdoorUnitFlowMode",
@@ -1992,6 +1994,7 @@
         ...SUPPLY_CALIBRATION_BACKUP_KEYS,
         "waterSupplySource",
         "localWaterSupplyTempSource",
+        "controllerFlowMeter",
         "flowSource",
         "qFlowSource",
         "outdoorUnitFlowMode",
