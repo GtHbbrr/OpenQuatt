@@ -20,10 +20,12 @@ const {
   renderOduGenerationDetectionStatus,
 } = await import("../js/src/features/odu-generation-ui.js");
 const { state } = await import("../js/src/core/state.js");
-const [installationSource, quickStartSource, quickStartActionsSource, entitySyncSource, namedButtonActionsSource] = await Promise.all([
+const [installationSource, quickStartSource, quickStartActionsSource, quickStartUiActionsSource, firmwareActionsSource, entitySyncSource, namedButtonActionsSource] = await Promise.all([
   readFile(new URL("../js/src/settings/installation.js", import.meta.url), "utf8"),
   readFile(new URL("../js/src/features/quickstart.js", import.meta.url), "utf8"),
   readFile(new URL("../js/src/features/quickstart-actions.js", import.meta.url), "utf8"),
+  readFile(new URL("../js/src/features/quickstart-ui-actions.js", import.meta.url), "utf8"),
+  readFile(new URL("../js/src/features/firmware-actions.js", import.meta.url), "utf8"),
   readFile(new URL("../js/src/core/entity-sync.js", import.meta.url), "utf8"),
   readFile(new URL("../js/src/core/named-button-actions.js", import.meta.url), "utf8"),
 ]);
@@ -68,6 +70,12 @@ test("web accepteert alleen canonieke firmwarelabels en bevat geen registermappi
   assert.equal(normalizeDetectedOduGeneration("v2"), "Unknown");
   assert.equal(normalizeDetectedOduGeneration("0x1037"), "Unknown");
   assert.equal(normalizeDetectedOduGeneration(4151), "Unknown");
+});
+
+test("Quick Start bevestigt ook de actieve setup zonder expliciete draft", () => {
+  assert.match(quickStartUiActionsSource, /"open-quickstart-modal"[\s\S]*?state\.quickStartSetupDraft = "";/);
+  assert.match(firmwareActionsSource, /state\.quickStartSetupDraft \|\| currentSetup/);
+  assert.match(quickStartSource, /data-oq-action="open-history-storage-modal"/);
 });
 
 test("Single adviseert exact de bekende firmwaredetectie", () => {
