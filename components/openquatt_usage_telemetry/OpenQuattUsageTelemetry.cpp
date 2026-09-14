@@ -679,6 +679,11 @@ void OpenQuattUsageTelemetry::start_publish_session_(SessionKind kind) {
   this->cleanup_disconnect_requested_ = false;
   this->session_started_ms_ = millis();
   this->session_active_.store(true);
+  if (kind == SessionKind::EXTERNAL) {
+    // The shared external transport is rate-limited from session start. This
+    // keeps a fixed device-uptime cadence from being shifted by teardown time.
+    this->external_next_publish_allowed_us_ = esp_timer_get_time() + EXTERNAL_PUBLISH_INTERVAL_US;
+  }
 
   if (!this->notify_worker_(WorkerCommand::START)) {
     this->session_active_.store(false);
@@ -886,9 +891,8 @@ void OpenQuattUsageTelemetry::complete_publish_session_() {
   this->cleanup_succeeded_.store(false);
 
   if (completed_kind == SessionKind::EXTERNAL) {
-    // Start the cooldown after teardown: delayed offline requests, failed ACKs
-    // and cancellation must not allow two publications within fifteen minutes.
-    this->external_next_publish_allowed_us_ = esp_timer_get_time() + EXTERNAL_PUBLISH_INTERVAL_US;
+    // The cooldown was anchored at session start, so teardown latency does not
+    // move the next fixed device-uptime publication deadline.
     const bool cancelled = this->external_publish_blocked_.load();
     this->session_kind_.store(SessionKind::NONE);
     this->external_publish_pending_.store(false);

@@ -10,6 +10,7 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE = ROOT / "components/openquatt_performance_telemetry/OpenQuattPerformanceTelemetry.cpp"
+USAGE_SOURCE = ROOT / "components/openquatt_usage_telemetry/OpenQuattUsageTelemetry.cpp"
 
 
 class PerformanceConsentFailureTest(unittest.TestCase):
@@ -157,7 +158,13 @@ int main() {
             self.assertEqual(executed.returncode, 0, executed.stderr)
 
     def test_transport_cooldown_survives_cancellation_and_delayed_sessions(self) -> None:
-        source = (ROOT / "components/openquatt_usage_telemetry/OpenQuattUsageTelemetry.cpp").read_text()
+        source = USAGE_SOURCE.read_text()
+        start_method = source.index("void OpenQuattUsageTelemetry::start_publish_session_")
+        cooldown_assignment = next(
+            line.strip()
+            for line in source[start_method : source.index("\n}", start_method)].splitlines()
+            if "external_next_publish_allowed_us_ = esp_timer_get_time()" in line
+        )
         methods = []
         for signature in (
             "bool OpenQuattUsageTelemetry::request_external_publish",
@@ -207,6 +214,7 @@ struct OpenQuattUsageTelemetry {
   std::atomic<SessionKind> session_kind_{SessionKind::NONE};
   std::atomic<ExternalPublishResult> external_publish_result_{ExternalPublishResult::NONE};
   uint32_t next_publish_ms_{0}, consecutive_failures_{0};
+  void start_external_session() { COOLDOWN_ASSIGNMENT }
   void clear_payload_() {}
   void schedule_regular_publish_() {}
   void schedule_retry_() {}
@@ -222,32 +230,57 @@ int main() {
     OpenQuattUsageTelemetry transport;
     now_us = 0;
     assert(transport.request_external_publish("/performance", "{}", 2));
-    // Pending offline for an hour: acceptance must not start the cooldown.
-    now_us = 3600000000LL;
-    assert(!transport.request_external_publish("/performance", "{}", 2));
+    // Starting the external session, not acceptance or teardown, anchors the
+    // fifteen-minute gate in the production implementation.
+    transport.start_external_session();
+    now_us = 10000000LL;
     transport.session_kind_ = SessionKind::EXTERNAL;
     transport.cleanup_succeeded_ = result == ExternalPublishResult::SUCCEEDED;
     if (result == ExternalPublishResult::CANCELLED) transport.cancel_external_publish();
     transport.complete_publish_session_();
     assert(transport.external_publish_result_ == result);
-    // Toggling consent, replacing a batch and a retry must all obey the gate.
+    // A subsequent session gets a fresh start-anchored gate; teardown and
+    // consent cancellation cannot bypass that gate.
     transport.cancel_external_publish();
+    assert(!transport.request_external_publish("/performance", "{}", 2));
+    now_us = 899999999LL;
+    assert(!transport.request_external_publish("/performance", "{}", 2));
+    ++now_us;
+    assert(transport.request_external_publish("/performance", "{}", 2));
+    transport.start_external_session();
+    transport.session_kind_ = SessionKind::EXTERNAL;
+    transport.cancel_external_publish();
+    transport.complete_publish_session_();
     assert(!transport.request_external_publish("/performance", "{}", 2));
     now_us += 899999999LL;
     assert(!transport.request_external_publish("/performance", "{}", 2));
     ++now_us;
     assert(transport.request_external_publish("/performance", "{}", 2));
-    assert(!transport.external_publish_blocked_);
   }
-  // Cancelling a request that never started cannot have sent any data.
+  // Cancelling before session start clears the request without sending data;
+  // a delayed session start at +400s anchors its own +900s deadline.
   OpenQuattUsageTelemetry transport;
   now_us = 0;
   assert(transport.request_external_publish("/performance", "{}", 2));
   transport.cancel_external_publish();
+  assert(!transport.external_publish_pending_);
+  assert(transport.request_external_publish("/performance", "{}", 2));
+  now_us = 400000000LL;
+  transport.start_external_session();
+  transport.session_kind_ = SessionKind::EXTERNAL;
+  transport.cancel_external_publish();
+  transport.complete_publish_session_();
+  now_us = 1299999999LL;
+  assert(!transport.request_external_publish("/performance", "{}", 2));
+  ++now_us;
   assert(transport.request_external_publish("/performance", "{}", 2));
 }
 '''
-        self.compile_and_run(harness + "\n".join(methods) + cases)
+        self.compile_and_run(
+            harness.replace("COOLDOWN_ASSIGNMENT", cooldown_assignment.replace("this->", ""))
+            + "\n".join(methods)
+            + cases
+        )
 
 
 if __name__ == "__main__":

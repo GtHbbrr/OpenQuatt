@@ -73,7 +73,6 @@ class OpenQuattPerformanceTelemetry : public switch_::Switch, public Component {
   static constexpr size_t PAYLOAD_CAPACITY = 4096U;
   static constexpr uint32_t SAMPLE_SECONDS = 10U;
   static constexpr uint32_t MINUTE_SECONDS = 60U;
-  static constexpr uint32_t WINDOW_SECONDS = 15U * MINUTE_SECONDS;
   static constexpr uint32_t START_SETTLE_SECONDS = 5U * MINUTE_SECONDS;
   static constexpr uint32_t LEVEL_SETTLE_SECONDS = MINUTE_SECONDS;
   static constexpr uint32_t DEFROST_SETTLE_SECONDS = 5U * MINUTE_SECONDS;
@@ -155,7 +154,7 @@ class OpenQuattPerformanceTelemetry : public switch_::Switch, public Component {
   void process_sample_(uint32_t timestamp_s);
   bool sample_minute_(uint32_t timestamp_s);
   void finish_minute_();
-  void close_window_(uint32_t next_window_s);
+  void close_window_(bool allow_publish);
   bool append_record_(const MinuteRecord& record);
   bool build_pending_payload_();
   void try_publish_pending_();
@@ -200,6 +199,8 @@ class OpenQuattPerformanceTelemetry : public switch_::Switch, public Component {
   std::atomic<bool> enabled_{false};
   std::atomic<bool> choice_configured_{false};
   std::atomic<bool> publish_in_flight_{false};
+  bool pending_publish_allowed_{false};
+  int64_t next_publish_us_{0};
 };
 
 }  // namespace esphome::openquatt_performance_telemetry

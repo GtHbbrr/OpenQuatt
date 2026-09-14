@@ -5,9 +5,12 @@
 
 #include "components/openquatt_performance_telemetry/OpenQuattPerformanceTelemetryPolicy.h"
 
+using esphome::openquatt_performance_telemetry::advance_performance_publish_deadline;
 using esphome::openquatt_performance_telemetry::append_json_escaped;
 using esphome::openquatt_performance_telemetry::append_json_string;
 using esphome::openquatt_performance_telemetry::FixedBufferWriter;
+using esphome::openquatt_performance_telemetry::performance_publish_due;
+using esphome::openquatt_performance_telemetry::PERFORMANCE_PUBLISH_INTERVAL_US;
 using esphome::openquatt_performance_telemetry::PERFORMANCE_SAMPLES_PER_MINUTE;
 using esphome::openquatt_performance_telemetry::retry_due;
 using esphome::openquatt_performance_telemetry::stable_minute;
@@ -25,6 +28,16 @@ int main() {
   assert(retry_due(100U, 100U));
   assert(retry_due(5U, 0xFFFFFFF0U));
   assert(!retry_due(100U, 101U));
+
+  const int64_t boot_deadline = PERFORMANCE_PUBLISH_INTERVAL_US;
+  assert(!performance_publish_due(PERFORMANCE_PUBLISH_INTERVAL_US - 1, boot_deadline));
+  assert(performance_publish_due(PERFORMANCE_PUBLISH_INTERVAL_US, boot_deadline));
+  assert(advance_performance_publish_deadline(boot_deadline, PERFORMANCE_PUBLISH_INTERVAL_US) ==
+         2 * PERFORMANCE_PUBLISH_INTERVAL_US);
+  // A delayed loop catches up to the next fixed uptime deadline; NTP cannot
+  // re-anchor this schedule because it never receives a wall-clock value.
+  assert(advance_performance_publish_deadline(boot_deadline, 3 * PERFORMANCE_PUBLISH_INTERVAL_US + 1) ==
+         4 * PERFORMANCE_PUBLISH_INTERVAL_US);
 
   assert(valid_active_measurement(100.0f, 100.0f, 0.0f));
   assert(!valid_active_measurement(99.9f, 100.0f, 0.0f));

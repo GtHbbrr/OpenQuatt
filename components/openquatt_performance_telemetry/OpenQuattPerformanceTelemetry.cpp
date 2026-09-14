@@ -6,6 +6,7 @@
 #include <cstdio>
 #include <cstring>
 
+#include "esp_timer.h"
 #include "OpenQuattPerformanceTelemetryPolicy.h"
 #include "esp_random.h"
 #include "esp_system.h"
@@ -62,6 +63,9 @@ void append_hp(FixedBufferWriter& output, const OpenQuattPerformanceTelemetry::M
 float OpenQuattPerformanceTelemetry::get_setup_priority() const { return setup_priority::LATE; }
 
 void OpenQuattPerformanceTelemetry::setup() {
+  // esp_timer_get_time() is device uptime from the ESP timer epoch. Keep the
+  // first slot at exactly boot+15m; setup latency is caught up by loop().
+  this->next_publish_us_ = PERFORMANCE_PUBLISH_INTERVAL_US;
   if (!this->records_.allocate()) {
     ESP_LOGE(TAG, "Could not allocate performance records in PSRAM; telemetry remains disabled");
     this->publish_state(false);
@@ -92,6 +96,11 @@ void OpenQuattPerformanceTelemetry::setup() {
 
 void OpenQuattPerformanceTelemetry::loop() {
   this->handle_transport_result_();
+  const int64_t monotonic_now_us = esp_timer_get_time();
+  const bool publish_due = performance_publish_due(monotonic_now_us, this->next_publish_us_);
+  if (publish_due) {
+    this->next_publish_us_ = advance_performance_publish_deadline(this->next_publish_us_, monotonic_now_us);
+  }
   if (!this->enabled_.load() || !this->setup_complete_() || this->clock_ == nullptr) return;
 
   const auto now = this->clock_->now();
@@ -100,6 +109,13 @@ void OpenQuattPerformanceTelemetry::loop() {
   const uint32_t slot_s = timestamp_s - (timestamp_s % SAMPLE_SECONDS);
   if (slot_s != this->last_sample_slot_s_) {
     this->process_sample_(slot_s);
+  }
+  // The cadence is anchored to monotonic device uptime. Only complete minutes
+  // already finalized by process_sample_ enter the batch; a half-filled minute
+  // remains in minute_ and is finalized exactly once at the next UTC boundary.
+  if (publish_due) {
+    this->pending_publish_allowed_ = true;
+    this->close_window_(true);
   }
   this->try_publish_pending_();
 }
@@ -194,7 +210,6 @@ void OpenQuattPerformanceTelemetry::process_sample_(uint32_t timestamp_s) {
   const uint32_t minute_s = timestamp_s - (timestamp_s % MINUTE_SECONDS);
   if (this->minute_.start_s != 0U && minute_s != this->minute_.start_s) {
     this->finish_minute_();
-    if (minute_s % WINDOW_SECONDS == 0U) this->close_window_(minute_s);
     this->minute_ = {};
   }
   if (this->minute_.start_s == 0U) this->minute_.start_s = minute_s;
@@ -322,19 +337,19 @@ void OpenQuattPerformanceTelemetry::finish_minute_() {
 }
 
 bool OpenQuattPerformanceTelemetry::append_record_(const MinuteRecord& record) {
-  const uint32_t record_window = record.start_s - (record.start_s % WINDOW_SECONDS);
-  if (this->active_window_s_ == 0U) this->active_window_s_ = record_window;
-  if (record_window != this->active_window_s_ ||
-      (this->active_record_count_ != 0U &&
-       (this->records_[0U].generation != record.generation || this->records_[0U].strategy != record.strategy))) {
-    this->close_window_(record_window);
+  if (this->active_record_count_ != 0U &&
+      (this->records_[0U].generation != record.generation || this->records_[0U].strategy != record.strategy)) {
+    // A semantic change closes the partial batch, but publication remains on
+    // the monotonic fifteen-minute cadence rather than happening immediately.
+    this->close_window_(false);
   }
+  if (this->active_window_s_ == 0U) this->active_window_s_ = record.start_s;
   if (this->active_record_count_ >= RECORDS_PER_BATCH) return false;
   this->records_[this->active_record_count_++] = record;
   return true;
 }
 
-void OpenQuattPerformanceTelemetry::close_window_(uint32_t next_window_s) {
+void OpenQuattPerformanceTelemetry::close_window_(bool allow_publish) {
   if (this->active_record_count_ != 0U) {
     if (this->pending_record_count_ == 0U) {
       for (size_t index = 0U; index < this->active_record_count_; ++index) {
@@ -343,13 +358,14 @@ void OpenQuattPerformanceTelemetry::close_window_(uint32_t next_window_s) {
       this->pending_window_s_ = this->active_window_s_;
       this->pending_record_count_ = this->active_record_count_;
       this->pending_batch_id_ = random_uuid_();
+      this->pending_publish_allowed_ = allow_publish;
       this->next_retry_ms_ = 0U;
       this->consecutive_failures_ = 0U;
     } else {
       ESP_LOGW(TAG, "Dropping one completed performance window while an earlier batch is retried");
     }
   }
-  this->active_window_s_ = next_window_s;
+  this->active_window_s_ = 0U;
   this->active_record_count_ = 0U;
 }
 
@@ -413,8 +429,8 @@ bool OpenQuattPerformanceTelemetry::build_pending_payload_() {
 }
 
 void OpenQuattPerformanceTelemetry::try_publish_pending_() {
-  if (this->pending_record_count_ == 0U || this->publish_in_flight_.load() || this->transport_ == nullptr ||
-      !retry_due(millis(), this->next_retry_ms_)) {
+  if (this->pending_record_count_ == 0U || !this->pending_publish_allowed_ || this->publish_in_flight_.load() ||
+      this->transport_ == nullptr || !retry_due(millis(), this->next_retry_ms_)) {
     return;
   }
   if (!this->build_pending_payload_()) {
@@ -427,7 +443,17 @@ void OpenQuattPerformanceTelemetry::try_publish_pending_() {
     this->payload_.release();
   } else {
     this->payload_.release();
-    this->schedule_retry_();
+    // A transport cooldown is measured from session start and may end just
+    // after the fixed uptime slot. Retry at that boundary (not five minutes
+    // later); other failures retain exponential backoff.
+    const int64_t now_us = esp_timer_get_time();
+    const int64_t allowed_us = this->transport_->external_publish_next_allowed_us();
+    if (allowed_us > now_us) {
+      const uint64_t delay_ms = static_cast<uint64_t>((allowed_us - now_us + 999) / 1000);
+      this->next_retry_ms_ = millis() + static_cast<uint32_t>(std::min<uint64_t>(delay_ms, RETRY_MAX_MS));
+    } else {
+      this->schedule_retry_();
+    }
   }
 }
 
@@ -461,6 +487,7 @@ void OpenQuattPerformanceTelemetry::clear_pending_() {
   this->pending_batch_id_.clear();
   this->next_retry_ms_ = 0U;
   this->consecutive_failures_ = 0U;
+  this->pending_publish_allowed_ = false;
   this->publish_in_flight_.store(false);
 }
 

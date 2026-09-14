@@ -4,6 +4,9 @@
 # Separate opt-in for compact, anonymous heating measurements used to validate
 # performance maps. It deliberately reuses the outbound-only usage telemetry
 # transport without enabling ESPHome's global MQTT integration.
+# Batches are published every 15 minutes from device boot using monotonic
+# uptime; `ws` is the UTC start timestamp of the first complete minute in the
+# batch and is informational, not a UTC-quarter-hour schedule anchor.
 # ==============================================================================
 
 openquatt_performance_telemetry:

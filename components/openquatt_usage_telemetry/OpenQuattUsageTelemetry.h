@@ -99,6 +99,7 @@ class OpenQuattUsageTelemetry : public switch_::Switch,
   bool ensure_installation_id_for_external() override;
   const char* external_installation_id() const override { return this->installation_id_.c_str(); }
   bool request_external_publish(const char* suffix, const char* payload, size_t payload_size) override;
+  int64_t external_publish_next_allowed_us() const override { return this->external_next_publish_allowed_us_; }
   void cancel_external_publish() override;
   ExternalPublishResult take_external_publish_result() override;
   void setup() override;

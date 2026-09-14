@@ -12,6 +12,19 @@ namespace esphome::openquatt_performance_telemetry {
 inline constexpr uint8_t PERFORMANCE_SAMPLES_PER_MINUTE = 6U;
 inline constexpr float PERFORMANCE_MIN_INPUT_POWER_W = 100.0f;
 inline constexpr float PERFORMANCE_MIN_THERMAL_POWER_W = 100.0f;
+inline constexpr int64_t PERFORMANCE_PUBLISH_INTERVAL_US = 15LL * 60LL * 1000000LL;
+
+inline bool performance_publish_due(int64_t now_us, int64_t deadline_us) {
+  return deadline_us > 0 && now_us >= deadline_us;
+}
+
+inline int64_t advance_performance_publish_deadline(int64_t deadline_us, int64_t now_us) {
+  if (deadline_us <= 0) return now_us + PERFORMANCE_PUBLISH_INTERVAL_US;
+  do {
+    deadline_us += PERFORMANCE_PUBLISH_INTERVAL_US;
+  } while (deadline_us <= now_us);
+  return deadline_us;
+}
 
 class FixedBufferWriter {
  public:

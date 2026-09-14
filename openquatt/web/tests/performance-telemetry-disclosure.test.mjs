@@ -12,6 +12,7 @@ test("privacy settings compose two cards with nested detail disclosures", async 
   assert.match(settingsSource, /renderSettingsSection\(/);
   assert.match(settingsSource, /disclosure: renderUsageTelemetryDisclosure\(\{ collapsible: true/);
   assert.match(settingsSource, /disclosure: renderPerformanceTelemetryDisclosure\(\{ collapsible: true/);
+  assert.match(settingsSource, /renderPerformanceTelemetryConsent\(\{ enabled: performanceEnabled, busy: performanceBusy, settings: true,/);
   assert.doesNotMatch(settingsSource, /\? renderUsageTelemetryDisclosure/);
   assert.doesNotMatch(settingsSource, /\? renderPerformanceTelemetryDisclosure/);
 });

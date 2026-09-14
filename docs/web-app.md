@@ -91,7 +91,7 @@ Quick Start begint met de configuratiekeuze en software-update. Daarna volgen de
 | `Watertemperatuur beveiligen` | Maximale watertemperatuur | Laat OpenQuatt terugregelen voordat het water te warm wordt. |
 | `Stille uren en niveaus` | Tijdvenster en compressorlimieten | Begrenst de compressor bijvoorbeeld 's nachts. |
 | `Gebruiksstatistieken` | Wel of niet beperkte technische systeemstatus en feature-instellingen delen | Tijdens een nieuwe Quick Start staat delen standaard aan en kan het hier worden uitgezet. |
-| `Prestatiemetingen` | Wel of niet stabiele verwarmingsmetingen delen voor validatie van het prestatiemodel | Tijdens een nieuwe Quick Start staat delen standaard uit en kan het hier worden aangezet. |
+| `Prestatiemetingen` | Wel of niet stabiele verwarmingsmetingen delen voor validatie van het prestatiemodel | Tijdens een nieuwe Quick Start staat delen standaard uit en kan het hier worden aangezet. Na inschakelen worden maximaal 15 complete minuutrecords per bericht iedere 15 minuten vanaf deviceboot verstuurd; de planning volgt uptime en niet UTC-kwartiergrenzen. |
 | `Bevestigen en afronden` | Je keuzes controleren | Markeert de basisconfiguratie als klaar. |
 
 Je hoeft niet meteen perfecte waardes te kiezen. Het doel van Quick Start is een veilige, begrijpelijke basis. Fijnregelen kan later.
