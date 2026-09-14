@@ -382,7 +382,7 @@ export function renderSettingsCheckboxSwitchField(key, title, copy, label, class
   );
 }
 
-export function renderSettingsIntegrationSwitchCard(key, title, copy) {
+export function renderSettingsIntegrationSwitchCard(key, title, copy, help = "") {
   if (!hasEntity(key)) {
     return "";
   }
@@ -392,6 +392,7 @@ export function renderSettingsIntegrationSwitchCard(key, title, copy) {
     <article class="oq-settings-integration-card" data-oq-settings-field="${escapeHtml(key)}">
       <div class="oq-settings-integration-card-head">
         <h4>${escapeHtml(title)}</h4>
+        ${renderSettingsInfoToggle(key, title, help)}
       </div>
       <p>${escapeHtml(copy)}</p>
       ${renderSettingsCompactSwitchControl(key, title, enabled, busy)}

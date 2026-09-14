@@ -131,6 +131,7 @@ export function createSettingsState() {
     installationMonitoringDetailsOpen: false,
     compressorLimitsOpen: false,
     integrationDiagnosticsOpen: false,
+    cicAddressOpen: false,
     oduRuntimeFrequencyStatuses: {},
     oduRuntimeFrequencyDrafts: {},
     oduRuntimeFrequencyError: "",
