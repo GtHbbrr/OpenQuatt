@@ -243,6 +243,7 @@ NESTED_KEY_ORDER_RULES = {
         "oq_api_ingress",
         "oq_mqtt_ingress",
         "oq_usage_telemetry",
+        "oq_performance_telemetry",
         "oq_local_sensors",
         "oq_sensor_sources",
     ),

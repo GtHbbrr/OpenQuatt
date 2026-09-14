@@ -21,6 +21,7 @@
     ["water", "Watertemperatuur beveiligen", "Controleer de normale bovengrens en de tripgrens voor het watercircuit."],
     ["silent", "Stille uren en niveaus", "Stel daarna het stille venster en de compressorlimieten voor dag en nacht in."],
     ["usage-telemetry", "Gebruiksstatistieken", "Kies of OpenQuatt beperkte technische gebruiksstatistieken mag delen. Tijdens een nieuwe Quick Start staat delen standaard aan.", "usageTelemetryEnabled"],
+    ["performance-telemetry", "Prestatiemetingen", "Kies of OpenQuatt stabiele verwarmingsmetingen mag delen voor validatie van het prestatiemodel. Tijdens een nieuwe Quick Start staat delen standaard uit.", "performanceTelemetryEnabled"],
     ["confirm", "Bevestigen en afronden", "Controleer nog één keer je keuzes. Met afronden markeer je Quick Start als voltooid."],
   ].map(([id, title, copy, optionalEntity], index) => ({ id, kicker: `Stap ${index + 1}`, title, copy, ...(optionalEntity ? { optionalEntity } : {}) }));
 
@@ -93,6 +94,8 @@
     ["usageTelemetryEnabled", DOMAIN_SWITCH, "Usage statistics"],
     ["usageTelemetryChoiceConfigured", DOMAIN_BINARY_SENSOR, "Usage statistics choice configured"],
     ["usageTelemetryInstallationId", DOMAIN_TEXT_SENSOR, "Usage statistics installation ID"],
+    ["performanceTelemetryEnabled", DOMAIN_SWITCH, "Performance model validation"],
+    ["performanceTelemetryChoiceConfigured", DOMAIN_BINARY_SENSOR, "Performance model validation choice configured"],
     ["hpGeneration", DOMAIN_SELECT, "Quatt Hybrid version", false],
     ["electricalCurrentLimit", DOMAIN_NUMBER, "Electrical current limit"],
     ["strategy", DOMAIN_SELECT, "Heating Control Mode", false],
@@ -668,12 +671,15 @@
     activity: '<path d="M3 12h4l2-7 4 14 2-7h6"/>',
     "bar-chart": '<path d="M4 19V5"/><path d="M20 19H4"/><rect x="7" y="11" width="3" height="5" rx="1"/><rect x="12" y="7" width="3" height="9" rx="1"/><rect x="17" y="3" width="3" height="13" rx="1"/>',
     calculator: '<rect x="4" y="2" width="16" height="20" rx="2"/><path d="M8 6h8"/><path d="M16 14v4"/><path d="M16 10h.01"/><path d="M12 10h.01"/><path d="M8 10h.01"/><path d="M12 14h.01"/><path d="M8 14h.01"/><path d="M12 18h.01"/><path d="M8 18h.01"/>',
+    clock: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
     clipboard: '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/>',
     "clipboard-check": '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/><path d="m11 14 2 2 4-5"/>',
     droplet: '<path d="M12 3.2s6 6.5 6 10.8a6 6 0 0 1-12 0c0-4.3 6-10.8 6-10.8z"/>',
     flame: '<path d="M12 12c2 -2.96 0 -7 -1 -8c0 3.04 -1.77 4.74 -3 6c-1.23 1.26 -2 3.24 -2 5a6 6 0 1 0 12 0c0 -1.53 -1.06 -3.94 -2 -5c-1.79 3 -2.79 3 -4 2z"/>',
     "home-cog": '<path d="M5 12h-2l9 -9l9 9h-2"/><path d="M5 12v7a2 2 0 0 0 2 2h4"/><path d="M9 21v-6a2 2 0 0 1 2 -2h1"/><circle cx="17" cy="18" r="2"/><path d="M17 14.5v1.5"/><path d="M17 20v1.5"/><path d="M13.97 16.25l1.3 .75"/><path d="M18.73 19l1.3 .75"/><path d="M20.03 16.25l-1.3 .75"/><path d="M15.27 19l-1.3 .75"/>',
+    info: '<circle cx="12" cy="12" r="8.5"/><path d="M12 11v5"/><path d="M12 7.6h.01"/>',
     link: '<path d="M9 15l6 -6"/><path d="M11 6l.46 -.54a5 5 0 0 1 7.08 7.08l-.54 .46"/><path d="M13 18l-.46 .54a5 5 0 0 1 -7.08 -7.08l.54 -.46"/>',
+    lock: '<rect x="5" y="10.5" width="14" height="9.5" rx="2.5"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"/>',
     "monitor-dashboard": '<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8"/><path d="M12 16v4"/><path d="M6.5 7h7v4h-7z"/><path d="M16 7h2"/><path d="M16 10h2"/><path d="M6.5 13h3"/><path d="M11 13h2.5"/>',
     "more-horizontal": '<path d="M5 12h.01"/><path d="M12 12h.01"/><path d="M19 12h.01"/>',
     pencil: '<path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>',
@@ -1889,6 +1895,7 @@
     "manualCoolingEnable",
     "usageTelemetryEnabled",
     "usageTelemetryInstallationId",
+    "performanceTelemetryEnabled",
     "silentModeOverride",
     "silentActive",
     "trendHistoryEnabled",
@@ -1946,6 +1953,7 @@
     "coolingEffectiveMinSupplyTemp",
     "statusLedsEnabled",
     "usageTelemetryEnabled",
+    "performanceTelemetryEnabled",
     "controlModeOverride",
   ]);
   // Keep this aligned with persisted UI settings. The build checks that new

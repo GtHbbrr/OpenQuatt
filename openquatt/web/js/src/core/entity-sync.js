@@ -217,7 +217,7 @@ import { fetchWithTimeout } from "./browser-utils.js";
       COOLING_SCHEDULE_EFFECTIVE_SOURCE_KEY,
     ],
     integrations: ["otEnabled", "cicPollingEnabled", "flowSource", "boilerConnection", "boilerCommandValid", "otbLinkAvailable"],
-    system: ["setupComplete", "projectVersionText", "releaseChannelText", "firmwareUpdateChannel", "statusLedsEnabled", "usageTelemetryEnabled", "usageTelemetryChoiceConfigured", "usageTelemetryInstallationId"],
+    system: ["setupComplete", "projectVersionText", "releaseChannelText", "firmwareUpdateChannel", "statusLedsEnabled", "usageTelemetryEnabled", "usageTelemetryChoiceConfigured", "usageTelemetryInstallationId", "performanceTelemetryEnabled"],
   };
 
   export const SETTINGS_GROUP_KEY_MAP = {
@@ -311,6 +311,7 @@ import { fetchWithTimeout } from "./browser-utils.js";
       "usageTelemetryEnabled",
       "usageTelemetryChoiceConfigured",
       "usageTelemetryInstallationId",
+      "performanceTelemetryEnabled",
       ...SETTINGS_STORAGE_KEYS,
       "debugLevel",
     ],

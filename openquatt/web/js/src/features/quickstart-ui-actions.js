@@ -7,6 +7,7 @@ import {
   applyQuickStartFlowSourceConfiguration,
   applyQuickStartHeatingEnableSource,
   applyQuickStartThermostatSourceConfiguration,
+  initializeQuickStartPerformanceTelemetryChoice,
   initializeQuickStartUsageTelemetryChoice,
   refreshQuickStartFlowSignal,
   refreshQuickStartStepHydration,
@@ -35,7 +36,9 @@ export function confirmQuickStartSetup(confirmed) {
 async function prepareQuickStartStep(stepId) {
   const preparationId = ++quickStartPreparationId;
   const preparesUsageTelemetry = stepId === "usage-telemetry";
-  if (preparesUsageTelemetry) {
+  const preparesPerformanceTelemetry = stepId === "performance-telemetry";
+  const preparesTelemetry = preparesUsageTelemetry || preparesPerformanceTelemetry;
+  if (preparesTelemetry) {
     if (state.busyAction && state.busyAction !== USAGE_TELEMETRY_PREPARATION_ACTION) {
       return;
     }
@@ -62,6 +65,9 @@ async function prepareQuickStartStep(stepId) {
       }
       captureUsageTelemetryPreview("quickstart", { mqttEnabled });
     }
+    if (preparesPerformanceTelemetry) {
+      await initializeQuickStartPerformanceTelemetryChoice();
+    }
   } finally {
     if (preparationId === quickStartPreparationId
       && state.busyAction === USAGE_TELEMETRY_PREPARATION_ACTION) {
@@ -77,7 +83,7 @@ function moveQuickStartStep(offset) {
     render();
     return;
   }
-  if (state.currentStep === "usage-telemetry") {
+  if (state.currentStep === "usage-telemetry" || state.currentStep === "performance-telemetry") {
     state.controlError = "";
     state.controlNotice = "";
   }
@@ -124,7 +130,7 @@ const quickStartActionHandlers = {
       return;
     }
     state.currentStep = stepId;
-    if (state.currentStep === "usage-telemetry") {
+    if (state.currentStep === "usage-telemetry" || state.currentStep === "performance-telemetry") {
       state.controlError = "";
       state.controlNotice = "";
     }
@@ -155,6 +161,8 @@ const quickStartActionHandlers = {
   "apply-quickstart-heating-enable": (button) => applyQuickStartHeatingEnableSource(button?.dataset?.heatingEnableTarget || null),
   "retry-usage-telemetry-choice": () => prepareQuickStartStep("usage-telemetry"),
   "confirm-no-usage-telemetry": () => commitSwitch("usageTelemetryEnabled", false),
+  "retry-performance-telemetry-choice": () => prepareQuickStartStep("performance-telemetry"),
+  "confirm-no-performance-telemetry": () => commitSwitch("performanceTelemetryEnabled", false),
   "previous-step": () => moveQuickStartStep(-1),
   "next-step": () => moveQuickStartStep(1),
 };

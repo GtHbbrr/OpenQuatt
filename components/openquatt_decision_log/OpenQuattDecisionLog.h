@@ -254,7 +254,9 @@ class OpenQuattDecisionLog : public Component {
   static constexpr uint64_t URGENT_FLUSH_COALESCE_US = 2ULL * 1000ULL * 1000ULL;
   static constexpr uint64_t URGENT_FLUSH_MIN_INTERVAL_US = 15ULL * 1000ULL * 1000ULL;
   static constexpr uint64_t URGENT_FLUSH_RETRY_US = 30ULL * 1000ULL * 1000ULL;
-  static constexpr size_t URGENT_FLUSH_MAX_BATCHES = 4U;
+  // An urgent flush must persist its target promptly, but one ESPHome loop
+  // must not perform several synchronous flash writes back-to-back.
+  static constexpr size_t URGENT_FLUSH_MAX_BATCHES = 1U;
 
   static_assert(FLASH_EVENT_CAPACITY == 5120, "Decision-log flash ring capacity changed unexpectedly");
   static_assert(FLASH_PARTITION_OFFSET % FLASH_SECTOR_SIZE == 0,

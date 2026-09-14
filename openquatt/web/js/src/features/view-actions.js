@@ -170,7 +170,10 @@ const viewActionHandlers = {
     toggleDetails(event, button, ".oq-settings-odu-technical", "oduRuntimeFrequencyTechnicalDetailsOpen");
   },
   "toggle-usage-telemetry-details": (button, event) => {
-    toggleDetails(event, button, ".oq-usage-disclosure--collapsible", "usageTelemetryDetailsOpen");
+    toggleDetails(event, button, ".oq-usage-consent-details", "usageTelemetryDetailsOpen");
+  },
+  "toggle-performance-telemetry-details": (button, event) => {
+    toggleDetails(event, button, ".oq-usage-consent-details", "performanceTelemetryDetailsOpen");
   },
   "toggle-storage-technical-details": (button, event) => {
     toggleDetails(event, button, ".oq-settings-storage-technical", "settingsStorageDetailsOpen");
