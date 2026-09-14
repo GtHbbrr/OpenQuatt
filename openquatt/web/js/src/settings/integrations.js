@@ -67,15 +67,17 @@ import { escapeHtml } from "../core/html.js";
     };
 
     const urlField = hasEntity("cicFeedUrl") ? `
-      <article class="oq-settings-integration-card oq-settings-integration-card--wide" data-oq-settings-field="cicFeedUrl">
+      <details class="oq-settings-cic-address"${state.cicAddressOpen ? " open" : ""}>
+        <summary data-oq-action="toggle-cic-address">Adres aanpassen</summary>
+      <article class="oq-settings-integration-card oq-settings-integration-card--wide oq-settings-cic-feed-url" data-oq-settings-field="cicFeedUrl">
         <div class="oq-settings-integration-card-head">
-          <h4>CIC feed URL</h4>
-          <span class="oq-settings-integration-pill">Lokaal</span>
+          <h4>Adres van de CiC JSON-feed</h4>
         </div>
         <label class="oq-settings-control oq-settings-control--text">
           <input
             class="oq-helper-input oq-settings-integration-url-input"
             type="url"
+            aria-label="Adres van de CiC JSON-feed"
             data-oq-field="cicFeedUrl"
             value="${escapeHtml(String(getInputDraftValue("cicFeedUrl") || ""))}"
             placeholder="http://<host>:<poort>/beta/feed/data.json"
@@ -84,8 +86,9 @@ import { escapeHtml } from "../core/html.js";
             ${state.loadingEntities ? "disabled" : ""}
           >
         </label>
-        <p>Gebruik de lokale JSON-feed van de CiC.</p>
+        <p>Vul het IP-adres van jouw CiC in. Dit is het adres van de gegevensbron, niet van OpenQuatt.</p>
       </article>
+      </details>
     ` : "";
 
     const otDiagnosticPanel = renderDiagnosticGroup("OpenTherm thermostaat (OTT)", [
@@ -158,7 +161,7 @@ import { escapeHtml } from "../core/html.js";
     }
     const otbDiagnosticPanel = renderDiagnosticGroup("OpenTherm ketel (OTB)", otbDiagnosticRows);
 
-    const cicDiagnosticPanel = renderDiagnosticGroup("CIC-feed", [
+    const cicDiagnosticPanel = renderDiagnosticGroup("CiC-feed", [
       hasEntity("cicJsonFeedOk") ? renderDiagnosticItem({
         label: "JSON-feed",
         value: !cicPollingEnabled
@@ -201,16 +204,17 @@ import { escapeHtml } from "../core/html.js";
     return renderSettingsSection(
       "Integratie",
       "OpenTherm en CiC",
-      "Configureer de thermostaatbus, externe CiC-feed en Quatt app-compatibiliteit.",
+      "Kies welke verbindingen je gebruikt.",
       `
-        <div class="oq-settings-integration-grid">
-          <p class="oq-settings-action-note oq-settings-integration-card--wide">
-            De aansluiting van de cv-ketel — OpenTherm of aan/uit via R1 — stel je in onder <strong>Instellingen → Installatie</strong>. Daarom wordt deze hier niet apart weergegeven.
-          </p>
-          ${renderSettingsIntegrationSwitchCard("otEnabled", "OpenTherm-thermostaat", "Thermostaatbus voor warmtevraag en kamerwaarden.")}
-          ${renderSettingsIntegrationSwitchCard("cicPollingEnabled", "CIC-polling", "JSON-feed uitlezen voor setpoint, kamerwaarden en flow.")}
-          ${renderSettingsIntegrationSwitchCard("cicCompatibilityMode", "CiC-compatibiliteit", "Gegevens doorgeven zodat de Quatt app kan blijven meekijken.")}
-          ${urlField}
+        <div class="oq-settings-cic-connections">
+          ${renderSettingsIntegrationSwitchCard("otEnabled", "OpenTherm-thermostaat", "Thermostaat rechtstreeks op OTT.", "Leest de aangesloten thermostaat. Kies onder Sensorselectie welke thermostaatwaarden je gebruikt. De aansluiting van de cv-ketel stel je in onder Instellingen → Installatie.")}
+          ${hasCicConfig ? `
+            <div class="oq-settings-cic-input">
+              ${renderSettingsIntegrationSwitchCard("cicPollingEnabled", "CiC JSON-feed inlezen", "Gegevens uit de CiC gebruiken in OpenQuatt.", "De CiC is de originele Quatt-controller. OpenQuatt leest via je lokale netwerk onder meer kamerwaarden en flow uit de JSON-feed. Stel het feed-adres in en kies onder Sensorselectie welke CiC-waarden je gebruikt. Dit heette eerder CIC-polling.")}
+              ${urlField}
+            </div>
+          ` : ""}
+          ${renderSettingsIntegrationSwitchCard("cicCompatibilityMode", "Quatt-app via CiC", "Buitenunitgegevens laten zien in de Quatt-app.", "Verbind M2 via een aparte RS485-kabel met de Modbuspoort van de CiC. Deze Modbusverbinding geeft alleen buitenunitgegevens door, geen thermostaatgegevens. OpenQuatt blijft regelen. De CiC heeft voeding en netwerk nodig; JSON-feed inlezen hoeft hiervoor niet aan. Dit heette eerder CiC-compatibiliteit.")}
         </div>
         ${diagnosticsPanel}
       `,

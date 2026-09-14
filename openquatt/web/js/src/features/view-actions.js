@@ -151,6 +151,9 @@ const viewActionHandlers = {
   "toggle-integration-diagnostics": (button, event) => {
     toggleDetails(event, button, ".oq-settings-integration-diagnostics", "integrationDiagnosticsOpen");
   },
+  "toggle-cic-address": (button, event) => {
+    toggleDetails(event, button, ".oq-settings-cic-address", "cicAddressOpen");
+  },
   "open-odu-bottom-plate-settings": () => {
     state.controlNotice = "";
     state.systemModal = "odu-bottom-plate-settings";

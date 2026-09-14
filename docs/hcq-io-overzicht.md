@@ -16,7 +16,7 @@ Technische naslag voor ontwikkeling en diagnose van de Electropaultje Heatpump C
 | `OTT` | Kamerthermostaat | OpenTherm slave, twee aders |
 | `OTB` | CV-ketel | OpenTherm master, twee aders |
 | `M1` | Quatt-buitenunit(s) | RS485 Modbus: `GND` / `A` / `B` |
-| `M2` | Optionele CiC-compatibiliteit | RS485 Modbus: `GND` / `A` / `B` |
+| `M2` | Quatt-app via CiC (optioneel) | RS485 Modbus: `GND` / `A` / `B` |
 | Ethernet | Netwerk in Ethernet-builds | W5500 met RJ45 |
 | USB | Voeding, Wi-Fi-provisioning, flashen en herstel | USB |
 
@@ -34,7 +34,7 @@ Gebruik voor de CV-ketel altijd precies één route: `OTB` of `R1`, nooit beide 
 | OpenTherm thermostaat | `OTT` | slave: in/uit | in `GPIO21`, uit `GPIO14` |
 | OpenTherm CV-ketel | `OTB` | master: in/uit | in `GPIO47`, uit `GPIO48` |
 | Buitenunit-Modbus | `M1` | UART met RS485 DE/RE | TX `GPIO40`, RX `GPIO42`, DE/RE `GPIO41` |
-| CiC-compatibiliteit | `M2` | UART met RS485 DE/RE | TX `GPIO45`, RX `GPIO39`, DE/RE `GPIO38` |
+| Quatt-app via CiC | `M2` | UART met RS485 DE/RE | TX `GPIO45`, RX `GPIO39`, DE/RE `GPIO38` |
 | Ethernet W5500 | RJ45 | SPI | MOSI `GPIO10`, MISO `GPIO11`, CLK `GPIO12`, CS `GPIO13`, INT `GPIO9` |
 | Status-led geel | Front | GPIO-uitgang | `GPIO1` |
 | Status-led rood | Front | GPIO-uitgang | `GPIO2` |
@@ -110,7 +110,7 @@ Op `OTT` gedraagt de HCQ zich als OpenTherm-slave tegenover de kamerthermostaat.
 
 `M1` is de primaire RS485-poort voor de buitenunit(s). De HCQ is hier Modbus-master met 19200 baud, 8E1 en DE/RE op `GPIO41`.
 
-`M2` is de optionele tweede RS485-poort voor CiC-compatibiliteit. Hier is de HCQ Modbus-server met 19200 baud, 8E1 en DE/RE op `GPIO38`. Na het aansluiten moet **CiC-compatibiliteit** in de web-app worden ingeschakeld als de Quatt-app via de CiC moet blijven meekijken.
+`M2` is de optionele tweede RS485-poort voor **Quatt-app via CiC**. Hier is de HCQ Modbus-server met 19200 baud, 8E1 en DE/RE op `GPIO38`. De CiC leest via deze koppeling alleen buitenunitgegevens; thermostaatgegevens gaan niet naar de CiC. Schakel na het aansluiten **Quatt-app via CiC** in als de Quatt-app via de CiC moet blijven meekijken. Dit staat los van **CiC JSON-feed inlezen**.
 
 ### Ethernet, leds en herstelknop
 

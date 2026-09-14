@@ -323,7 +323,7 @@
       },
       {
         number: "06",
-        label: "CiC-optie",
+        label: "Quatt-app via CiC",
         file: "q-edition-kabelstap-6-cic-compatibiliteit.svg",
         mobileFile: "q-edition-kabelstap-6-cic-compatibiliteit-mobile.svg",
         height: 405,

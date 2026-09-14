@@ -330,6 +330,7 @@ test("integration diagnostics separates thermostat, boiler control, OTB and CiC"
     otbFlameOn: { value: true },
     otbChPressure: { value: 1.6, uom: "bar" },
     cicPollingEnabled: { value: true },
+    cicCompatibilityMode: { value: false },
     cicJsonFeedOk: { value: true },
   };
 
@@ -345,6 +346,9 @@ test("integration diagnostics separates thermostat, boiler control, OTB and CiC"
     assert.match(html, /Waterdruk/);
     assert.match(html, /De aansluiting van de cv-ketel/);
     assert.match(html, /Instellingen → Installatie/);
+    assert.match(html, /CiC JSON-feed inlezen/);
+    assert.match(html, /Quatt-app via CiC/);
+    assert.match(html, /JSON-feed inlezen hoeft hiervoor niet aan/);
     assert.doesNotMatch(html, /thermostaatbus, ketelaansturing/);
   } finally {
     state.entities = previousEntities;
