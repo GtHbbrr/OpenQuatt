@@ -201,7 +201,7 @@ Voeg een nieuw package-bestand toe in `openquatt/`, bijvoorbeeld:
 
 Gebruik als startpunt:
 
-- `docs/templates/heating-strategy-template.yaml`
+- `docs/development/heating-strategy-template.yaml`
 
 Optioneel:
 
@@ -348,6 +348,6 @@ Een nieuwe strategy is pas merge-klaar als:
 
 Gebruik dit bestand als startpunt:
 
-- [Heating strategy template](templates/heating-strategy-template.yaml)
+- [Heating strategy template](heating-strategy-template.yaml)
 
 Dit template is expres minimaal en niet direct in de package-load opgenomen. Het is bedoeld als skeleton voor nieuwe strategy-modules.

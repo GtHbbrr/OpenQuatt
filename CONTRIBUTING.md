@@ -2,6 +2,9 @@
 
 This guide is intended for repo maintenance and reviews. Its goal is not to enforce generic YAML style, but to keep ESPHome packages predictable and quick to review.
 
+For architecture, HIL, release and local-development references, see
+[`docs/development/`](docs/development/README.md).
+
 ## Purpose
 
 - Keep high-churn control packages logically organized.
@@ -58,6 +61,14 @@ Not everything is checked automatically. These rules remain leading during revie
 - Add comments only where intent is not immediately clear.
 - Write new and changed code comments in English, including YAML comments and `//` comments inside ESPHome lambdas.
 
+## Ownership And Maintenance
+
+- Do not change control behaviour during a structural cleanup. Keep formatting, comments and functional changes in separate batches where practical.
+- Preserve the package include order in `openquatt/oq_packages*.yaml` unless dependencies are deliberately redesigned.
+- Do not add `web_server.sorting_groups`, `sorting_group_id` or `sorting_weight`: the OpenQuatt SPA owns entity layout, while ESPHome retains this unused metadata in dynamic internal-heap maps.
+- Keep established IDs and suffixes readable: use `oq_*` for system-owned state, `hp1_*` / `hp2_*` for per-heat-pump entities, `*_selected` for canonical selected inputs, and explicit unit/time suffixes such as `_ms`, `_s`, `_min`, `_w`, `_c` and `_lph`.
+- When a package or user-facing entity changes, update the relevant user documentation in the same PR.
+
 ## Embedded Memory and Heap
 
 Internal DRAM is a safety and availability budget, not interchangeable with free PSRAM. Wi-Fi, lwIP, TLS, ESP-MQTT, DMA and several FreeRTOS paths still require internal memory and often a sufficiently large contiguous block.
@@ -83,7 +94,7 @@ Validate memory-sensitive work with identical baseline and candidate firmware. R
 
 Measure during cold boot and realistic combined load, including the applicable HA, web, API, MQTT, Modbus, OpenTherm and OTA/flash paths. Avoid high-frequency diagnostic polling that materially changes the result. The linker RAM summary is useful for static deltas, but does not expose transient task stacks, TLS buffers or allocation peaks.
 
-An unexplained regression, allocation failure, or minimum/largest-block result without measured margin for the worst simultaneous allocation is release-blocking until investigated. Establish healthy HIL baselines per hardware profile and turn those into explicit profile budgets rather than relying on one global magic number. See `docs/system-overview.md` for the project memory model.
+An unexplained regression, allocation failure, or minimum/largest-block result without measured margin for the worst simultaneous allocation is release-blocking until investigated. Establish healthy HIL baselines per hardware profile and turn those into explicit profile budgets rather than relying on one global magic number. See `docs/development/system-overview.md` for the project memory model.
 
 ## Lambda Style
 
