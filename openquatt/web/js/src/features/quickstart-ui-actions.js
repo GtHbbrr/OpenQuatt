@@ -14,6 +14,7 @@ import {
 } from "./quickstart-actions.js";
 import { isQuickStartStepSelectionAllowed, selectQuickStepByOffset } from "./quickstart.js";
 import { installQuickStartSetupSwitch } from "./firmware-actions.js";
+import { getFirmwareBuildConnection, getInstallationTopology } from "./device-context.js";
 import {
   captureUsageTelemetryPreview,
   loadUsageTelemetryPreviewMqttEnabled,
@@ -21,6 +22,15 @@ import {
 
 const USAGE_TELEMETRY_PREPARATION_ACTION = "quickstart-usage-telemetry-prepare";
 let quickStartPreparationId = 0;
+
+export function confirmQuickStartSetup(confirmed) {
+  if (confirmed && !state.quickStartSetupDraft) {
+    const topology = getInstallationTopology();
+    const connection = getFirmwareBuildConnection();
+    state.quickStartSetupDraft = topology && connection ? `${topology}:${connection}` : "";
+  }
+  state.quickStartSetupConfirmed = Boolean(confirmed) && Boolean(state.quickStartSetupDraft);
+}
 
 async function prepareQuickStartStep(stepId) {
   const preparationId = ++quickStartPreparationId;
@@ -86,6 +96,8 @@ const quickStartActionHandlers = {
   },
   "open-quickstart-modal": () => {
     state.currentStep = "setup";
+    state.quickStartSetupDraft = "";
+    state.quickStartSetupConfirmed = false;
     state.quickStartModalMode = "wizard";
     state.quickStartModalOpen = true;
     render();

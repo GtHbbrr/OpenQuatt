@@ -21,7 +21,7 @@ import { handleMqttAction, syncMqttDraftFromInput } from "../features/mqtt-actio
 import { handleOduEepromDumpAction } from "../features/odu-eeprom-dump.js";
 import { handleOduRuntimeFrequencyAction, handleOduRuntimeFrequencyInputKeyDown, updateOduRuntimeFrequencyDraft } from "../features/odu-runtime-frequency.js";
 import { handleOduSettingsAction, updateOduSettingsDraft } from "../features/odu-settings.js";
-import { handleQuickStartAction } from "../features/quickstart-ui-actions.js";
+import { confirmQuickStartSetup, handleQuickStartAction } from "../features/quickstart-ui-actions.js";
 import { handleSecurityAction, stopLoginAuthStatusPolling } from "../features/security-actions.js";
 import { clearSettingsBackupDraft, handleSettingsBackupFileSelection, handleStorageHistoryAction, normalizeEnergyHistoryExportMode } from "../features/storage-history.js";
 import { handleSystemAction } from "../features/system-actions.js";
@@ -190,7 +190,7 @@ function updateFrequencyRangeControl(input) {
     }
 
     if (event.target.dataset.oqQuickstartSetupConfirm) {
-      state.quickStartSetupConfirmed = Boolean(event.target.checked);
+      confirmQuickStartSetup(Boolean(event.target.checked));
       render();
       return;
     }
