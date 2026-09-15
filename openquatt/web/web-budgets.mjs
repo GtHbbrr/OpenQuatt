@@ -41,12 +41,20 @@ export const WEB_BUNDLE_BUDGETS = [
     // Compact pipeline plus the bottom-plate editor/backup: ~914 kB.
     // the issue-649 heating supply target source card with OT/HA/API/MQTT rows:
     // measured +3.668 kB over its compact baseline.
+    // Includes the separate issue-670 performance-telemetry privacy control.
+    // plus the performance-telemetry consent/disclosure in usage-statistics
+    // format (consent card, collapsible included/excluded scope, JSON example):
+    // measured +3.457 kB over the compact-control baseline.
+    // plus the privacy mockup panel (nested facts/why columns, icons):
+    // measured +0.923 kB over the grouped-disclosure baseline.
+    // plus the restored performance JSON example:
+    // measured +0.234 kB over the mockup-panel baseline.
+    // plus the performance-telemetry Quick Start step (workspace, choice
+    // init/confirmation, review row, mock handling):
+    // measured +3.766 kB over the JSON-example baseline.
     // Keep a narrow margin for the merged issue-642, V2 and issue-649 set;
     // do not restore the pre-compaction 1 MB ceiling.
-    // plus the custom flow meter calibration/settings backup: raised to
-    // 932 kB for ~1.3 kB of margin above this addition, still well short
-    // of a generous generic limit.
-    raw: 932_000,
+    raw: 941_000,
     // One-time migration ceiling for structured incident monitoring, replay,
     // the CSRF-protected deferred recovery actions, and their compact editor.
     // Once this bundle is the base, the normal gzip growth limit applies again.

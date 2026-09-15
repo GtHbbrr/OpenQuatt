@@ -7,7 +7,7 @@ import { getEntityValue } from "../core/entity-store.js";
 import { isLikelyDeviceConnectionError, refreshEntities } from "../core/entity-sync.js";
 import { armOtaRefresh, awaitOtaEvidence, beginDeviceReconnect, clearOtaRefresh } from "../core/device-reconnect.js";
 import { clearQuickStartSetupInstall, state, storeQuickStartSetupInstall } from "../core/state.js";
-import { getFirmwareConnectionLabel, getFirmwareTopologyLabel, getInstallationTopology } from "./device-context.js";
+import { getFirmwareBuildConnection, getFirmwareConnectionLabel, getFirmwareTopologyLabel, getInstallationTopology } from "./device-context.js";
 import { beginFirmwareOtaQuietWindow, clearFirmwareOtaQuietWindow, getFirmwareBuildSwitchModel, getFirmwareConnectionSwitchModel, getFirmwareCurrentVersion, getFirmwareLatestVersion, getFirmwareRunningChannelLabel, getFirmwareTestAssetUrls, getFirmwareTestPrNumber, getFirmwareTestTargetModel, getFirmwareTopologySwitchModel, getFirmwareUpdateEntity, hasFirmwareTestLegacyCapability, hasFirmwareTestManifestCapability, hasKnownFirmwareTargetVersion, isFirmwareChannelTransition, isFirmwareDowngradeAvailable, isFirmwareEntityAlignedWithChannel, isFirmwareUpdateEntityForBuild, isQuickStartSetupFirmwareCurrent, pollFirmwareInstallState, pollFirmwareUpdateState, primeFirmwareInstallProgressHints, primeFirmwareUpdateState, resetFirmwareInstallUiState, resetFirmwareManualUploadSelection, resetFirmwareTestSelection, wait } from "./firmware-update.js";
 import { render } from "../core/render-scheduler.js";
 
@@ -498,7 +498,8 @@ import { render } from "../core/render-scheduler.js";
   }
 
   export async function installQuickStartSetupSwitch() {
-    const [targetTopology, targetConnection] = String(state.quickStartSetupDraft || "").split(":");
+    const currentSetup = `${getInstallationTopology()}:${getFirmwareBuildConnection()}`;
+    const [targetTopology, targetConnection] = String(state.quickStartSetupDraft || currentSetup).split(":");
     const model = getFirmwareBuildSwitchModel(targetTopology, targetConnection);
     if (!model.available) {
       return;

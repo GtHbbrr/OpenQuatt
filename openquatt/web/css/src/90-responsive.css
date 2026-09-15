@@ -1115,6 +1115,24 @@
   }
 }
 
+@media (max-width: 860px) {
+  .oq-usage-facts-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .oq-usage-facts-grid > .oq-usage-disclosure-column {
+    padding-right: 2px;
+  }
+
+  .oq-usage-facts {
+    margin-top: 12px;
+    padding-top: 14px;
+    padding-left: 0;
+    border-top: 1px solid var(--oq-helper-line);
+    border-left: none;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   #oq-helper-root *,
   #oq-helper-root *::before,

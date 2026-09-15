@@ -11,7 +11,7 @@ V2_RUNNER = (ROOT / "scripts/hil/run-v2-performance.mjs").read_text()
 REST_CLIENT = (ROOT / "scripts/hil/rest-client.mjs").read_text()
 SUBSTITUTIONS = (ROOT / "openquatt/oq_substitutions_common.yaml").read_text()
 TARGETS = (ROOT / "build_targets.yaml").read_text()
-DOCS = (ROOT / "docs/hil-testing.md").read_text()
+DOCS = (ROOT / "docs/development/hil-testing.md").read_text()
 PACKAGE = (ROOT / "package.json").read_text()
 WORKFLOW = (ROOT / ".github/workflows/ci-build.yml").read_text()
 

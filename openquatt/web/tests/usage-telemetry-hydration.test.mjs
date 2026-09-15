@@ -377,7 +377,7 @@ test("usage telemetry disclosure matches the hourly payload scope", async () => 
     assert.match(previewSource, new RegExp(field));
     assert.match(telemetryCpp, new RegExp(`"${field}"`));
   }
-  assert.match(disclosureSource, /oq-usage-disclosure--collapsible/);
+  assert.match(disclosureSource, /oq-usage-consent-details/);
   assert.match(disclosureSource, /data-oq-action="toggle-usage-telemetry-details"/);
   assert.match(disclosureSource, /technisch wel het bron-IP-adres zien/);
   assert.match(disclosureSource, /OpenQuatt slaat dit IP-adres niet op/);

@@ -63,7 +63,7 @@ class NvsPersistenceContractTest(unittest.TestCase):
         self.assertIn("identity_matches_profile_", settings_service)
         self.assertIn("pending_profile_", settings_service)
         self.assertIn("manual_apply_pending_", settings_service)
-        self.assertEqual(check_nvs_budget.CUSTOM_PREFERENCE_ENTRIES, 42)
+        self.assertEqual(check_nvs_budget.CUSTOM_PREFERENCE_ENTRIES, 45)
 
     def test_retired_flow_pwm_preferences_are_cleaned_up(self) -> None:
         self.assertIn("435184091U", FLOW_CONTROL)

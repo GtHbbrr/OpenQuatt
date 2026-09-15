@@ -9,6 +9,15 @@ firmwarelog te tonen, maar om gebruikers en support te laten begrijpen:
 - wat het systeem daarna doet;
 - of actie nodig is.
 
+## Status en broncode
+
+Dit is het functionele contract tussen de firmware-eventbuffer en de web-app. De
+huidige eventnamen en serialisatie staan in
+`components/openquatt_decision_log/`; de gebruikersweergave staat in
+`openquatt/web/js/src/features/control-replay-*.js`. Controleer beide bij een
+contractwijziging. De sectie met aanbevolen uitbreidingen is nadrukkelijk geen
+toegezegde roadmap.
+
 De controller blijft eigenaar van de control mode. De UI gebruikt `CM0`, `CM1`, `CM2`,
 `CM3`, `CM4`, `CM5`, `CM98` en `CM100` alleen als context of kleine supportbadge.
 
@@ -59,7 +68,7 @@ Belangrijk:
 
 ## Event-types
 
-### V1: aanwezig in PR #308
+### Huidige eventset
 
 | Event type | Subject | Doel in UI | Bron |
 | --- | --- | --- | --- |
@@ -152,7 +161,7 @@ er niets?" vragen beantwoorden.
 
 | Reason code | Nodig voor | Opmerking |
 | --- | --- | --- |
-| `cooling_room_cap` | Koeling zachter door kamer/setpoint | Past bij PR #300 limiter |
+| `cooling_room_cap` | Koeling zachter door kamer/setpoint | Alleen toevoegen met duidelijke supportweergave |
 | `cooling_restart_wait` | Koeling wacht na stop | Voorkomt aan/uit-fladderen |
 | `service_override` | CM100 of handmatige test | Support/service |
 
