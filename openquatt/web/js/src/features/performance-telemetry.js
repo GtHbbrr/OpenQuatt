@@ -68,8 +68,8 @@ export function renderPerformanceTelemetryDisclosure({ collapsible = false, idPr
       </div>
       <ul>
         <li><strong>Systeem</strong><span>Willekeurig installatie-ID, OpenQuatt-versie en Single of Duo</span></li>
-        <li><strong>Warmtepomp</strong><span>Generatie (V1 / V1.5 / V2) en versie van het prestatiemodel en de vermogensberekening</span></li>
-        <li><strong>Bedrijfspunt</strong><span>Buitentemperatuur, aanvoertemperatuur en waterflow</span></li>
+        <li><strong>Warmtepomp</strong><span>Generatie (V1 / V1.5 / V2) en versie van het prestatiemodel</span></li>
+        <li><strong>Bedrijfspunt</strong><span>Buitentemperatuur en waterflow</span></li>
         <li><strong>Per warmtepomp</strong><span>Compressorlevel en frequentie, water in/uit, elektrische/thermische/pompenergie en bodemplaatverwarming</span></li>
         <li><strong>Bereik</strong><span>Alleen stabiele verwarmingsminuten; starten, stoppen, defrosts en incomplete perioden worden niet meegenomen</span></li>
       </ul>
