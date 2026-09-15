@@ -14,12 +14,22 @@ PERFORMANCE_SOURCE = (
 
 
 class PerformanceTelemetryContractTest(unittest.TestCase):
-    def test_samples_the_effective_heating_curve_target(self) -> None:
-        self.assertIn(
-            "supply_target_sensor: oq_strategy_supply_target_temp_sensor",
-            PERFORMANCE_YAML,
-        )
-        self.assertNotIn("supply_target_sensor: oq_supply_target_temp\n", PERFORMANCE_YAML)
+    def test_excludes_global_supply_and_power_model_context(self) -> None:
+        for removed in (
+            "strategy_select:",
+            "supply_target_sensor:",
+            "system_supply_sensor:",
+        ):
+            self.assertNotIn(removed, PERFORMANCE_YAML)
+        for removed in (
+            'R"(,"pem":',
+            'R"(,"mk":',
+            'R"(,"s":)',
+            "strategy_code_",
+            "supply_kind_",
+        ):
+            self.assertNotIn(removed, PERFORMANCE_SOURCE)
+        self.assertIn('R"({"v":1,"iid":")"', PERFORMANCE_SOURCE)
 
     def test_external_id_creation_does_not_reapply_usage_consent(self) -> None:
         match = re.search(

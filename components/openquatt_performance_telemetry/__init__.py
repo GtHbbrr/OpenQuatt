@@ -13,11 +13,8 @@ CONF_CLOCK = "clock"
 CONF_SETUP_COMPLETE_SENSOR = "setup_complete_sensor"
 CONF_CHOICE_CONFIGURED = "choice_configured"
 CONF_GENERATION_SELECT = "generation_select"
-CONF_STRATEGY_SELECT = "strategy_select"
 CONF_OUTSIDE_TEMP_SENSOR = "outside_temp_sensor"
 CONF_FLOW_SENSOR = "flow_sensor"
-CONF_SUPPLY_TARGET_SENSOR = "supply_target_sensor"
-CONF_SYSTEM_SUPPLY_SENSOR = "system_supply_sensor"
 CONF_FIRMWARE_VERSION = "firmware_version"
 CONF_TOPOLOGY = "topology"
 
@@ -57,11 +54,8 @@ CONFIG_SCHEMA = switch.switch_schema(
         cv.Required(CONF_SETUP_COMPLETE_SENSOR): cv.use_id(binary_sensor.BinarySensor),
         cv.Required(CONF_CHOICE_CONFIGURED): binary_sensor.binary_sensor_schema(),
         cv.Required(CONF_GENERATION_SELECT): cv.use_id(select.Select),
-        cv.Required(CONF_STRATEGY_SELECT): cv.use_id(select.Select),
         cv.Required(CONF_OUTSIDE_TEMP_SENSOR): cv.use_id(sensor.Sensor),
         cv.Required(CONF_FLOW_SENSOR): cv.use_id(sensor.Sensor),
-        cv.Required(CONF_SUPPLY_TARGET_SENSOR): cv.use_id(sensor.Sensor),
-        cv.Required(CONF_SYSTEM_SUPPLY_SENSOR): cv.use_id(sensor.Sensor),
         cv.Required(CONF_FIRMWARE_VERSION): cv.All(cv.string_strict, cv.Length(max=32)),
         cv.Required(CONF_TOPOLOGY): cv.All(cv.string_strict, cv.Length(max=16)),
         **hp_schema("hp1"),
@@ -80,11 +74,8 @@ async def to_code(config):
         CONF_CLOCK: "set_clock",
         CONF_SETUP_COMPLETE_SENSOR: "set_setup_complete_sensor",
         CONF_GENERATION_SELECT: "set_generation_select",
-        CONF_STRATEGY_SELECT: "set_strategy_select",
         CONF_OUTSIDE_TEMP_SENSOR: "set_outside_temp_sensor",
         CONF_FLOW_SENSOR: "set_flow_sensor",
-        CONF_SUPPLY_TARGET_SENSOR: "set_supply_target_sensor",
-        CONF_SYSTEM_SUPPLY_SENSOR: "set_system_supply_sensor",
     }
     for key, setter in setters.items():
         value = await cg.get_variable(config[key])

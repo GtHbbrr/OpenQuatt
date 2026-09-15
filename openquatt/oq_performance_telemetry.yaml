@@ -4,6 +4,8 @@
 # Separate opt-in for compact, anonymous heating measurements used to validate
 # performance maps. It deliberately reuses the outbound-only usage telemetry
 # transport without enabling ESPHome's global MQTT integration.
+# Payload schema v1 contains only outside-unit performance-map inputs and
+# measurements; it intentionally excludes global supply and power-model context.
 # Batches are published every 15 minutes from device boot using monotonic
 # uptime; `ws` is the UTC start timestamp of the first complete minute in the
 # batch and is informational, not a UTC-quarter-hour schedule anchor.
@@ -20,11 +22,8 @@ openquatt_performance_telemetry:
     name: "Performance model validation choice configured"
     internal: true
   generation_select: hp_generation
-  strategy_select: oq_heat_control_mode
   outside_temp_sensor: outside_temp_selected
   flow_sensor: flow_rate_selected
-  supply_target_sensor: oq_strategy_supply_target_temp_sensor
-  system_supply_sensor: oq_system_supply_temp
   firmware_version: "${project_version}"
   topology: "${oq_topology}"
   hp1_working_mode: hp1_working_mode

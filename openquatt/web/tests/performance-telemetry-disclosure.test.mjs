@@ -78,11 +78,13 @@ test("performance disclosure matches the firmware payload scope", async () => {
   );
 
   assert.match(telemetryCpp, /"bid"/);
-  assert.match(telemetryCpp, /"pem":"pinput-v1"/);
+  assert.match(telemetryCpp, /"v":1/);
+  assert.doesNotMatch(telemetryCpp, /"pem"/);
+  assert.doesNotMatch(telemetryCpp, /"mk"/);
   for (const needle of [
     /Willekeurig installatie-ID, OpenQuatt-versie en Single of Duo/,
-    /Generatie \(V1 \/ V1\.5 \/ V2\) en versie van het prestatiemodel en de vermogensberekening/,
-    /Buitentemperatuur, aanvoertemperatuur en waterflow/,
+    /Generatie \(V1 \/ V1\.5 \/ V2\) en versie van het prestatiemodel/,
+    /Buitentemperatuur en waterflow/,
     /Compressorlevel en frequentie, water in\/uit/,
     /bodemplaatverwarming/,
     /Alleen stabiele verwarmingsminuten/,

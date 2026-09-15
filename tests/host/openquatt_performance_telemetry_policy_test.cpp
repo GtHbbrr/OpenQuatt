@@ -57,14 +57,6 @@ int main() {
   assert(writer.ok());
   assert(std::strcmp(escaped.data(), R"({"firmware":"v1\\\"\ntest"})") == 0);
 
-  std::array<char, 64U> string_value{};
-  FixedBufferWriter string_writer(string_value.data(), string_value.size());
-  string_writer += R"({"mk":)";
-  append_json_string(string_writer, "system_actual");
-  string_writer += '}';
-  assert(string_writer.ok());
-  assert(std::strcmp(string_value.data(), R"({"mk":"system_actual"})") == 0);
-
   std::array<char, 8U> exact{};
   FixedBufferWriter exact_writer(exact.data(), exact.size());
   exact_writer += "1234567";
