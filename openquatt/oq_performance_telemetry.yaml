@@ -4,7 +4,7 @@
 # Separate opt-in for compact, anonymous heating measurements used to validate
 # performance maps. It deliberately reuses the outbound-only usage telemetry
 # transport without enabling ESPHome's global MQTT integration.
-# Payload schema v2 contains only outside-unit performance-map inputs and
+# Payload schema v1 contains only outside-unit performance-map inputs and
 # measurements; it intentionally excludes global supply and power-model context.
 # Batches are published every 15 minutes from device boot using monotonic
 # uptime; `ws` is the UTC start timestamp of the first complete minute in the

@@ -372,7 +372,7 @@ bool OpenQuattPerformanceTelemetry::build_pending_payload_() {
   }
   const MinuteRecord& first = this->records_[RECORDS_PER_BATCH];
   FixedBufferWriter output(this->payload_.data(), this->payload_.size());
-  output += R"({"v":2,"iid":")";
+  output += R"({"v":1,"iid":")";
   output += this->transport_->external_installation_id();
   output += R"(","bid":")";
   output += this->pending_batch_id_;

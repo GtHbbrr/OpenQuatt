@@ -29,7 +29,7 @@ class PerformanceTelemetryContractTest(unittest.TestCase):
             "supply_kind_",
         ):
             self.assertNotIn(removed, PERFORMANCE_SOURCE)
-        self.assertIn('R"({"v":2,"iid":")"', PERFORMANCE_SOURCE)
+        self.assertIn('R"({"v":1,"iid":")"', PERFORMANCE_SOURCE)
 
     def test_external_id_creation_does_not_reapply_usage_consent(self) -> None:
         match = re.search(
