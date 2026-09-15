@@ -35,7 +35,7 @@ Net na het flashen kan OpenQuatt ook nog op het fallback access point zitten:
 - SSID: `OpenQuatt`
 - wachtwoord: `openquatt`
 
-Zie je dit access point niet meer, dan is het instelvenster van ca. 10 minuten waarschijnlijk gesloten; herstart de controller en verbind direct opnieuw.
+Zie je dit access point niet meer, dan is het instelvenster van ca. 10 minuten waarschijnlijk gesloten. Dit gebeurt alleen zolang OpenQuatt nog niet volledig is ingesteld; herstart de controller en verbind direct opnieuw.
 
 ## Controller terugzetten naar fabrieksinstellingen
 
