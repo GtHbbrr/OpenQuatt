@@ -948,25 +948,37 @@ void OpenQuattOduEepromDump::write_download(httpd_req_t* req) const {
 
 void OpenQuattOduEepromDump::EepromModbusDevice::on_response(std::span<const uint8_t> request_pdu,
                                                              std::span<const uint8_t> response_pdu) {
-  if (this->parent_ == nullptr) return;
+  if (this->parent_ == nullptr || this->parent_->controller_ == nullptr) return;
   auto addr_opt = modbus::helpers::client_pdu_start_address(request_pdu);
   if (!addr_opt.has_value()) return;
   const uint16_t start_address = *addr_opt;
+  const uint8_t fc = modbus::helpers::pdu_function_code(request_pdu);
+  this->parent_->controller_->set_online(true, static_cast<int>(fc), static_cast<int>(start_address));
   auto payload = modbus::helpers::server_pdu_payload(response_pdu);
   this->parent_->on_response_(this->parent_->pending_modbus_token_, start_address, payload);
 }
 
 void OpenQuattOduEepromDump::EepromModbusDevice::on_error(std::span<const uint8_t> request_pdu,
                                                           modbus::ExceptionCode ec) {
-  if (this->parent_ == nullptr) return;
+  if (this->parent_ == nullptr || this->parent_->controller_ == nullptr) return;
+  auto addr_opt = modbus::helpers::client_pdu_start_address(request_pdu);
+  const uint16_t start_address = addr_opt.has_value() ? *addr_opt : this->parent_->request_start_address_;
+  const uint8_t fc = modbus::helpers::pdu_function_code(request_pdu);
+  this->parent_->controller_->set_online(true, static_cast<int>(fc), static_cast<int>(start_address));
   ESP_LOGW(TAG, "HP%u EEPROM Modbus exception %u", this->parent_->hp_index_, static_cast<uint8_t>(ec));
-  // Let the loop timeout drive retry; mark as invalid response for faster handling.
   this->parent_->response_valid_.store(false, std::memory_order_relaxed);
   this->parent_->response_received_.store(true, std::memory_order_release);
 }
 
 bool OpenQuattOduEepromDump::EepromModbusDevice::on_no_response(std::span<const uint8_t> request_pdu) {
-  if (this->parent_ == nullptr) return false;
+  if (this->parent_ == nullptr || this->parent_->controller_ == nullptr) return false;
+  auto addr_opt = modbus::helpers::client_pdu_start_address(request_pdu);
+  const uint16_t start_address = addr_opt.has_value() ? *addr_opt : this->parent_->request_start_address_;
+  const uint8_t fc = modbus::helpers::pdu_function_code(request_pdu);
+  auto* ctrl = this->parent_->controller_;
+  ctrl->increment_non_response_count();
+  if (ctrl->can_send()) return true;
+  ctrl->set_online(false, static_cast<int>(fc), static_cast<int>(start_address));
   ESP_LOGW(TAG, "HP%u EEPROM Modbus no response", this->parent_->hp_index_);
   this->parent_->response_valid_.store(false, std::memory_order_relaxed);
   this->parent_->response_received_.store(true, std::memory_order_release);

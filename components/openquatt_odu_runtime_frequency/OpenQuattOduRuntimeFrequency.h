@@ -92,6 +92,9 @@ class OpenQuattOduRuntimeFrequency : public Component {
   std::function<void(modbus::EntityType, uint16_t, std::span<const uint8_t>)> pending_modbus_handler_{};
   modbus::EntityType pending_modbus_type_{modbus::EntityType::HOLDING};
   uint16_t pending_modbus_start_{0};
+  bool pending_modbus_is_write_{false};
+  oq_odu_runtime_frequency::RuntimeFrequencyTables pending_extension_tables_{};
+  oq_odu_runtime_frequency::RuntimeFrequencyTables pending_readback_tables_{};
 
   std::atomic<bool> available_{false};
   std::atomic<bool> busy_{false};

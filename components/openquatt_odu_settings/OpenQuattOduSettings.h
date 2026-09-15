@@ -124,6 +124,7 @@ class OpenQuattOduSettings : public Component {
   std::function<void(modbus::EntityType, uint16_t, std::span<const uint8_t>)> pending_modbus_handler_{};
   modbus::EntityType pending_modbus_type_{modbus::EntityType::HOLDING};
   uint16_t pending_modbus_start_{0};
+  bool pending_modbus_is_write_{false};
 };
 
 }  // namespace openquatt_odu_settings

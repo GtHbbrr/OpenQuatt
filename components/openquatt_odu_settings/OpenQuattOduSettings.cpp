@@ -476,6 +476,7 @@ void OpenQuattOduSettings::queue_settings_read_(uint32_t operation_token) {
   this->pending_modbus_token_ = operation_token;
   this->pending_modbus_type_ = modbus::EntityType::HOLDING;
   this->pending_modbus_start_ = oq_odu::BOTTOM_PLATE_START_ADDRESS;
+  this->pending_modbus_is_write_ = false;
   this->pending_modbus_handler_ = [this, operation_token](modbus::EntityType, uint16_t start_address,
                                                           std::span<const uint8_t> data) {
     if (!this->token_matches_(operation_token) || start_address != oq_odu::BOTTOM_PLATE_START_ADDRESS) return;
@@ -544,6 +545,7 @@ void OpenQuattOduSettings::queue_next_write_(uint32_t operation_token) {
   this->pending_modbus_token_ = operation_token;
   this->pending_modbus_type_ = modbus::EntityType::HOLDING;
   this->pending_modbus_start_ = target.address;
+  this->pending_modbus_is_write_ = true;
   this->pending_modbus_handler_ = [this, current_index, operation_token](modbus::EntityType, uint16_t,
                                                                          std::span<const uint8_t>) {
     if (!this->token_matches_(operation_token) || this->write_index_ != current_index) return;
@@ -558,6 +560,7 @@ void OpenQuattOduSettings::queue_readback_(uint32_t operation_token) {
   this->pending_modbus_token_ = operation_token;
   this->pending_modbus_type_ = modbus::EntityType::HOLDING;
   this->pending_modbus_start_ = oq_odu::BOTTOM_PLATE_START_ADDRESS;
+  this->pending_modbus_is_write_ = false;
   this->pending_modbus_handler_ = [this, operation_token](modbus::EntityType, uint16_t start_address,
                                                           std::span<const uint8_t> data) {
     if (!this->token_matches_(operation_token) || start_address != oq_odu::BOTTOM_PLATE_START_ADDRESS) return;
@@ -710,9 +713,11 @@ void OpenQuattOduSettings::write_status(httpd_req_t* req) const {
 
 void OpenQuattOduSettings::SettingsModbusDevice::on_response(std::span<const uint8_t> request_pdu,
                                                              std::span<const uint8_t> response_pdu) {
-  if (this->parent_ == nullptr) return;
+  if (this->parent_ == nullptr || this->parent_->controller_ == nullptr) return;
   auto addr_opt = modbus::helpers::client_pdu_start_address(request_pdu);
   const uint16_t start_address = addr_opt.has_value() ? *addr_opt : this->parent_->pending_modbus_start_;
+  const uint8_t fc = modbus::helpers::pdu_function_code(request_pdu);
+  this->parent_->controller_->set_online(true, static_cast<int>(fc), static_cast<int>(start_address));
   auto payload = modbus::helpers::server_pdu_payload(response_pdu);
   if (this->parent_->pending_modbus_handler_) {
     this->parent_->pending_modbus_handler_(this->parent_->pending_modbus_type_, start_address, payload);
@@ -721,18 +726,31 @@ void OpenQuattOduSettings::SettingsModbusDevice::on_response(std::span<const uin
 
 void OpenQuattOduSettings::SettingsModbusDevice::on_error(std::span<const uint8_t> request_pdu,
                                                           modbus::ExceptionCode ec) {
-  if (this->parent_ == nullptr) return;
+  if (this->parent_ == nullptr || this->parent_->controller_ == nullptr) return;
+  auto addr_opt = modbus::helpers::client_pdu_start_address(request_pdu);
+  const uint16_t start_address = addr_opt.has_value() ? *addr_opt : this->parent_->pending_modbus_start_;
+  const uint8_t fc = modbus::helpers::pdu_function_code(request_pdu);
+  this->parent_->controller_->set_online(true, static_cast<int>(fc), static_cast<int>(start_address));
   ESP_LOGW(TAG, "HP%u settings Modbus exception %u", this->parent_->hp_index_, static_cast<uint8_t>(ec));
+  if (this->parent_->pending_modbus_is_write_) {
+    this->parent_->fail_operation_("Verification failed: ODU rejected the write", this->parent_->pending_modbus_token_);
+    return;
+  }
   if (this->parent_->pending_modbus_handler_) {
-    auto addr_opt = modbus::helpers::client_pdu_start_address(request_pdu);
-    const uint16_t start_address = addr_opt.has_value() ? *addr_opt : this->parent_->pending_modbus_start_;
     this->parent_->pending_modbus_handler_(this->parent_->pending_modbus_type_, start_address,
                                            std::span<const uint8_t>{});
   }
 }
 
 bool OpenQuattOduSettings::SettingsModbusDevice::on_no_response(std::span<const uint8_t> request_pdu) {
-  if (this->parent_ == nullptr) return false;
+  if (this->parent_ == nullptr || this->parent_->controller_ == nullptr) return false;
+  auto addr_opt = modbus::helpers::client_pdu_start_address(request_pdu);
+  const uint16_t start_address = addr_opt.has_value() ? *addr_opt : this->parent_->pending_modbus_start_;
+  const uint8_t fc = modbus::helpers::pdu_function_code(request_pdu);
+  auto* ctrl = this->parent_->controller_;
+  ctrl->increment_non_response_count();
+  if (ctrl->can_send()) return true;
+  ctrl->set_online(false, static_cast<int>(fc), static_cast<int>(start_address));
   ESP_LOGW(TAG, "HP%u settings Modbus no response", this->parent_->hp_index_);
   return false;
 }
