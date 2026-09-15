@@ -18,6 +18,20 @@ def yaml_block(source: str, start: str, end: str) -> str:
     return source[start_idx:end_idx]
 
 
+def entity_block(source: str, marker: str) -> str:
+    """Return the single `- platform:` list item containing marker.
+
+    Bounds assertions to the entity's own block, so a key found here
+    provably belongs to this entity and not to a neighbour.
+    """
+    idx = source.index(marker)
+    item_start = source.rfind("\n  - platform:", 0, idx) + 1
+    item_end = source.find("\n  - platform:", idx)
+    if item_end == -1:
+        item_end = len(source)
+    return source[item_start:item_end]
+
+
 class Modbus20269ContractTest(unittest.TestCase):
     def test_esphome_pin_is_explicit_2026_9_beta(self) -> None:
         # PR 1 uses the pinned 2026.9.0b4 beta until a stable 2026.9.x is chosen.
@@ -58,22 +72,21 @@ class Modbus20269ContractTest(unittest.TestCase):
     def test_known_gaps_bridged_with_reuse(self) -> None:
         # Each previously bridged reserved register is now covered by reuse on the next entity.
         cases = (
-            ("${hp_id}_eev_steps", "2107"),
-            ("${hp_id}_outside_temp", "2110"),
-            ("${hp_id}_status_2115_raw", "2115"),
-            ("${hp_id}_control_board_item", "2127"),
-            ("${hp_id}_condensing_temp", "2131"),
-            ("${hp_id}_pump_ipwm_feedback_raw", "2137"),
+            ("id: ${hp_id}_eev_steps\n", "2107"),
+            ("id: ${hp_id}_outside_temp\n", "2110"),
+            ("id: ${hp_id}_status_2115_raw\n", "2115"),
+            ("id: ${hp_id}_control_board_item\n", "2127"),
+            ("id: ${hp_id}_condensing_temp\n", "2131"),
+            ("id: ${hp_id}_pump_ipwm_feedback_raw\n", "2137"),
         )
-        for entity_id, address in cases:
-            with self.subTest(entity=entity_id):
+        for marker, address in cases:
+            block = entity_block(HP_IO, marker)
+            with self.subTest(entity=marker.strip()):
                 # Trailing newline prevents prefix matches (e.g. outside_temp
                 # vs outside_temp_last_change_ms in the globals section).
-                block_start = HP_IO.index(f"id: {entity_id}\n")
-                # Include a bounded window; reuse must be on this entity itself.
-                window = HP_IO[block_start : block_start + 1200]
-                self.assertIn(f"address: {address}", window)
-                self.assertIn("reuse_previous_range: true", window)
+                self.assertIn(f"address: {address}", block)
+                self.assertIn("reuse_previous_range: true", block)
+                self.assertNotIn("register_count", block)
         # No other Modbus entity should need an explicit reuse flag for PR 1.
         self.assertEqual(HP_IO.count("reuse_previous_range: true"), 6)
 
@@ -110,27 +123,27 @@ class Modbus20269ContractTest(unittest.TestCase):
         self.assertNotIn("skip_updates", HP_IO.replace("offline_skip_updates", "").replace("#skip_updates: 0", ""))
 
     def test_telemetry_still_uses_expected_registers(self) -> None:
-        # Spot-check that entity identities and addresses did not drift during migration.
-        for address, entity_id in (
-            ("2099", "${hp_id}_working_mode"),
-            ("2105", "${hp_id}_fan_speed"),
-            ("2107", "${hp_id}_eev_steps"),
-            ("2110", "${hp_id}_outside_temp"),
-            ("2113", "${hp_id}_gas_return_temp"),
-            ("2115", "${hp_id}_status_2115_raw"),
-            ("2122", "${hp_id}_pcb_firmware_raw"),
-            ("2123", "Firmware EEPROM"),
-            ("2127", "${hp_id}_control_board_item"),
-            ("2131", "${hp_id}_condensing_temp"),
-            ("2135", "${hp_id}_inner_coil_temp"),
-            ("2137", "${hp_id}_pump_ipwm_feedback_raw"),
-            ("2138", "${hp_id}_flow"),
-            ("1999", "${hp_id}_compressor_level"),
-            ("3999", "${hp_id}_set_working_mode"),
+        # Spot-check that each entity is coupled to its own register: the
+        # address must sit inside the entity's own block, not anywhere else.
+        for address, marker in (
+            ("2099", "id: ${hp_id}_working_mode\n"),
+            ("2105", "id: ${hp_id}_fan_speed\n"),
+            ("2107", "id: ${hp_id}_eev_steps\n"),
+            ("2110", "id: ${hp_id}_outside_temp\n"),
+            ("2113", "id: ${hp_id}_gas_return_temp\n"),
+            ("2115", "id: ${hp_id}_status_2115_raw\n"),
+            ("2122", "id: ${hp_id}_pcb_firmware_raw\n"),
+            ("2123", 'name: "${prefix}Firmware EEPROM"'),
+            ("2127", "id: ${hp_id}_control_board_item\n"),
+            ("2131", "id: ${hp_id}_condensing_temp\n"),
+            ("2135", "id: ${hp_id}_inner_coil_temp\n"),
+            ("2137", "id: ${hp_id}_pump_ipwm_feedback_raw\n"),
+            ("2138", "id: ${hp_id}_flow\n"),
+            ("1999", "id: ${hp_id}_compressor_level\n"),
+            ("3999", "id: ${hp_id}_set_working_mode\n"),
         ):
-            with self.subTest(entity=entity_id):
-                self.assertIn(entity_id, HP_IO)
-                self.assertIn(f"address: {address}", HP_IO)
+            with self.subTest(entity=marker.strip()):
+                self.assertIn(f"address: {address}", entity_block(HP_IO, marker))
         # Temperature filter offsets are unrelated to the Modbus address offset migration.
         self.assertIn("- offset: -3000", HP_IO)
 
