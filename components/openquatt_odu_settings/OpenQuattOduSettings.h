@@ -89,41 +89,41 @@ class OpenQuattOduSettings : public Component {
   uint32_t reconcile_due_ms_{0U};
   char status_[96]{"READY"};
 
-   bool begin_request_(uint32_t& request_token);
-   bool begin_reconcile_();
-   bool begin_operation_(Operation operation, uint32_t operation_token);
-   bool token_matches_(uint32_t operation_token) const;
-   bool identity_matches_profile_() const;
-   bool persist_profile_(const oq_odu::BottomPlateProfileStorage& profile);
-   void release_bus_(uint32_t request_token = 0U);
-   void set_status_locked_(const char* status);
-   void schedule_reconcile_(uint32_t delay_ms);
-   void finish_operation_(const char* status, uint32_t operation_token, uint32_t next_reconcile_delay_ms = 0U);
-   void fail_operation_(const char* status, uint32_t operation_token);
-   void queue_settings_read_(uint32_t operation_token);
-   void handle_settings_read_(const oq_odu::BottomPlateSettings& settings, uint32_t operation_token);
-   void queue_next_write_(uint32_t operation_token);
-   void queue_readback_(uint32_t operation_token);
+  bool begin_request_(uint32_t& request_token);
+  bool begin_reconcile_();
+  bool begin_operation_(Operation operation, uint32_t operation_token);
+  bool token_matches_(uint32_t operation_token) const;
+  bool identity_matches_profile_() const;
+  bool persist_profile_(const oq_odu::BottomPlateProfileStorage& profile);
+  void release_bus_(uint32_t request_token = 0U);
+  void set_status_locked_(const char* status);
+  void schedule_reconcile_(uint32_t delay_ms);
+  void finish_operation_(const char* status, uint32_t operation_token, uint32_t next_reconcile_delay_ms = 0U);
+  void fail_operation_(const char* status, uint32_t operation_token);
+  void queue_settings_read_(uint32_t operation_token);
+  void handle_settings_read_(const oq_odu::BottomPlateSettings& settings, uint32_t operation_token);
+  void queue_next_write_(uint32_t operation_token);
+  void queue_readback_(uint32_t operation_token);
 
-   // ESPHome 2026.9 migration
-   class SettingsModbusDevice : public modbus::ModbusClientDevice {
-    public:
-     void set_parent_component(OpenQuattOduSettings *parent) { this->parent_ = parent; }
+  // ESPHome 2026.9 migration
+  class SettingsModbusDevice : public modbus::ModbusClientDevice {
+   public:
+    void set_parent_component(OpenQuattOduSettings* parent) { this->parent_ = parent; }
 
-    protected:
-     void on_response(std::span<const uint8_t> request_pdu, std::span<const uint8_t> response_pdu) override;
-     void on_error(std::span<const uint8_t> request_pdu, modbus::ExceptionCode ec) override;
-     bool on_no_response(std::span<const uint8_t> request_pdu) override;
-     void on_not_sent(std::span<const uint8_t> request_pdu) override;
+   protected:
+    void on_response(std::span<const uint8_t> request_pdu, std::span<const uint8_t> response_pdu) override;
+    void on_error(std::span<const uint8_t> request_pdu, modbus::ExceptionCode ec) override;
+    bool on_no_response(std::span<const uint8_t> request_pdu) override;
+    void on_not_sent(std::span<const uint8_t> request_pdu) override;
 
-    private:
-     OpenQuattOduSettings *parent_{nullptr};
-   };
-   SettingsModbusDevice modbus_device_{};
-   uint32_t pending_modbus_token_{0};
-   std::function<void(modbus::EntityType, uint16_t, std::span<const uint8_t>)> pending_modbus_handler_{};
-   modbus::EntityType pending_modbus_type_{modbus::EntityType::HOLDING};
-   uint16_t pending_modbus_start_{0};
+   private:
+    OpenQuattOduSettings* parent_{nullptr};
+  };
+  SettingsModbusDevice modbus_device_{};
+  uint32_t pending_modbus_token_{0};
+  std::function<void(modbus::EntityType, uint16_t, std::span<const uint8_t>)> pending_modbus_handler_{};
+  modbus::EntityType pending_modbus_type_{modbus::EntityType::HOLDING};
+  uint16_t pending_modbus_start_{0};
 };
 
 }  // namespace openquatt_odu_settings

@@ -476,18 +476,18 @@ void OpenQuattOduSettings::queue_settings_read_(uint32_t operation_token) {
   this->pending_modbus_token_ = operation_token;
   this->pending_modbus_type_ = modbus::EntityType::HOLDING;
   this->pending_modbus_start_ = oq_odu::BOTTOM_PLATE_START_ADDRESS;
-  this->pending_modbus_handler_ =
-      [this, operation_token](modbus::EntityType, uint16_t start_address, std::span<const uint8_t> data) {
-        if (!this->token_matches_(operation_token) || start_address != oq_odu::BOTTOM_PLATE_START_ADDRESS) return;
-        oq_odu::BottomPlateSettings settings;
-        if (!oq_odu::decode_bottom_plate_settings(data.data(), data.size(), settings)) {
-          this->fail_operation_(this->operation_ == Operation::LOAD ? "LOAD_FAILED" : "VERIFY_FAILED", operation_token);
-          return;
-        }
-        this->handle_settings_read_(settings, operation_token);
-      };
-  const bool accepted =
-      this->modbus_device_.read_holding_registers(oq_odu::BOTTOM_PLATE_START_ADDRESS, oq_odu::BOTTOM_PLATE_REGISTER_COUNT);
+  this->pending_modbus_handler_ = [this, operation_token](modbus::EntityType, uint16_t start_address,
+                                                          std::span<const uint8_t> data) {
+    if (!this->token_matches_(operation_token) || start_address != oq_odu::BOTTOM_PLATE_START_ADDRESS) return;
+    oq_odu::BottomPlateSettings settings;
+    if (!oq_odu::decode_bottom_plate_settings(data.data(), data.size(), settings)) {
+      this->fail_operation_(this->operation_ == Operation::LOAD ? "LOAD_FAILED" : "VERIFY_FAILED", operation_token);
+      return;
+    }
+    this->handle_settings_read_(settings, operation_token);
+  };
+  const bool accepted = this->modbus_device_.read_holding_registers(oq_odu::BOTTOM_PLATE_START_ADDRESS,
+                                                                    oq_odu::BOTTOM_PLATE_REGISTER_COUNT);
   if (!accepted) ESP_LOGW(TAG, "HP%u settings read not accepted", this->hp_index_);
 }
 
@@ -558,25 +558,25 @@ void OpenQuattOduSettings::queue_readback_(uint32_t operation_token) {
   this->pending_modbus_token_ = operation_token;
   this->pending_modbus_type_ = modbus::EntityType::HOLDING;
   this->pending_modbus_start_ = oq_odu::BOTTOM_PLATE_START_ADDRESS;
-  this->pending_modbus_handler_ =
-      [this, operation_token](modbus::EntityType, uint16_t start_address, std::span<const uint8_t> data) {
-        if (!this->token_matches_(operation_token) || start_address != oq_odu::BOTTOM_PLATE_START_ADDRESS) return;
-        oq_odu::BottomPlateSettings actual;
-        if (!oq_odu::decode_bottom_plate_settings(data.data(), data.size(), actual) ||
-            !oq_odu::bottom_plate_settings_match(actual, this->desired_)) {
-          this->fail_operation_("VERIFY_FAILED", operation_token);
-          return;
-        }
-        portENTER_CRITICAL(&this->state_mux_);
-        this->actual_ = actual;
-        this->loaded_.store(true, std::memory_order_release);
-        this->manual_apply_pending_.store(false, std::memory_order_release);
-        this->write_tainted_.store(false, std::memory_order_release);
-        portEXIT_CRITICAL(&this->state_mux_);
-        this->finish_operation_("IN_SYNC", operation_token, PERIODIC_RECONCILE_MS);
-      };
-  const bool accepted =
-      this->modbus_device_.read_holding_registers(oq_odu::BOTTOM_PLATE_START_ADDRESS, oq_odu::BOTTOM_PLATE_REGISTER_COUNT);
+  this->pending_modbus_handler_ = [this, operation_token](modbus::EntityType, uint16_t start_address,
+                                                          std::span<const uint8_t> data) {
+    if (!this->token_matches_(operation_token) || start_address != oq_odu::BOTTOM_PLATE_START_ADDRESS) return;
+    oq_odu::BottomPlateSettings actual;
+    if (!oq_odu::decode_bottom_plate_settings(data.data(), data.size(), actual) ||
+        !oq_odu::bottom_plate_settings_match(actual, this->desired_)) {
+      this->fail_operation_("VERIFY_FAILED", operation_token);
+      return;
+    }
+    portENTER_CRITICAL(&this->state_mux_);
+    this->actual_ = actual;
+    this->loaded_.store(true, std::memory_order_release);
+    this->manual_apply_pending_.store(false, std::memory_order_release);
+    this->write_tainted_.store(false, std::memory_order_release);
+    portEXIT_CRITICAL(&this->state_mux_);
+    this->finish_operation_("IN_SYNC", operation_token, PERIODIC_RECONCILE_MS);
+  };
+  const bool accepted = this->modbus_device_.read_holding_registers(oq_odu::BOTTOM_PLATE_START_ADDRESS,
+                                                                    oq_odu::BOTTOM_PLATE_REGISTER_COUNT);
   if (!accepted) ESP_LOGW(TAG, "HP%u settings readback not accepted", this->hp_index_);
 }
 
@@ -709,7 +709,7 @@ void OpenQuattOduSettings::write_status(httpd_req_t* req) const {
 }
 
 void OpenQuattOduSettings::SettingsModbusDevice::on_response(std::span<const uint8_t> request_pdu,
-                                                            std::span<const uint8_t> response_pdu) {
+                                                             std::span<const uint8_t> response_pdu) {
   if (this->parent_ == nullptr) return;
   auto addr_opt = modbus::helpers::client_pdu_start_address(request_pdu);
   const uint16_t start_address = addr_opt.has_value() ? *addr_opt : this->parent_->pending_modbus_start_;
@@ -720,7 +720,7 @@ void OpenQuattOduSettings::SettingsModbusDevice::on_response(std::span<const uin
 }
 
 void OpenQuattOduSettings::SettingsModbusDevice::on_error(std::span<const uint8_t> request_pdu,
-                                                         modbus::ExceptionCode ec) {
+                                                          modbus::ExceptionCode ec) {
   if (this->parent_ == nullptr) return;
   ESP_LOGW(TAG, "HP%u settings Modbus exception %u", this->parent_->hp_index_, static_cast<uint8_t>(ec));
   if (this->parent_->pending_modbus_handler_) {

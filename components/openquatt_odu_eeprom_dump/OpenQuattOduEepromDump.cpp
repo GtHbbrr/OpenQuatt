@@ -947,7 +947,7 @@ void OpenQuattOduEepromDump::write_download(httpd_req_t* req) const {
 }
 
 void OpenQuattOduEepromDump::EepromModbusDevice::on_response(std::span<const uint8_t> request_pdu,
-                                                            std::span<const uint8_t> response_pdu) {
+                                                             std::span<const uint8_t> response_pdu) {
   if (this->parent_ == nullptr) return;
   auto addr_opt = modbus::helpers::client_pdu_start_address(request_pdu);
   if (!addr_opt.has_value()) return;
@@ -957,7 +957,7 @@ void OpenQuattOduEepromDump::EepromModbusDevice::on_response(std::span<const uin
 }
 
 void OpenQuattOduEepromDump::EepromModbusDevice::on_error(std::span<const uint8_t> request_pdu,
-                                                         modbus::ExceptionCode ec) {
+                                                          modbus::ExceptionCode ec) {
   if (this->parent_ == nullptr) return;
   ESP_LOGW(TAG, "HP%u EEPROM Modbus exception %u", this->parent_->hp_index_, static_cast<uint8_t>(ec));
   // Let the loop timeout drive retry; mark as invalid response for faster handling.
