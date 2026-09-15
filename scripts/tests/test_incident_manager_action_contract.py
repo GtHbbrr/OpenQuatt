@@ -42,14 +42,12 @@ class IncidentManagerActionContractTest(unittest.TestCase):
         self.assertNotIn("Confirm HP${hp_index} ODU power cycle", HP_IO_YAML)
 
     def test_successful_recovery_probe_reports_transport_online(self) -> None:
-        # PR3: probe now uses shim queue_modbus_read instead of ModbusCommandItem
-        self.assertIn("queue_modbus_read", HP_IO_YAML)
-        self.assertIn("2099, 1,", HP_IO_YAML)
-        self.assertIn("id(${hp_id}_is_online) = true;", HP_IO_YAML)
-        self.assertIn(
-            "id(oq_incident_manager).observe_transport(",
-            HP_IO_YAML,
-        )
+        # PR3: probe now uses shim queue_modbus_read; bind R2099 and is_online to the same callback block.
+        probe_idx = HP_IO_YAML.index("2099, 1,")
+        probe_block = HP_IO_YAML[max(0, probe_idx - 800) : probe_idx + 800]
+        self.assertIn("queue_modbus_read", probe_block)
+        self.assertIn("id(${hp_id}_is_online) = true;", probe_block)
+        self.assertIn("id(oq_incident_manager).observe_transport(", probe_block)
 
 
 if __name__ == "__main__":
