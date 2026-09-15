@@ -67,10 +67,9 @@ class Modbus20269ContractTest(unittest.TestCase):
         )
         for entity_id, address in cases:
             with self.subTest(entity=entity_id):
-                # Find the block for this entity up to the next modbus entity.
-                start = f"id: {entity_id}"
-                block_start = HP_IO.index(start)
-                next_entity = HP_IO.index("- platform: modbus_controller", block_start + len(start))
+                # Trailing newline prevents prefix matches (e.g. outside_temp
+                # vs outside_temp_last_change_ms in the globals section).
+                block_start = HP_IO.index(f"id: {entity_id}\n")
                 # Include a bounded window; reuse must be on this entity itself.
                 window = HP_IO[block_start : block_start + 1200]
                 self.assertIn(f"address: {address}", window)
