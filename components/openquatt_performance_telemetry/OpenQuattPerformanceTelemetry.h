@@ -26,11 +26,8 @@ class OpenQuattPerformanceTelemetry : public switch_::Switch, public Component {
   void set_setup_complete_sensor(binary_sensor::BinarySensor* value) { this->setup_complete_sensor_ = value; }
   void set_choice_configured_sensor(binary_sensor::BinarySensor* value) { this->choice_configured_sensor_ = value; }
   void set_generation_select(select::Select* value) { this->generation_select_ = value; }
-  void set_strategy_select(select::Select* value) { this->strategy_select_ = value; }
   void set_outside_temp_sensor(sensor::Sensor* value) { this->outside_temp_sensor_ = value; }
   void set_flow_sensor(sensor::Sensor* value) { this->flow_sensor_ = value; }
-  void set_supply_target_sensor(sensor::Sensor* value) { this->supply_target_sensor_ = value; }
-  void set_system_supply_sensor(sensor::Sensor* value) { this->system_supply_sensor_ = value; }
   void set_firmware_version(const std::string& value) { this->firmware_version_ = value; }
   void set_topology(const std::string& value) { this->topology_ = value; }
 
@@ -126,9 +123,7 @@ class OpenQuattPerformanceTelemetry : public switch_::Switch, public Component {
     bool invalid{false};
     uint8_t active_mask{0U};
     int generation{0};
-    int strategy{0};
     float outside_sum{0.0f};
-    float supply_sum{0.0f};
     float flow_sum{0.0f};
     std::array<HpAccumulator, 2U> hp{};
   };
@@ -137,9 +132,7 @@ class OpenQuattPerformanceTelemetry : public switch_::Switch, public Component {
     uint32_t start_s{0U};
     uint8_t active_mask{0U};
     int generation{0};
-    int strategy{0};
     float outside_c{NAN};
-    float supply_c{NAN};
     float flow_lph{NAN};
     std::array<HpAccumulator, 2U> hp{};
   };
@@ -164,10 +157,8 @@ class OpenQuattPerformanceTelemetry : public switch_::Switch, public Component {
   static bool valid_sensor_(const sensor::Sensor* value);
   static bool valid_binary_(const binary_sensor::BinarySensor* value);
   static int generation_code_(const select::Select* source);
-  static int strategy_code_(const select::Select* source);
   static const char* generation_name_(int generation);
   static const char* map_id_(int generation);
-  static const char* supply_kind_(int strategy);
   static std::string random_uuid_();
 
   openquatt_common::OpenQuattExternalTelemetryTransport* transport_{nullptr};
@@ -175,11 +166,8 @@ class OpenQuattPerformanceTelemetry : public switch_::Switch, public Component {
   binary_sensor::BinarySensor* setup_complete_sensor_{nullptr};
   binary_sensor::BinarySensor* choice_configured_sensor_{nullptr};
   select::Select* generation_select_{nullptr};
-  select::Select* strategy_select_{nullptr};
   sensor::Sensor* outside_temp_sensor_{nullptr};
   sensor::Sensor* flow_sensor_{nullptr};
-  sensor::Sensor* supply_target_sensor_{nullptr};
-  sensor::Sensor* system_supply_sensor_{nullptr};
   std::array<HpSources, 2U> hp_{};
   std::array<HpRuntime, 2U> hp_runtime_{};
   std::string firmware_version_;

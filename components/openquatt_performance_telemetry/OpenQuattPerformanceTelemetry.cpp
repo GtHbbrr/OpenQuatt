@@ -226,15 +226,12 @@ bool OpenQuattPerformanceTelemetry::sample_minute_(uint32_t timestamp_s) {
     return false;
   }
   const int generation = generation_code_(this->generation_select_);
-  const int strategy = strategy_code_(this->strategy_select_);
-  const sensor::Sensor* supply = strategy == 1 ? this->supply_target_sensor_ : this->system_supply_sensor_;
-  if (generation == 0 || strategy == 0 || !valid_sensor_(this->outside_temp_sensor_) ||
-      !valid_sensor_(this->flow_sensor_) || !valid_sensor_(supply)) {
+  if (generation == 0 || !valid_sensor_(this->outside_temp_sensor_) || !valid_sensor_(this->flow_sensor_)) {
     this->minute_.invalid = true;
     return false;
   }
-  if (this->minute_.samples != 0U && (this->minute_.generation != generation || this->minute_.strategy != strategy)) {
-    // Never combine measurements across a map or supply-temperature semantic change.
+  if (this->minute_.samples != 0U && this->minute_.generation != generation) {
+    // Never combine measurements across a performance-map version change.
     this->minute_.invalid = true;
     return false;
   }
@@ -310,10 +307,8 @@ bool OpenQuattPerformanceTelemetry::sample_minute_(uint32_t timestamp_s) {
     return false;
   }
   this->minute_.generation = generation;
-  this->minute_.strategy = strategy;
   this->minute_.active_mask = active_mask;
   this->minute_.outside_sum += this->outside_temp_sensor_->state;
-  this->minute_.supply_sum += supply->state;
   this->minute_.flow_sum += this->flow_sensor_->state;
   ++this->minute_.samples;
   return true;
@@ -328,19 +323,15 @@ void OpenQuattPerformanceTelemetry::finish_minute_() {
   record.start_s = this->minute_.start_s;
   record.active_mask = this->minute_.active_mask;
   record.generation = this->minute_.generation;
-  record.strategy = this->minute_.strategy;
   record.outside_c = this->minute_.outside_sum / 6.0f;
-  record.supply_c = this->minute_.supply_sum / 6.0f;
   record.flow_lph = this->minute_.flow_sum / 6.0f;
   record.hp = this->minute_.hp;
   this->append_record_(record);
 }
 
 bool OpenQuattPerformanceTelemetry::append_record_(const MinuteRecord& record) {
-  if (this->active_record_count_ != 0U &&
-      (this->records_[0U].generation != record.generation || this->records_[0U].strategy != record.strategy)) {
-    // A semantic change closes the partial batch, but publication remains on
-    // the monotonic fifteen-minute cadence rather than happening immediately.
+  if (this->active_record_count_ != 0U && this->records_[0U].generation != record.generation) {
+    // Never combine measurements across a performance-map version change.
     this->close_window_(false);
   }
   if (this->active_window_s_ == 0U) this->active_window_s_ = record.start_s;
@@ -381,7 +372,7 @@ bool OpenQuattPerformanceTelemetry::build_pending_payload_() {
   }
   const MinuteRecord& first = this->records_[RECORDS_PER_BATCH];
   FixedBufferWriter output(this->payload_.data(), this->payload_.size());
-  output += R"({"v":1,"iid":")";
+  output += R"({"v":2,"iid":")";
   output += this->transport_->external_installation_id();
   output += R"(","bid":")";
   output += this->pending_batch_id_;
@@ -395,8 +386,6 @@ bool OpenQuattPerformanceTelemetry::build_pending_payload_() {
   append_json_string(output, generation_name_(first.generation));
   output += R"(,"map":)";
   append_json_string(output, map_id_(first.generation));
-  output += R"(,"pem":"pinput-v1","mk":)";
-  append_json_string(output, supply_kind_(first.strategy));
   output += R"(,"m":[)";
   for (size_t index = 0U; index < this->pending_record_count_; ++index) {
     if (index != 0U) output += ',';
@@ -407,8 +396,6 @@ bool OpenQuattPerformanceTelemetry::build_pending_payload_() {
     output.append_uint(record.active_mask);
     output += R"(,"o":)";
     append_float(output, record.outside_c, 2U);
-    output += R"(,"s":)";
-    append_float(output, record.supply_c, 2U);
     output += R"(,"f":)";
     append_float(output, record.flow_lph, 1U);
     output += R"(,"h":[)";
@@ -508,14 +495,6 @@ int OpenQuattPerformanceTelemetry::generation_code_(const select::Select* source
   return 0;
 }
 
-int OpenQuattPerformanceTelemetry::strategy_code_(const select::Select* source) {
-  if (source == nullptr || !source->has_state()) return 0;
-  const std::string& value = source->current_option();
-  if (value == "Water Temperature Control (heating curve)") return 1;
-  if (value == "Power House") return 2;
-  return 0;
-}
-
 const char* OpenQuattPerformanceTelemetry::generation_name_(int generation) {
   switch (generation) {
     case 1:
@@ -531,10 +510,6 @@ const char* OpenQuattPerformanceTelemetry::generation_name_(int generation) {
 
 const char* OpenQuattPerformanceTelemetry::map_id_(int generation) {
   return generation == 3 ? "v2-2026-09-a" : "v1-2026-09-a";
-}
-
-const char* OpenQuattPerformanceTelemetry::supply_kind_(int strategy) {
-  return strategy == 1 ? "target" : (strategy == 2 ? "system_actual" : "unknown");
 }
 
 std::string OpenQuattPerformanceTelemetry::random_uuid_() {

@@ -37,7 +37,7 @@ struct Clock {
 };
 class OpenQuattPerformanceTelemetry {
  public:
-  struct MinuteRecord { uint32_t start_s=0; int generation=1; int strategy=1; };
+  struct MinuteRecord { uint32_t start_s=0; int generation=1; };
   struct Minute { uint32_t start_s=0; int samples=0; bool invalid=false; } minute_;
   static constexpr uint32_t SAMPLE_SECONDS=10, MINUTE_SECONDS=60;
   static constexpr size_t RECORDS_PER_BATCH=15;
@@ -69,7 +69,7 @@ class OpenQuattPerformanceTelemetry {
 int main() {
   OpenQuattPerformanceTelemetry c;
   c.minute_={120000,3,false}; c.last_sample_slot_s_=120030;
-  c.append_record_({119940,1,1});
+  c.append_record_({119940,1});
   mono=899999999; c.loop(); assert(c.sent==0);
   mono=900000000; c.loop();
   assert(c.sent==1 && c.next_publish_us_==1800000000);
@@ -82,7 +82,7 @@ int main() {
   assert(c.next_publish_us_==1800000000);
   c.local_clock.value.timestamp=119000; c.loop();
   assert(c.next_publish_us_==1800000000);
-  c.append_record_({119040,1,1}); c.append_record_({119100,1,2});
+  c.append_record_({119040,1}); c.append_record_({119100,2});
   c.loop(); assert(c.sent==1 && c.pending_record_count_==1);
   mono=1800000000; c.loop(); assert(c.sent==2);
   assert(c.next_publish_us_==2700000000);
