@@ -10,6 +10,7 @@
 #include <freertos/FreeRTOS.h>
 
 #include "PsramBuffer.h"
+#include "esphome/components/modbus/modbus.h"
 #include "esphome/components/modbus_controller/modbus_controller.h"
 #include "esphome/components/openquatt_web_auth/OpenQuattWebAuth.h"
 #include "esphome/components/time/real_time_clock.h"
@@ -140,24 +141,42 @@ class OpenQuattOduEepromDump : public Component {
   char phase_[48]{"idle"};
   char error_[96]{};
 
-  bool available_storage_() const;
-  void reset_job_();
-  void queue_current_request_();
-  bool modbus_bus_idle_() const;
-  void on_response_(uint32_t request_token, uint16_t start_address, std::span<const uint8_t> data);
-  void handle_request_result_();
-  void handle_request_failure_();
-  void advance_after_success_();
-  void finish_job_();
-  void fail_job_(const char* error);
-  void set_phase_(const char* phase);
-  void set_error_(const char* error);
-  void add_warning_(Warning warning);
-  uint16_t current_start_address_() const;
-  uint16_t current_register_count_() const;
-  uint16_t calculate_crc_() const;
-  static uint16_t read_word_(std::span<const uint8_t> data, size_t index);
-  static void decode_ascii_words_(const uint16_t* words, size_t count, char* output, size_t output_size);
+   bool available_storage_() const;
+   void reset_job_();
+   void queue_current_request_();
+   bool modbus_bus_idle_() const;
+   void on_response_(uint32_t request_token, uint16_t start_address, std::span<const uint8_t> data);
+   void handle_request_result_();
+   void handle_request_failure_();
+   void advance_after_success_();
+   void finish_job_();
+   void fail_job_(const char* error);
+   void set_phase_(const char* phase);
+   void set_error_(const char* error);
+   void add_warning_(Warning warning);
+   uint16_t current_start_address_() const;
+   uint16_t current_register_count_() const;
+   uint16_t calculate_crc_() const;
+   static uint16_t read_word_(std::span<const uint8_t> data, size_t index);
+   static void decode_ascii_words_(const uint16_t* words, size_t count, char* output, size_t output_size);
+
+   // --- ESPHome 2026.9 Modbus migration: persistent client device replaces ModbusCommandItem ---
+   class EepromModbusDevice : public modbus::ModbusClientDevice {
+    public:
+     void set_parent_component(OpenQuattOduEepromDump *parent) { this->parent_ = parent; }
+
+    protected:
+     void on_response(std::span<const uint8_t> request_pdu, std::span<const uint8_t> response_pdu) override;
+     void on_error(std::span<const uint8_t> request_pdu, modbus::ExceptionCode ec) override;
+     bool on_no_response(std::span<const uint8_t> request_pdu) override;
+     void on_not_sent(std::span<const uint8_t> request_pdu) override;
+
+    private:
+     OpenQuattOduEepromDump *parent_{nullptr};
+   };
+   EepromModbusDevice modbus_device_{};
+   // Token of the in-flight Modbus transaction (mirrors request_token_ for the device callback).
+   uint32_t pending_modbus_token_{0};
 };
 
 }  // namespace openquatt_odu_eeprom_dump

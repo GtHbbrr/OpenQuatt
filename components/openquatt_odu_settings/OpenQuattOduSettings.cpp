@@ -238,6 +238,11 @@ void OpenQuattOduSettings::setup() {
     this->auto_reapply_.store((stored.flags & oq_odu::BOTTOM_PLATE_PROFILE_AUTO_REAPPLY) != 0U,
                               std::memory_order_release);
   }
+  if (this->controller_ != nullptr && this->controller_->hub() != nullptr) {
+    this->modbus_device_.set_parent(this->controller_->hub());
+    this->modbus_device_.set_address(this->controller_->device_address());
+    this->modbus_device_.set_parent_component(this);
+  }
   web_server_base::global_web_server_base->add_handler(new OduSettingsRequestHandler(this, this->hp_index_));
 }
 
@@ -468,9 +473,10 @@ bool OpenQuattOduSettings::begin_reconcile_() {
 }
 
 void OpenQuattOduSettings::queue_settings_read_(uint32_t operation_token) {
-  auto command = modbus_controller::ModbusCommandItem::create_read_command(
-      this->controller_, modbus::EntityType::HOLDING, oq_odu::BOTTOM_PLATE_START_ADDRESS,
-      oq_odu::BOTTOM_PLATE_REGISTER_COUNT,
+  this->pending_modbus_token_ = operation_token;
+  this->pending_modbus_type_ = modbus::EntityType::HOLDING;
+  this->pending_modbus_start_ = oq_odu::BOTTOM_PLATE_START_ADDRESS;
+  this->pending_modbus_handler_ =
       [this, operation_token](modbus::EntityType, uint16_t start_address, std::span<const uint8_t> data) {
         if (!this->token_matches_(operation_token) || start_address != oq_odu::BOTTOM_PLATE_START_ADDRESS) return;
         oq_odu::BottomPlateSettings settings;
@@ -479,8 +485,10 @@ void OpenQuattOduSettings::queue_settings_read_(uint32_t operation_token) {
           return;
         }
         this->handle_settings_read_(settings, operation_token);
-      });
-  this->controller_->queue_command(std::move(command));
+      };
+  const bool accepted =
+      this->modbus_device_.read_holding_registers(oq_odu::BOTTOM_PLATE_START_ADDRESS, oq_odu::BOTTOM_PLATE_REGISTER_COUNT);
+  if (!accepted) ESP_LOGW(TAG, "HP%u settings read not accepted", this->hp_index_);
 }
 
 void OpenQuattOduSettings::handle_settings_read_(const oq_odu::BottomPlateSettings& settings,
@@ -533,21 +541,24 @@ void OpenQuattOduSettings::queue_next_write_(uint32_t operation_token) {
   const auto target = targets[current_index];
   this->write_started_ = true;
   this->write_tainted_.store(true, std::memory_order_release);
-  auto command = modbus_controller::ModbusCommandItem::create_write_single_command(this->controller_, target.address,
-                                                                                   target.value);
-  command.on_data_func = [this, current_index, operation_token](modbus::EntityType, uint16_t,
-                                                                std::span<const uint8_t>) {
+  this->pending_modbus_token_ = operation_token;
+  this->pending_modbus_type_ = modbus::EntityType::HOLDING;
+  this->pending_modbus_start_ = target.address;
+  this->pending_modbus_handler_ = [this, current_index, operation_token](modbus::EntityType, uint16_t,
+                                                                         std::span<const uint8_t>) {
     if (!this->token_matches_(operation_token) || this->write_index_ != current_index) return;
     ++this->write_index_;
     this->queue_next_write_(operation_token);
   };
-  this->controller_->queue_command(std::move(command));
+  const bool accepted = this->modbus_device_.write_single_register(target.address, target.value);
+  if (!accepted) ESP_LOGW(TAG, "HP%u settings write not accepted for addr %u", this->hp_index_, target.address);
 }
 
 void OpenQuattOduSettings::queue_readback_(uint32_t operation_token) {
-  auto command = modbus_controller::ModbusCommandItem::create_read_command(
-      this->controller_, modbus::EntityType::HOLDING, oq_odu::BOTTOM_PLATE_START_ADDRESS,
-      oq_odu::BOTTOM_PLATE_REGISTER_COUNT,
+  this->pending_modbus_token_ = operation_token;
+  this->pending_modbus_type_ = modbus::EntityType::HOLDING;
+  this->pending_modbus_start_ = oq_odu::BOTTOM_PLATE_START_ADDRESS;
+  this->pending_modbus_handler_ =
       [this, operation_token](modbus::EntityType, uint16_t start_address, std::span<const uint8_t> data) {
         if (!this->token_matches_(operation_token) || start_address != oq_odu::BOTTOM_PLATE_START_ADDRESS) return;
         oq_odu::BottomPlateSettings actual;
@@ -563,8 +574,10 @@ void OpenQuattOduSettings::queue_readback_(uint32_t operation_token) {
         this->write_tainted_.store(false, std::memory_order_release);
         portEXIT_CRITICAL(&this->state_mux_);
         this->finish_operation_("IN_SYNC", operation_token, PERIODIC_RECONCILE_MS);
-      });
-  this->controller_->queue_command(std::move(command));
+      };
+  const bool accepted =
+      this->modbus_device_.read_holding_registers(oq_odu::BOTTOM_PLATE_START_ADDRESS, oq_odu::BOTTOM_PLATE_REGISTER_COUNT);
+  if (!accepted) ESP_LOGW(TAG, "HP%u settings readback not accepted", this->hp_index_);
 }
 
 void OpenQuattOduSettings::release_bus_(uint32_t request_token) {
@@ -693,6 +706,40 @@ void OpenQuattOduSettings::write_status(httpd_req_t* req) const {
   write_settings(defaults);
   writer.write_char('}');
   writer.finish();
+}
+
+void OpenQuattOduSettings::SettingsModbusDevice::on_response(std::span<const uint8_t> request_pdu,
+                                                            std::span<const uint8_t> response_pdu) {
+  if (this->parent_ == nullptr) return;
+  auto addr_opt = modbus::helpers::client_pdu_start_address(request_pdu);
+  const uint16_t start_address = addr_opt.has_value() ? *addr_opt : this->parent_->pending_modbus_start_;
+  auto payload = modbus::helpers::server_pdu_payload(response_pdu);
+  if (this->parent_->pending_modbus_handler_) {
+    this->parent_->pending_modbus_handler_(this->parent_->pending_modbus_type_, start_address, payload);
+  }
+}
+
+void OpenQuattOduSettings::SettingsModbusDevice::on_error(std::span<const uint8_t> request_pdu,
+                                                         modbus::ExceptionCode ec) {
+  if (this->parent_ == nullptr) return;
+  ESP_LOGW(TAG, "HP%u settings Modbus exception %u", this->parent_->hp_index_, static_cast<uint8_t>(ec));
+  if (this->parent_->pending_modbus_handler_) {
+    auto addr_opt = modbus::helpers::client_pdu_start_address(request_pdu);
+    const uint16_t start_address = addr_opt.has_value() ? *addr_opt : this->parent_->pending_modbus_start_;
+    this->parent_->pending_modbus_handler_(this->parent_->pending_modbus_type_, start_address,
+                                           std::span<const uint8_t>{});
+  }
+}
+
+bool OpenQuattOduSettings::SettingsModbusDevice::on_no_response(std::span<const uint8_t> request_pdu) {
+  if (this->parent_ == nullptr) return false;
+  ESP_LOGW(TAG, "HP%u settings Modbus no response", this->parent_->hp_index_);
+  return false;
+}
+
+void OpenQuattOduSettings::SettingsModbusDevice::on_not_sent(std::span<const uint8_t> request_pdu) {
+  if (this->parent_ == nullptr) return;
+  ESP_LOGW(TAG, "HP%u settings Modbus not sent", this->parent_->hp_index_);
 }
 
 }  // namespace openquatt_odu_settings
