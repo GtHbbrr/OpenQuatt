@@ -719,7 +719,7 @@ import { renderStatCard } from "./stat-card.js";
 
     if (state.hpVisualMode === "schematic") {
       return `
-        <section class="oq-overview-hp oq-overview-hp--${escapeHtml(accent)} oq-overview-hp--${escapeHtml(emphasis)}" data-oq-hp-panel="${escapeHtml(title)}">
+        <section class="oq-overview-hp oq-overview-hp--${escapeHtml(accent)} oq-overview-hp--${escapeHtml(emphasis)}" data-oq-hp-panel="${escapeHtml(title)}" data-oq-matrix-target="${escapeHtml(title === "HP2" ? "hp2" : "hp1")}">
           <div class="oq-overview-hp-head">
             <div class="oq-overview-hp-head-title">
               ${renderHeatPumpPanelTitle(title, layoutAction)}
@@ -734,7 +734,7 @@ import { renderStatCard } from "./stat-card.js";
     }
 
     return `
-      <section class="oq-overview-hp oq-overview-hp--${escapeHtml(accent)} oq-overview-hp--${escapeHtml(emphasis)}" data-oq-hp-panel="${escapeHtml(title)}">
+      <section class="oq-overview-hp oq-overview-hp--${escapeHtml(accent)} oq-overview-hp--${escapeHtml(emphasis)}" data-oq-hp-panel="${escapeHtml(title)}" data-oq-matrix-target="${escapeHtml(title === "HP2" ? "hp2" : "hp1")}">
         <div class="oq-overview-hp-head">
           <div>
             <h3>${escapeHtml(title)}</h3>
@@ -1034,7 +1034,7 @@ import { renderStatCard } from "./stat-card.js";
 
   export function renderBoilerCompactPanel(model) {
     return `
-      <section class="oq-overview-hp oq-overview-boiler oq-overview-boiler--compact" data-oq-boiler-panel data-render-signature="${escapeHtml(getBoilerPanelRenderSignature(model))}">
+      <section class="oq-overview-hp oq-overview-boiler oq-overview-boiler--compact" data-oq-boiler-panel data-oq-matrix-target="boiler" data-render-signature="${escapeHtml(getBoilerPanelRenderSignature(model))}">
         <div class="oq-overview-hp-head">
           <div>
             <span class="oq-boiler-eyebrow">${escapeHtml(model.transportText)}</span>
@@ -1089,7 +1089,7 @@ import { renderStatCard } from "./stat-card.js";
     }
 
     return `
-      <section class="oq-overview-hp oq-overview-boiler" data-oq-boiler-panel data-render-signature="${escapeHtml(getBoilerPanelRenderSignature(model))}">
+      <section class="oq-overview-hp oq-overview-boiler" data-oq-boiler-panel data-oq-matrix-target="boiler" data-render-signature="${escapeHtml(getBoilerPanelRenderSignature(model))}">
         <div class="${escapeHtml([model.boardClass, model.flowPathClass].filter(Boolean).join(" "))}">
           <div class="oq-boiler-card-main">
             <div class="oq-boiler-card-head">
@@ -1272,7 +1272,7 @@ import { renderStatCard } from "./stat-card.js";
             ${renderOverviewTempsPanel()}
           </div>
           ${heatPumpControls ? `<div class="oq-overview-hp-tools">${heatPumpControls}</div>` : ""}
-          <div class="oq-overview-hp-grid oq-overview-hp-grid--${escapeHtml(hpGridLayout)}">
+          <div class="oq-overview-hp-grid oq-overview-hp-grid--${escapeHtml(hpGridLayout)}" data-oq-matrix-target="hardware-section">
             ${heatPumpPanels.map((panel, index) => renderHeatPumpPanel(panel.title, panel.keys, panel.accent, getHeatPumpPanelEmphasis(index, heatPumpPanels, hpLayoutMode), getHeatPumpPanelLayoutAction(index, heatPumpPanels, hpLayoutMode))).join("")}
             ${renderBoilerPanel()}
           </div>
