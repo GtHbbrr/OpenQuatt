@@ -1,6 +1,8 @@
 #pragma once
 
 #include "oq_boiler_transport_logic.h"
+#include "oq_otb_start_handshake.h"
+#include "oq_otb_startup_probe.h"
 #include "../control/oq_boiler_runtime.h"
 
 #if OQ_HARDWARE_HEATPUMP_CONTROLLER_Q
