@@ -43,7 +43,10 @@ export const WEB_BUNDLE_BUDGETS = [
     // measured +3.668 kB over its compact baseline.
     // Keep a narrow margin for the merged issue-642, V2 and issue-649 set;
     // do not restore the pre-compaction 1 MB ceiling.
-    raw: 930_000,
+    // plus the custom flow meter calibration/settings backup: raised to
+    // 932 kB for ~1.3 kB of margin above this addition, still well short
+    // of a generous generic limit.
+    raw: 932_000,
     // One-time migration ceiling for structured incident monitoring, replay,
     // the CSRF-protected deferred recovery actions, and their compact editor.
     // Once this bundle is the base, the normal gzip growth limit applies again.
