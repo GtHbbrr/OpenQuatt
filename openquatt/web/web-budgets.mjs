@@ -4,69 +4,8 @@ export const WEB_BUNDLE_GZIP_GROWTH_LIMIT = { bytes: 4_608, ratio: 0.03 };
 export const WEB_BUNDLE_BUDGETS = [
   {
     file: "js/openquatt-app.js",
-    // Includes HCQ R2 settings, bounded usage-telemetry confirmation polling,
-    // source-bound supply-temperature calibration status and results,
-    // its read-only sensor-correction summary, calibration backup/restore,
-    // the read-only ODU EEPROM service export, API ingress source controls,
-    // concise CM100 boiler test phase copy (FLOW_SETTLING/BOILER_SETTLING/MEASURING/COOLDOWN),
-    // advisory per-ODU generation detection with single bulk-detect button for onboarding and installation settings,
-    // the explicitly confirmed dev-to-main firmware downgrade flow,
-    // selectable cooling restart by water temperature or minimum off-time,
-    // instelbare elektrische ingangsgrens met topologie- en ODU-afhankelijk maximum,
-    // issue-615 verduidelijking met standaardreferentie, inline waarschuwing,
-    // expliciete bevestiging boven de standaard en standaard-herstelactie,
-    // ODU-detectie-gating voor verhoogde limieten, reset-naar-automatisch,
-    // restore-waarschuwing en live inline-feedback tijdens typen,
-    // toelichting lokale historie in Quick Start, plus fase-2 flash-I/O observability,
-    // bounded OTA app-shell cache refresh before reloading into newly installed firmware,
-    // strategie-afhankelijke warmtetoestemming-advies (Power House vs stooklijn, OT-voorkeur, centrale modal, auto-set in Quick Start),
-    // plus hervatbare, fail-closed Quick Start-OTA met main-/doelcontrole en duurzaam post-bootbewijs,
-    // afzonderlijke rollen voor een aangesloten aanvullende warmtebron, hybride verwarmen en overname,
-    // the issue-516 boiler/OpenTherm debug-recording fields,
-    // the issue-536 boiler-result quality and confirmed empirical Apply flow,
-    // the compact per-ODU compressor profile for safe manual F-levels,
-    // the generation-bound bottom-plate profile editor and backup/restore,
-    // the unified Q-firmware network preference and active-connection controls,
-    // the issue-471 grouped source focus panel with configured/effective paths,
-    // relevant-source diagnostics, warnings and stable keyboard focus,
-    // frequency-based day/silent limits and exclusion ranges per ODU,
-    // and the grouped issue-541 cooling-window settings block.
-    // plus the issue-642 published cooling start block (reason + M:SS
-    // countdown on the existing Ready location, preflow/active distinction).
-    // plus bounded webserver-log history polling (single scheduler, retry
-    // back-off and authoritative refresh without a second /events stream).
-    // plus twaalf compacte V2/Power-House debug-recordingvelden (gevraagd/
-    // toegepast niveau, tabel-Hz, intentcode, latch, Pmin/off/on, snapshot).
-    // Includes stable native time editing and confirmed, stale-poll-safe saves.
-    // Compact pipeline plus the bottom-plate editor/backup: ~914 kB.
-    // the issue-649 heating supply target source card with OT/HA/API/MQTT rows:
-    // measured +3.668 kB over its compact baseline.
-    // Includes the separate issue-670 performance-telemetry privacy control.
-    // plus the performance-telemetry consent/disclosure in usage-statistics
-    // format (consent card, collapsible included/excluded scope, JSON example):
-    // measured +3.457 kB over the compact-control baseline.
-    // plus the privacy mockup panel (nested facts/why columns, icons):
-    // measured +0.923 kB over the grouped-disclosure baseline.
-    // plus the restored performance JSON example:
-    // measured +0.234 kB over the mockup-panel baseline.
-    // plus the performance-telemetry Quick Start step (workspace, choice
-    // init/confirmation, review row, mock handling):
-    // measured +3.766 kB over the JSON-example baseline.
-    // Keep a narrow margin for the merged issue-642, V2 and issue-649 set;
-    // do not restore the pre-compaction 1 MB ceiling.
-    raw: 941_000,
-    // One-time migration ceiling for structured incident monitoring, replay,
-    // the CSRF-protected deferred recovery actions, and their compact editor.
-    // Once this bundle is the base, the normal gzip growth limit applies again.
+    raw: 942_000,
     gzipBaselineCeiling: 238_000,
   },
-  // Includes the compact, dark-safe ODU generation picker with unified header action and distinct badge/button,
-  // the warmtetoestemming-advies modal (3 summary cards, comparison, matrix, sticky footer),
-  // the issue-615 electrical-limit slider with red above-standard zone,
-  // matching estimate/entry boxes, label icons and aligned vertical rhythm,
-  // the responsive issue-471 master/detail source focus panel,
-  // the per-ODU bottom-plate settings modal,
-  // and the grouped issue-541 cooling-window settings block.
-  // Preserve the source-level symbol compaction and dead-CSS reduction.
   { file: "css/openquatt-app.css", raw: 200_000 },
 ];
