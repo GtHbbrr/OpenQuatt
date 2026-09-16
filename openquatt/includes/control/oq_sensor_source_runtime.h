@@ -122,8 +122,8 @@ class Runtime {
     return active.empty() ? "None" : active;
   }
 
-  float water_supply(uint32_t now_ms, uint32_t local_cic_hold_ms, uint32_t ha_hold_ms, uint32_t fallback_stale_ms,
-                     const char* ha_entity_id) {
+  float water_supply(uint32_t now_ms, uint32_t local_cic_hold_ms, uint32_t ha_hold_ms, uint32_t ha_stale_s,
+                     uint32_t fallback_stale_ms, const char* ha_entity_id) {
     const std::string option =
         id(water_supply_source).has_state() ? id(water_supply_source).current_option() : std::string();
     const auto source = supply_source(option, ha_entity_id);
@@ -154,7 +154,8 @@ class Runtime {
     float selected_c = NAN;
     if (option == "CIC" && cic_feed_valid() && id(water_supply_temp_cic).has_state())
       selected_c = id(water_supply_temp_cic).state;
-    else if (option == "HA input" && ha_valid(id(water_supply_temp_valid_ha), id(water_supply_temp_ha)))
+    else if (option == "HA input" &&
+             ha_live_valid(id(water_supply_temp_valid_ha), id(water_supply_temp_ha), now_ms, ha_stale_s))
       selected_c = id(water_supply_temp_ha).state;
     else if (option == "Local" && id(water_supply_temp_esp).has_state())
       selected_c = id(water_supply_temp_esp).state;
@@ -230,11 +231,12 @@ class Runtime {
     return selected.valid ? selected.value : NAN;
   }
 
-  float outside(uint32_t now_ms, uint32_t hold_ms) {
+  float outside(uint32_t now_ms, uint32_t hold_ms, uint32_t ha_stale_s) {
     if (!id(outside_temp_source).has_state()) return NAN;
     oq_input_source::NumericSources sources;
     sources.outdoor = sample(true, id(outside_temp_hp_avg));
-    sources.ha = sample(ha_valid(id(outside_temp_valid_ha), id(outside_temp_ha)), id(outside_temp_ha));
+    sources.ha =
+        sample(ha_live_valid(id(outside_temp_valid_ha), id(outside_temp_ha), now_ms, ha_stale_s), id(outside_temp_ha));
     sources.api = sample(api_valid(id(api_input_outside_temperature_valid), id(api_input_outside_temperature)),
                          id(api_input_outside_temperature));
     sources.mqtt = sample(mqtt_valid(id(mqtt_outside_temperature_valid), id(mqtt_outside_temperature)),
@@ -245,15 +247,22 @@ class Runtime {
     return selected.valid ? selected.value : NAN;
   }
 
-  float room_temperature(uint32_t now_ms, uint32_t hold_ms, bool opentherm_fresh) {
+  float room_temperature(uint32_t now_ms, uint32_t hold_ms, uint32_t ha_stale_s, bool opentherm_fresh) {
     if (!id(room_temp_source).has_state()) return NAN;
-    const auto sources = room_sources(opentherm_fresh, false);
+    auto sources = room_sources(opentherm_fresh, false);
+    // Live input: a constant room temperature stays usable while the HA
+    // ingress heartbeat arrives, and goes stale when the link drops.
+    sources.ha = sample(ha_live_valid(id(room_temp_valid_ha), id(thermostat_room_temp_ha), now_ms, ha_stale_s),
+                        id(thermostat_room_temp_ha));
     const auto selected = oq_input_source::select_direct(parse_source(id(room_temp_source).current_option()), sources,
                                                          true, now_ms, hold_ms, room_hold_);
     id(oq_room_temp_selected_hold_active) = selected.held;
     return selected.valid ? selected.value : NAN;
   }
 
+  // Stateful input: a room setpoint of 20.0 °C may stay unchanged for weeks
+  // without expiring, so only plain entity validity applies (mirrors the
+  // API/MQTT room setpoint stale_s = 0 semantics).
   float room_setpoint(uint32_t now_ms, uint32_t hold_ms, bool opentherm_fresh) {
     if (!id(room_setpoint_source).has_state()) return NAN;
     const auto sources = room_sources(opentherm_fresh, true);
@@ -263,11 +272,11 @@ class Runtime {
     return selected.valid ? selected.value : NAN;
   }
 
-  float external_heat_demand(uint32_t now_ms, uint32_t hold_ms) {
+  float external_heat_demand(uint32_t now_ms, uint32_t hold_ms, uint32_t ha_stale_s) {
     if (!id(external_heat_demand_source).has_state()) return NAN;
     oq_input_source::NumericSources sources;
-    sources.ha =
-        sample(ha_valid(id(external_heat_demand_valid_ha), id(external_heat_demand_ha)), id(external_heat_demand_ha));
+    sources.ha = sample(ha_live_valid(id(external_heat_demand_valid_ha), id(external_heat_demand_ha), now_ms, ha_stale_s),
+                        id(external_heat_demand_ha));
     sources.api = sample(api_valid(id(api_input_external_heat_demand_valid), id(api_input_external_heat_demand)),
                          id(api_input_external_heat_demand));
     const auto selected = oq_input_source::select_direct(parse_source(id(external_heat_demand_source).current_option()),
@@ -276,7 +285,27 @@ class Runtime {
     return selected.valid ? selected.value : NAN;
   }
 
-  void observe_heating_supply_target_ha(uint32_t now_ms) { ha_supply_target_state_.observe(now_ms); }
+  // Central HA ingress heartbeat: proves Home Assistant, the
+  // dynamic-sources package and the HA -> ESPHome link are actively
+  // delivering updates. Observed once per heartbeat (about every minute),
+  // shared by all live HA inputs instead of one freshness clock per sensor.
+  void observe_ha_ingress(uint32_t now_ms) { ha_ingress_state_.observe(now_ms); }
+
+  float ha_ingress_age_s(uint32_t now_ms) const {
+    if (!ha_ingress_state_.has_value) return NAN;
+    return static_cast<float>(now_ms - ha_ingress_state_.last_update_ms) / 1000.0f;
+  }
+
+  bool ha_ingress_fresh(uint32_t now_ms, uint32_t stale_s) const {
+    return oq_input_source::evaluate_freshness(ha_ingress_state_, now_ms, stale_s, true).valid;
+  }
+
+  // Live HA inputs are valid only while their proxy entities are valid AND
+  // the HA ingress heartbeat is fresh (issue #698).
+  template <typename B, typename S>
+  bool ha_live_valid(const B& valid, const S& value, uint32_t now_ms, uint32_t stale_s) const {
+    return oq_input_source::ha_live_valid(valid, value, ha_ingress_state_, now_ms, stale_s);
+  }
 
   float heating_supply_target(uint32_t now_ms, uint32_t hold_ms, uint32_t ha_stale_s, bool opentherm_fresh) {
     if (!id(heating_supply_target_source).has_state()) return NAN;
@@ -294,12 +323,11 @@ class Runtime {
       supply_target_hold_.reset();
     }
     oq_input_source::NumericSources sources;
-    // HA freshness is tracked at ingress (on_value): a value frozen by
-    // connection loss goes stale even though ESPHome retains the states.
-    const bool ha_fresh =
-        oq_input_source::evaluate_freshness(ha_supply_target_state_, now_ms, ha_stale_s,
-                                            ha_valid(id(heating_supply_target_valid_ha), id(heating_supply_target_ha)))
-            .valid;
+    // Live HA input: shares the central HA ingress heartbeat, so a constant
+    // target (e.g. 40.0 °C) stays usable while the heartbeat arrives and goes
+    // stale when the HA -> ESPHome link drops (issue #698).
+    const bool ha_fresh = ha_live_valid(id(heating_supply_target_valid_ha), id(heating_supply_target_ha), now_ms,
+                                        ha_stale_s);
     sources.ha = sample(ha_fresh && oq_heating_supply::external_target_in_range(id(heating_supply_target_ha).state),
                         id(heating_supply_target_ha));
     sources.api = sample(api_valid(id(api_input_heating_supply_target_valid), id(api_input_heating_supply_target)),
@@ -331,7 +359,7 @@ class Runtime {
   oq_input_source::HoldState setpoint_hold_;
   oq_input_source::HoldState demand_hold_;
   oq_input_source::HoldState supply_target_hold_;
-  oq_input_source::TimedState ha_supply_target_state_;
+  oq_input_source::TimedState ha_ingress_state_;
 
   template <typename T>
   static oq_input_source::Source parse_source(const T& option) {

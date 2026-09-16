@@ -66,6 +66,20 @@ inline Freshness evaluate_freshness(const TimedState& state, uint32_t now_ms, ui
   return {static_cast<float>(age_ms) / 1000.0f, stale_s == 0U || age_ms <= seconds_to_millis(stale_s)};
 }
 
+// Single definition of validity for live HA inputs: the proxy entities must
+// be valid AND the central HA ingress heartbeat must be fresh. A constant
+// proxy value therefore stays usable while the heartbeat keeps arriving, and
+// goes stale when the HA -> ESPHome link stops delivering updates. Stateful
+// HA inputs (room setpoint, heating/cooling enable) intentionally keep plain
+// entity validity instead, so they never expire on a constant value.
+template <typename B, typename S>
+inline bool ha_live_valid(const B& valid_entity, const S& value_entity, const TimedState& ingress, uint32_t now_ms,
+                          uint32_t stale_s) {
+  const bool entity_valid = valid_entity.has_state() && valid_entity.state && value_entity.has_state() &&
+                            isfinite(value_entity.state);
+  return evaluate_freshness(ingress, now_ms, stale_s, entity_valid).valid;
+}
+
 struct NumericSources {
   NumericSample local;
   NumericSample outdoor;
