@@ -88,7 +88,7 @@ ha_ingress_fresh_s: "300"                             # Diagnostic threshold for
 # Stateful HA inputs (room setpoint, heating/cooling enable) intentionally have
 # no stale timeout: they keep plain entity validity, like API/MQTT stale_s = 0.
 usage_telemetry_broker: "mqtt.openquatt.nl"           # Central usage-statistics MQTT broker.
-usage_telemetry_port: "1883"                          # Plain MQTT port for the current central broker.
+usage_telemetry_port: "1883"                          # Plain central broker port for current central broker.
 usage_telemetry_tls: "false"                          # Temporary until the central broker exposes MQTT/TLS.
 usage_telemetry_username: "openquatt"                 # Shared central broker username.
 usage_telemetry_password: "openquatt"                 # Shared central broker password; not strong device authentication.
@@ -140,7 +140,7 @@ oq_supervisory_loop_s: "5"                            # Main interval of the sup
 oq_power_peak_trip_s: "15"                            # Time above peak required for a fast cap step [s].
 oq_power_soft_trip_s: "300"                           # Time above soft required for a mild cap step [s].
 oq_power_recover_s: "60"                              # Time below recover required for cap recovery [s].
-oq_power_cap_max_f: "20"                              # Upper limit of demand scale for mapping PID/power -> f.
+oq_power_cap_max_f: "20"                              # Upper limit of demand-cap factor f.
 oq_power_cap_nan_f: "16"                              # Duo fail-safe demand cap for invalid power measurement; Single uses half.
 oq_duo_current_limit_v1_a: "16.0"                     # Duo standard limit: official Quatt Duo max for V1/V1.5 [A].
 oq_duo_current_limit_v2_a: "20.0"                     # Duo standard limit: official Quatt Duo max for V2 [A]; also the derived per-ODU ceiling (2 x 10 A) for V1/V1.5 [A].
@@ -162,7 +162,7 @@ oq_cm_frost_off_c: "6.0"                              # Frost protection disable
 oq_cm_frost_nan_grace_s: "30"                         # Startup grace before NaN outside temp triggers frost fail-safe [s].
 oq_cm_override_max_s: "1800"                          # Maximum duration of each forced control-mode override [s].
 oq_cm3_promote_s: "300"                               # Required deficit duration for CM2 -> CM3 promotion [s].
-oq_cm3_demote_s: "120"                                # Required low-deficit duration for CM3 -> CM2 [s].
+oq_cm3_demote_s: "120"                                # Required low-deficit duration for CM3 -> CM2 demotion [s].
 oq_cm3_min_run_s: "300"                               # Minimum dwell time in CM3 before demotion [s].
 oq_cm2_min_run_s: "120"                               # Minimum dwell time in CM2 before promotion [s].
 oq_cm3_curve_on_delta_c: "3.0"                        # Heating Curve target-minus-supply margin for CM2 -> CM3 [°C].
@@ -198,7 +198,7 @@ oq_ph_demand_loop_s: "10"                             # Power House demand and d
 oq_cooling_minimum_off_min_s: "240"                   # Production floor for the user-configurable cooling restart delay [s].
 oq_cooling_limiter_stop_confirm_s: "30"               # Confirm time before soft-stop and dew hard-stop take effect [s].
 oq_cooling_oil_return_hold_s: "1200"                  # Maximum oil-return recovery window; floor-guard modes clear earlier after recovery [s].
-oq_cop_min_input_w: "10.0"                            # Minimum electrical input for a valid COP calculation.
+oq_cop_min_input_w: "10.0"                            # Minimum electrical input for a valid COP calculation [W].
 oq_hp_min_off_s: "240"                                # Minimum per-HP off-time before any restart [s].
 oq_hp_min_runtime_min_s: "300"                        # Build-time floor for the user-configurable compressor runtime [s].
 oq_optimizer_penalty_per_w: "5.0"                     # Cost factor above soft limit [cost/W].
@@ -216,8 +216,8 @@ oq_flow_loop_startup_delay_ms: "6000"                 # Phase PI after both stag
 oq_air_purge_loop_s: "5"                              # Independent Air Purge phase cadence; preserves 25s/15s pulse timing [s].
 oq_flow_service_output_loop_s: "5"                    # Fast actuator cadence for fixed-output service tasks [s].
 oq_flow_service_output_startup_delay_ms: "5700"       # Apply service targets shortly after their state-machine ticks [ms].
-oq_flow_mismatch_threshold_lph: "150.0"               # Allowed HP1-vs-HP2 flow difference before mismatch logic starts.
-oq_flow_mismatch_hyst_lph: "50.0"                     # Hysteresis on mismatch detection to prevent chatter.
+oq_flow_mismatch_threshold_lph: "150.0"               # Allowed HP1-vs-HP2 flow difference before mismatch logic starts [L/h].
+oq_flow_mismatch_hyst_lph: "50.0"                     # Hysteresis on mismatch detection to prevent chatter [L/h].
 oq_flow_kp_default: "0.03"                            # Default Flow PI Kp; single builds override this for one-pump hydraulics.
 oq_flow_ki_default: "0.0008"                          # Default Flow PI Ki; single builds override this for one-pump hydraulics.
 oq_flow_kp_min: "0.00"                                # Lower bound for Flow PI Kp.
