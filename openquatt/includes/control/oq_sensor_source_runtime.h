@@ -301,11 +301,14 @@ class Runtime {
     return oq_input_source::evaluate_freshness(ha_ingress_state_, now_ms, stale_s, true).valid;
   }
 
-  // Live HA inputs are valid only while their proxy entities are valid AND
-  // the HA ingress heartbeat is fresh (issue #698).
+  // Live HA inputs are valid while their proxy entities are valid AND the HA
+  // ingress heartbeat is fresh (issue #698). Backward compatibility with
+  // pre-heartbeat HA packages and custom proxies: while this boot never
+  // received a heartbeat, plain entity validity applies, so an OTA never
+  // suddenly rejects existing HA ingress.
   template <typename B, typename S>
   bool ha_live_valid(const B& valid, const S& value, uint32_t now_ms, uint32_t stale_s) const {
-    return oq_input_source::ha_live_valid(valid, value, ha_ingress_state_, now_ms, stale_s);
+    return oq_input_source::ha_live_valid_with_legacy(ha_valid(valid, value), ha_ingress_state_, now_ms, stale_s);
   }
 
   float heating_supply_target(uint32_t now_ms, uint32_t hold_ms, uint32_t ha_stale_s, bool opentherm_fresh) {

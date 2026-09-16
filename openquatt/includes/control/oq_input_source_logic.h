@@ -80,6 +80,16 @@ inline bool ha_live_valid(const B& valid_entity, const S& value_entity, const Ti
   return evaluate_freshness(ingress, now_ms, stale_s, entity_valid).valid;
 }
 
+// Legacy-aware variant of the live-HA rule above, used for the firmware
+// member wrapper: while this boot never received a heartbeat (pre-heartbeat
+// HA package or custom proxies without one), plain entity validity applies
+// so an OTA never suddenly rejects existing HA ingress. After the first
+// heartbeat, freshness gating is permanent for that boot.
+inline bool ha_live_valid_with_legacy(bool entity_valid, const TimedState& ingress, uint32_t now_ms, uint32_t stale_s) {
+  if (!ingress.has_value) return entity_valid;
+  return evaluate_freshness(ingress, now_ms, stale_s, entity_valid).valid;
+}
+
 struct NumericSources {
   NumericSample local;
   NumericSample outdoor;

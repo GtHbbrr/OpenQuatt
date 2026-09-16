@@ -241,6 +241,21 @@ void test_ha_live_zero_timeout_never_expires() {
   assert(ha_live_valid(valid, value, ingress, 3600000, 0));
 }
 
+void test_ha_live_legacy_without_heartbeat() {
+  // Backward compatibility with pre-heartbeat HA packages and custom
+  // proxies: a valid HA proxy stays usable while this boot never received
+  // a heartbeat, so an OTA never suddenly rejects existing HA ingress.
+  // After the first heartbeat, freshness gating is permanent for that boot.
+  TimedState ingress;
+  assert(ha_live_valid_with_legacy(true, ingress, 3600000, 600));
+  assert(!ha_live_valid_with_legacy(false, ingress, 3600000, 600));
+
+  ingress.observe(3600000);
+  assert(ha_live_valid_with_legacy(true, ingress, 3600000, 600));
+  assert(!ha_live_valid_with_legacy(true, ingress, 3600000 + 600001, 600));
+  assert(!ha_live_valid_with_legacy(false, ingress, 3600000, 600));
+}
+
 void test_ha_live_millis_rollover() {
   StubValidEntity valid{true, true};
   StubValueEntity value{true, 20.5f};
@@ -261,6 +276,7 @@ int main() {
   test_ha_live_goes_stale_without_heartbeat_and_recovers();
   test_ha_live_validity_off_overrides_fresh_heartbeat();
   test_ha_live_zero_timeout_never_expires();
+  test_ha_live_legacy_without_heartbeat();
   test_ha_live_millis_rollover();
   return 0;
 }

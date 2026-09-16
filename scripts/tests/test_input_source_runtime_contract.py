@@ -129,6 +129,12 @@ class InputSourceRuntimeContractTest(unittest.TestCase):
         self.assertIn("ha_ingress_state_", SOURCE_RUNTIME)
         self.assertIn("ha_live_valid", SOURCE_RUNTIME)
         self.assertIn("ha_live_valid", SOURCE_LOGIC)
+        # Backward compatibility: while this boot never received a heartbeat
+        # (pre-heartbeat HA package or custom proxies), plain entity validity
+        # applies so an OTA never suddenly rejects existing HA ingress.
+        self.assertIn("ha_live_valid_with_legacy", SOURCE_LOGIC)
+        self.assertIn("ha_live_valid_with_legacy", SOURCE_RUNTIME)
+        self.assertIn("if (!ingress.has_value) return entity_valid;", SOURCE_LOGIC)
         for stale_sub in (
             "ha_outside_temperature_stale_s",
             "ha_water_supply_temperature_stale_s",
@@ -165,6 +171,7 @@ class InputSourceRuntimeContractTest(unittest.TestCase):
             "test_ha_live_goes_stale_without_heartbeat_and_recovers",
             "test_ha_live_validity_off_overrides_fresh_heartbeat",
             "test_ha_live_zero_timeout_never_expires",
+            "test_ha_live_legacy_without_heartbeat",
             "test_ha_live_millis_rollover",
         ):
             self.assertIn(test_name, host_test)
