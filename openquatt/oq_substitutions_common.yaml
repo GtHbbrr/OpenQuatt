@@ -79,7 +79,7 @@ api_input_cooling_enable_stale_s: "0"                 # Maximum age for API-inpu
 api_input_external_heat_demand_stale_s: "900"         # Maximum age for API-input external heat demand before it becomes invalid [s].
 api_input_heating_supply_target_stale_s: "900"        # Maximum age for API-input heating supply target before it becomes invalid [s].
 ha_outside_temperature_stale_s: "1800"                # Maximum age for live HA outside temperature without a fresh HA ingress heartbeat before it becomes invalid [s].
-ha_water_supply_temperature_stale_s: "300"            # Maximum age for live HA water supply temperature without a fresh HA ingress heartbeat before it becomes invalid [s]; shortest live window because it drives the control loop directly while HP fallback is available.
+ha_water_supply_temperature_stale_s: "600"            # Maximum age for live HA water supply temperature without a fresh HA ingress heartbeat before it becomes invalid [s]; 10-minute window tolerates normal HA restarts while HP fallback remains available.
 ha_room_temperature_stale_s: "600"                    # Maximum age for live HA room temperature without a fresh HA ingress heartbeat before it becomes invalid [s].
 ha_cooling_dew_point_stale_s: "900"                   # Maximum age for live HA cooling dew point without a fresh HA ingress heartbeat before it becomes invalid [s].
 ha_external_heat_demand_stale_s: "900"                # Maximum age for live HA external heat demand without a fresh HA ingress heartbeat before it becomes invalid [s].
@@ -140,7 +140,7 @@ oq_supervisory_loop_s: "5"                            # Main interval of the sup
 oq_power_peak_trip_s: "15"                            # Time above peak required for a fast cap step [s].
 oq_power_soft_trip_s: "300"                           # Time above soft required for a mild cap step [s].
 oq_power_recover_s: "60"                              # Time below recover required for cap recovery [s].
-oq_power_cap_max_f: "20"                              # Upper limit of demand-cap factor f.
+oq_power_cap_max_f: "20"                              # Upper limit of demand scale for mapping PID/power -> f.
 oq_power_cap_nan_f: "16"                              # Duo fail-safe demand cap for invalid power measurement; Single uses half.
 oq_duo_current_limit_v1_a: "16.0"                     # Duo standard limit: official Quatt Duo max for V1/V1.5 [A].
 oq_duo_current_limit_v2_a: "20.0"                     # Duo standard limit: official Quatt Duo max for V2 [A]; also the derived per-ODU ceiling (2 x 10 A) for V1/V1.5 [A].
@@ -162,7 +162,7 @@ oq_cm_frost_off_c: "6.0"                              # Frost protection disable
 oq_cm_frost_nan_grace_s: "30"                         # Startup grace before NaN outside temp triggers frost fail-safe [s].
 oq_cm_override_max_s: "1800"                          # Maximum duration of each forced control-mode override [s].
 oq_cm3_promote_s: "300"                               # Required deficit duration for CM2 -> CM3 promotion [s].
-oq_cm3_demote_s: "120"                                # Required low-deficit duration for CM3 -> CM2 demotion [s].
+oq_cm3_demote_s: "120"                                # Required low-deficit duration for CM3 -> CM2 [s].
 oq_cm3_min_run_s: "300"                               # Minimum dwell time in CM3 before demotion [s].
 oq_cm2_min_run_s: "120"                               # Minimum dwell time in CM2 before promotion [s].
 oq_cm3_curve_on_delta_c: "3.0"                        # Heating Curve target-minus-supply margin for CM2 -> CM3 [°C].
@@ -198,7 +198,7 @@ oq_ph_demand_loop_s: "10"                             # Power House demand and d
 oq_cooling_minimum_off_min_s: "240"                   # Production floor for the user-configurable cooling restart delay [s].
 oq_cooling_limiter_stop_confirm_s: "30"               # Confirm time before soft-stop and dew hard-stop take effect [s].
 oq_cooling_oil_return_hold_s: "1200"                  # Maximum oil-return recovery window; floor-guard modes clear earlier after recovery [s].
-oq_cop_min_input_w: "10.0"                            # Minimum electrical input for a valid COP calculation [W].
+oq_cop_min_input_w: "10.0"                            # Minimum electrical input for a valid COP calculation.
 oq_hp_min_off_s: "240"                                # Minimum per-HP off-time before any restart [s].
 oq_hp_min_runtime_min_s: "300"                        # Build-time floor for the user-configurable compressor runtime [s].
 oq_optimizer_penalty_per_w: "5.0"                     # Cost factor above soft limit [cost/W].
@@ -216,8 +216,8 @@ oq_flow_loop_startup_delay_ms: "6000"                 # Phase PI after both stag
 oq_air_purge_loop_s: "5"                              # Independent Air Purge phase cadence; preserves 25s/15s pulse timing [s].
 oq_flow_service_output_loop_s: "5"                    # Fast actuator cadence for fixed-output service tasks [s].
 oq_flow_service_output_startup_delay_ms: "5700"       # Apply service targets shortly after their state-machine ticks [ms].
-oq_flow_mismatch_threshold_lph: "150.0"               # Allowed HP1-vs-HP2 flow difference before mismatch logic starts [L/h].
-oq_flow_mismatch_hyst_lph: "50.0"                     # Hysteresis on mismatch detection to prevent chatter [L/h].
+oq_flow_mismatch_threshold_lph: "150.0"               # Allowed HP1-vs-HP2 flow difference before mismatch logic starts.
+oq_flow_mismatch_hyst_lph: "50.0"                     # Hysteresis on mismatch detection to prevent chatter.
 oq_flow_kp_default: "0.03"                            # Default Flow PI Kp; single builds override this for one-pump hydraulics.
 oq_flow_ki_default: "0.0008"                          # Default Flow PI Ki; single builds override this for one-pump hydraulics.
 oq_flow_kp_min: "0.00"                                # Lower bound for Flow PI Kp.
