@@ -88,7 +88,7 @@ ha_ingress_fresh_s: "300"                             # Diagnostic threshold for
 # Stateful HA inputs (room setpoint, heating/cooling enable) intentionally have
 # no stale timeout: they keep plain entity validity, like API/MQTT stale_s = 0.
 usage_telemetry_broker: "mqtt.openquatt.nl"           # Central usage-statistics MQTT broker.
-usage_telemetry_port: "1883"                          # Plain central broker port for current central broker.
+usage_telemetry_port: "1883"                          # Plain MQTT port for the current central broker.
 usage_telemetry_tls: "false"                          # Temporary until the central broker exposes MQTT/TLS.
 usage_telemetry_username: "openquatt"                 # Shared central broker username.
 usage_telemetry_password: "openquatt"                 # Shared central broker password; not strong device authentication.
