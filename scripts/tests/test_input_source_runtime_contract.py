@@ -125,6 +125,11 @@ class InputSourceRuntimeContractTest(unittest.TestCase):
         self.assertNotIn("last_refresh", HA_YAML)
         self.assertEqual(HA_YAML.count("observe_ha_ingress"), 1)
         self.assertIn("ha_ingress_heartbeat", HA_YAML)
+        # Only a finite heartbeat proves freshness: an unknown/unavailable
+        # publish arrives as NAN and must not restart the stale clock.
+        heartbeat_block = entity_block(HA_YAML, "ha_ingress_heartbeat")
+        self.assertIn("if (isfinite(x))", heartbeat_block)
+        self.assertIn("observe_ha_ingress", heartbeat_block)
         self.assertIn("ha_ingress_heartbeat_entity_id", SUBSTITUTIONS_YAML)
         self.assertIn("ha_ingress_state_", SOURCE_RUNTIME)
         self.assertIn("ha_live_valid", SOURCE_RUNTIME)

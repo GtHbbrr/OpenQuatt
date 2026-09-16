@@ -100,7 +100,9 @@ sensor:
   # HA ingress heartbeat: the single freshness signal for all live HA inputs.
   # The state itself changes about once per minute (whole minutes since
   # epoch), because Home Assistant does not forward attribute-only changes to
-  # ESPHome sensors subscribed to the bare state (issue #698).
+  # ESPHome sensors subscribed to the bare state (issue #698). Only a finite
+  # heartbeat proves freshness: an `unknown`/`unavailable` publish arrives as
+  # NAN and must not restart the stale clock.
   - platform: homeassistant
     id: ha_ingress_heartbeat
     name: "HA - Ingress Heartbeat"
@@ -109,7 +111,9 @@ sensor:
     accuracy_decimals: 0
     on_value:
       - lambda: |-
-          oq_sensor_source::runtime().observe_ha_ingress((uint32_t) millis());
+          if (isfinite(x)) {
+            oq_sensor_source::runtime().observe_ha_ingress((uint32_t) millis());
+          }
 
 binary_sensor:
   - platform: homeassistant
