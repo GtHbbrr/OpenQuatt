@@ -75,8 +75,8 @@ inline Freshness evaluate_freshness(const TimedState& state, uint32_t now_ms, ui
 template <typename B, typename S>
 inline bool ha_live_valid(const B& valid_entity, const S& value_entity, const TimedState& ingress, uint32_t now_ms,
                           uint32_t stale_s) {
-  const bool entity_valid = valid_entity.has_state() && valid_entity.state && value_entity.has_state() &&
-                            isfinite(value_entity.state);
+  const bool entity_valid =
+      valid_entity.has_state() && valid_entity.state && value_entity.has_state() && isfinite(value_entity.state);
   return evaluate_freshness(ingress, now_ms, stale_s, entity_valid).valid;
 }
 

@@ -275,8 +275,9 @@ class Runtime {
   float external_heat_demand(uint32_t now_ms, uint32_t hold_ms, uint32_t ha_stale_s) {
     if (!id(external_heat_demand_source).has_state()) return NAN;
     oq_input_source::NumericSources sources;
-    sources.ha = sample(ha_live_valid(id(external_heat_demand_valid_ha), id(external_heat_demand_ha), now_ms, ha_stale_s),
-                        id(external_heat_demand_ha));
+    sources.ha =
+        sample(ha_live_valid(id(external_heat_demand_valid_ha), id(external_heat_demand_ha), now_ms, ha_stale_s),
+               id(external_heat_demand_ha));
     sources.api = sample(api_valid(id(api_input_external_heat_demand_valid), id(api_input_external_heat_demand)),
                          id(api_input_external_heat_demand));
     const auto selected = oq_input_source::select_direct(parse_source(id(external_heat_demand_source).current_option()),
@@ -326,8 +327,8 @@ class Runtime {
     // Live HA input: shares the central HA ingress heartbeat, so a constant
     // target (e.g. 40.0 °C) stays usable while the heartbeat arrives and goes
     // stale when the HA -> ESPHome link drops (issue #698).
-    const bool ha_fresh = ha_live_valid(id(heating_supply_target_valid_ha), id(heating_supply_target_ha), now_ms,
-                                        ha_stale_s);
+    const bool ha_fresh =
+        ha_live_valid(id(heating_supply_target_valid_ha), id(heating_supply_target_ha), now_ms, ha_stale_s);
     sources.ha = sample(ha_fresh && oq_heating_supply::external_target_in_range(id(heating_supply_target_ha).state),
                         id(heating_supply_target_ha));
     sources.api = sample(api_valid(id(api_input_heating_supply_target_valid), id(api_input_heating_supply_target)),
