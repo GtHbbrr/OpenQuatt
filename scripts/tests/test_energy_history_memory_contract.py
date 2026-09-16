@@ -93,6 +93,39 @@ class EnergyHistoryMemoryContractTest(unittest.TestCase):
             clear_history.index("esp_partition_erase_range"),
         )
 
+    def test_http_history_bounds_daily_scan_but_preserves_hourly_physical_mapping(self) -> None:
+        write_history = section(
+            SOURCE,
+            "void OpenQuattEnergyHistory::write_history(httpd_req_t* req)",
+            "std::string OpenQuattEnergyHistory::get_available_label()",
+        )
+
+        self.assertIn(
+            "const uint32_t start_sequence = this->next_sequence_ > slot_count ? this->next_sequence_ - slot_count : 0U;",
+            write_history,
+        )
+        self.assertIn(
+            "for (uint32_t sequence = start_sequence; sequence < this->next_sequence_; ++sequence)",
+            write_history,
+        )
+        self.assertIn("record.sequence != sequence", write_history)
+        self.assertNotIn(
+            "for (uint32_t slot_index = 0; slot_index < this->flash_slot_count_; ++slot_index)",
+            write_history,
+        )
+
+        # Hourly retention is configurable. Existing records can therefore have
+        # physical slot positions derived from an older ring modulus, so the
+        # response path must keep scanning the small physical hourly window.
+        self.assertIn(
+            "for (uint32_t slot_index = 0; slot_index < this->hour_flash_slot_count_; ++slot_index)",
+            write_history,
+        )
+        self.assertNotIn(
+            "for (uint32_t sequence = start_sequence; sequence < this->next_hour_flash_sequence_; ++sequence)",
+            write_history,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
