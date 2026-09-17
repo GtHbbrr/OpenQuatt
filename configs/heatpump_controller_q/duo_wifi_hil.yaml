@@ -1,5 +1,5 @@
 # ==============================================================================
-# OpenQuatt - HCQ desktop HIL test controller / Q-edition / Duo / Wi-Fi
+# OpenQuatt - HCQ desktop HIL test controller / Q-edition / Duo
 # ==============================================================================
 # This entrypoint intentionally has a distinct mDNS hostname and ESPHome
 # project identity. Do not use it for a production controller.
@@ -18,4 +18,4 @@ preferences:
   flash_write_interval: 1s
 
 packages:
-  openquatt_q_duo_wifi: !include duo_wifi.yaml
+  openquatt_q_duo: !include duo.yaml
