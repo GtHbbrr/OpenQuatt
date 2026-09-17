@@ -258,9 +258,6 @@ export function renderSettingsView() {
             <div class="oq-helper-brand">
               <div class="oq-helper-logo-lockup">
                 <div data-oq-action="matrix-version-tap" style="display:contents">${LOGO_MARKUP}</div>
-              <div class="oq-helper-brand-copy">
-                  <h1>OpenQuatt Control</h1>
-                </div>
               </div>
               <p class="oq-helper-lead">Stel je OpenQuatt in, volg live wat er gebeurt en verfijn de regeling wanneer nodig.</p>
             </div>
