@@ -49,24 +49,13 @@ esphome:
             #else
             std::string topology = "single";
             #endif
-            std::string connection = "${oq_connection}";
             const std::string target = id(oq_firmware_update_target).current_option();
-            if (target == "alternate connection" && std::string("${alternate_connection}") != "") {
-              connection = "${alternate_connection}";
-            } else if (target == "alternate topology" && std::string("${alternate_topology}") != "") {
+            if (target == "alternate topology" && std::string("${alternate_topology}") != "") {
               topology = "${alternate_topology}";
-            } else if (target == "alternate topology and connection"
-                       && std::string("${alternate_topology}") != "") {
-              topology = "${alternate_topology}";
-              if (std::string("${alternate_connection}") != "") {
-                connection = "${alternate_connection}";
-              }
             }
 
-            const std::string connection_suffix =
-                std::string("${oq_artifact_connection_suffix}").empty() ? "" : "-" + connection;
             const std::string expected_file =
-                "openquatt-" + hardware_slug + "-" + topology + connection_suffix + ".firmware.ota.bin";
+                "openquatt-" + hardware_slug + "-" + topology + ".firmware.ota.bin";
             const std::string firmware_url = id(oq_firmware_update).update_info.firmware_url;
             id(oq_fw_check_target_ready) = !hardware_slug.empty()
                 && firmware_url.size() >= expected_file.size()
@@ -334,29 +323,19 @@ script:
       - lambda: |-
           // Re-apply the manifest URL immediately before check/install so the selected target wins.
           const std::string channel = id(oq_firmware_update_channel).current_option();
-          const std::string target = id(oq_firmware_update_target).current_option();
-          const bool alternate_connection_update_target = target == "alternate connection";
-          const bool alternate_topology_update_target = target == "alternate topology";
-          const bool alternate_build_update_target = target == "alternate topology and connection";
+          const bool alternate_topology_update_target =
+            id(oq_firmware_update_target).current_option() == "alternate topology";
           const bool dev_channel = channel == "dev";
 
           const char *source_url = dev_channel ? "${dev_release_manifest_url}" : "${main_release_manifest_url}";
-          const char *alternate_connection_url =
-            dev_channel ? "${alternate_dev_release_manifest_url}" : "${alternate_main_release_manifest_url}";
           const char *alternate_topology_url =
             dev_channel ? "${alternate_topology_dev_release_manifest_url}" : "${alternate_topology_main_release_manifest_url}";
-          const char *alternate_build_url =
-            dev_channel ? "${alternate_build_dev_release_manifest_url}" : "${alternate_build_main_release_manifest_url}";
-          if (alternate_build_update_target && alternate_build_url[0] != '\0') {
-            source_url = alternate_build_url;
-          } else if (alternate_connection_update_target && alternate_connection_url[0] != '\0') {
-            source_url = alternate_connection_url;
-          } else if (alternate_topology_update_target && alternate_topology_url[0] != '\0') {
+          if (alternate_topology_update_target && alternate_topology_url[0] != '\0') {
             source_url = alternate_topology_url;
           }
 
           ESP_LOGI("oq_fw", "Firmware update target '%s' on channel '%s' uses manifest: %s",
-                   target.c_str(), channel.c_str(), source_url);
+                   id(oq_firmware_update_target).current_option().c_str(), channel.c_str(), source_url);
           id(oq_firmware_update).set_source_url(source_url);
 
   - id: oq_initial_firmware_update_check
@@ -576,8 +555,7 @@ script:
           const std::string topology = "single";
           #endif
           const std::string artifact_base = "openquatt-" + hardware_slug + "-" + topology;
-          const std::string expected_manifest =
-              artifact_base + "${oq_artifact_connection_suffix}-ota.manifest.json";
+          const std::string expected_manifest = artifact_base + "-ota.manifest.json";
           bool valid = url.rfind(prefix, 0) == 0;
           if (valid) {
             std::string rest = url.substr(prefix.size());
@@ -954,35 +932,19 @@ select:
               ESP_LOGW("oq_fw", "Firmware source change ignored during active install.");
               return;
             }
-            const bool alternate_connection_update_target =
-              id(oq_firmware_update_target).current_option() == "alternate connection";
             const bool alternate_topology_update_target =
               id(oq_firmware_update_target).current_option() == "alternate topology";
-            const bool alternate_build_update_target =
-              id(oq_firmware_update_target).current_option() == "alternate topology and connection";
             if (x == "dev") {
               const char *source_url = "${dev_release_manifest_url}";
-              const char *alternate_connection_url = "${alternate_dev_release_manifest_url}";
               const char *alternate_topology_url = "${alternate_topology_dev_release_manifest_url}";
-              const char *alternate_build_url = "${alternate_build_dev_release_manifest_url}";
-              if (alternate_build_update_target && alternate_build_url[0] != '\0') {
-                source_url = alternate_build_url;
-              } else if (alternate_connection_update_target && alternate_connection_url[0] != '\0') {
-                source_url = alternate_connection_url;
-              } else if (alternate_topology_update_target && alternate_topology_url[0] != '\0') {
+              if (alternate_topology_update_target && alternate_topology_url[0] != '\0') {
                 source_url = alternate_topology_url;
               }
               id(oq_firmware_update).set_source_url(source_url);
             } else {
               const char *source_url = "${main_release_manifest_url}";
-              const char *alternate_connection_url = "${alternate_main_release_manifest_url}";
               const char *alternate_topology_url = "${alternate_topology_main_release_manifest_url}";
-              const char *alternate_build_url = "${alternate_build_main_release_manifest_url}";
-              if (alternate_build_update_target && alternate_build_url[0] != '\0') {
-                source_url = alternate_build_url;
-              } else if (alternate_connection_update_target && alternate_connection_url[0] != '\0') {
-                source_url = alternate_connection_url;
-              } else if (alternate_topology_update_target && alternate_topology_url[0] != '\0') {
+              if (alternate_topology_update_target && alternate_topology_url[0] != '\0') {
                 source_url = alternate_topology_url;
               }
               id(oq_firmware_update).set_source_url(source_url);
@@ -1020,43 +982,29 @@ select:
     internal: true
     optimistic: true
     restore_value: false
-    options: ["current build", "alternate connection", "alternate topology", "alternate topology and connection"]
+    options: ["current build", "alternate topology"]
     initial_option: "current build"
     on_value:
       then:
         - lambda: |-
-            // Switch between the current-build manifest and alternate target manifests.
+            // Switch between the current-build manifest and alternate topology manifest.
             // No source changes while a firmware install owns the update slot.
             if (id(oq_firmware_target_install_active)) {
               ESP_LOGW("oq_fw", "Firmware source change ignored during active install.");
               return;
             }
-            const bool alternate_connection_update_target = x == "alternate connection";
             const bool alternate_topology_update_target = x == "alternate topology";
-            const bool alternate_build_update_target = x == "alternate topology and connection";
             if (id(oq_firmware_update_channel).current_option() == "dev") {
               const char *source_url = "${dev_release_manifest_url}";
-              const char *alternate_connection_url = "${alternate_dev_release_manifest_url}";
               const char *alternate_topology_url = "${alternate_topology_dev_release_manifest_url}";
-              const char *alternate_build_url = "${alternate_build_dev_release_manifest_url}";
-              if (alternate_build_update_target && alternate_build_url[0] != '\0') {
-                source_url = alternate_build_url;
-              } else if (alternate_connection_update_target && alternate_connection_url[0] != '\0') {
-                source_url = alternate_connection_url;
-              } else if (alternate_topology_update_target && alternate_topology_url[0] != '\0') {
+              if (alternate_topology_update_target && alternate_topology_url[0] != '\0') {
                 source_url = alternate_topology_url;
               }
               id(oq_firmware_update).set_source_url(source_url);
             } else {
               const char *source_url = "${main_release_manifest_url}";
-              const char *alternate_connection_url = "${alternate_main_release_manifest_url}";
               const char *alternate_topology_url = "${alternate_topology_main_release_manifest_url}";
-              const char *alternate_build_url = "${alternate_build_main_release_manifest_url}";
-              if (alternate_build_update_target && alternate_build_url[0] != '\0') {
-                source_url = alternate_build_url;
-              } else if (alternate_connection_update_target && alternate_connection_url[0] != '\0') {
-                source_url = alternate_connection_url;
-              } else if (alternate_topology_update_target && alternate_topology_url[0] != '\0') {
+              if (alternate_topology_update_target && alternate_topology_url[0] != '\0') {
                 source_url = alternate_topology_url;
               }
               id(oq_firmware_update).set_source_url(source_url);
@@ -1158,8 +1106,7 @@ button:
                 #endif
                 const std::string artifact_base =
                     "openquatt-" + hardware_slug + "-" + topology;
-                const std::string expected_manifest =
-                    artifact_base + "${oq_artifact_connection_suffix}-ota.manifest.json";
+                const std::string expected_manifest = artifact_base + "-ota.manifest.json";
                 if (url.rfind(prefix, 0) != 0) {
                   ESP_LOGW("oq_fw", "Test firmware rejected: invalid PR manifest prefix.");
                   id(oq_firmware_update_status).publish_state("Error");
