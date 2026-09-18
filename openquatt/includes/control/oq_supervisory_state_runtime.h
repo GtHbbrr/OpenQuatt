@@ -366,9 +366,10 @@ class Runtime {
     bool cold_start_released_now = false;
     // Cold-start outlet samples are only required from currently startable
     // HP's. An unavailable ODU must not block the healthy ODU. Required is
-    // re-derived every tick so an HP recovering mid-CM1 still needs a fresh
-    // post-flow sample before release.
-    static oq_hp_supervisory::ColdStartRequiredSet cold_start_release_set;
+    // re-derived every tick; any false->true edge before the first
+    // compressor start re-arms sampling with a new freshness epoch, so a
+    // recovered HP cannot release on a pre-recovery measurement.
+    static oq_hp_supervisory::ColdStartRequiredSet previous_cold_start_required;
     const bool hp1_cold_start_required = id(oq_incident_manager).get_outputs(1).available_for_start;
 #if OQ_TOPOLOGY_DUO
     const bool hp2_cold_start_required = id(oq_incident_manager).get_outputs(2).available_for_start;
@@ -383,21 +384,22 @@ class Runtime {
       id(oq_cold_start_sample_after_ms) = 0;
       id(oq_cold_start_hp_blocked) = false;
       id(oq_cold_start_assist_active) = false;
-      cold_start_release_set = oq_hp_supervisory::ColdStartRequiredSet{};
     } else {
       if (!id(oq_cold_start_session_active)) {
         id(oq_cold_start_session_active) = true;
         id(oq_cold_start_pending) = !any_hp_compressor_active;
         id(oq_cold_start_sample_after_ms) = 0;
         id(oq_cold_start_assist_active) = false;
-        cold_start_release_set = oq_hp_supervisory::ColdStartRequiredSet{};
       }
 
-      if (!id(oq_cold_start_pending) && !any_hp_compressor_active &&
-          oq_hp_supervisory::cold_start_requires_rearm(cold_start_release_set, cold_start_required)) {
-        // Released, but no compressor runs yet and a previously unavailable
-        // HP became startable: sample it before any compressor may start.
+      if (!any_hp_compressor_active &&
+          oq_hp_supervisory::cold_start_required_added(previous_cold_start_required, cold_start_required)) {
+        // A previously unavailable HP became startable while no compressor
+        // runs yet: re-arm sampling and invalidate every earlier sample, so
+        // only measurements taken after this edge can release the session.
+        // The water probes restart automatically on the new session stamp.
         id(oq_cold_start_pending) = true;
+        id(oq_cold_start_sample_after_ms) = flow_ok ? now_ms : 0;
       }
 
       if (id(oq_cold_start_pending)) {
@@ -428,7 +430,6 @@ class Runtime {
 
         if (cold_start.released) {
           id(oq_cold_start_pending) = false;
-          cold_start_release_set = cold_start_required;
           cold_start_released_now = true;
         } else {
           cold_start_blocked = !any_hp_compressor_active && !cold_start.hp_start_allowed;
@@ -440,6 +441,9 @@ class Runtime {
       }
       id(oq_cold_start_hp_blocked) = cold_start_blocked;
     }
+    // Track the required set across ticks in every branch, so the next tick
+    // observes any false->true edge exactly once.
+    previous_cold_start_required = cold_start_required;
     const bool probe_allowed = heating_flow_req && id(oq_cold_start_pending) && flow_ok &&
                                !id(oq_runtime_polling_paused).state && openquatt_enabled &&
                                id(oq_cm_override).current_option() == "Auto" && id(oq_control_mode_code) != 100;

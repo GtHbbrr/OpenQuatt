@@ -81,15 +81,22 @@ class SupervisoryStateRuntimeContractTest(unittest.TestCase):
         # Regression for #705: Duo cold start required both ODU outlet samples
         # even when one ODU was unavailable, wedging CM1 forever. Required must
         # follow the incident-manager start contract per HP, never topology.
+        # Recovery before the first compressor start must open a new freshness
+        # epoch: a false->true edge re-arms sampling and invalidates every
+        # earlier sample, so a recovered HP cannot release on a pre-loss
+        # measurement.
         self.assertIn("cold_start_required_set(", RUNTIME)
         self.assertIn("get_outputs(1).available_for_start", RUNTIME)
         self.assertIn("get_outputs(2).available_for_start", RUNTIME)
-        self.assertIn("cold_start_requires_rearm(", RUNTIME)
+        self.assertIn("cold_start_required_added(", RUNTIME)
+        self.assertIn("id(oq_cold_start_sample_after_ms) = flow_ok ? now_ms : 0;", RUNTIME)
         self.assertIn("probe_allowed && hp1_cold_start_required", RUNTIME)
         self.assertIn("probe_allowed && hp2_cold_start_required", RUNTIME)
         self.assertNotIn("ColdStartWaterSample{true,", RUNTIME)
+        self.assertNotIn("cold_start_release_set", RUNTIME)
         self.assertIn("cold_start_required_set", HP_SUPERVISORY_TEST)
-        self.assertIn("cold_start_requires_rearm", HP_SUPERVISORY_TEST)
+        self.assertIn("cold_start_required_added", HP_SUPERVISORY_TEST)
+        self.assertNotIn("cold_start_requires_rearm", HP_SUPERVISORY_TEST)
 
 
 if __name__ == "__main__":

@@ -67,12 +67,13 @@ void test_cold_start_temperature_bands() {
 }
 
 void test_cold_start_availability_matrix() {
+  using oq_hp_supervisory::cold_start_required_added;
   using oq_hp_supervisory::cold_start_required_set;
-  using oq_hp_supervisory::cold_start_requires_rearm;
+  using oq_hp_supervisory::cold_start_sample_is_new;
   using oq_hp_supervisory::ColdStartWaterSample;
   using oq_hp_supervisory::evaluate_cold_start;
 
-  const uint32_t sample_after_ms = 1000;
+  uint32_t sample_after_ms = 1000;
 
   // A. HP1 unavailable, HP2 available and warm: healthy HP2 alone releases.
   auto required = cold_start_required_set(false, true);
@@ -134,14 +135,52 @@ void test_cold_start_availability_matrix() {
   assert(!decision.hp_start_allowed);
   assert(!decision.released);
 
-  // Recovery in the post-release, pre-compressor window re-arms sampling
-  // only when a previously unavailable HP became startable.
-  const auto released_hp2_only = cold_start_required_set(false, true);
-  assert(!cold_start_requires_rearm(released_hp2_only, cold_start_required_set(false, true)));
-  assert(cold_start_requires_rearm(released_hp2_only, cold_start_required_set(true, true)));
-  assert(cold_start_requires_rearm(cold_start_required_set(false, false), cold_start_required_set(true, false)));
-  assert(!cold_start_requires_rearm(released_hp2_only, cold_start_required_set(false, false)));
-  assert(!cold_start_requires_rearm(cold_start_required_set(true, true), cold_start_required_set(true, true)));
+  // Recovery before any compressor start is a false->true edge in the
+  // required set, whatever the release history was.
+  const auto hp2_only = cold_start_required_set(false, true);
+  const auto both = cold_start_required_set(true, true);
+  const auto none = cold_start_required_set(false, false);
+  assert(!cold_start_required_added(hp2_only, hp2_only));
+  assert(cold_start_required_added(hp2_only, both));
+  assert(cold_start_required_added(none, cold_start_required_set(true, false)));
+  assert(!cold_start_required_added(hp2_only, none));
+  assert(!cold_start_required_added(both, both));
+  assert(!cold_start_required_added(both, hp2_only));
+
+  // Recovery must start a new freshness epoch: a measurement taken before
+  // the edge is stale even though it is newer than the original preflow.
+  // t=1000 flow OK, t=1500 HP1 sample, t=2000 HP1 offline, t=5000 HP2-only
+  // release, t=8000 HP1 recovers.
+  sample_after_ms = 1000;
+  hp1 = ColdStartWaterSample{false, 20.0f, 1500};
+  hp2 = ColdStartWaterSample{true, 21.0f, 4000};
+  decision = evaluate_cold_start(sample_after_ms, hp1, hp2, 5.0f, 12.0f);
+  assert(decision.released);
+  assert(cold_start_required_added(hp2_only, both));
+  // Without the epoch reset, the pre-recovery HP1 sample would wrongly
+  // count as fresh (1500 > 1000) and release immediately: the reported bug.
+  assert(cold_start_sample_is_new(ColdStartWaterSample{true, 20.0f, 1500}, 1000));
+  assert(evaluate_cold_start(1000, ColdStartWaterSample{true, 20.0f, 1500}, ColdStartWaterSample{true, 21.0f, 4000},
+                             5.0f, 12.0f)
+             .released);
+  sample_after_ms = 8000;  // runtime resets the epoch on the edge
+  assert(!cold_start_sample_is_new(ColdStartWaterSample{true, 20.0f, 1500}, sample_after_ms));
+  assert(!cold_start_sample_is_new(ColdStartWaterSample{true, 21.0f, 4000}, sample_after_ms));
+  decision = evaluate_cold_start(sample_after_ms, ColdStartWaterSample{true, 20.0f, 1500},
+                                 ColdStartWaterSample{true, 21.0f, 4000}, 5.0f, 12.0f);
+  assert(!decision.samples_ready);
+  assert(!decision.hp_start_allowed);
+  assert(!decision.released);
+  decision = evaluate_cold_start(sample_after_ms, ColdStartWaterSample{true, 20.5f, 8100},
+                                 ColdStartWaterSample{true, 21.0f, 8200}, 5.0f, 12.0f);
+  assert(decision.released);
+
+  // A validated HP that drops out and recovers also edges false->true, so
+  // it cannot restart on its pre-loss measurement either.
+  assert(!cold_start_required_added(hp2_only, none));
+  assert(cold_start_required_added(none, hp2_only));
+  sample_after_ms = 9000;  // runtime resets the epoch on the recovery edge
+  assert(!cold_start_sample_is_new(ColdStartWaterSample{true, 21.0f, 8200}, sample_after_ms));
 }
 
 oq_hp_supervisory::FallbackEvaluationInputs eligible_fallback_evaluation_inputs() {

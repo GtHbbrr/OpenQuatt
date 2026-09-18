@@ -48,11 +48,14 @@ inline ColdStartRequiredSet cold_start_required_set(bool hp1_available_for_start
   return required;
 }
 
-// Post-release, pre-compressor window: a newly available HP must deliver a
-// fresh post-flow sample before any compressor may start. Dropping out of
-// the required set never re-arms; dispatch already excludes unavailable HP's.
-inline bool cold_start_requires_rearm(const ColdStartRequiredSet& released, const ColdStartRequiredSet& current) {
-  return (current.hp1 && !released.hp1) || (current.hp2 && !released.hp2);
+// Rising edge in the required set: an HP went from not required to required
+// (recovered after link loss, or newly startable in the post-release,
+// pre-compressor window). The runtime must re-arm sampling and start a new
+// freshness epoch, so only measurements taken after the edge can release
+// the cold start. Dropping out of the required set is not an edge;
+// dispatch already excludes unavailable HP's while they are gone.
+inline bool cold_start_required_added(const ColdStartRequiredSet& previous, const ColdStartRequiredSet& current) {
+  return (current.hp1 && !previous.hp1) || (current.hp2 && !previous.hp2);
 }
 
 inline bool cold_start_sample_is_new(const ColdStartWaterSample& sample, uint32_t sample_after_ms) {
