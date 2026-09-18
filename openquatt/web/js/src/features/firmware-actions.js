@@ -521,6 +521,8 @@ import { render } from "../core/render-scheduler.js";
     const [targetTopology, targetConnection] = String(state.quickStartSetupDraft || "").split(":");
     const model = getFirmwareBuildSwitchModel(targetTopology, targetConnection);
     if (!model.available) {
+      state.controlError = "De huidige configuratie kon niet betrouwbaar worden vastgesteld. Wacht een moment en probeer opnieuw.";
+      render();
       return;
     }
     if (!state.quickStartSetupConfirmed) {
@@ -534,8 +536,26 @@ import { render } from "../core/render-scheduler.js";
       return;
     }
 
-    const currentChannel = getFirmwareRunningChannelLabel().toLowerCase() || "current";
     const currentVersion = getFirmwareCurrentVersion() || "";
+    if (isQuickStartSetupFirmwareCurrent(model)) {
+      storeQuickStartSetupInstall({
+        status: "complete",
+        targetTopology: model.targetTopology,
+        targetConnection: model.targetConnection,
+        targetChannel: "main",
+        targetVersion: currentVersion,
+        startedAt: Date.now(),
+      });
+      state.currentStep = "generation";
+      state.quickStartSetupUpdateComplete = true;
+      state.controlError = "";
+      state.controlNotice = "De gekozen configuratie en stabiele main-software zijn al actueel. Er was geen OTA nodig.";
+      render();
+      return;
+    }
+
+    const runningChannel = String(getFirmwareRunningChannelLabel() || "").trim().toLowerCase();
+    const currentChannel = ["main", "dev"].includes(runningChannel) ? runningChannel : "current";
     storeQuickStartSetupInstall({
       status: "skipped",
       targetTopology: model.targetTopology,
