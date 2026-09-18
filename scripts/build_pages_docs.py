@@ -554,6 +554,13 @@ def render_template(rendered_page: RenderedPage, rendered_pages: list[RenderedPa
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{escape(page.label)} | OpenQuatt</title>
     <meta name="description" content="{escape(page.summary)}" />
+    <meta name="theme-color" content="#0F1724" />
+    <link rel="icon" type="image/svg+xml" href="{asset_prefix}assets/brand/favicon.svg" />
+    <link rel="apple-touch-icon" href="{asset_prefix}assets/brand/apple-touch-icon.png" />
+    <meta property="og:title" content="{escape(page.label)} | OpenQuatt" />
+    <meta property="og:description" content="{escape(page.summary)}" />
+    <meta property="og:image" content="https://openquatt.github.io/OpenQuatt/assets/brand/openquatt-social-card-1280x640.png" />
+    <meta name="twitter:card" content="summary_large_image" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
@@ -573,7 +580,7 @@ def render_template(rendered_page: RenderedPage, rendered_pages: list[RenderedPa
           </button>
 
           <a class="site-brand" href="{rel_url(page.output, PurePosixPath('index.html'))}">
-            <img class="site-brand-logo" src="{asset_prefix}assets/openquatt_logo.svg" alt="OpenQuatt" width="118" height="40" />
+            <img class="site-brand-logo" src="{asset_prefix}assets/brand/openquatt-logo-compact-dark.svg" alt="OpenQuatt" width="200" height="44" />
           </a>
         </div>
 
