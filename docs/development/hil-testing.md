@@ -33,7 +33,7 @@ firmware uploadt vereist altijd `--apply`. Verder gelden deze grenzen:
 - een muterende run vereist een normale restoreconfig en OTA-adres;
 - snapshots en rapporten blijven onder het door Git genegeerde `.tmp/hil/`.
 
-De afzonderlijke `duo_wifi_hil.yaml`-testcontroller en gecombineerde simulator
+De afzonderlijke `duo_hil.yaml`-testcontroller en gecombineerde simulator
 gebruiken `preferences.flash_write_interval: 1s`. De runner wacht daarna twee
 seconden en verifieert alle herstelwaarden nogmaals read-only. Persistente
 controllerinstellingen en simulatorprofielen/-adressen zijn dan naar flash
@@ -67,7 +67,7 @@ beschikbaar zijn. Ook simulatorcontract en -versie worden vastgelegd.
 ## Volledige input-/bronselectietest
 
 De testconfig is uitsluitend voor HIL en wordt niet als releaseprofiel gebouwd.
-Hij gebruikt de normale Q Duo WiFi-firmware, met alleen deze kortere testtijden:
+Hij gebruikt de normale unified Q Duo-firmware, met alleen deze kortere testtijden:
 
 | Contract | Productie | HIL |
 |---|---:|---:|
@@ -83,7 +83,7 @@ node scripts/hil/run-input-sources.mjs \
   --simulator http://SIMULATOR-IP \
   --device openquatt.local \
   --test-config configs/hil/input_sources_fast_duo_wifi.yaml \
-  --restore-config configs/heatpump_controller_q/duo_wifi.yaml \
+  --restore-config configs/heatpump_controller_q/duo.yaml \
   --stage all \
   --apply
 ```
@@ -129,7 +129,7 @@ node scripts/hil/run-input-sources.mjs \
   --controller http://openquatt.local \
   --simulator http://SIMULATOR-IP \
   --device openquatt.local \
-  --restore-config configs/heatpump_controller_q/duo_wifi.yaml \
+  --restore-config configs/heatpump_controller_q/duo.yaml \
   --restore-snapshot .tmp/hil/RUN/snapshot.json \
   --apply
 ```
@@ -156,11 +156,15 @@ waarna de normale integratie nieuwe API-waarden moet aanleveren.
 npm run check:hil
 python3 scripts/dev.py validate --config-only \
   --config configs/hil/input_sources_fast_duo_wifi.yaml
+python3 scripts/dev.py validate --config-only \
+  --config configs/heatpump_controller_q/duo_hil.yaml
 ```
 
 De eerste opdracht test write-gating, requestbegrenzing, CLI-veiligheidsregels,
-OTA-commandoconstructie en volledig instellingenherstel met fakes. De tweede
-controleert of de testoverlay met de actuele firmwareconfig blijft compileren.
+OTA-commandoconstructie en volledig instellingenherstel met fakes. De twee
+config-validaties controleren respectievelijk de testoverlay en de canonieke
+HIL-entrypoint tegen de actuele firmwarecompositie. De Duo HIL-config wordt ook
+automatisch in CI gevalideerd.
 
 ## Issue #667: V2 performance en Power Input
 
@@ -175,7 +179,7 @@ node scripts/hil/run-v2-performance.mjs \
   --simulator http://SIMULATOR-IP \
   --device openquatt-test.local \
   --test-config configs/hil/issue_667_v2_performance_duo_wifi.yaml \
-  --restore-config configs/heatpump_controller_q/duo_wifi_hil.yaml \
+  --restore-config configs/heatpump_controller_q/duo_hil.yaml \
   --stage all \
   --apply
 ```
@@ -202,7 +206,7 @@ node scripts/hil/run-v2-performance.mjs \
   --controller http://openquatt-test.local \
   --simulator http://SIMULATOR-IP \
   --device openquatt-test.local \
-  --restore-config configs/heatpump_controller_q/duo_wifi_hil.yaml \
+  --restore-config configs/heatpump_controller_q/duo_hil.yaml \
   --restore-snapshot .tmp/hil/RUN/snapshot.json \
   --apply
 ```

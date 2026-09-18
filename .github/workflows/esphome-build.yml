@@ -107,6 +107,10 @@ jobs:
           pip install --upgrade "esphome==${ESPHOME_VERSION}"
           esphome version
 
+      - name: Validate Duo HIL config
+        if: ${{ matrix.target.id == 'heatpump_controller_q_duo' }}
+        run: esphome config configs/heatpump_controller_q/duo_hil.yaml
+
       - name: Resolve ESP-IDF version for cache key
         id: idf_version
         run: |

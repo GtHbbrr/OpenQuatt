@@ -5,7 +5,8 @@ import unittest
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 PROFILE = (ROOT / "configs/hil/input_sources_fast_duo_wifi.yaml").read_text()
 V2_PROFILE = (ROOT / "configs/hil/issue_667_v2_performance_duo_wifi.yaml").read_text()
-HIL_CONTROLLER = (ROOT / "configs/heatpump_controller_q/duo_wifi_hil.yaml").read_text()
+HIL_CONTROLLER = (ROOT / "configs/heatpump_controller_q/duo_hil.yaml").read_text()
+HIL_CONTROLLER_COMPAT = (ROOT / "configs/heatpump_controller_q/duo_wifi_hil.yaml").read_text()
 RUNNER = (ROOT / "scripts/hil/run-input-sources.mjs").read_text()
 V2_RUNNER = (ROOT / "scripts/hil/run-v2-performance.mjs").read_text()
 REST_CLIENT = (ROOT / "scripts/hil/rest-client.mjs").read_text()
@@ -14,13 +15,14 @@ TARGETS = (ROOT / "build_targets.yaml").read_text()
 DOCS = (ROOT / "docs/development/hil-testing.md").read_text()
 PACKAGE = (ROOT / "package.json").read_text()
 WORKFLOW = (ROOT / ".github/workflows/ci-build.yml").read_text()
+ESPHOME_BUILD_WORKFLOW = (ROOT / ".github/workflows/esphome-build.yml").read_text()
 
 
 class HilHarnessContractTest(unittest.TestCase):
     def test_fast_profile_is_explicitly_test_only(self):
         self.assertIn("HIL TEST ONLY", PROFILE)
         self.assertIn(
-            "!include ../heatpump_controller_q/duo_wifi.yaml", PROFILE
+            "!include ../heatpump_controller_q/duo.yaml", PROFILE
         )
         self.assertIn('name: "HIL Test Profile"', PROFILE)
         self.assertIn('return {"input-sources-fast-v1"};', PROFILE)
@@ -56,13 +58,16 @@ class HilHarnessContractTest(unittest.TestCase):
     def test_issue_667_profile_and_runner_are_test_only(self):
         self.assertIn("HIL TEST ONLY", V2_PROFILE)
         self.assertIn("issue-667-v2-performance-v1", V2_PROFILE)
+        self.assertIn("!include ../heatpump_controller_q/duo_hil.yaml", V2_PROFILE)
         self.assertIn("HIL HP1 Power Input quality", V2_PROFILE)
         self.assertIn("HIL Low-load Pmin", V2_PROFILE)
         self.assertIn("id(cic_component).stop_poller();", V2_PROFILE)
         self.assertIn("id(cic_component).start_poller();", V2_PROFILE)
         self.assertIn("flash_write_interval: 1s", HIL_CONTROLLER)
+        self.assertIn("!include duo_hil.yaml", HIL_CONTROLLER_COMPAT)
         self.assertIn("openquatt-modbus-opentherm-v2", V2_RUNNER)
         self.assertIn("v2PerformanceScenario", V2_RUNNER)
+        self.assertIn("configs/heatpump_controller_q/duo_hil.yaml", V2_RUNNER)
         self.assertNotIn("192.168.", V2_RUNNER)
         self.assertNotIn("issue_667_v2_performance_duo_wifi.yaml", TARGETS)
 
@@ -77,6 +82,11 @@ class HilHarnessContractTest(unittest.TestCase):
         )[0]
         self.assertIn("npm run check:hil", host_job)
         self.assertIn("./scripts/run_host_regression_tests.sh", host_job)
+        self.assertIn("Validate Duo HIL config", ESPHOME_BUILD_WORKFLOW)
+        self.assertIn(
+            "esphome config configs/heatpump_controller_q/duo_hil.yaml",
+            ESPHOME_BUILD_WORKFLOW,
+        )
 
 
 if __name__ == "__main__":
