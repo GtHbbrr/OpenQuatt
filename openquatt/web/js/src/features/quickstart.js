@@ -47,6 +47,10 @@ import { renderPerformanceTelemetryConsent, renderPerformanceTelemetryDisclosure
     const currentVersion = getFirmwareCurrentVersion(firmwareEntity) || "Onbekend";
     const mainVersion = mainManifestReady ? getFirmwareLatestVersion(firmwareEntity) || "Onbekend" : "Wordt na bevestigen gecontroleerd";
     const firmwareCurrent = mainManifestReady && isQuickStartSetupFirmwareCurrent(model);
+    const canKeepCurrentSoftware = model.available
+      && model.currentTopology === model.targetTopology
+      && model.currentConnection === model.targetConnection
+      && !firmwareCurrent;
     const unifiedNetworkBuild = hasEntity("preferredConnection");
     const options = [
         ["single:wifi", "Single · Wi-Fi", "Eén warmtepomp via het draadloze netwerk."],
@@ -57,9 +61,6 @@ import { renderPerformanceTelemetryConsent, renderPerformanceTelemetryDisclosure
     const requirements = [
       model.targetIsDuo ? "De tweede warmtepomp is aangesloten en hoort bij deze controller." : "Deze controller wordt voor één warmtepomp gebruikt.",
       model.targetIsEthernet ? "De netwerkkabel is aangesloten." : "De Wi-Fi-gegevens zijn beschikbaar op de controller.",
-      firmwareCurrent
-        ? "Configuratie en main-release zijn actueel; er is geen OTA nodig."
-        : "Zo nodig wordt de stabiele main-release geïnstalleerd en vervangt deze een dev- of testbuild.",
     ];
 
     return `
@@ -67,8 +68,8 @@ import { renderPerformanceTelemetryConsent, renderPerformanceTelemetryDisclosure
         <p class="oq-helper-label">${escapeHtml(getQuickStepKicker("setup"))}</p>
         <h2 class="oq-helper-section-title">Configuratie en software-update</h2>
         <p class="oq-helper-section-copy">${escapeHtml(unifiedNetworkBuild
-          ? "Kies de opstelling. De verbindingsmodus wijzig je via Connectiviteit."
-          : "Kies de configuratie van je Q-edition. OpenQuatt controleert daarna de nieuwste stabiele main-release en installeert deze alleen als de versie of configuratie afwijkt.")}</p>
+          ? "Kies de opstelling. De verbindingsmodus wijzig je via Connectiviteit. Als de gekozen build al actief is, kun je de huidige software behouden zonder OTA."
+          : "Kies de configuratie van je Q-edition. Je kunt daarna de stabiele main-release controleren of, als deze build al actief is, doorgaan met de huidige software zonder OTA.")}</p>
         <div class="oq-helper-fields">
           ${options.map(([key, title, copy]) => {
             const selected = model.selectedKey === key;
@@ -112,17 +113,30 @@ import { renderPerformanceTelemetryConsent, renderPerformanceTelemetryDisclosure
             </div>
             <p class="oq-helper-modal-note">${firmwareCurrent
               ? "Softwareversie en configuratie kloppen. Na bevestigen gaat Quick Start zonder OTA verder."
-              : "OpenQuatt controleert de stabiele softwareversie en gekozen configuratie. Alleen bij een afwijking volgt OTA en herstart. Instellingen blijven behouden."}</p>
+              : canKeepCurrentSoftware
+                ? "De gekozen build is al actief. Je kunt de stabiele main-release controleren/installeren of Quick Start zonder OTA voortzetten met de huidige software."
+                : "OpenQuatt controleert de stabiele softwareversie en gekozen configuratie. Alleen bij een afwijking volgt OTA en herstart. Instellingen blijven behouden; een dev- of testbuild wordt bij deze route vervangen."}</p>
             <label class="oq-helper-modal-check">
               <input type="checkbox" data-oq-quickstart-setup-confirm="true" ${state.quickStartSetupConfirmed ? "checked" : ""} ${busy ? "disabled" : ""}>
               <span>${escapeHtml(requirements.join(" "))}</span>
             </label>
             <div class="oq-firmware-advanced-footer">
               <button class="oq-helper-button oq-helper-button--primary" type="button" data-oq-action="install-quickstart-setup" ${busy || !state.quickStartSetupConfirmed || !model.canInstall ? "disabled" : ""}>
-                ${busy ? "Configuratie en software controleren..." : firmwareCurrent ? "Configuratie bevestigen" : "Configuratie bevestigen en software controleren"}
+                ${busy
+                  ? "Configuratie en software controleren..."
+                  : firmwareCurrent
+                    ? "Configuratie bevestigen"
+                    : canKeepCurrentSoftware
+                      ? "Stabiele main controleren/installeren"
+                      : "Configuratie bevestigen en software controleren"}
               </button>
+              ${canKeepCurrentSoftware ? `
+                <button class="oq-helper-button oq-helper-button--ghost" type="button" data-oq-action="keep-current-quickstart-setup" ${busy || !state.quickStartSetupConfirmed ? "disabled" : ""}>
+                  Huidige software behouden en doorgaan
+                </button>
+              ` : ""}
             </div>
-            ${!model.canInstall && !busy ? `<p class="oq-helper-modal-note oq-helper-modal-note--muted">${escapeHtml(
+            ${!model.canInstall && !busy && !canKeepCurrentSoftware ? `<p class="oq-helper-modal-note oq-helper-modal-note--muted">${escapeHtml(
               !model.targetEntityAvailable || !model.installActionAvailable || !model.mainChannelAvailable
                 ? "De firmwarebediening wordt nog geladen. Wacht een moment en probeer opnieuw."
                 : "Deze firmware mist nog het vereiste OTA-target voor de gekozen configuratie.",

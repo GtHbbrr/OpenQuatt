@@ -80,7 +80,7 @@ Quick Start begint met de configuratiekeuze en software-update. Daarna volgen de
 
 | Stap | Wat kies je? | Waarom? |
 |---|---|---|
-| `Configuratie en software-update` | `Single` of `Duo`, via `Wi-Fi` of `Ethernet` | Alleen op de HCQ; controleert de stabiele release en installeert deze alleen als versie of configuratie afwijkt. |
+| `Configuratie en software-update` | `Single` of `Duo`, via `Wi-Fi` of `Ethernet` | Alleen op de HCQ; controleert de stabiele release. Als de gekozen build al actief is, kun je ook met de huidige software doorgaan zonder OTA. |
 | `Kies je Quatt Hybrid` | V1, V1.5 of V2 | Selecteert de juiste basislogica voor jouw warmtepompgeneratie. |
 | `Flowmeting configureren` | De juiste flowbron | Zorgt dat de regeling de juiste meting gebruikt. |
 | `Thermostaatgegevens configureren` | Eén bron voor kamertemperatuur en setpoint | Voorkomt dat OpenQuatt waarden uit verschillende bronnen combineert. |
