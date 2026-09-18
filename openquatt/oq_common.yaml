@@ -245,7 +245,10 @@ modbus:
   - uart_id: uart_bus
     id: mod_bus
     send_wait_time: 100ms
-    # ESPHome 2026.8 moved command spacing from modbus_controller to the shared hub.
+    # Shared-hub pacing (ESPHome 2026.8+; controller command_throttle is gone).
+    # 100 ms restores the long-stable pre-2026.8 pacing: the 500 ms was PR #129
+    # controller-throttle heritage, not an ODU requirement. Re-raise only on
+    # wire-measured evidence. The substitution keeps its historic name.
     turnaround_time: ${oq_modbus_command_throttle_ms}ms
 
 # ==============================================================================
