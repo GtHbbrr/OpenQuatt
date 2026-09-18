@@ -11,14 +11,14 @@ export function renderPerformanceTelemetryConsent({ enabled, busy, settings = fa
       <div class="oq-usage-consent-copy">
         <span class="oq-usage-consent-icon" aria-hidden="true">${renderOqIcon("activity", "oq-usage-consent-icon-svg")}</span>
         <div>
-          <h3>Prestatiemetingen delen</h3>
+          <h3>Warmtepompprestaties delen</h3>
           <p>${scheduleCopy}</p>
         </div>
       </div>
       <div class="oq-usage-consent-action">
         ${renderSettingsCompactSwitchControl(
           "performanceTelemetryEnabled",
-          "Prestatiemetingen delen",
+          "Warmtepompprestaties delen",
           enabled,
           busy,
           "Aan",

@@ -31,7 +31,7 @@ test("consent cards lead with why and toggle Aan/Uit", async () => {
   }
   assert.match(usageConsentSource, /<h3>Technische statistieken delen<\/h3>/);
   assert.match(usageConsentSource, /Help OpenQuatt stabieler en betrouwbaarder te maken/);
-  assert.match(performanceConsentSource, /<h3>Prestatiemetingen delen<\/h3>/);
+  assert.match(performanceConsentSource, /<h3>Warmtepompprestaties delen<\/h3>/);
   assert.match(performanceConsentSource, /vermogens- en COP-modellen van OpenQuatt te controleren en verbeteren/);
   assert.match(performanceConsentSource, /basis voor de <strong>Power House<\/strong>-verwarmingsstrategie/);
 });
