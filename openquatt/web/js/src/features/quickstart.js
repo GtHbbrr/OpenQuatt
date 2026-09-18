@@ -114,7 +114,7 @@ import { renderPerformanceTelemetryConsent, renderPerformanceTelemetryDisclosure
               ? "Softwareversie en configuratie kloppen. Na bevestigen gaat Quick Start zonder OTA verder."
               : canKeepCurrentSoftware
                 ? "De gekozen build is al actief. Je kunt de stabiele main-release controleren/installeren of Quick Start zonder OTA voortzetten met de huidige software."
-                : "OpenQuatt controleert de stabiele softwareversie en gekozen configuratie. Alleen bij een afwijking volgt OTA en herstart. Instellingen blijven behouden."}</p>
+                : "OpenQuatt controleert de stabiele softwareversie en gekozen configuratie. Alleen bij een afwijking volgt OTA en herstart. Instellingen blijven behouden; een dev- of testbuild wordt bij deze route vervangen."}</p>
             <label class="oq-helper-modal-check">
               <input type="checkbox" data-oq-quickstart-setup-confirm="true" ${state.quickStartSetupConfirmed ? "checked" : ""} ${busy ? "disabled" : ""}>
               <span>${escapeHtml(requirements.join(" "))}</span>
