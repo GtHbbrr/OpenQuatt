@@ -47,7 +47,8 @@ import { renderPerformanceTelemetryConsent, renderPerformanceTelemetryDisclosure
     const currentVersion = getFirmwareCurrentVersion(firmwareEntity) || "Onbekend";
     const mainVersion = mainManifestReady ? getFirmwareLatestVersion(firmwareEntity) || "Onbekend" : "Wordt na bevestigen gecontroleerd";
     const firmwareCurrent = mainManifestReady && isQuickStartSetupFirmwareCurrent(model);
-    const canKeepCurrentSoftware = model.currentTopology === model.targetTopology
+    const canKeepCurrentSoftware = model.available
+      && model.currentTopology === model.targetTopology
       && model.currentConnection === model.targetConnection
       && !firmwareCurrent;
     const unifiedNetworkBuild = hasEntity("preferredConnection");
