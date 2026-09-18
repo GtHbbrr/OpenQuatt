@@ -185,7 +185,7 @@ class Modbus20269ContractTest(unittest.TestCase):
         self.assertIn("id: ${hp_id}_recovery_probe_pending", HP_IO)
         self.assertIn("id(${hp_id}_recovery_probe_pending) = true;", HP_IO)
         self.assertIn("id(${hp_id}_recovery_probe_pending) = false;", HP_IO)
-        self.assertIn("queue_command(std::move(probe))", HP_IO)
+        self.assertIn("openquatt_modbus_shim::queue_modbus_read(", HP_IO)
 
     def test_planner_ownership_and_transports_unchanged(self) -> None:
         self.assertIn("update_interval: never", HP_IO)
