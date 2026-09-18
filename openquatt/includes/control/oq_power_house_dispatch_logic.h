@@ -61,6 +61,35 @@ struct DispatchInput {
   bool duo = false, performance_valid = false, lead_hp1 = true;
   HpInput hp1, hp2;
 };
+
+enum class PerformanceSupplyRoute : uint8_t { NONE = 0, SYSTEM, HP1_OUTLET, HP2_OUTLET };
+
+struct PerformanceSupplyInputs {
+  float system_supply_c = NAN;
+  float hp1_outlet_c = NAN;
+  float hp2_outlet_c = NAN;
+  bool hp1_servable = false;
+  bool hp2_servable = false;
+};
+
+struct PerformanceSupplySelection {
+  float supply_c = NAN;
+  PerformanceSupplyRoute route = PerformanceSupplyRoute::NONE;
+  bool valid = false;
+};
+
+// Power House may estimate the one remaining HP from that HP's own fresh
+// outlet temperature when the shared system-supply signal is unavailable.
+// Never substitute one outlet while two HPs are serveable: the shared supply
+// remains authoritative for normal Duo optimization and all safety consumers.
+inline PerformanceSupplySelection select_performance_supply(const PerformanceSupplyInputs& input) {
+  if (std::isfinite(input.system_supply_c)) return {input.system_supply_c, PerformanceSupplyRoute::SYSTEM, true};
+  if (input.hp1_servable && !input.hp2_servable && std::isfinite(input.hp1_outlet_c))
+    return {input.hp1_outlet_c, PerformanceSupplyRoute::HP1_OUTLET, true};
+  if (input.hp2_servable && !input.hp1_servable && std::isfinite(input.hp2_outlet_c))
+    return {input.hp2_outlet_c, PerformanceSupplyRoute::HP2_OUTLET, true};
+  return {};
+}
 struct DispatchTuning {
   float soft_limit_w = NAN, peak_limit_w = NAN;
   float over_soft_penalty_per_w = 5.0f;

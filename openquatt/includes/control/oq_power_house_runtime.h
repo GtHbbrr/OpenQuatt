@@ -17,6 +17,7 @@ namespace oq_power_house_runtime {
 struct TickConfig {
   uint32_t loop_ms;
   uint32_t minimum_off_ms;
+  uint32_t hp_water_temp_stale_ms;
   int demand_max_f;
   float temperature_guard_c;
   float defrost_power_factor;
@@ -134,8 +135,7 @@ class Runtime {
 
     const auto frequency = oq_frequency_runtime::capture();
     const float outside_c = id(outside_temp_selected).state;
-    const float supply_c = id(oq_system_supply_temp).state;
-    const bool performance_valid = std::isfinite(outside_c) && std::isfinite(supply_c);
+    const float system_supply_c = id(oq_system_supply_temp).state;
     const bool allow_low_supply_boundary_estimate = id(oq_cold_start_session_active) && !id(oq_cold_start_hp_blocked);
     auto hp1_candidate =
         oq_hp_candidate::candidate_state(id(oq_incident_manager).get_outputs(1), id(hp1_last_applied_level));
@@ -151,6 +151,25 @@ class Runtime {
     const oq_hp_candidate::HpCandidateState hp2_candidate;
     const bool hp2_defrost_active = false;
 #endif
+
+    const auto fresh_hp_outlet = [&](bool online, uint32_t last_update_ms, bool has_state, float value) {
+      const bool fresh = online && last_update_ms > 0 &&
+                         static_cast<uint32_t>(now_ms - last_update_ms) <= config.hp_water_temp_stale_ms;
+      return fresh && has_state && std::isfinite(value) ? value : NAN;
+    };
+    const float hp1_outlet_c = fresh_hp_outlet(id(hp1_is_online), id(hp1_water_out_temp_last_update_ms),
+                                               id(hp1_water_out_temp).has_state(), id(hp1_water_out_temp).state);
+#if OQ_TOPOLOGY_DUO
+    const float hp2_outlet_c = fresh_hp_outlet(id(hp2_is_online), id(hp2_water_out_temp_last_update_ms),
+                                               id(hp2_water_out_temp).has_state(), id(hp2_water_out_temp).state);
+#else
+    const float hp2_outlet_c = NAN;
+#endif
+    const auto performance_supply = oq_power_house_dispatch::select_performance_supply(
+        {system_supply_c, hp1_outlet_c, hp2_outlet_c, oq_hp_candidate::may_serve_candidate(hp1_candidate),
+         duo && oq_hp_candidate::may_serve_candidate(hp2_candidate)});
+    const float supply_c = performance_supply.supply_c;
+    const bool performance_valid = std::isfinite(outside_c) && performance_supply.valid;
 
     float defrost_factor = config.defrost_power_factor;
     if (!std::isfinite(defrost_factor)) defrost_factor = 0.55f;

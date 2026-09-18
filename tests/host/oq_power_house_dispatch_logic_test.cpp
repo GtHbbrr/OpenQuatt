@@ -73,6 +73,33 @@ void test_timing_and_matrix() {
             expect_safe(decide_dispatch(in, cfg, {}), in, cfg);
           }
 }
+void test_performance_supply_fallback() {
+  using oq_power_house_dispatch::PerformanceSupplyRoute;
+  using oq_power_house_dispatch::select_performance_supply;
+
+  // The shared system supply stays authoritative whenever it is valid.
+  auto selected = select_performance_supply({30.0f, 31.0f, 32.0f, true, false});
+  assert(selected.valid && selected.route == PerformanceSupplyRoute::SYSTEM && selected.supply_c == 30.0f);
+
+  // Issue #713: if only HP1 can serve, its own fresh outlet may be used for
+  // Power House performance estimation without changing the shared safety signal.
+  selected = select_performance_supply({NAN, 31.0f, NAN, true, false});
+  assert(selected.valid && selected.route == PerformanceSupplyRoute::HP1_OUTLET && selected.supply_c == 31.0f);
+
+  // Mirror path for the one remaining HP2 candidate.
+  selected = select_performance_supply({NAN, NAN, 32.0f, false, true});
+  assert(selected.valid && selected.route == PerformanceSupplyRoute::HP2_OUTLET && selected.supply_c == 32.0f);
+
+  // Never substitute an outlet when both HPs are serveable; normal Duo
+  // optimization requires the shared system-supply measurement.
+  selected = select_performance_supply({NAN, 31.0f, 32.0f, true, true});
+  assert(!selected.valid && selected.route == PerformanceSupplyRoute::NONE && isnan(selected.supply_c));
+
+  // Missing/stale/non-finite outlet data remains fail-closed for the model.
+  assert(!select_performance_supply({NAN, NAN, NAN, true, false}).valid);
+  assert(!select_performance_supply({NAN, 31.0f, 32.0f, false, false}).valid);
+}
+
 void test_single_and_failures() {
   auto cfg = tuning();
   auto in = input(true);
@@ -159,6 +186,13 @@ void test_duo_holds_and_boost() {
   assert(out.hp2_level == 3 && out.reason == Reason::RUNTIME_LEAD);
   in.hp2.candidate.available_for_start = false;
   assert(decide_dispatch(in, cfg, {}).hp1_level > 0);
+
+  // Exact #713 dispatch boundary: once performance input is valid, an HP2
+  // must-stop condition must still leave HP1 as a valid single-HP candidate.
+  in = input(true);
+  in.hp2.candidate.must_stop = true;
+  out = decide_dispatch(in, cfg, {});
+  assert(out.hp1_level > 0 && out.hp2_level == 0 && out.owner_hp == 1);
   in = input(true);
   in.hp1.candidate.previous_applied_level = 3;
   for (int level = 1; level <= kMaxLevel; ++level) {
@@ -214,6 +248,7 @@ void test_duo_holds_and_boost() {
 }  // namespace
 int main() {
   test_timing_and_matrix();
+  test_performance_supply_fallback();
   test_single_and_failures();
   test_duo_holds_and_boost();
   return 0;
