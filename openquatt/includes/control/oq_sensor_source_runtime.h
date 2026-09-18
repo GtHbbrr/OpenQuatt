@@ -292,6 +292,13 @@ class Runtime {
   // shared by all live HA inputs instead of one freshness clock per sensor.
   void observe_ha_ingress(uint32_t now_ms) { ha_ingress_state_.observe(now_ms); }
 
+  // Heating Supply Target already had per-value freshness before the shared
+  // heartbeat existed. Keep observing that clock during migration so an old
+  // HA package cannot turn a frozen target into an indefinitely valid target.
+  void observe_heating_supply_target_ha(uint32_t now_ms) { ha_supply_target_legacy_state_.observe(now_ms); }
+
+  bool ha_ingress_seen() const { return ha_ingress_state_.has_value; }
+
   float ha_ingress_age_s(uint32_t now_ms) const {
     if (!ha_ingress_state_.has_value) return NAN;
     return static_cast<float>(now_ms - ha_ingress_state_.last_update_ms) / 1000.0f;
@@ -327,11 +334,12 @@ class Runtime {
       supply_target_hold_.reset();
     }
     oq_input_source::NumericSources sources;
-    // Live HA input: shares the central HA ingress heartbeat, so a constant
-    // target (e.g. 40.0 °C) stays usable while the heartbeat arrives and goes
-    // stale when the HA -> ESPHome link drops (issue #698).
-    const bool ha_fresh =
-        ha_live_valid(id(heating_supply_target_valid_ha), id(heating_supply_target_ha), now_ms, ha_stale_s);
+    // With the new HA package, the shared ingress heartbeat is authoritative.
+    // Before the first heartbeat, preserve the pre-#700 per-target freshness
+    // timer instead of timeless legacy validity.
+    const bool ha_entity_valid = ha_valid(id(heating_supply_target_valid_ha), id(heating_supply_target_ha));
+    const bool ha_fresh = oq_input_source::ha_live_valid_with_legacy_freshness(
+        ha_entity_valid, ha_ingress_state_, ha_supply_target_legacy_state_, now_ms, ha_stale_s);
     sources.ha = sample(ha_fresh && oq_heating_supply::external_target_in_range(id(heating_supply_target_ha).state),
                         id(heating_supply_target_ha));
     sources.api = sample(api_valid(id(api_input_heating_supply_target_valid), id(api_input_heating_supply_target)),
@@ -364,6 +372,7 @@ class Runtime {
   oq_input_source::HoldState demand_hold_;
   oq_input_source::HoldState supply_target_hold_;
   oq_input_source::TimedState ha_ingress_state_;
+  oq_input_source::TimedState ha_supply_target_legacy_state_;
 
   template <typename T>
   static oq_input_source::Source parse_source(const T& option) {

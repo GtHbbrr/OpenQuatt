@@ -96,6 +96,12 @@ sensor:
     device_class: temperature
     state_class: measurement
     accuracy_decimals: 1
+    # Legacy migration only: before the first shared heartbeat, preserve the
+    # old per-target freshness clock. Once a heartbeat is seen this clock is
+    # ignored for the rest of the boot.
+    on_value:
+      - lambda: |-
+          oq_sensor_source::runtime().observe_heating_supply_target_ha((uint32_t) millis());
 
   # HA ingress heartbeat: the single freshness signal for all live HA inputs.
   # The state itself changes about once per minute (whole minutes since
@@ -187,3 +193,8 @@ binary_sensor:
     name: "HA - Heating Supply Target Valid"
     entity_id: ${ha_heating_supply_target_valid_entity_id}
     internal: true
+    # Match pre-heartbeat behaviour: validity transitions also re-arm the
+    # legacy target timer. Shared-heartbeat mode ignores this clock.
+    on_state:
+      - lambda: |-
+          oq_sensor_source::runtime().observe_heating_supply_target_ha((uint32_t) millis());

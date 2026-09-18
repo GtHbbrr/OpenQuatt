@@ -159,8 +159,9 @@ binary_sensor:
     device_class: connectivity
     entity_category: diagnostic
     lambda: |-
-      return oq_sensor_source::runtime().ha_ingress_fresh(
-          (uint32_t) millis(), (uint32_t) ${ha_ingress_fresh_s}UL);
+      auto &runtime = oq_sensor_source::runtime();
+      if (!runtime.ha_ingress_seen()) return {};
+      return runtime.ha_ingress_fresh((uint32_t) millis(), (uint32_t) ${ha_ingress_fresh_s}UL);
 
 text_sensor:
   - platform: template
