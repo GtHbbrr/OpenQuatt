@@ -126,7 +126,10 @@ modbus_controller:
   # (R1999/R2006/R2010/R2015). Deliberately has no online/offline hooks:
   # the primary controller alone owns transport state, incident-manager
   # transitions, ODU revalidation and recovery scheduling, so a failed
-  # slow readback can never mark the physical HP offline.
+  # slow readback can never mark the physical HP offline. Writes via these
+  # entities stay immediate one-shot commands; write-failure semantics are
+  # unchanged (optimistic state with correction at the next 30 s readback,
+  # and persistent outages still trip the primary via telemetry).
   - id: ${hp_id}_slow
     address: ${device_address}
     modbus_id: mod_bus
