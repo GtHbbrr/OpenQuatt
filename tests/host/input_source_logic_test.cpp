@@ -229,9 +229,9 @@ void test_ha_live_validity_off_overrides_fresh_heartbeat() {
 }
 
 void test_ha_live_zero_timeout_never_expires() {
-  // Stateful inputs (room setpoint, heating/cooling enable) use stale_s = 0
-  // semantics like API/MQTT: a 20.0 °C setpoint stays valid for weeks without
-  // any heartbeat, as long as the entities themselves are valid.
+  // Pure helper boundary: stale_s = 0 means "never expire" once an ingress
+  // clock exists. Stateful HA inputs bypass this helper entirely and keep
+  // plain entity validity.
   StubValidEntity valid{true, true};
   StubValueEntity value{true, 20.0f};
   TimedState ingress;
@@ -256,6 +256,26 @@ void test_ha_live_legacy_without_heartbeat() {
   assert(!ha_live_valid_with_legacy(false, ingress, 3600000, 600));
 }
 
+void test_ha_live_legacy_freshness_preserves_supply_target_timeout() {
+  // Heating Supply Target had a per-value freshness timer before the shared
+  // heartbeat. With an old HA package (no heartbeat), keep that 900 s timeout
+  // instead of accepting the retained proxy state forever.
+  TimedState ingress;
+  TimedState legacy;
+  assert(!ha_live_valid_with_legacy_freshness(true, ingress, legacy, 1000, 900));
+
+  legacy.observe(1000);
+  assert(ha_live_valid_with_legacy_freshness(true, ingress, legacy, 1000, 900));
+  assert(!ha_live_valid_with_legacy_freshness(true, ingress, legacy, 901002, 900));
+
+  // After the first shared heartbeat it is authoritative for the rest of the
+  // boot, even if legacy target publishes continue to arrive.
+  ingress.observe(1000000);
+  assert(ha_live_valid_with_legacy_freshness(true, ingress, legacy, 1000000, 900));
+  legacy.observe(1800000);
+  assert(!ha_live_valid_with_legacy_freshness(true, ingress, legacy, 1900001, 900));
+}
+
 void test_ha_live_millis_rollover() {
   StubValidEntity valid{true, true};
   StubValueEntity value{true, 20.5f};
@@ -277,6 +297,7 @@ int main() {
   test_ha_live_validity_off_overrides_fresh_heartbeat();
   test_ha_live_zero_timeout_never_expires();
   test_ha_live_legacy_without_heartbeat();
+  test_ha_live_legacy_freshness_preserves_supply_target_timeout();
   test_ha_live_millis_rollover();
   return 0;
 }

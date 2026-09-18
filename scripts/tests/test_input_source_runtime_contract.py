@@ -118,10 +118,14 @@ class InputSourceRuntimeContractTest(unittest.TestCase):
         # one central heartbeat ingress: the heartbeat state itself changes
         # about once per minute, because Home Assistant does not forward
         # attribute-only changes to ESPHome sensors on the bare state.
-        # No per-sensor observe hack may remain.
-        self.assertNotIn("observe_heating_supply_target_ha", HA_YAML)
-        self.assertNotIn("observe_heating_supply_target_ha", SOURCE_RUNTIME)
-        self.assertNotIn("ha_supply_target_state_", SOURCE_RUNTIME)
+        # Only Heating Supply Target keeps its pre-#700 observer during
+        # migration. It is used until the first shared heartbeat so an older
+        # HA package still expires a frozen target after its stale window.
+        self.assertEqual(HA_YAML.count("observe_heating_supply_target_ha"), 2)
+        self.assertIn("observe_heating_supply_target_ha", SOURCE_RUNTIME)
+        self.assertIn("ha_supply_target_legacy_state_", SOURCE_RUNTIME)
+        self.assertIn("ha_live_valid_with_legacy_freshness", SOURCE_RUNTIME)
+        self.assertIn("ha_live_valid_with_legacy_freshness", SOURCE_LOGIC)
         self.assertNotIn("last_refresh", HA_YAML)
         self.assertEqual(HA_YAML.count("observe_ha_ingress"), 1)
         self.assertIn("ha_ingress_heartbeat", HA_YAML)
@@ -140,6 +144,7 @@ class InputSourceRuntimeContractTest(unittest.TestCase):
         self.assertIn("ha_live_valid_with_legacy", SOURCE_LOGIC)
         self.assertIn("ha_live_valid_with_legacy", SOURCE_RUNTIME)
         self.assertIn("if (!ingress.has_value) return entity_valid;", SOURCE_LOGIC)
+        self.assertIn("if (!runtime.ha_ingress_seen()) return {};", SOURCE_YAML)
         for stale_sub in (
             "ha_outside_temperature_stale_s",
             "ha_water_supply_temperature_stale_s",
@@ -177,6 +182,7 @@ class InputSourceRuntimeContractTest(unittest.TestCase):
             "test_ha_live_validity_off_overrides_fresh_heartbeat",
             "test_ha_live_zero_timeout_never_expires",
             "test_ha_live_legacy_without_heartbeat",
+            "test_ha_live_legacy_freshness_preserves_supply_target_timeout",
             "test_ha_live_millis_rollover",
         ):
             self.assertIn(test_name, host_test)

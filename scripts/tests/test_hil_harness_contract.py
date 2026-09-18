@@ -32,6 +32,10 @@ class HilHarnessContractTest(unittest.TestCase):
         for marker in (
             'api_input_room_temperature_stale_s: "45"',
             'api_input_heating_enable_stale_s: "45"',
+            'api_input_heating_supply_target_stale_s: "45"',
+            'ha_room_temperature_stale_s: "90"',
+            'ha_heating_supply_target_stale_s: "90"',
+            'ha_ingress_fresh_s: "75"',
             'oq_selected_input_stale_hold_s: "10"',
             'oq_hp_min_off_s: "10"',
         ):
@@ -39,6 +43,9 @@ class HilHarnessContractTest(unittest.TestCase):
         for marker in (
             'api_input_room_temperature_stale_s: "600"',
             'api_input_heating_enable_stale_s: "0"',
+            'ha_room_temperature_stale_s: "600"',
+            'ha_heating_supply_target_stale_s: "900"',
+            'ha_ingress_fresh_s: "300"',
             'oq_selected_input_stale_hold_s: "300"',
             'oq_cooling_minimum_off_min_s: "240"',
             'oq_hp_min_off_s: "240"',
