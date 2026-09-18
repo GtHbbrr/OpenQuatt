@@ -14,7 +14,7 @@ import {
   startQuickStartFlowTest,
 } from "./quickstart-actions.js";
 import { isQuickStartStepSelectionAllowed, selectQuickStepByOffset } from "./quickstart.js";
-import { installQuickStartSetupSwitch } from "./firmware-actions.js";
+import { installQuickStartSetupSwitch, keepCurrentQuickStartSetup } from "./firmware-actions.js";
 import { getFirmwareBuildConnection, getInstallationTopology } from "./device-context.js";
 import {
   captureUsageTelemetryPreview,
@@ -153,6 +153,7 @@ const quickStartActionHandlers = {
     void refreshQuickStartStepHydration("setup");
   },
   "install-quickstart-setup": () => installQuickStartSetupSwitch(),
+  "keep-current-quickstart-setup": () => keepCurrentQuickStartSetup(),
   "apply-quickstart-flow-source": () => applyQuickStartFlowSourceConfiguration(),
   "refresh-quickstart-flow-signal": () => refreshQuickStartFlowSignal(),
   "start-quickstart-flow-test": () => startQuickStartFlowTest(),
