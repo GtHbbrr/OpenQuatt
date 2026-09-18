@@ -7,7 +7,7 @@ Van nieuwe controller naar een werkende OpenQuatt-installatie. De Heatpump Contr
 1. Maak de CiC en Quatt-buitenunit(s) spanningsloos, verplaats de kabels en voer de eindcontrole uit.
 2. Voed de HCQ, schakel de Quatt-buitenunit(s) weer in en stel Wi-Fi in.
 3. Open `openquatt.local` en controleer de basisverbinding.
-4. Kies in **Quick Start → Configuratie en software-update** de juiste configuratie, laat de software controleren en rond Quick Start af.
+4. Kies in **Quick Start → Configuratie en software-update** de juiste configuratie. Controleer de stabiele software of behoud, als de gekozen build al actief is, de huidige software zonder OTA. Rond daarna Quick Start af.
 
 Daarna werkt OpenQuatt zelfstandig via de web-app. Home Assistant is een optionele vervolgstap voor dashboards en automatisering.
 
@@ -145,7 +145,7 @@ Kies hier direct de combinatie die bij je installatie hoort:
 
 Sluit bij Ethernet eerst de netwerkkabel aan. Kies alleen `Duo` als de installatie daadwerkelijk twee warmtepompen heeft.
 
-Na bevestiging controleert OpenQuatt de nieuwste stabiele release voor de gekozen configuratie. Alleen als de softwareversie of configuratie afwijkt, installeert OpenQuatt de juiste stabiele release en start de controller opnieuw op. Een aanwezige dev- of testbuild wordt daarmee vervangen. Zijn versie en configuratie al correct, dan gaat Quick Start zonder OTA verder. **Bestaande OpenQuatt-instellingen blijven bij een software-update of configuratiewissel behouden.** Je hoeft bij de eerste ingebruikname dus niet via **Instellingen → Systeem → Updates** te wisselen. Open na een herstart zo nodig opnieuw `http://openquatt.local` en ga verder met Quick Start.
+Na bevestiging kun je OpenQuatt de nieuwste stabiele release voor de gekozen configuratie laten controleren. Alleen als de softwareversie of configuratie afwijkt, installeert OpenQuatt de juiste stabiele release en start de controller opnieuw op. Een aanwezige dev- of testbuild wordt daarmee vervangen. Is de gekozen build al actief, dan kun je in plaats daarvan **Huidige software behouden en doorgaan** kiezen; Quick Start gaat dan zonder OTA of herstart verder en het actieve releasekanaal blijft ongewijzigd. Zijn versie en configuratie al correct, dan gaat Quick Start eveneens zonder OTA verder. **Bestaande OpenQuatt-instellingen blijven bij een software-update of configuratiewissel behouden.** Je hoeft bij de eerste ingebruikname dus niet via **Instellingen → Systeem → Updates** te wisselen. Open na een herstart zo nodig opnieuw `http://openquatt.local` en ga verder met Quick Start.
 
 Daarna geef je aan welke Quatt Hybrid en installatie je hebt. V1, V1.5 en V2 beschrijven de generatie van de warmtepomp en staan los van de keuze voor `Single` of `Duo`.
 
@@ -155,7 +155,7 @@ Daarna geef je aan welke Quatt Hybrid en installatie je hebt. V1, V1.5 en V2 bes
 
 Volg de route die de web-app voor jouw installatie toont. De basisstappen zijn:
 
-1. **Configuratie en software-update:** `Single` of `Duo` en Wi-Fi of Ethernet; daarna controleert OpenQuatt de stabiele main-release en installeert deze alleen als dat nodig is.
+1. **Configuratie en software-update:** `Single` of `Duo` en Wi-Fi of Ethernet; controleer de stabiele main-release of behoud de huidige software zonder OTA als de gekozen build al actief is.
 2. **Kies je Quatt Hybrid:** V1, V1.5 of V2.
 3. **Flowmeting configureren:** controleer en activeer de juiste flowbron.
 4. **Thermostaatgegevens configureren:** kies waar kamertemperatuur en kamer-setpoint vandaan komen.
