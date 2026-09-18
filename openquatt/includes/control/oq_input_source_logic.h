@@ -97,8 +97,7 @@ inline bool ha_live_valid_with_legacy(bool entity_valid, const TimedState& ingre
  * the shared ingress clock remains authoritative for the rest of the boot.
  */
 inline bool ha_live_valid_with_legacy_freshness(bool entity_valid, const TimedState& ingress,
-                                                const TimedState& legacy_freshness, uint32_t now_ms,
-                                                uint32_t stale_s) {
+                                                const TimedState& legacy_freshness, uint32_t now_ms, uint32_t stale_s) {
   const TimedState& freshness = ingress.has_value ? ingress : legacy_freshness;
   return evaluate_freshness(freshness, now_ms, stale_s, entity_valid).valid;
 }
