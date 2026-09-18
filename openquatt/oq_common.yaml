@@ -229,6 +229,12 @@ http_request:
 # ==============================================================================
 # MODBUS (RS485)
 # ==============================================================================
+external_components:
+  - source:
+      type: local
+      path: ${external_components_path}
+    components: [openquatt_modbus]
+
 uart:
   - id: uart_bus
     tx_pin: ${uart_tx_pin}
@@ -241,7 +247,7 @@ uart:
     rx_full_threshold: 1
     rx_timeout: 1
 
-modbus:
+openquatt_modbus:
   - uart_id: uart_bus
     id: mod_bus
     send_wait_time: 100ms

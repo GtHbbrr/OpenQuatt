@@ -1050,6 +1050,12 @@ bool OpenQuattUsageTelemetry::build_payload_() {
                                configured_source_wire_value);
   append_json_optional_select_(payload, "heating_supply_target_source", this->heating_supply_target_source_select_,
                                configured_source_wire_value);
+  append_json_uint_(payload, "modbus_partial_response_count",
+                    this->modbus_hub_ != nullptr ? this->modbus_hub_->partial_response_count() : 0U);
+  append_json_uint_(payload, "modbus_parse_failed_count",
+                    this->modbus_hub_ != nullptr ? this->modbus_hub_->parse_failed_count() : 0U);
+  append_json_uint_(payload, "modbus_offline_count",
+                    this->modbus_hub_ != nullptr ? this->modbus_hub_->offline_count() : 0U);
   append_json_uint_(payload, "heap_free_b", heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
   append_json_uint_(payload, "heap_min_free_b", heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL));
   append_json_uint_(payload, "heap_largest_block_b", heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL));

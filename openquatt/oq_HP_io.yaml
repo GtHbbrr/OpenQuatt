@@ -72,6 +72,7 @@ modbus_controller:
     on_offline:
       then:
         - lambda: |-
+            id(mod_bus).record_offline_transition();
             id(${hp_id}_is_online) = false;
             // The hub purges queued frames for this address on transport loss,
             // so an outstanding recovery probe is gone: allow a fresh one.
