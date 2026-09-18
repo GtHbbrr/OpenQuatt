@@ -62,6 +62,7 @@ openquatt_usage_telemetry:
   trend_flash_switch: oq_trend_history_flash_switch
   decision_log_flash_switch: oq_decision_log_flash_switch
   energy_history_flash_switch: oq_lifetime_energy_history_switch
+  modbus_hub: mod_bus
 
 openquatt_crash_telemetry:
   id: oq_crash_telemetry

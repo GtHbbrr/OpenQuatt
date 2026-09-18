@@ -102,6 +102,9 @@ test("usage telemetry preview maps live entity values to the wire contract", () 
     cooling_dew_point_source: "mqtt",
     external_heat_demand_source: "api_input",
     heating_supply_target_source: "heating_curve",
+    modbus_partial_response_count: null,
+    modbus_parse_failed_count: null,
+    modbus_offline_count: null,
     heap_free_b: 178432,
     heap_min_free_b: 151008,
     heap_largest_block_b: 98304,
@@ -126,6 +129,8 @@ test("usage telemetry preview maps live entity values to the wire contract", () 
   assert.equal(flowSourceConfigWireValue("Outdoor unit", undefined, false), "outdoor_unit");
   assert.equal(configuredSourceWireValue("Schedule"), "schedule");
   assert.ok(USAGE_TELEMETRY_PREVIEW_ENTITY_KEYS.includes("psramFree"));
+  assert.ok(!USAGE_TELEMETRY_PREVIEW_ENTITY_KEYS.includes("modbusPartialResponseCount"));
+  assert.ok(!USAGE_TELEMETRY_PREVIEW_ENTITY_KEYS.includes("modbusOfflineCount"));
   assert.ok(!USAGE_TELEMETRY_PREVIEW_ENTITY_KEYS.includes("webServerLogHistoryEnabled"));
 });
 
@@ -352,10 +357,13 @@ test("usage telemetry disclosure matches the hourly payload scope", async () => 
   assert.match(disclosureSource, /Quatt Hybrid-versie, verwarmingsstrategie, flowbron en regelbronnen/);
   assert.match(disclosureSource, /Aan\/uit-status van CiC, OpenTherm-thermostaat, ketelondersteuning, MQTT-inputs en lokale historie/);
   assert.match(disclosureSource, /ketelaansluiting \(aan\/uit of OpenTherm\)/);
-  assert.match(disclosureSource, /Geen gemeten of ingestelde temperaturen, grenzen, MQTT-topics of logs/);
+  assert.match(disclosureSource, /drie cumulatieve Modbus-betrouwbaarheidstellers sinds opstart/);
+  assert.match(disclosureSource, /Geen gemeten of ingestelde temperaturen, grenzen, MQTT-topics, logregels of Modbus-frames/);
+  assert.match(disclosureSource, /alleen cumulatieve communicatiefouttellers/);
   assert.match(disclosureSource, /Nooit een wifi-netwerknaam, wifi-wachtwoord, gebruikersnaam, ander wachtwoord of inloggegevens/);
   assert.match(disclosureSource, /Voorbeeld van het verzonden bericht \(JSON\)/);
   assert.match(disclosureSource, /Live momentopname bij het openen van deze pagina/);
+  assert.match(disclosureSource, /Modbus-tellers worden bij verzending rechtstreeks uit de ODU-bus gelezen/);
   assert.match(previewSource, /captureUsageTelemetryPreview/);
   assert.match(previewSource, /schema_version/);
   assert.match(previewSource, /timestamp_s/);
@@ -372,6 +380,9 @@ test("usage telemetry disclosure matches the hourly payload scope", async () => 
     "cooling_dew_point_source",
     "external_heat_demand_source",
     "heating_supply_target_source",
+    "modbus_partial_response_count",
+    "modbus_parse_failed_count",
+    "modbus_offline_count",
   ];
   for (const field of configFields) {
     assert.match(previewSource, new RegExp(field));

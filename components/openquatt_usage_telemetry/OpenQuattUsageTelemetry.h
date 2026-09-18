@@ -10,6 +10,7 @@
 #include <freertos/semphr.h>
 #include <freertos/task.h>
 #include "esphome/components/binary_sensor/binary_sensor.h"
+#include "esphome/components/openquatt_modbus/OpenQuattModbusClientHub.h"
 #include "esphome/components/select/select.h"
 #include "esphome/components/sensor/sensor.h"
 #include "esphome/components/switch/switch.h"
@@ -92,6 +93,7 @@ class OpenQuattUsageTelemetry : public switch_::Switch,
   void set_energy_history_flash_switch(switch_::Switch* feature_switch) {
     this->energy_history_flash_switch_ = feature_switch;
   }
+  void set_modbus_hub(openquatt_modbus::OpenQuattModbusClientHub* hub) { this->modbus_hub_ = hub; }
 
   // A second opt-in telemetry feature may reuse this outbound-only client.
   // Its payload stays separate from usage statistics and is protected by its
@@ -234,6 +236,7 @@ class OpenQuattUsageTelemetry : public switch_::Switch,
   switch_::Switch* trend_flash_switch_{nullptr};
   switch_::Switch* decision_log_flash_switch_{nullptr};
   switch_::Switch* energy_history_flash_switch_{nullptr};
+  openquatt_modbus::OpenQuattModbusClientHub* modbus_hub_{nullptr};
   ESPPreferenceObject pref_;
   std::array<uint8_t, 16> installation_id_bytes_{};
   std::string installation_id_;

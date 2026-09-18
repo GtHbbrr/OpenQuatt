@@ -70,6 +70,7 @@ modbus_controller:
     on_offline:
       then:
         - lambda: |-
+            id(mod_bus).record_offline_transition();
             id(${hp_id}_is_online) = false;
             // Preserve validated control metadata; the incident manager decides
             // whether a transport interruption requires a stop.
