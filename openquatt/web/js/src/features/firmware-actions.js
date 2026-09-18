@@ -517,6 +517,42 @@ import { render } from "../core/render-scheduler.js";
     await installQuickStartSetupFirmware(model);
   }
 
+  export function keepCurrentQuickStartSetup() {
+    const [targetTopology, targetConnection] = String(state.quickStartSetupDraft || "").split(":");
+    const model = getFirmwareBuildSwitchModel(targetTopology, targetConnection);
+    if (!model.available) {
+      return;
+    }
+    if (!state.quickStartSetupConfirmed) {
+      state.controlError = "Bevestig eerst dat de gekozen setup klaar is voor gebruik.";
+      render();
+      return;
+    }
+    if (model.currentTopology !== model.targetTopology || model.currentConnection !== model.targetConnection) {
+      state.controlError = "De huidige software kan alleen behouden blijven als de gekozen configuratie al actief is.";
+      render();
+      return;
+    }
+
+    const currentChannel = getFirmwareRunningChannelLabel().toLowerCase() || "current";
+    const currentVersion = getFirmwareCurrentVersion() || "";
+    storeQuickStartSetupInstall({
+      status: "skipped",
+      targetTopology: model.targetTopology,
+      targetConnection: model.targetConnection,
+      targetChannel: currentChannel,
+      targetVersion: currentVersion,
+      startedAt: Date.now(),
+    });
+    state.currentStep = "generation";
+    state.quickStartSetupUpdateComplete = true;
+    state.controlError = "";
+    state.controlNotice = currentVersion
+      ? `Quick Start gaat verder met ${currentVersion}; er is geen OTA gestart.`
+      : "Quick Start gaat verder met de huidige software; er is geen OTA gestart.";
+    render();
+  }
+
   export async function setFirmwareTestTextEntity(key, value) {
     if (!hasEntity(key)) {
       throw new Error(`${ENTITY_DEFS[key]?.name || key} is niet beschikbaar op deze firmware.`);
