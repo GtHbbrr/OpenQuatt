@@ -136,6 +136,23 @@ modbus_controller:
     update_interval: never
     max_cmd_retries: ${oq_modbus_max_cmd_retries}
     setup_priority: -10
+    on_offline:
+      then:
+        - lambda: |-
+            // Read timeouts stay local: a failed slow readback must never
+            // mark the physical HP offline. An exhausted write timeout has
+            // physical meaning, so escalate it to the transport owner.
+            // Exception responses never reach this callback (ESPHome treats
+            // them as proof the device is online).
+            if (!esphome::modbus::helpers::is_function_code_write(
+                    static_cast<uint8_t>(function_code))) {
+              ESP_LOGV("quatt", "%sSlow readback timeout stays local (FC %d)",
+                       "${prefix}", function_code);
+              return;
+            }
+            ESP_LOGW("quatt", "%sSlow-controller write failed after retries (FC %d); escalating to primary",
+                     "${prefix}", function_code);
+            id(${hp_id}).set_online(false, function_code, address);
 
 openquatt_odu_eeprom_dump:
   - id: ${hp_id}_odu_eeprom_dump

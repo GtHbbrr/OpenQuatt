@@ -152,16 +152,30 @@ class Modbus20269ContractTest(unittest.TestCase):
         self.assertIn("parity: EVEN", HUB)
 
     def test_transport_ownership_stays_with_primary(self) -> None:
-        # Only the primary controller may carry OpenQuatt online/offline hooks.
+        # Only the primary controller carries on_online. The slow controller
+        # has exactly one on_offline hook, and only to escalate an exhausted
+        # write timeout to the transport owner (see below).
         self.assertEqual(HP_IO.count("on_online:"), 1)
-        self.assertEqual(HP_IO.count("on_offline:"), 1)
+        self.assertEqual(HP_IO.count("on_offline:"), 2)
         slow = yaml_block(HP_IO, "- id: ${hp_id}_slow\n", "openquatt_odu_eeprom_dump:")
         self.assertNotIn("on_online", slow)
-        self.assertNotIn("on_offline", slow)
         self.assertNotIn("observe_transport", slow)
         self.assertNotIn("revalidation", slow)
+        self.assertNotIn("_is_online) =", slow)
         primary = yaml_block(HP_IO, "- id: ${hp_id}\n", "- id: ${hp_id}_slow")
         self.assertIn("observe_transport", primary)
+
+    def test_slow_offline_escalates_only_write_timeouts(self) -> None:
+        slow = yaml_block(HP_IO, "- id: ${hp_id}_slow\n", "openquatt_odu_eeprom_dump:")
+        # Write timeouts (any mutating function code, present and future)
+        # escalate to the primary transport owner.
+        self.assertIn("on_offline:", slow)
+        self.assertIn("is_function_code_write", slow)
+        self.assertIn("id(${hp_id}).set_online(false, function_code, address)", slow)
+        # Read timeouts stay local: no transport observation, no online flag,
+        # no revalidation is driven from the slow controller.
+        self.assertNotIn("observe_transport", slow)
+        self.assertNotIn("incident_manager", slow)
 
     def test_offline_recovery_queues_without_idle_bus(self) -> None:
         # The recovery probe must queue behind in-flight traffic: no exact-idle
