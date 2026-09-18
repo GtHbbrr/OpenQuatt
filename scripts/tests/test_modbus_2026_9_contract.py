@@ -33,19 +33,24 @@ def entity_block(source: str, marker: str) -> str:
 
 
 class Modbus20269ContractTest(unittest.TestCase):
-    def test_esphome_pin_is_explicit_2026_9_beta(self) -> None:
-        self.assertIn("esphome==2026.9.0", REQUIREMENTS)
+    def test_esphome_pin_is_explicit_2026_9_stable(self) -> None:
+        # PR 1 uses the pinned 2026.9.0 stable release.
+        self.assertEqual(REQUIREMENTS.strip(), "esphome==2026.9.0")
         self.assertNotIn("esphome==2026.8.2", REQUIREMENTS)
         self.assertIn("min_version: 2026.9.0", BASE_COMMON)
+        self.assertNotIn("2026.9.0b4", BASE_COMMON + REQUIREMENTS)
 
     def test_regular_online_polling_is_10s_and_offline_probe_is_30s(self) -> None:
         self.assertIn('oq_modbus_update_interval_s: "10"', SUBSTITUTIONS)
         self.assertIn('oq_modbus_offline_probe_interval_s: "30"', SUBSTITUTIONS)
+        self.assertIn('oq_modbus_command_throttle_ms: "100"', SUBSTITUTIONS)
         self.assertNotIn("oq_modbus_telemetry_skip", SUBSTITUTIONS)
         self.assertNotIn("oq_modbus_target_readback_skip", SUBSTITUTIONS)
         self.assertNotIn("oq_modbus_control_readback_skip", SUBSTITUTIONS)
         self.assertIn("interval: ${oq_modbus_update_interval_s}s", HP_IO)
         self.assertIn("${oq_modbus_offline_probe_interval_s}UL * 1000UL", HP_IO)
+        self.assertIn("send_wait_time: 100ms", HUB)
+        self.assertIn("turnaround_time: ${oq_modbus_command_throttle_ms}ms", HUB)
 
     def test_skip_updates_removed_but_offline_skip_kept(self) -> None:
         active_skips = [
@@ -102,6 +107,72 @@ class Modbus20269ContractTest(unittest.TestCase):
         self.assertNotIn("register_count", block)
         self.assertNotIn("address: 2113", block)
 
+    def test_fast_slow_same_address_controllers(self) -> None:
+        # Upstream #18652 skip_updates replacement: per HP a primary (fast)
+        # and a slow controller share mod_bus and the physical ODU address,
+        # both with update_interval: never so OpenQuatt owns all timing.
+        primary = yaml_block(HP_IO, "- id: ${hp_id}\n", "- id: ${hp_id}_slow")
+        slow = yaml_block(HP_IO, "- id: ${hp_id}_slow\n", "openquatt_odu_eeprom_dump:")
+        for block in (primary, slow):
+            self.assertIn("address: ${device_address}", block)
+            self.assertIn("modbus_id: mod_bus", block)
+            self.assertIn("update_interval: never", block)
+            self.assertIn("max_cmd_retries: ${oq_modbus_max_cmd_retries}", block)
+        # Only the controller-level offline cadence remains; per-entity skip_updates is gone.
+        self.assertIn("offline_skip_updates: 5", primary)
+        self.assertNotIn("offline_skip_updates", slow)
+        # Control readbacks live on the slow controller; target R3999 stays fast.
+        for entity_id in (
+            "${hp_id}_compressor_level",
+            "${hp_id}_low_noise_mode",
+            "${hp_id}_set_pump_mode",
+            "${hp_id}_pump_speed",
+        ):
+            with self.subTest(entity=entity_id):
+                block = entity_block(HP_IO, f"id: {entity_id}\n")
+                self.assertIn("modbus_controller_id: ${hp_id}_slow", block)
+        fast_block = entity_block(HP_IO, "id: ${hp_id}_set_working_mode\n")
+        self.assertIn("modbus_controller_id: ${hp_id}\n", fast_block)
+        self.assertNotIn("${hp_id}_slow", fast_block)
+
+    def test_planner_schedules_fast_10s_and_slow_30s(self) -> None:
+        self.assertIn("id(${hp_id}).update();", HP_IO)
+        # Explicit per-HP cycle counter drives the 30 s cadence, not millis()%30000.
+        self.assertIn("id: ${hp_id}_poll_cycle", HP_IO)
+        self.assertIn("poll_cycle % 3U == 0U", HP_IO)
+        self.assertIn("id(${hp_id}_slow).update();", HP_IO)
+        # On a slow cycle the primary is queued before the slow controller.
+        fast_idx = HP_IO.index("id(${hp_id}).update();")
+        slow_idx = HP_IO.index("id(${hp_id}_slow).update();")
+        self.assertLess(fast_idx, slow_idx)
+        # HP1 starts immediately, HP2 keeps its 2500 ms staging phase.
+        self.assertIn('oq_modbus_startup_delay_ms: "0"', SUBSTITUTIONS)
+        self.assertIn('oq_modbus_startup_delay_ms: "2500"', DUO_PACKAGES)
+        self.assertIn("baud_rate: 19200", HUB)
+        self.assertIn("parity: EVEN", HUB)
+
+    def test_transport_ownership_stays_with_primary(self) -> None:
+        # Only the primary controller may carry OpenQuatt online/offline hooks.
+        self.assertEqual(HP_IO.count("on_online:"), 1)
+        self.assertEqual(HP_IO.count("on_offline:"), 1)
+        slow = yaml_block(HP_IO, "- id: ${hp_id}_slow\n", "openquatt_odu_eeprom_dump:")
+        self.assertNotIn("on_online", slow)
+        self.assertNotIn("on_offline", slow)
+        self.assertNotIn("observe_transport", slow)
+        self.assertNotIn("revalidation", slow)
+        primary = yaml_block(HP_IO, "- id: ${hp_id}\n", "- id: ${hp_id}_slow")
+        self.assertIn("observe_transport", primary)
+
+    def test_offline_recovery_queues_without_idle_bus(self) -> None:
+        # The recovery probe must queue behind in-flight traffic: no exact-idle
+        # guard, at most one outstanding probe per HP on a 30 s cadence.
+        self.assertNotIn("tx_buffer_empty", HP_IO)
+        self.assertNotIn("tx_blocked", HP_IO)
+        self.assertIn("id: ${hp_id}_recovery_probe_pending", HP_IO)
+        self.assertIn("id(${hp_id}_recovery_probe_pending) = true;", HP_IO)
+        self.assertIn("id(${hp_id}_recovery_probe_pending) = false;", HP_IO)
+        self.assertIn("queue_command(std::move(probe))", HP_IO)
+
     def test_planner_ownership_and_transports_unchanged(self) -> None:
         self.assertIn("update_interval: never", HP_IO)
         self.assertIn("id(${hp_id}).update();", HP_IO)
@@ -109,9 +180,9 @@ class Modbus20269ContractTest(unittest.TestCase):
         self.assertIn("baud_rate: 19200", HUB)
         self.assertIn("parity: EVEN", HUB)
         self.assertIn("turnaround_time: ${oq_modbus_command_throttle_ms}ms", HUB)
-        # Control readbacks are intentionally on the regular 10s cadence now.
+        # Slow control readbacks keep their historic 30 s cadence via the
+        # slow controller; target R3999 stays on the regular 10 s cadence.
         for entity_id in (
-            "${hp_id}_set_working_mode",
             "${hp_id}_compressor_level",
             "${hp_id}_low_noise_mode",
             "${hp_id}_set_pump_mode",
