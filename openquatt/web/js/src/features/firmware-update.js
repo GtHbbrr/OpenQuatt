@@ -385,7 +385,7 @@ import { render } from "../core/render-scheduler.js";
       || (state.updateInstallResumedAfterReload && !isFirmwareProgressActive());
     const record = getStoredQuickStartSetupInstall();
     const currentVersion = getFirmwareCurrentVersion();
-    const durableTargetTransition = record?.status !== "complete"
+    const durableTargetTransition = !["complete", "skipped"].includes(record?.status)
       && ["single", "duo"].includes(record?.sourceTopology)
       && ["wifi", "eth"].includes(record?.sourceConnection)
       && ["main", "dev"].includes(record?.sourceChannel)
@@ -413,7 +413,7 @@ import { render } from "../core/render-scheduler.js";
     }
     state.updateInstallSuccessfulPhaseObserved = true;
     const record = getStoredQuickStartSetupInstall();
-    if (record && record.status !== "complete") {
+    if (record && !["complete", "skipped"].includes(record.status)) {
       storeQuickStartSetupInstall({ ...record, status: "successful-phase" });
     }
   }
@@ -423,7 +423,7 @@ import { render } from "../core/render-scheduler.js";
       return false;
     }
     const record = getStoredQuickStartSetupInstall();
-    if (!record || record.status === "complete") {
+    if (!record || record.status === "complete" || record.status === "skipped") {
       return false;
     }
     const failureMessage = getFirmwareInstallFailureMessage();
