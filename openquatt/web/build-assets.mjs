@@ -67,6 +67,9 @@ async function buildEmbeddedAssetModule() {
     lines.push(`export const ${name} = "data:image/webp;base64,${bytes.toString("base64")}";`);
   }
 
+  const faviconMarkup = await readFile(path.join(__dirname, "assets", "brand", "favicon.svg"), "utf8");
+  lines.push(`export const FAVICON_DATA_URL = "data:image/svg+xml;base64,${Buffer.from(faviconMarkup).toString("base64")}";`);
+
   const logoMarkup = await readFile(path.join(__dirname, "assets", "openquatt-logo.svg"), "utf8");
   lines.push(`export const LOGO_MARKUP = ${JSON.stringify(logoMarkup.trim())};`);
 

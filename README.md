@@ -1,6 +1,9 @@
 # OpenQuatt
 
-<img src="docs/assets/openquatt_logo.svg" alt="OpenQuatt logo" width="400" />
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/brand/openquatt-logo-horizontal-dark.svg" />
+  <img src="docs/assets/brand/openquatt-logo-horizontal-light.svg" alt="OpenQuatt" width="420" />
+</picture>
 
 OpenQuatt is open-source ESPHome-firmware voor Quatt Hybrid `Single`- en `Duo`-installaties. Het project geeft je lokaal inzicht, lokale controle, een uitgebreide web-app en optionele Home Assistant-integratie bovenop de bestaande Quatt-hardware.
 

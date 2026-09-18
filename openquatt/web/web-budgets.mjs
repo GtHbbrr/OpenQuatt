@@ -1,11 +1,13 @@
 // Fail when gzip growth exceeds the smaller of these two limits.
-export const WEB_BUNDLE_GZIP_GROWTH_LIMIT = { bytes: 4_608, ratio: 0.03 };
+export const WEB_BUNDLE_GZIP_GROWTH_LIMIT = { bytes: 7_680, ratio: 0.03 };
 
 export const WEB_BUNDLE_BUDGETS = [
   {
     file: "js/openquatt-app.js",
-    raw: 942_000,
+    // plus temporary Matrix UI-takeover effects (frontend-only, read-only):
+    // measured +17.2 kB raw / +6.5 kB gzip over the pre-egg dev baseline.
+    raw: 960_000,
     gzipBaselineCeiling: 238_000,
   },
-  { file: "css/openquatt-app.css", raw: 200_000 },
+  { file: "css/openquatt-app.css", raw: 203_000 },
 ];

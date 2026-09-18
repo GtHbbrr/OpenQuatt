@@ -21,6 +21,7 @@ CRASH_TELEMETRY_CPP = (
 ).read_text()
 INSTALLER = (ROOT / "docs" / "install" / "install.js").read_text()
 INSTALLER_PAGE = (ROOT / "docs" / "install" / "index.html").read_text()
+COMMON = (ROOT / "openquatt" / "oq_common.yaml").read_text()
 
 
 def function_body(name: str, next_name: str) -> str:
@@ -110,10 +111,12 @@ class OpenQuattNetworkContractTest(unittest.TestCase):
         self.assertIn("wifiProvisioning: true", INSTALLER)
         self.assertIn("zonder opgeslagen Wi-Fi-gegevens", INSTALLER_PAGE)
 
-    def test_fallback_ap_texts_mention_the_provisioning_window(self) -> None:
-        # Sinds ESPHome 2026.9 sluit het fallback access point zodra het
-        # instelvenster (ca. 10 minuten na opstarten) sluit. De herstelteksten
-        # moeten dat venster noemen, zodat niemand op een verdwenen AP wacht.
+
+    def test_fallback_ap_texts_match_the_provisioning_window(self) -> None:
+        # OpenQuatt explicitly configures a 10 minute ESPHome provisioning
+        # window. Keep the recovery copy tied to that runtime contract.
+        self.assertIn("provisioning:\n  timeout: 10min", COMMON)
+
         installer_page = (ROOT / "docs" / "install" / "index.html").read_text()
         manual = (ROOT / "docs" / "handmatige-installatie.md").read_text()
         troubleshooting = (ROOT / "docs" / "problemen-oplossen.md").read_text()

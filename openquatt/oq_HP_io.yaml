@@ -48,6 +48,8 @@ esphome:
           id(${hp_id}_odu_settings)->notify_odu_offline();
           id(${hp_id}_compressor_level_profile_request_pending) = false;
           id(${hp_id}_compressor_level_profile_request_token) = 0U;
+          id(${hp_id}_recovery_probe_pending) = false;
+          id(${hp_id}_poll_cycle) = 0U;
           id(${hp_id}_runtime_frequency_retry_ms) = 0U;
           id(${hp_id}_compressor_level_profile).publish_state(
               oq_odu::compressor_level_profile_label(
@@ -71,6 +73,9 @@ modbus_controller:
       then:
         - lambda: |-
             id(${hp_id}_is_online) = false;
+            // The hub purges queued frames for this address on transport loss,
+            // so an outstanding recovery probe is gone: allow a fresh one.
+            id(${hp_id}_recovery_probe_pending) = false;
             // Preserve validated control metadata; the incident manager decides
             // whether a transport interruption requires a stop.
             id(${hp_id}_odu_generation_request_token) =
@@ -109,9 +114,45 @@ modbus_controller:
       then:
         - lambda: |-
             id(${hp_id}_is_online) = true;
+            id(${hp_id}_recovery_probe_pending) = false;
             id(oq_incident_manager).observe_transport(${hp_index}, true, millis());
             ESP_LOGI("quatt", "%sModbus ONLINE", "${prefix}");
         - script.execute: ${hp_id}_detect_odu_generation_once
+
+  # Slow readback controller for the same physical ODU (the ESPHome #18652
+  # replacement for per-entity polling cadences). Same modbus_id and device
+  # address as the primary controller; both run update_interval: never so the
+  # OpenQuatt planner below owns all timing. Owns only the 30 s control readbacks
+  # (R1999/R2006/R2010/R2015). Deliberately has no online/offline hooks:
+  # the primary controller alone owns transport state, incident-manager
+  # transitions, ODU revalidation and recovery scheduling, so a failed
+  # slow readback can never mark the physical HP offline. Writes via these
+  # entities stay immediate one-shot commands; write-failure semantics are
+  # unchanged (optimistic state with correction at the next 30 s readback,
+  # and persistent outages still trip the primary via telemetry).
+  - id: ${hp_id}_slow
+    address: ${device_address}
+    modbus_id: mod_bus
+    update_interval: never
+    max_cmd_retries: ${oq_modbus_max_cmd_retries}
+    setup_priority: -10
+    on_offline:
+      then:
+        - lambda: |-
+            // Read timeouts stay local: a failed slow readback must never
+            // mark the physical HP offline. An exhausted write timeout has
+            // physical meaning, so escalate it to the transport owner.
+            // Exception responses never reach this callback (ESPHome treats
+            // them as proof the device is online).
+            if (!esphome::modbus::helpers::is_function_code_write(
+                    static_cast<uint8_t>(function_code))) {
+              ESP_LOGV("quatt", "%sSlow readback timeout stays local (FC %d)",
+                       "${prefix}", function_code);
+              return;
+            }
+            ESP_LOGW("quatt", "%sSlow-controller write failed after retries (FC %d); escalating to primary",
+                     "${prefix}", function_code);
+            id(${hp_id}).set_online(false, function_code, address);
 
 openquatt_odu_eeprom_dump:
   - id: ${hp_id}_odu_eeprom_dump
@@ -215,6 +256,21 @@ globals:
     initial_value: 'false'
 
   - id: ${hp_id}_last_offline_probe_ms
+    type: uint32_t
+    restore_value: no
+    initial_value: '0'
+
+  # True while a queued offline recovery probe has not resolved yet.
+  # Caps outstanding recovery probes at one per HP; cleared on the probe
+  # response, on transport transitions, or by the stale-probe timeout.
+  - id: ${hp_id}_recovery_probe_pending
+    type: bool
+    restore_value: no
+    initial_value: 'false'
+
+  # Counts 10 s planner cycles; every third cycle also polls the slow
+  # controller (fast + slow every 30 s). Explicit counter, not millis()%30000.
+  - id: ${hp_id}_poll_cycle
     type: uint32_t
     restore_value: no
     initial_value: '0'
@@ -589,7 +645,7 @@ select:
       "Heating": 2
 
   - platform: modbus_controller
-    modbus_controller_id: ${hp_id}
+    modbus_controller_id: ${hp_id}_slow
     id: ${hp_id}_compressor_level
     name: "${prefix}Set Compressor Level"
     internal: true
@@ -620,7 +676,7 @@ select:
       "20": 20
 
   - platform: modbus_controller
-    modbus_controller_id: ${hp_id}
+    modbus_controller_id: ${hp_id}_slow
     id: ${hp_id}_low_noise_mode
     name: "${prefix}Silent Mode"
     internal: true
@@ -632,7 +688,7 @@ select:
       "On": 1
 
   - platform: modbus_controller
-    modbus_controller_id: ${hp_id}
+    modbus_controller_id: ${hp_id}_slow
     id: ${hp_id}_set_pump_mode
     name: "${prefix}Set Pump Mode"
     internal: true
@@ -677,7 +733,7 @@ number:
 # NUMBER
 # ----------------------------
   - platform: modbus_controller
-    modbus_controller_id: ${hp_id}
+    modbus_controller_id: ${hp_id}_slow
     id: ${hp_id}_pump_speed
     name: "${prefix}Set Pump Speed"
     internal: true
@@ -1800,25 +1856,43 @@ interval:
             }
 
             id(${hp_id}).update();
+            // Slow control readbacks (R1999/R2006/R2010/R2015) keep their
+            // historic 30 s cadence: every third 10 s cycle polls the slow
+            // controller right after the primary, so live telemetry and the
+            // R3999 readback take priority on a slow cycle.
+            const uint32_t poll_cycle = id(${hp_id}_poll_cycle);
+            id(${hp_id}_poll_cycle) = poll_cycle + 1U;
+            if (poll_cycle % 3U == 0U) {
+              id(${hp_id}_slow).update();
+            }
             return;
           }
 
-          // An absent HP only receives one lightweight recovery probe per interval.
+          // An absent HP receives at most one lightweight recovery probe per
+          // offline interval. The probe is queued on the shared hub behind any
+          // in-flight traffic instead of requiring an idle bus, so HP1 traffic
+          // may delay but can never starve HP2 recovery.
           const uint32_t now = millis();
           const uint32_t last_probe = id(${hp_id}_last_offline_probe_ms);
-          if (last_probe != 0U &&
-              now - last_probe < ${oq_modbus_offline_probe_interval_s}UL * 1000UL) {
-            return;
-          }
-          if (!id(${hp_id}).hub()->tx_buffer_empty() ||
-              id(${hp_id}).hub()->tx_blocked()) {
+          const uint32_t probe_interval_ms =
+              ${oq_modbus_offline_probe_interval_s}UL * 1000UL;
+          if (id(${hp_id}_recovery_probe_pending)) {
+            // One probe is still outstanding: only re-queue after a full
+            // interval without a response, so a lost probe cannot wedge
+            // recovery forever.
+            if (last_probe == 0U || now - last_probe < probe_interval_ms) {
+              return;
+            }
+          } else if (last_probe != 0U && now - last_probe < probe_interval_ms) {
             return;
           }
 
+          id(${hp_id}_recovery_probe_pending) = true;
           id(${hp_id}_last_offline_probe_ms) = now == 0U ? 1U : now;
           auto probe = esphome::modbus_controller::ModbusCommandItem::create_read_command(
               id(${hp_id}), esphome::modbus::EntityType::HOLDING, 2099, 1,
               [=](esphome::modbus::EntityType, uint16_t, std::span<const uint8_t>) {
+                id(${hp_id}_recovery_probe_pending) = false;
                 id(${hp_id}_is_online) = true;
                 id(oq_incident_manager).observe_transport(
                     ${hp_index}, true, millis());

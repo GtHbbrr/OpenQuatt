@@ -82,9 +82,9 @@
 
 .oq-helper-shell--dark,
 .oq-helper-modal-backdrop--dark {
-  --oq-helper-bg: #202d3f;
-  --oq-helper-card: #26364a;
-  --oq-helper-card-muted: #304155;
+  --oq-helper-bg: #162131;
+  --oq-helper-card: #1c2a3d;
+  --oq-helper-card-muted: #243449;
   --oq-helper-line: rgba(148, 163, 184, 0.24);
   --oq-helper-line-strong: rgba(148, 163, 184, 0.4);
   --oq-helper-ink: #f8fafc;
