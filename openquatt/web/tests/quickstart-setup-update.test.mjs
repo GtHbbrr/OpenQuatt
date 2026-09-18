@@ -338,10 +338,11 @@ test("de wizard bewaart een lopende en afgeronde Quick Start-update in de sessie
   storeQuickStartSetupInstall({
     ...pending,
     status: "skipped",
-    targetChannel: "dev",
+    targetChannel: "current",
     targetVersion: "v0.50.0",
   });
   assert.equal(getStoredQuickStartSetupInstall().status, "skipped");
+  assert.equal(getStoredQuickStartSetupInstall().targetChannel, "current");
   assert.equal(hasCompletedQuickStartSetupInstallFor("duo", "eth"), true);
   resetSetupState();
   restoreStoredQuickStartSetupInstall();
@@ -458,6 +459,7 @@ test("de Quick Start-actie controleert current build en blokkeert vervolgstappen
   assert.match(viewSource, /Configuratie bevestigen/);
   assert.match(viewSource, /Huidige software behouden en doorgaan/);
   assert.match(viewSource, /data-oq-action="keep-current-quickstart-setup"/);
+  assert.match(viewSource, /const canKeepCurrentSoftware = model\.available/);
   assert.match(viewSource, /Nieuwste main-versie/);
   assert.match(viewSource, /Wordt na bevestigen gecontroleerd/);
   assert.doesNotMatch(viewSource, /als het kanaal, de versie of configuratie afwijkt/);
@@ -467,8 +469,16 @@ test("de Quick Start-actie controleert current build en blokkeert vervolgstappen
   assert.match(uiActionsSource, /isQuickStartStepSelectionAllowed\(stepId\)/);
   assert.match(uiActionsSource, /hasCompletedQuickStartSetupInstallFor\(targetTopology, targetConnection\)/);
   assert.match(uiActionsSource, /keepCurrentQuickStartSetup\(\)/);
+  assert.match(skipAction, /De huidige configuratie kon niet betrouwbaar worden vastgesteld/);
   assert.match(skipAction, /model\.currentTopology !== model\.targetTopology/);
+  assert.match(skipAction, /isQuickStartSetupFirmwareCurrent\(model\)/);
+  assert.match(skipAction, /status: "complete"/);
   assert.match(skipAction, /status: "skipped"/);
+  assert.ok(
+    skipAction.indexOf('status: "complete"')
+      < skipAction.indexOf('status: "skipped"'),
+  );
+  assert.match(skipAction, /\["main", "dev"\]\.includes\(runningChannel\) \? runningChannel : "current"/);
   assert.match(skipAction, /state\.quickStartSetupUpdateComplete = true/);
   assert.doesNotMatch(skipAction, /requestFirmwareOta/);
   assert.match(actionsSource, /setQuickStartFirmwareUpdateChannelMain\(\)/);
