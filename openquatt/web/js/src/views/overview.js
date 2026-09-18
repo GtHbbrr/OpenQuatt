@@ -14,8 +14,10 @@ import { render } from "../core/render-scheduler.js";
 import { isSystemInStandby, replaceOuterHtmlIfSignatureChanged, setInnerHtmlIfChanged } from "./view-utils.js";
 import { renderStatCard } from "./stat-card.js";
 
-  export function renderOverviewStatCardMarkup({ label, value, tone, note, status = false }) {
-    return renderStatCard({ label, value, tone, note, status });
+  const MATRIX_TARGET_BY_KEY = { flowSelected: "flow", totalCop: "cop", totalEer: "cop" };
+  export function renderOverviewStatCardMarkup({ label, value, tone, note, status = false, key = "" }) {
+    const matrixTarget = MATRIX_TARGET_BY_KEY[key];
+    return renderStatCard({ label, value, tone, note, status, ...(matrixTarget ? { valueData: { "oq-matrix-target": matrixTarget } } : {}) });
   }
 
   export function renderOverviewStatCards(cards, status = false) {

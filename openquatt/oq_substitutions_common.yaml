@@ -22,22 +22,13 @@ oq_hardware_build_flag: "-DOQ_HARDWARE_HEATPUMP_CONTROLLER_Q=0" # Hardware capab
 oq_boiler_transport_shutdown_extra: ""                 # Optional profile-specific synchronous actuator shutdown statements.
 oq_local_supply_temp_sensor_id: "water_supply_temp_ds18b20" # Profile-safe local supply-temperature sensor used by shared lambdas.
 oq_local_supply_temp_selector_id: "water_supply_source"     # Validation-safe placeholder outside Q profiles.
-oq_controller_flow_sensor_id: "hp1_flow"              # Profile-safe controller-flow source used by shared lambdas.
-oq_q_flow_source_selector_id: "flow_source"           # Validation-safe placeholder outside Q profiles.
 oq_connection: "unknown"                              # Compile-time connection profile id (`wifi` or `eth`).
 oq_connection_text_internal: "true"                   # Hide the static connection diagnostic unless a runtime manager owns it.
-oq_artifact_connection_suffix: "-${oq_connection}"    # Artifact filename suffix; empty for combined-connection firmware.
-alternate_connection: ""                              # Optional connection target used for controlled Wi-Fi/Ethernet switching.
-alternate_main_release_manifest_url: ""               # Optional main-channel OTA manifest for the alternate connection target.
-alternate_dev_release_manifest_url: ""                # Optional dev-channel OTA manifest for the alternate connection target.
 alternate_topology: ""                                # Optional topology target used for controlled single/duo switching.
 alternate_topology_main_release_manifest_url: ""       # Optional main-channel OTA manifest for the alternate topology target.
 alternate_topology_dev_release_manifest_url: ""        # Optional dev-channel OTA manifest for the alternate topology target.
-alternate_build_main_release_manifest_url: ""          # Optional main-channel OTA manifest when both connection and topology change.
-alternate_build_dev_release_manifest_url: ""           # Optional dev-channel OTA manifest when both connection and topology change.
 openquatt_root: "../../openquatt"                    # OpenQuatt package root relative to the active config file.
 components_root: "../../components"                  # Custom component root relative to the active config file.
-scripts_root: "../../../scripts"                     # Build script root relative to the active config file.
 oq_cpp_headers_dir: "${openquatt_root}/includes"     # Copy and include the grouped OpenQuatt C++ runtime headers.
 oq_component_psram_buffer_header: "${components_root}/openquatt_common/PsramBuffer.h" # Shared PSRAM-backed buffer helper for custom components.
 oq_component_external_telemetry_transport_header: "${components_root}/openquatt_common/OpenQuattExternalTelemetryTransport.h" # Shared outbound-only telemetry transport interface.
@@ -46,7 +37,6 @@ external_components_path: "${components_root}"      # Local custom component dir
 oq_timezone: "Europe/Amsterdam"                         # SNTP timezone used by runtime timestamps.
 oq_webserver_css_include: "${openquatt_root}/web/css/openquatt-app.css" # Bundled OpenQuatt web UI stylesheet.
 oq_webserver_js_include: "${openquatt_root}/web/js/openquatt-app.js" # Bundled OpenQuatt web UI script.
-oq_webserver_css_url: ""                            # Optional external CSS for the ESPHome web UI.
 oq_webserver_js_url: ""                               # Custom OpenQuatt app is primary; load ESPHome fallback lazily on demand.
 web_auth_bootstrap_username: "admin"                  # Bootstrap username used to keep web auth support compiled in.
 web_auth_bootstrap_password: "openquatt"              # Bootstrap password used to keep web auth support compiled in.
@@ -302,6 +292,6 @@ ha_heating_supply_target_valid_entity_id: "binary_sensor.openquatt_ext_heating_s
 # ----------------------------
 oq_modbus_update_interval_s: "10"                   # Base Modbus controller polling interval [s]; regular online reads every 10s (ESPHome 2026.9, no skip_updates).
 oq_modbus_offline_probe_interval_s: "30"             # Sparse single-register probe while an HP is offline [s].
-oq_modbus_command_throttle_ms: "500"                 # Minimum spacing between Modbus commands [ms].
+oq_modbus_command_throttle_ms: "100"                 # Shared-hub turnaround_time [ms]; historic name kept (was controller command_throttle, 500ms). 100ms matches the long-stable pre-2026.8 pacing; re-raise only on wire-measured evidence.
 oq_modbus_max_cmd_retries: "1"                       # Retries per Modbus command; keep low to avoid long blocking on bad links.
 oq_modbus_startup_delay_ms: "0"                      # Default startup offset for staged Modbus polling [ms].

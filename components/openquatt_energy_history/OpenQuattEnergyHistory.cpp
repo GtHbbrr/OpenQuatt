@@ -1655,10 +1655,13 @@ void OpenQuattEnergyHistory::write_history(httpd_req_t* req) {
     return;
   }
 
-  if (!meta_only) {
-    for (uint32_t slot_index = 0; slot_index < this->flash_slot_count_; ++slot_index) {
+  if (!meta_only && this->flash_slot_count_ > 0U) {
+    const uint32_t slot_count = static_cast<uint32_t>(this->flash_slot_count_);
+    const uint32_t start_sequence = this->next_sequence_ > slot_count ? this->next_sequence_ - slot_count : 0U;
+    for (uint32_t sequence = start_sequence; sequence < this->next_sequence_; ++sequence) {
+      const uint32_t slot_index = sequence % slot_count;
       EnergyHistoryRecord record{};
-      if (!this->read_record_(slot_index, &record) || !this->record_valid_(record) ||
+      if (!this->read_record_(slot_index, &record) || !this->record_valid_(record) || record.sequence != sequence ||
           !date_key_in_range_(record.date_key, from_date_key, to_date_key)) {
         continue;
       }

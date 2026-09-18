@@ -22,15 +22,26 @@ class PrManifestInstallContractTest(unittest.TestCase):
             "https://github.com/OpenQuatt/OpenQuatt/releases/download/pr-",
             COMMON_PACKAGE,
         )
-        # Canonical HCQ manifest without connection suffix via substitution.
+        # Canonical HCQ manifest has no connection suffix in the unified build.
         self.assertIn(
-            'artifact_base + "${oq_artifact_connection_suffix}-ota.manifest.json"',
+            'artifact_base + "-ota.manifest.json"',
             COMMON_PACKAGE,
         )
         # PR number 1-6 digits, no leading zero, exact manifest filename.
         self.assertIn("pr.size() <= 6", COMMON_PACKAGE)
         self.assertIn('pr[0] == \'0\'', COMMON_PACKAGE)
         self.assertIn("file == expected_manifest", COMMON_PACKAGE)
+
+    def test_firmware_update_targets_are_topology_only(self) -> None:
+        self.assertIn(
+            'options: ["current build", "alternate topology"]',
+            COMMON_PACKAGE,
+        )
+        self.assertNotIn('"alternate connection"', COMMON_PACKAGE)
+        self.assertNotIn('"alternate topology and connection"', COMMON_PACKAGE)
+        self.assertNotIn("alternate_connection", COMMON_PACKAGE)
+        self.assertNotIn("alternate_build_", COMMON_PACKAGE)
+        self.assertNotIn("oq_artifact_connection_suffix", COMMON_PACKAGE)
 
     def test_manifest_install_rejects_stale_checks_with_exact_url(self) -> None:
         install_script = _script_block("oq_install_firmware_test_manifest_deferred")

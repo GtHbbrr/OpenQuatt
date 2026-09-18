@@ -35,6 +35,8 @@ Net na het flashen kan OpenQuatt ook nog op het fallback access point zitten:
 - SSID: `OpenQuatt`
 - wachtwoord: `openquatt`
 
+Heb je het access point eerder wel gezien en verdwijnt het daarna, dan kan het instelvenster van circa 10 minuten gesloten zijn (of de controller heeft inmiddels normale Wi-Fi-connectiviteit). Herstart de controller en verbind direct opnieuw als je de fallback-route nog nodig hebt.
+
 ## Controller terugzetten naar fabrieksinstellingen
 
 Gebruik dit alleen als laatste redmiddel, bij overdracht of om volledig opnieuw te beginnen. Een factory reset wist alle lokaal opgeslagen instellingen, netwerkgegevens en koppelingen van de controller. De firmware blijft staan; instellingen in de warmtepomp zelf worden niet gewijzigd.
