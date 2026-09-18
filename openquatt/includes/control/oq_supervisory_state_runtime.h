@@ -364,18 +364,40 @@ class Runtime {
     bool cold_start_below_minimum = false;
     bool cold_start_assist_requested = false;
     bool cold_start_released_now = false;
+    // Cold-start outlet samples are only required from currently startable
+    // HP's. An unavailable ODU must not block the healthy ODU. Required is
+    // re-derived every tick so an HP recovering mid-CM1 still needs a fresh
+    // post-flow sample before release.
+    static oq_hp_supervisory::ColdStartRequiredSet cold_start_release_set;
+    const bool hp1_cold_start_required = id(oq_incident_manager).get_outputs(1).available_for_start;
+#if OQ_TOPOLOGY_DUO
+    const bool hp2_cold_start_required = id(oq_incident_manager).get_outputs(2).available_for_start;
+#else
+    const bool hp2_cold_start_required = false;
+#endif
+    const auto cold_start_required =
+        oq_hp_supervisory::cold_start_required_set(hp1_cold_start_required, hp2_cold_start_required);
     if (!heating_flow_req) {
       id(oq_cold_start_session_active) = false;
       id(oq_cold_start_pending) = false;
       id(oq_cold_start_sample_after_ms) = 0;
       id(oq_cold_start_hp_blocked) = false;
       id(oq_cold_start_assist_active) = false;
+      cold_start_release_set = oq_hp_supervisory::ColdStartRequiredSet{};
     } else {
       if (!id(oq_cold_start_session_active)) {
         id(oq_cold_start_session_active) = true;
         id(oq_cold_start_pending) = !any_hp_compressor_active;
         id(oq_cold_start_sample_after_ms) = 0;
         id(oq_cold_start_assist_active) = false;
+        cold_start_release_set = oq_hp_supervisory::ColdStartRequiredSet{};
+      }
+
+      if (!id(oq_cold_start_pending) && !any_hp_compressor_active &&
+          oq_hp_supervisory::cold_start_requires_rearm(cold_start_release_set, cold_start_required)) {
+        // Released, but no compressor runs yet and a previously unavailable
+        // HP became startable: sample it before any compressor may start.
+        id(oq_cold_start_pending) = true;
       }
 
       if (id(oq_cold_start_pending)) {
@@ -392,19 +414,21 @@ class Runtime {
         const float hp2_raw_c = id(hp2_water_out_temp_raw).state;
         const float hp2_offset_c = id(hp2_water_out_temp_offset).state;
         const float hp2_out_c = isnan(hp2_raw_c) || isnan(hp2_offset_c) ? NAN : hp2_raw_c + hp2_offset_c;
-        const oq_hp_supervisory::ColdStartWaterSample hp2_cold_start_sample{true, hp2_out_c,
+        const oq_hp_supervisory::ColdStartWaterSample hp2_cold_start_sample{cold_start_required.hp2, hp2_out_c,
                                                                             id(hp2_water_out_temp_last_update_ms)};
 #else
         const float hp2_out_c = NAN;
-        const oq_hp_supervisory::ColdStartWaterSample hp2_cold_start_sample{false, hp2_out_c, 0};
+        const oq_hp_supervisory::ColdStartWaterSample hp2_cold_start_sample{cold_start_required.hp2, hp2_out_c, 0};
 #endif
         const auto cold_start = oq_hp_supervisory::evaluate_cold_start(
             id(oq_cold_start_sample_after_ms),
-            oq_hp_supervisory::ColdStartWaterSample{true, hp1_out_c, id(hp1_water_out_temp_last_update_ms)},
+            oq_hp_supervisory::ColdStartWaterSample{cold_start_required.hp1, hp1_out_c,
+                                                    id(hp1_water_out_temp_last_update_ms)},
             hp2_cold_start_sample, tick.hp_cold_start_min_c, tick.hp_cold_start_assist_release_c);
 
         if (cold_start.released) {
           id(oq_cold_start_pending) = false;
+          cold_start_release_set = cold_start_required;
           cold_start_released_now = true;
         } else {
           cold_start_blocked = !any_hp_compressor_active && !cold_start.hp_start_allowed;
@@ -419,13 +443,15 @@ class Runtime {
     const bool probe_allowed = heating_flow_req && id(oq_cold_start_pending) && flow_ok &&
                                !id(oq_runtime_polling_paused).state && openquatt_enabled &&
                                id(oq_cm_override).current_option() == "Auto" && id(oq_control_mode_code) != 100;
-    this->hp1_water_probe_.poll(now_ms, id(oq_cold_start_sample_after_ms),
-                                probe_allowed && id(hp1_is_online) && !id(hp1_odu_eeprom_dump).is_active(), &id(hp1),
-                                &id(hp1_water_out_temp_raw));
+    this->hp1_water_probe_.poll(
+        now_ms, id(oq_cold_start_sample_after_ms),
+        probe_allowed && hp1_cold_start_required && id(hp1_is_online) && !id(hp1_odu_eeprom_dump).is_active(), &id(hp1),
+        &id(hp1_water_out_temp_raw));
 #if OQ_TOPOLOGY_DUO
-    this->hp2_water_probe_.poll(now_ms, id(oq_cold_start_sample_after_ms),
-                                probe_allowed && id(hp2_is_online) && !id(hp2_odu_eeprom_dump).is_active(), &id(hp2),
-                                &id(hp2_water_out_temp_raw));
+    this->hp2_water_probe_.poll(
+        now_ms, id(oq_cold_start_sample_after_ms),
+        probe_allowed && hp2_cold_start_required && id(hp2_is_online) && !id(hp2_odu_eeprom_dump).is_active(), &id(hp2),
+        &id(hp2_water_out_temp_raw));
 #endif
     // -------------------------------------------------
     // 4) CM selection with CM1 timer (pre/postflow) + flow interlock

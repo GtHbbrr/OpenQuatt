@@ -66,6 +66,84 @@ void test_cold_start_temperature_bands() {
   assert(!decision.samples_ready);
 }
 
+void test_cold_start_availability_matrix() {
+  using oq_hp_supervisory::cold_start_required_set;
+  using oq_hp_supervisory::cold_start_requires_rearm;
+  using oq_hp_supervisory::ColdStartWaterSample;
+  using oq_hp_supervisory::evaluate_cold_start;
+
+  const uint32_t sample_after_ms = 1000;
+
+  // A. HP1 unavailable, HP2 available and warm: healthy HP2 alone releases.
+  auto required = cold_start_required_set(false, true);
+  assert(!required.hp1);
+  assert(required.hp2);
+  ColdStartWaterSample hp1{required.hp1, NAN, 0};
+  ColdStartWaterSample hp2{required.hp2, 15.0f, 1001};
+  auto decision = evaluate_cold_start(sample_after_ms, hp1, hp2, 5.0f, 12.0f);
+  assert(decision.samples_ready);
+  assert(decision.hp_start_allowed);
+  assert(decision.released);
+  assert(decision.minimum_temperature_c == 15.0f);
+
+  // B. Mirror: only HP1 available.
+  required = cold_start_required_set(true, false);
+  assert(required.hp1);
+  assert(!required.hp2);
+  hp1 = ColdStartWaterSample{required.hp1, 15.0f, 1001};
+  hp2 = ColdStartWaterSample{required.hp2, NAN, 0};
+  decision = evaluate_cold_start(sample_after_ms, hp1, hp2, 5.0f, 12.0f);
+  assert(decision.samples_ready);
+  assert(decision.hp_start_allowed);
+  assert(decision.released);
+  assert(decision.minimum_temperature_c == 15.0f);
+
+  // C. Available HP below 5 C blocks the start.
+  required = cold_start_required_set(false, true);
+  hp1 = ColdStartWaterSample{required.hp1, NAN, 0};
+  hp2 = ColdStartWaterSample{required.hp2, 4.9f, 1001};
+  decision = evaluate_cold_start(sample_after_ms, hp1, hp2, 5.0f, 12.0f);
+  assert(decision.samples_ready);
+  assert(!decision.hp_start_allowed);
+  assert(!decision.released);
+
+  // D. Available HP at 5..12 C allows start with assist, without release.
+  hp2 = ColdStartWaterSample{required.hp2, 8.0f, 1001};
+  decision = evaluate_cold_start(sample_after_ms, hp1, hp2, 5.0f, 12.0f);
+  assert(decision.samples_ready);
+  assert(decision.hp_start_allowed);
+  assert(decision.auxiliary_assist_recommended);
+  assert(!decision.released);
+
+  // E. Two available HP's: both samples required, coldest outlet decides.
+  required = cold_start_required_set(true, true);
+  hp1 = ColdStartWaterSample{required.hp1, 15.0f, 1002};
+  hp2 = ColdStartWaterSample{required.hp2, 4.0f, 1003};
+  decision = evaluate_cold_start(sample_after_ms, hp1, hp2, 5.0f, 12.0f);
+  assert(decision.samples_ready);
+  assert(decision.minimum_temperature_c == 4.0f);
+  assert(!decision.hp_start_allowed);
+  assert(!decision.released);
+
+  // F. No available HP must never fake a release; fallback logic stays owner.
+  required = cold_start_required_set(false, false);
+  hp1 = ColdStartWaterSample{required.hp1, NAN, 0};
+  hp2 = ColdStartWaterSample{required.hp2, NAN, 0};
+  decision = evaluate_cold_start(sample_after_ms, hp1, hp2, 5.0f, 12.0f);
+  assert(!decision.samples_ready);
+  assert(!decision.hp_start_allowed);
+  assert(!decision.released);
+
+  // Recovery in the post-release, pre-compressor window re-arms sampling
+  // only when a previously unavailable HP became startable.
+  const auto released_hp2_only = cold_start_required_set(false, true);
+  assert(!cold_start_requires_rearm(released_hp2_only, cold_start_required_set(false, true)));
+  assert(cold_start_requires_rearm(released_hp2_only, cold_start_required_set(true, true)));
+  assert(cold_start_requires_rearm(cold_start_required_set(false, false), cold_start_required_set(true, false)));
+  assert(!cold_start_requires_rearm(released_hp2_only, cold_start_required_set(false, false)));
+  assert(!cold_start_requires_rearm(cold_start_required_set(true, true), cold_start_required_set(true, true)));
+}
+
 oq_hp_supervisory::FallbackEvaluationInputs eligible_fallback_evaluation_inputs() {
   oq_hp_supervisory::FallbackEvaluationInputs inputs;
   inputs.current_mode = 3;
@@ -284,6 +362,7 @@ int main() {
   test_heating_enable_gate();
   test_frost_control_mode_remains_independent_of_heating_request();
   test_cold_start_temperature_bands();
+  test_cold_start_availability_matrix();
   using oq_hp_supervisory::Cm4ResumeTracker;
   using oq_hp_supervisory::fallback_availability_is_confirmed;
   using oq_hp_supervisory::recovered_heating_mode;
