@@ -112,14 +112,60 @@ class InputSourceRuntimeContractTest(unittest.TestCase):
         for runtime in (SOURCE_RUNTIME, API_RUNTIME, SOURCE_LOGIC):
             self.assertNotIn("${", runtime)
 
-    def test_heating_supply_target_ha_is_freshness_gated(self) -> None:
+    def test_ha_ingress_heartbeat_gates_live_inputs(self) -> None:
         # A value frozen by HA connection loss must go stale even though
-        # ESPHome retains the states: freshness is tracked at ingress via
-        # on_value, and the selected sensor passes an explicit stale window.
+        # ESPHome retains the states (issue #698). Freshness is tracked via
+        # one central heartbeat ingress: the heartbeat state itself changes
+        # about once per minute, because Home Assistant does not forward
+        # attribute-only changes to ESPHome sensors on the bare state.
+        # Only Heating Supply Target keeps its pre-#700 observer during
+        # migration. It is used until the first shared heartbeat so an older
+        # HA package still expires a frozen target after its stale window.
         self.assertEqual(HA_YAML.count("observe_heating_supply_target_ha"), 2)
-        self.assertIn("ha_heating_supply_target_stale_s", SUBSTITUTIONS_YAML)
-        self.assertIn("ha_heating_supply_target_stale_s", SOURCE_YAML)
-        self.assertIn("evaluate_freshness(ha_supply_target_state_", SOURCE_RUNTIME)
+        self.assertIn("observe_heating_supply_target_ha", SOURCE_RUNTIME)
+        self.assertIn("ha_supply_target_legacy_state_", SOURCE_RUNTIME)
+        self.assertIn("ha_live_valid_with_legacy_freshness", SOURCE_RUNTIME)
+        self.assertIn("ha_live_valid_with_legacy_freshness", SOURCE_LOGIC)
+        self.assertNotIn("last_refresh", HA_YAML)
+        self.assertEqual(HA_YAML.count("observe_ha_ingress"), 1)
+        self.assertIn("ha_ingress_heartbeat", HA_YAML)
+        # Only a finite heartbeat proves freshness: an unknown/unavailable
+        # publish arrives as NAN and must not restart the stale clock.
+        heartbeat_block = entity_block(HA_YAML, "ha_ingress_heartbeat")
+        self.assertIn("if (isfinite(x))", heartbeat_block)
+        self.assertIn("observe_ha_ingress", heartbeat_block)
+        self.assertIn("ha_ingress_heartbeat_entity_id", SUBSTITUTIONS_YAML)
+        self.assertIn("ha_ingress_state_", SOURCE_RUNTIME)
+        self.assertIn("ha_live_valid", SOURCE_RUNTIME)
+        self.assertIn("ha_live_valid", SOURCE_LOGIC)
+        # Backward compatibility: while this boot never received a heartbeat
+        # (pre-heartbeat HA package or custom proxies), plain entity validity
+        # applies so an OTA never suddenly rejects existing HA ingress.
+        self.assertIn("ha_live_valid_with_legacy", SOURCE_LOGIC)
+        self.assertIn("ha_live_valid_with_legacy", SOURCE_RUNTIME)
+        self.assertIn("if (!ingress.has_value) return entity_valid;", SOURCE_LOGIC)
+        self.assertIn("if (!runtime.ha_ingress_seen()) return {};", SOURCE_YAML)
+        for stale_sub in (
+            "ha_outside_temperature_stale_s",
+            "ha_water_supply_temperature_stale_s",
+            "ha_room_temperature_stale_s",
+            "ha_cooling_dew_point_stale_s",
+            "ha_external_heat_demand_stale_s",
+            "ha_heating_supply_target_stale_s",
+        ):
+            self.assertIn(stale_sub, SUBSTITUTIONS_YAML)
+        for stale_sub in (
+            "ha_outside_temperature_stale_s",
+            "ha_water_supply_temperature_stale_s",
+            "ha_room_temperature_stale_s",
+            "ha_external_heat_demand_stale_s",
+            "ha_heating_supply_target_stale_s",
+        ):
+            self.assertIn(stale_sub, SOURCE_YAML)
+        cooling_safety_yaml = (ROOT / "openquatt/oq_cooling_safety.yaml").read_text()
+        self.assertIn("ha_cooling_dew_point_stale_s", cooling_safety_yaml)
+        cooling_safety_runtime = (ROOT / "openquatt/includes/control/oq_cooling_safety_logic.h").read_text()
+        self.assertIn("ha_stale_s", cooling_safety_runtime)
         self.assertIn("ha_hold_revoked", SOURCE_RUNTIME)
 
     def test_host_regressions_cover_failure_boundaries(self) -> None:
@@ -131,6 +177,13 @@ class InputSourceRuntimeContractTest(unittest.TestCase):
             "test_outside_lowest_valid_selection",
             "test_enable_source_selection",
             "test_flow_source_routes",
+            "test_ha_live_constant_value_survives_on_heartbeat",
+            "test_ha_live_goes_stale_without_heartbeat_and_recovers",
+            "test_ha_live_validity_off_overrides_fresh_heartbeat",
+            "test_ha_live_zero_timeout_never_expires",
+            "test_ha_live_legacy_without_heartbeat",
+            "test_ha_live_legacy_freshness_preserves_supply_target_timeout",
+            "test_ha_live_millis_rollover",
         ):
             self.assertIn(test_name, host_test)
 

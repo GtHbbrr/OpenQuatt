@@ -6,6 +6,18 @@
 
 using namespace oq_input_source;
 
+struct StubValidEntity {
+  bool present = false;
+  bool state = false;
+  bool has_state() const { return present; }
+};
+
+struct StubValueEntity {
+  bool present = false;
+  float state = NAN;
+  bool has_state() const { return present; }
+};
+
 void test_freshness_accepts_timestamp_zero_and_rollover() {
   TimedState state;
   assert(!evaluate_freshness(state, 1000, 10, true).valid);
@@ -158,6 +170,121 @@ void test_flow_source_routes() {
   assert(selected.valid && selected.route == FlowRoute::CIC && selected.value == 600.0f);
 }
 
+void test_ha_live_constant_value_survives_on_heartbeat() {
+  // Room temperature 20.5 °C never changes, but the HA ingress heartbeat
+  // keeps arriving every minute: the live input must stay valid well beyond
+  // its 600 s stale window (issue #698).
+  StubValidEntity valid{true, true};
+  StubValueEntity value{true, 20.5f};
+  TimedState ingress;
+  ingress.observe(0);
+  for (uint32_t now_ms = 60000; now_ms <= 3600000; now_ms += 60000) {
+    ingress.observe(now_ms);
+    assert(ha_live_valid(valid, value, ingress, now_ms, 600));
+  }
+}
+
+void test_ha_live_goes_stale_without_heartbeat_and_recovers() {
+  // Heating supply target 40.0 °C with a heartbeat every minute stays at
+  // 40.0 without falling back; once the heartbeat stops for more than the
+  // 900 s window the HA input goes invalid, and it becomes usable again as
+  // soon as the heartbeat resumes (issue #698).
+  StubValidEntity valid{true, true};
+  StubValueEntity value{true, 40.0f};
+  TimedState ingress;
+  ingress.observe(0);
+  for (uint32_t now_ms = 60000; now_ms <= 1800000; now_ms += 60000) {
+    ingress.observe(now_ms);
+    assert(ha_live_valid(valid, value, ingress, now_ms, 900));
+  }
+  assert(!ha_live_valid(valid, value, ingress, 1800000 + 900001, 900));
+  ingress.observe(2700001);
+  assert(ha_live_valid(valid, value, ingress, 2700001, 900));
+}
+
+void test_ha_live_validity_off_overrides_fresh_heartbeat() {
+  // An explicitly switched-off validity flag invalidates the input at once,
+  // no matter how fresh the heartbeat is; a missing or non-finite value does
+  // the same.
+  StubValidEntity valid{true, true};
+  StubValueEntity value{true, 40.0f};
+  TimedState ingress;
+  ingress.observe(1000);
+  assert(ha_live_valid(valid, value, ingress, 1000, 900));
+
+  StubValidEntity switched_off{true, false};
+  assert(!ha_live_valid(switched_off, value, ingress, 1000, 900));
+
+  StubValidEntity missing{false, false};
+  assert(!ha_live_valid(missing, value, ingress, 1000, 900));
+
+  StubValueEntity no_value{false, NAN};
+  assert(!ha_live_valid(valid, no_value, ingress, 1000, 900));
+
+  StubValueEntity nan_value{true, NAN};
+  assert(!ha_live_valid(valid, nan_value, ingress, 1000, 900));
+
+  StubValueEntity inf_value{true, INFINITY};
+  assert(!ha_live_valid(valid, inf_value, ingress, 1000, 900));
+}
+
+void test_ha_live_zero_timeout_never_expires() {
+  // Pure helper boundary: stale_s = 0 means "never expire" once an ingress
+  // clock exists. Stateful HA inputs bypass this helper entirely and keep
+  // plain entity validity.
+  StubValidEntity valid{true, true};
+  StubValueEntity value{true, 20.0f};
+  TimedState ingress;
+  assert(!ha_live_valid(valid, value, ingress, 100000, 0));
+  ingress.observe(0);
+  assert(ha_live_valid(valid, value, ingress, 0, 0));
+  assert(ha_live_valid(valid, value, ingress, 3600000, 0));
+}
+
+void test_ha_live_legacy_without_heartbeat() {
+  // Backward compatibility with pre-heartbeat HA packages and custom
+  // proxies: a valid HA proxy stays usable while this boot never received
+  // a heartbeat, so an OTA never suddenly rejects existing HA ingress.
+  // After the first heartbeat, freshness gating is permanent for that boot.
+  TimedState ingress;
+  assert(ha_live_valid_with_legacy(true, ingress, 3600000, 600));
+  assert(!ha_live_valid_with_legacy(false, ingress, 3600000, 600));
+
+  ingress.observe(3600000);
+  assert(ha_live_valid_with_legacy(true, ingress, 3600000, 600));
+  assert(!ha_live_valid_with_legacy(true, ingress, 3600000 + 600001, 600));
+  assert(!ha_live_valid_with_legacy(false, ingress, 3600000, 600));
+}
+
+void test_ha_live_legacy_freshness_preserves_supply_target_timeout() {
+  // Heating Supply Target had a per-value freshness timer before the shared
+  // heartbeat. With an old HA package (no heartbeat), keep that 900 s timeout
+  // instead of accepting the retained proxy state forever.
+  TimedState ingress;
+  TimedState legacy;
+  assert(!ha_live_valid_with_legacy_freshness(true, ingress, legacy, 1000, 900));
+
+  legacy.observe(1000);
+  assert(ha_live_valid_with_legacy_freshness(true, ingress, legacy, 1000, 900));
+  assert(!ha_live_valid_with_legacy_freshness(true, ingress, legacy, 901002, 900));
+
+  // After the first shared heartbeat it is authoritative for the rest of the
+  // boot, even if legacy target publishes continue to arrive.
+  ingress.observe(1000000);
+  assert(ha_live_valid_with_legacy_freshness(true, ingress, legacy, 1000000, 900));
+  legacy.observe(1800000);
+  assert(!ha_live_valid_with_legacy_freshness(true, ingress, legacy, 1900001, 900));
+}
+
+void test_ha_live_millis_rollover() {
+  StubValidEntity valid{true, true};
+  StubValueEntity value{true, 20.5f};
+  TimedState ingress;
+  ingress.observe(UINT32_MAX - 30000U);
+  assert(ha_live_valid(valid, value, ingress, 60000, 600));
+  assert(!ha_live_valid(valid, value, ingress, 600000 + 60000, 600));
+}
+
 int main() {
   test_freshness_accepts_timestamp_zero_and_rollover();
   test_hold_is_bound_to_selected_source();
@@ -165,5 +292,12 @@ int main() {
   test_outside_lowest_valid_selection();
   test_enable_source_selection();
   test_flow_source_routes();
+  test_ha_live_constant_value_survives_on_heartbeat();
+  test_ha_live_goes_stale_without_heartbeat_and_recovers();
+  test_ha_live_validity_off_overrides_fresh_heartbeat();
+  test_ha_live_zero_timeout_never_expires();
+  test_ha_live_legacy_without_heartbeat();
+  test_ha_live_legacy_freshness_preserves_supply_target_timeout();
+  test_ha_live_millis_rollover();
   return 0;
 }

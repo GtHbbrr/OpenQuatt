@@ -66,6 +66,42 @@ inline Freshness evaluate_freshness(const TimedState& state, uint32_t now_ms, ui
   return {static_cast<float>(age_ms) / 1000.0f, stale_s == 0U || age_ms <= seconds_to_millis(stale_s)};
 }
 
+// Single definition of validity for live HA inputs: the proxy entities must
+// be valid AND the central HA ingress heartbeat must be fresh. A constant
+// proxy value therefore stays usable while the heartbeat keeps arriving, and
+// goes stale when the HA -> ESPHome link stops delivering updates. Stateful
+// HA inputs (room setpoint, heating/cooling enable) intentionally keep plain
+// entity validity instead, so they never expire on a constant value.
+template <typename B, typename S>
+inline bool ha_live_valid(const B& valid_entity, const S& value_entity, const TimedState& ingress, uint32_t now_ms,
+                          uint32_t stale_s) {
+  const bool entity_valid =
+      valid_entity.has_state() && valid_entity.state && value_entity.has_state() && isfinite(value_entity.state);
+  return evaluate_freshness(ingress, now_ms, stale_s, entity_valid).valid;
+}
+
+// Legacy-aware variant of the live-HA rule above, used for the firmware
+// member wrapper: while this boot never received a heartbeat (pre-heartbeat
+// HA package or custom proxies without one), plain entity validity applies
+// so an OTA never suddenly rejects existing HA ingress. After the first
+// heartbeat, freshness gating is permanent for that boot.
+inline bool ha_live_valid_with_legacy(bool entity_valid, const TimedState& ingress, uint32_t now_ms, uint32_t stale_s) {
+  if (!ingress.has_value) return entity_valid;
+  return evaluate_freshness(ingress, now_ms, stale_s, entity_valid).valid;
+}
+
+/**
+ * Migration helper for a live HA input that already had its own freshness
+ * timer before the shared ingress heartbeat existed. Until the first shared
+ * heartbeat is seen, preserve that old timer. Once a heartbeat has been seen,
+ * the shared ingress clock remains authoritative for the rest of the boot.
+ */
+inline bool ha_live_valid_with_legacy_freshness(bool entity_valid, const TimedState& ingress,
+                                                const TimedState& legacy_freshness, uint32_t now_ms, uint32_t stale_s) {
+  const TimedState& freshness = ingress.has_value ? ingress : legacy_freshness;
+  return evaluate_freshness(freshness, now_ms, stale_s, entity_valid).valid;
+}
+
 struct NumericSources {
   NumericSample local;
   NumericSample outdoor;

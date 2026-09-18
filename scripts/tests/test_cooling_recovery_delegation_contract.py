@@ -27,8 +27,9 @@ class CoolingRecoveryDelegationContractTest(unittest.TestCase):
         # Issue #642 publishes the dispatch/actuator refuse verdict (reason +
         # countdown, incl. Duo min-unblock over deployable HPs and
         # startup-inhibit naming) from these exact decision files, so the
-        # bound grows with it.
-        self.assertLessEqual(sum(len(path.read_text().splitlines()) for path in files), 3070)
+        # bound grows with it. Issue #698 gates the HA dew point on the
+        # central HA ingress heartbeat instead of bare entity validity.
+        self.assertLessEqual(sum(len(path.read_text().splitlines()) for path in files), 3078)
 
     def test_dispatch_verdict_is_copied_unconditionally(self) -> None:
         # Inhibited owners ride with start_blocked == false; gating the copy
