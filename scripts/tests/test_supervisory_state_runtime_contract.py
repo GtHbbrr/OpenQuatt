@@ -8,6 +8,7 @@ LOGIC = (ROOT / "openquatt/includes/control/oq_supervisory_state_logic.h").read_
 RUNTIME = (ROOT / "openquatt/includes/control/oq_supervisory_state_runtime.h").read_text()
 PROBE = (ROOT / "openquatt/includes/control/oq_cold_start_probe.h").read_text()
 HOST_TEST = (ROOT / "tests/host/supervisory_state_logic_test.cpp").read_text()
+HP_SUPERVISORY_TEST = (ROOT / "tests/host/hp_supervisory_logic_test.cpp").read_text()
 
 
 class SupervisoryStateRuntimeContractTest(unittest.TestCase):
@@ -72,8 +73,30 @@ class SupervisoryStateRuntimeContractTest(unittest.TestCase):
 
     def test_production_sources_remain_bounded(self) -> None:
         # Include the bounded Modbus reader added for first-start water samples.
+        # Duo single-HP cold start (#705) added per-HP availability wiring.
         total = sum(len(source.splitlines()) for source in (YAML, LOGIC, RUNTIME, PROBE))
-        self.assertLessEqual(total, 2275)
+        self.assertLessEqual(total, 2310)
+
+    def test_cold_start_follows_available_heat_pumps(self) -> None:
+        # Regression for #705: Duo cold start required both ODU outlet samples
+        # even when one ODU was unavailable, wedging CM1 forever. Required must
+        # follow the incident-manager start contract per HP, never topology.
+        # Recovery before the first compressor start must open a new freshness
+        # epoch: a false->true edge re-arms sampling and invalidates every
+        # earlier sample, so a recovered HP cannot release on a pre-loss
+        # measurement.
+        self.assertIn("cold_start_required_set(", RUNTIME)
+        self.assertIn("get_outputs(1).available_for_start", RUNTIME)
+        self.assertIn("get_outputs(2).available_for_start", RUNTIME)
+        self.assertIn("cold_start_required_added(", RUNTIME)
+        self.assertIn("id(oq_cold_start_sample_after_ms) = flow_ok ? now_ms : 0;", RUNTIME)
+        self.assertIn("probe_allowed && hp1_cold_start_required", RUNTIME)
+        self.assertIn("probe_allowed && hp2_cold_start_required", RUNTIME)
+        self.assertNotIn("ColdStartWaterSample{true,", RUNTIME)
+        self.assertNotIn("cold_start_release_set", RUNTIME)
+        self.assertIn("cold_start_required_set", HP_SUPERVISORY_TEST)
+        self.assertIn("cold_start_required_added", HP_SUPERVISORY_TEST)
+        self.assertNotIn("cold_start_requires_rearm", HP_SUPERVISORY_TEST)
 
 
 if __name__ == "__main__":
