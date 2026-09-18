@@ -1,9 +1,9 @@
 :root {
-  --bg: #f9fafb;
+  --bg: #f8fafc;
   --panel: #ffffff;
   --panel-muted: #f3f4f6;
   --ink: #111827;
-  --ink-soft: #4b5563;
+  --ink-soft: #475569;
   --ink-faint: #6b7280;
   --line: #e5e7eb;
   --line-strong: #d1d5db;
@@ -18,7 +18,7 @@
   --radius-lg: 16px;
   --radius-md: 12px;
   --radius-sm: 10px;
-  --font-body: "Inter", "Segoe UI", sans-serif;
+  --font-body: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
   --font-mono: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
 }
 
@@ -48,7 +48,7 @@ body.search-open {
 }
 
 a {
-  color: var(--accent);
+  color: var(--accent-strong);
   text-decoration: none;
 }
 
@@ -129,7 +129,8 @@ kbd {
   top: 0;
   z-index: 50;
   border-bottom: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.96);
+  background: #0f1724;
+  color: #f8fafc;
   backdrop-filter: blur(14px);
 }
 
@@ -169,8 +170,26 @@ kbd {
 }
 
 .site-brand-logo {
-  width: 116px;
+  width: 200px;
   height: auto;
+}
+
+.site-header .menu-toggle,
+.site-header .search-trigger,
+.site-header .header-link,
+.site-header kbd {
+  background: #162131;
+  border-color: #344155;
+  color: #f8fafc;
+  transition: border-color 140ms ease, background-color 140ms ease;
+}
+
+.site-header .menu-toggle:hover,
+.site-header .search-trigger:hover,
+.site-header .header-link:hover {
+  background: #243449;
+  border-color: #f97316;
+  color: #f8fafc;
 }
 
 .site-brand-copy {
@@ -1687,7 +1706,7 @@ kbd {
   }
 
   .site-brand-logo {
-    width: 102px;
+    width: 150px;
   }
 
   .site-header-actions {

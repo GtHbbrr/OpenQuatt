@@ -12,7 +12,7 @@ function getStoredDebugRecordingAcknowledgedId() {
 export const DEFAULT_TREND_WINDOW_HOURS = 24;
 export const TREND_WINDOW_HOURS_OPTIONS = [3, 12, 24, 72, 168, 336, 720];
 const QUICK_START_SETUP_INSTALL_STORAGE_KEY = "oq-quickstart-setup-install";
-const QUICK_START_SETUP_INSTALL_STATUSES = new Set(["pending", "successful-phase", "complete"]);
+const QUICK_START_SETUP_INSTALL_STATUSES = new Set(["pending", "successful-phase", "complete", "skipped"]);
 
 export function getStoredQuickStartSetupInstall() {
   try {
@@ -25,10 +25,13 @@ export function getStoredQuickStartSetupInstall() {
     const sourceChannel = String(value?.sourceChannel || "");
     const sourceVersion = String(value?.sourceVersion || "");
     const status = String(value?.status || "");
+    const targetChannelValid = status === "skipped"
+      ? Boolean(targetChannel)
+      : targetChannel === "main";
     if (!QUICK_START_SETUP_INSTALL_STATUSES.has(status)
       || !["single", "duo"].includes(targetTopology)
       || !["wifi", "eth"].includes(targetConnection)
-      || targetChannel !== "main") {
+      || !targetChannelValid) {
       return null;
     }
     const sourceValid = ["single", "duo"].includes(sourceTopology)
@@ -51,8 +54,9 @@ export function getStoredQuickStartSetupInstall() {
 
 export function hasCompletedQuickStartSetupInstallFor(targetTopology, targetConnection) {
   const record = getStoredQuickStartSetupInstall();
-  return record?.status === "complete"
-    && record.targetChannel === "main"
+  return Boolean(record)
+    && (record.status === "complete" || record.status === "skipped")
+    && (record.status === "skipped" || record.targetChannel === "main")
     && record.targetTopology === String(targetTopology || "")
     && record.targetConnection === String(targetConnection || "");
 }
@@ -74,7 +78,7 @@ export function clearQuickStartSetupInstall() {
 }
 
 const initialQuickStartSetupInstall = getStoredQuickStartSetupInstall();
-const initialQuickStartSetupComplete = initialQuickStartSetupInstall?.status === "complete";
+const initialQuickStartSetupComplete = initialQuickStartSetupInstall?.status === "complete" || initialQuickStartSetupInstall?.status === "skipped";
 
 export const state = {
   mounted: false,
@@ -139,7 +143,7 @@ export const state = {
 
 export function restoreStoredQuickStartSetupInstall() {
   const record = getStoredQuickStartSetupInstall();
-  if (!record || record.status === "complete") {
+  if (!record || record.status === "complete" || record.status === "skipped") {
     return record;
   }
   state.updateInstallMode = "quickstart-setup";

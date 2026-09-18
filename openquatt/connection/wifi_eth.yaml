@@ -9,6 +9,7 @@
 
 substitutions:
   oq_connection: "auto"
+  oq_connection_text_internal: "false"
 
 network:
   priority: [ethernet, wifi]

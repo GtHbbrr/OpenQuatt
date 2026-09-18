@@ -57,6 +57,8 @@ Als Wi-Fi niet direct via de browserflow lukt, gebruikt een Wi-Fi-capabele build
 - SSID: `OpenQuatt`
 - wachtwoord: `openquatt`
 
+Als dit fallback access point actief is, blijft het alleen beschikbaar binnen het instelvenster: uiterlijk circa 10 minuten na opstarten, en het kan eerder verdwijnen zodra normale Wi-Fi-connectiviteit/provisioning slaagt. Is het venster gesloten, herstart de controller dan eerst of stel Wi-Fi via USB in.
+
 Open daarna de web-app via:
 
 ```text

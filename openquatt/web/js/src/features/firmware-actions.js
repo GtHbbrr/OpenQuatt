@@ -517,6 +517,62 @@ import { render } from "../core/render-scheduler.js";
     await installQuickStartSetupFirmware(model);
   }
 
+  export function keepCurrentQuickStartSetup() {
+    const [targetTopology, targetConnection] = String(state.quickStartSetupDraft || "").split(":");
+    const model = getFirmwareBuildSwitchModel(targetTopology, targetConnection);
+    if (!model.available) {
+      state.controlError = "De huidige configuratie kon niet betrouwbaar worden vastgesteld. Wacht een moment en probeer opnieuw.";
+      render();
+      return;
+    }
+    if (!state.quickStartSetupConfirmed) {
+      state.controlError = "Bevestig eerst dat de gekozen setup klaar is voor gebruik.";
+      render();
+      return;
+    }
+    if (model.currentTopology !== model.targetTopology || model.currentConnection !== model.targetConnection) {
+      state.controlError = "De huidige software kan alleen behouden blijven als de gekozen configuratie al actief is.";
+      render();
+      return;
+    }
+
+    const currentVersion = getFirmwareCurrentVersion() || "";
+    if (isQuickStartSetupFirmwareCurrent(model)) {
+      storeQuickStartSetupInstall({
+        status: "complete",
+        targetTopology: model.targetTopology,
+        targetConnection: model.targetConnection,
+        targetChannel: "main",
+        targetVersion: currentVersion,
+        startedAt: Date.now(),
+      });
+      state.currentStep = "generation";
+      state.quickStartSetupUpdateComplete = true;
+      state.controlError = "";
+      state.controlNotice = "De gekozen configuratie en stabiele main-software zijn al actueel. Er was geen OTA nodig.";
+      render();
+      return;
+    }
+
+    const runningChannel = String(getFirmwareRunningChannelLabel() || "").trim().toLowerCase();
+    const currentChannel = ["main", "dev"].includes(runningChannel) ? runningChannel : "current";
+    storeQuickStartSetupInstall({
+      status: "skipped",
+      targetTopology: model.targetTopology,
+      targetConnection: model.targetConnection,
+      targetChannel: currentChannel,
+      targetVersion: currentVersion,
+      startedAt: Date.now(),
+    });
+    state.currentStep = "generation";
+    state.quickStartSetupUpdateComplete = true;
+    state.controlError = "";
+    state.controlNotice = currentVersion
+      ? `Quick Start gaat verder met ${currentVersion}; er is geen OTA gestart.`
+      : "Quick Start gaat verder met de huidige software; er is geen OTA gestart.";
+    render();
+  }
+
   export async function setFirmwareTestTextEntity(key, value) {
     if (!hasEntity(key)) {
       throw new Error(`${ENTITY_DEFS[key]?.name || key} is niet beschikbaar op deze firmware.`);

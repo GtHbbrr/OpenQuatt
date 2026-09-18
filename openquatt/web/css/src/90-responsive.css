@@ -28,19 +28,15 @@
   .oq-helper-logo-lockup {
     flex-direction: column;
     align-items: flex-start;
-    gap: 12px;
-  }
-
-  .oq-helper-brand-copy {
-    width: 100%;
+    gap: 6px;
   }
 
   .oq-helper-logo-mark {
-    width: clamp(104px, 20vw, 126px);
+    width: 230px;
   }
 
   .oq-helper-head h1 {
-    font-size: clamp(1.9rem, 8vw, 2.7rem);
+    font-size: 1rem;
   }
 }
 
@@ -56,7 +52,7 @@
   }
 
   .oq-helper-head h1 {
-    font-size: clamp(1.95rem, 7.5vw, 2.5rem);
+    font-size: 1rem;
   }
 
   .oq-native-surface-controls {
@@ -543,11 +539,11 @@
   }
 
   .oq-helper-logo-mark {
-    width: clamp(96px, 28vw, 118px);
+    width: 200px;
   }
 
   .oq-helper-head h1 {
-    font-size: clamp(1.72rem, 9vw, 2.1rem);
+    font-size: 0.95rem;
     line-height: 1.03;
   }
 
