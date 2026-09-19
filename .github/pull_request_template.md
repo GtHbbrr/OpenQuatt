@@ -36,7 +36,7 @@ Toelichting:
 Kies exact één optie:
 
 - [ ] Documentatie bijgewerkt voor de gebruikersgerichte wijziging
-- [ ] Geen documentatiewijziging nodig
+- [x] Geen documentatiewijziging nodig
 
 Docs-impact motivatie:
 
