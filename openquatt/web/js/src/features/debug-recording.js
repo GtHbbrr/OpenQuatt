@@ -761,7 +761,13 @@ export function renderDebugRecordingModal() {
             <button class="oq-helper-button oq-helper-button--ghost" type="button" data-oq-action="start-rolling-debug-recording" ${busy || state.debugRecordingDeviceStatus?.available === false ? "disabled" : ""}>${renderDebugRecordingButtonIcon("activity")}Start rolling</button>
           `}
           <button class="oq-helper-button oq-helper-button--ghost" type="button" data-oq-action="download-debug-recording" ${!hasRecording || busy ? "disabled" : ""}>${renderDebugRecordingButtonIcon("download")}${active && rolling ? "Download tot nu toe" : "Download supportbestand"}</button>
-          <button class="oq-helper-button oq-helper-button--ghost" type="button" data-oq-action="copy-debug-recording" ${!hasRecording || busy ? "disabled" : ""}>${renderDebugRecordingButtonIcon("copy")}${active && rolling ? "Kopieer tot nu toe" : "Kopieer data"}</button>
+          ${hasRecording ? `
+            <a class="oq-helper-button oq-helper-button--ghost" href="https://openheatpumps.nl" target="_blank" rel="noopener noreferrer" style="text-decoration: none; display: inline-flex; align-items: center;">
+              ${renderDebugRecordingButtonIcon("activity")}Analyseer bestand
+            </a>
+          ` : ""}
+
+          <button class="oq-helper-button oq-helper-button--ghost" type="button" data-oq-action="copy-debug-recording" ${!hasRecording || busy ? "disabled" : ""}>${renderDebugRecordingButtonIcon("copy")}${active && rolling ? "Kopieer tot nu toe" : "Kopieer data"}</button>          
           ${feedback ? `
             <p class="oq-debug-recording-feedback oq-debug-recording-feedback--${feedback.kind}" role="status">
               ${renderDebugRecordingButtonIcon(feedback.icon)}
