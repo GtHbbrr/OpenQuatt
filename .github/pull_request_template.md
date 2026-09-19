@@ -8,7 +8,7 @@
 ## Type
 
 - [ ] Bugfix
-- [ ] Feature
+- [x] Feature
 - [ ] Docs
 - [ ] UI/config
 - [ ] Control/platform
@@ -41,6 +41,7 @@ Kies exact één optie:
 Docs-impact motivatie:
 
 <!-- Verplicht invullen als "Geen documentatiewijziging nodig" is aangevinkt. -->
+Geen documentatiewijziging nodig
 
 ## Validatie
 
