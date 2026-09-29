@@ -5,6 +5,19 @@
 #   Configure the authenticated OpenQuatt web app. The SPA owns entity layout;
 #   ESPHome sorting metadata is intentionally omitted to protect internal heap.
 # ==============================================================================
+substitutions:
+  # Standaard instellingen voor de binaire stateless proxy tunnel
+  oq_tunnel_relay_host: "quatt.openheatpumps.nl"
+  oq_tunnel_pump_secret: "dev_placeholder_secret"
+
+# Registreer onze lokale oq_tunnel component conform de nieuwe v2026.9.0 syntax
+external_components:
+  - source:
+      type: local
+      path: ../../components
+    components:
+      - oq_tunnel
+
 web_server:
   port: 80
   version: 3
@@ -15,3 +28,9 @@ web_server:
   css_include: ${oq_webserver_css_include}
   js_include: ${oq_webserver_js_include}
   js_url: "${oq_webserver_js_url}"
+
+# Binaire stateless HTTP-over-WebSocket tunnel naar Cloudflare
+oq_tunnel:
+  id: openquatt_tunnel_service
+  relay_host: ${oq_tunnel_relay_host}
+  pump_secret: ${oq_tunnel_pump_secret}

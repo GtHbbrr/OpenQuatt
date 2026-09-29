@@ -2,5 +2,24 @@
 # OpenQuatt - Heatpump Controller Q Single WiFi compatibility entrypoint
 # ==============================================================================
 # The released WiFi and Ethernet assets are aliases of the same topology firmware.
+
+substitutions:
+  # Los de upstream compilatiefout op door de missende parameters te definieren
+  alternate_dev_release_manifest_url: ""
+  alternate_connection_url: ""
+  alternate_topology_update_target: "false"
+  alternate_topology_url: ""
+
+  # Activeer en configureer jouw binaire proxy-tunnel naar Cloudflare
+  oq_tunnel_relay_host: "quatt.openheatpumps.nl"
+  oq_tunnel_pump_secret: "f81d4fae-7dec-11d0-a765-00a0c91e6bf6"
+
+# Forceer de sdkconfig-optie van ESP-IDF om de websocket client component te compileren
+esp32:
+  framework:
+    type: esp-idf
+    sdkconfig_options:
+      CONFIG_ESP_WEBSOCKET_CLIENT_ENABLE: "y"
+
 packages:
   unified_q_single: !include single.yaml
