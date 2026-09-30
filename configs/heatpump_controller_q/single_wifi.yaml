@@ -1,29 +1,6 @@
 # ==============================================================================
 # OpenQuatt - Heatpump Controller Q Single WiFi compatibility entrypoint
 # ==============================================================================
-substitutions:
-  alternate_dev_release_manifest_url: ""
-  alternate_connection_url: ""
-  alternate_topology_update_target: "false"
-  alternate_topology_url: ""
-  oq_tunnel_relay_host: "quatt.openheatpumps.nl"
-  oq_tunnel_pump_secret: "f81d4fae-7dec-11d0-a765-00a0c91e6bf6"
-  external_components_path: "/Volumes/USB Sonoma/Users/sonoma/Documents/GitHub/OpenQuatt/components"
-  web_auth_bootstrap_username: "admin"
-  web_auth_bootstrap_password: "password_placeholder"
-  web_auth_default_enabled: "true"
-
-# Dummy top-level initialisatie om openquatt_captive_portal_router te sussen
-web_server:
-  port: 80
-
-esphome:
-  name: heatpump_controller_q_single
-  compile_process_limit: 8
-  build_flags:
-    # 1. Dwing de preprocessor om de authenticatie-functies in web_server_base.h te activeren
-    - -DUSE_WEBSERVER_AUTH=1
-
+# The released WiFi and Ethernet assets are aliases of the same topology firmware.
 packages:
   unified_q_single: !include single.yaml
-  oq_tunnel_proxy: !include ../../openquatt/oq_tunnel.yaml
