@@ -355,6 +355,11 @@ function syncFrequencyRangeControl(control) {
           if (copyNode && copyNode.textContent !== statusCopy) {
             copyNode.textContent = statusCopy;
           }
+        } else if (item === "tunnel") {
+          const tunnelActive = isEntityActive("openquatt_tunnel_service");
+          if (valueNode && valueNode.textContent !== (tunnelActive ? "Actief" : "Uitgeschakeld")) {
+            valueNode.textContent = tunnelActive ? "Actief" : "Uitgeschakeld";
+          }
         } else if (item === "api") {
           const statusLabel = getApiSecurityStatusLabel();
           const statusCopy = getApiSecurityStatusDetail();

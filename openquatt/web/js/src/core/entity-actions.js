@@ -23,7 +23,7 @@ import { handleOduEepromDumpAction } from "../features/odu-eeprom-dump.js";
 import { handleOduRuntimeFrequencyAction, handleOduRuntimeFrequencyInputKeyDown, updateOduRuntimeFrequencyDraft } from "../features/odu-runtime-frequency.js";
 import { handleOduSettingsAction, updateOduSettingsDraft } from "../features/odu-settings.js";
 import { confirmQuickStartSetup, handleQuickStartAction } from "../features/quickstart-ui-actions.js";
-import { handleSecurityAction, stopLoginAuthStatusPolling } from "../features/security-actions.js";
+import { handleSecurityAction, stopLoginAuthStatusPolling, handleTunnelProxyChange, handleTunnelProxyClick } from "../features/security-actions.js";
 import { clearSettingsBackupDraft, handleSettingsBackupFileSelection, handleStorageHistoryAction, normalizeEnergyHistoryExportMode } from "../features/storage-history.js";
 import { handleSystemAction } from "../features/system-actions.js";
 import { handleShellAction } from "../features/shell-actions.js";
@@ -180,6 +180,7 @@ function updateFrequencyRangeControl(input) {
   }
 
   export function handleInput(event) {
+    if (handleTunnelProxyChange(event)) return;
     if (event.target.dataset.oqOduSettingsHp) {
       updateOduSettingsDraft(event.target);
       return;
@@ -401,6 +402,7 @@ function updateFrequencyRangeControl(input) {
   }
 
   export function handleChange(event) {
+    if (handleTunnelProxyChange(event)) return;
     if (event.target.dataset.oqOduSettingsHp) {
       updateOduSettingsDraft(event.target);
       return;
@@ -600,6 +602,7 @@ function updateFrequencyRangeControl(input) {
     }
 
     const action = button.dataset.oqAction;
+    if (handleTunnelProxyClick(action, button)) return;
     if (action === "disable-range") {
       const minKey = button.dataset.oqRangeKey || "";
       const maxKey = minKey.replace("MinHz", "MaxHz");
