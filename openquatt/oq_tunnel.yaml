@@ -1,18 +1,5 @@
-# ==============================================================================
 # OpenQuatt - Stateless HTTP Reverse Proxy Tunnel (Cloudflare Tunnel Client)
-# ==============================================================================
-#
-# Goal:
-#   Expose the local webapp securely to the outside world through a Cloudflare 
-#   Relay without requiring port forwarding.
-#
-# ==============================================================================
-
-external_components:
-  - source:
-      type: local
-      path: "${external_components_path}"
-    components: [openquatt_tunnel]
+# Geïntegreerd in de centrale core-omgeving via oq_web_access.yaml
 
 openquatt_tunnel:
   id: openquatt_tunnel_service
