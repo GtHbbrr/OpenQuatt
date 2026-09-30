@@ -3,7 +3,7 @@
 #include "esp_websocket_client.h"
 
 namespace esphome {
-namespace openquatt_tunnel {
+namespace openquatt_tunnel_tunnel {
 
 static const char *const TAG = "openquatt_tunnel";
 
@@ -72,5 +72,5 @@ void OpenQuattTunnel::send_frame(FrameType type, uint32_t stream_id, const uint8
     esp_websocket_client_send_bin(ws_client, (char *)tx_frame_buffer_, payload_len + 5, portMAX_DELAY);
 }
 
-} // namespace openquatt_tunnel
+} // namespace openquatt_tunnel_tunnel
 } // namespace esphome
