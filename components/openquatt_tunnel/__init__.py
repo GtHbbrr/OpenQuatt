@@ -4,7 +4,6 @@ from esphome.const import CONF_ID
 
 AUTO_LOAD = ["network"]
 
-# Namespace en klasse exact gelijnd met de core-architectuur
 openquatt_tunnel_ns = cg.esphome_ns.namespace("openquatt_tunnel")
 OpenQuattTunnel = openquatt_tunnel_ns.class_("OpenQuattTunnel", cg.Component)
 
@@ -17,9 +16,6 @@ CONFIG_SCHEMA = cv.Schema(
 ).extend(cv.COMPONENT_SCHEMA)
 
 async def to_code(config):
-    # Dwing de generator om de specifieke CamelCase bronbestanden te registreren
-    cg.add_sources(["OpenQuattTunnel.cpp"])
-    
     cg.add_global(openquatt_tunnel_ns.using)
     var = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(var, config)

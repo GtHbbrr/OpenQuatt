@@ -1,4 +1,4 @@
-#include "OpenQuattTunnel.h"
+#include "openquatt_tunnel.h"
 #include "esphome/core/log.h"
 #include "esp_websocket_client.h"
 
