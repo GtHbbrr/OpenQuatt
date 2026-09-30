@@ -195,6 +195,10 @@ function syncFrequencyRangeControl(control) {
           const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 768;
           input.disabled = !isMobile || state.loadingEntities;
         }
+        if (fieldKey === "openquatt_tunnel_service") {
+          const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 768;
+          input.disabled = !isMobile || state.loadingEntities;
+        }
         const value = input.type === "time"
           ? toTimeInputValue(getInputDraftValue(fieldKey))
           : String(getInputDraftValue(fieldKey) ?? "");
@@ -371,6 +375,16 @@ function syncFrequencyRangeControl(control) {
             valueNode.textContent = statusLabel;
           }
           if (copyNode && copyNode.textContent !== statusCopy) {
+        } else if (item === "tunnel") {
+          const isTunnelActive = isEntityActive("openquatt_tunnel_service");
+          const statusLabel = isTunnelActive ? t("settingsSecurity.tunnelStatusActive") : t("settingsSecurity.tunnelStatusDisabled");
+          const statusCopy = t("settingsSecurity.tunnelCopy");
+          if (valueNode && valueNode.textContent !== statusLabel) {
+            valueNode.textContent = statusLabel;
+          }
+          if (copyNode && copyNode.textContent !== statusCopy) {
+            copyNode.textContent = statusCopy;
+          }
         } else if (item === "tunnel") {
           const isTunnelActive = isEntityActive("openquatt_tunnel_service");
           const statusLabel = isTunnelActive ? t("settingsSecurity.tunnelStatusActive") : t("settingsSecurity.tunnelStatusDisabled");
