@@ -18,11 +18,10 @@ CONFIG_SCHEMA = cv.Schema(
 
 async def to_code(config):
     if CORE.is_esp32:
-        # Dit is het enige juiste alternatief voor add_build_macro:
         cg.add_build_flag("-DUSE_ESP_WEBSOCKET_CLIENT")
         cg.add_build_flag("-D_GLIBCXX_USE_C99")
         
-        # Dit dwingt de CMake-generator om de websocket include-paden globaal te mappen
+        # Dit dwingt de generator om de include-paden native te ontsluiten
         import esphome.components.esp32 as esp32_ext
         esp32_ext.include_builtin_idf_component("esp_websocket_client")
 
