@@ -19,8 +19,12 @@ CONFIG_SCHEMA = cv.Schema(
 
 async def to_code(config):
     if CORE.is_esp32:
+        # Laad de ingebouwde componenten in
         include_builtin_idf_component("esp_websocket_client")
         include_builtin_idf_component("json")
+        
+        # Injecteer het exacte compiler include-pad voor de websocket headers
+        cg.add_build_flag("-I/Users/admin/Library/Caches/esphome/idf/frameworks/5.5.5/components/esp_websocket_client/include")
 
     cg.add_global(openquatt_tunnel_ns.using)
 
