@@ -1600,6 +1600,8 @@ export default {
     sectionCopy: "Beheer hier de web-login en bekijk of Home Assistant veilig verbonden is.",
     statusAction: "Status",
     adjustAction: "Aanpassen",
+    tunnelLabel: "Buitenshuis Toegang (Stateless Proxy)",
+    tunnelCopy: "Exposeer de interface anoniem en database-vrij via quatt.openheatpumps.nl",
   },
   settingsService: {
     phasePrep: "Voorbereiden",
