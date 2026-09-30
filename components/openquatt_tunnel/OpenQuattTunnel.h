@@ -5,7 +5,7 @@
 #include <string>
 
 namespace esphome {
-namespace openquatt_tunnel {
+namespace openquatt { // Aangesloten op core namespace
 
 // Maximale frame grootte voor de stateless proxy
 static constexpr size_t MAX_FRAME_SIZE = 4096;
@@ -44,5 +44,5 @@ class OpenQuattTunnel : public Component {
     void send_frame(FrameType type, uint32_t stream_id, const uint8_t *payload, size_t payload_len);
 };
 
-}  // namespace openquatt_tunnel
+}  // namespace openquatt
 }  // namespace esphome
