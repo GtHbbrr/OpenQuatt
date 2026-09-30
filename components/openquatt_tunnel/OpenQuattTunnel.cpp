@@ -1,13 +1,13 @@
-#include "oq_tunnel.h"
+#include "OpenQuattTunnel.h"
 #include "esphome/core/log.h"
 #include "esp_websocket_client.h"
 
 namespace esphome {
-namespace oq_tunnel {
+namespace openquatt_tunnel {
 
-static const char *const TAG = "oq_tunnel";
+static const char *const TAG = "openquatt_tunnel";
 
-void OQTunnelComponent::setup() {
+void OpenQuattTunnel::setup() {
     ESP_LOGI(TAG, "Initializing stateless proxy tunnel buffers...");
     
     // Allocate transaction structures safely (Section 11)
@@ -22,7 +22,7 @@ void OQTunnelComponent::setup() {
     this->connect_to_relay();
 }
 
-void OQTunnelComponent::loop() {
+void OpenQuattTunnel::loop() {
     if (!is_connected_) {
         unsigned long now = millis();
         if (now - last_reconnect_attempt_ > 15000) {
@@ -31,7 +31,7 @@ void OQTunnelComponent::loop() {
     }
 }
 
-void OQTunnelComponent::connect_to_relay() {
+void OpenQuattTunnel::connect_to_relay() {
     last_reconnect_attempt_ = millis();
     
     esp_websocket_client_config_t ws_cfg = {};
@@ -53,7 +53,7 @@ void OQTunnelComponent::connect_to_relay() {
     }
 }
 
-void OQTunnelComponent::send_frame(FrameType type, uint32_t stream_id, const uint8_t *payload, size_t payload_len) {
+void OpenQuattTunnel::send_frame(FrameType type, uint32_t stream_id, const uint8_t *payload, size_t payload_len) {
     if (!is_connected_ || client_ == nullptr || payload_len > MAX_FRAME_SIZE) return;
 
     esp_websocket_client_handle_t ws_client = (esp_websocket_client_handle_t)client_;
@@ -72,5 +72,5 @@ void OQTunnelComponent::send_frame(FrameType type, uint32_t stream_id, const uin
     esp_websocket_client_send_bin(ws_client, (char *)tx_frame_buffer_, payload_len + 5, portMAX_DELAY);
 }
 
-} // namespace oq_tunnel
+} // namespace openquatt_tunnel
 } // namespace esphome
