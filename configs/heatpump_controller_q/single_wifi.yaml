@@ -8,12 +8,35 @@ substitutions:
   alternate_topology_url: ""
   oq_tunnel_relay_host: "quatt.openheatpumps.nl"
   oq_tunnel_pump_secret: "f81d4fae-7dec-11d0-a765-00a0c91e6bf6"
+  external_components_path: "/Volumes/USB Sonoma/Users/sonoma/Documents/GitHub/OpenQuatt/components"
+  web_auth_bootstrap_username: "admin"
+  web_auth_bootstrap_password: "password_placeholder"
+  web_auth_default_enabled: "true"
 
-# Correct global compilation configuration block according to ESPHome standards
+# Dummy top-level initialisatie om openquatt_captive_portal_router te sussen
+web_server:
+  port: 80
+
+external_components:
+  - source:
+      type: local
+      path: "/Volumes/USB Sonoma/Users/sonoma/Documents/GitHub/OpenQuatt/components"
+    components:
+      - oq_tunnel
+
 esphome:
+  name: heatpump_controller_q_single
+  compile_process_limit: 8
   build_flags:
-    - "-DCONFIG_ESP_WEBSOCKET_CLIENT_ENABLE=1"
-    - "-DSDKCONFIG_HAVE_TARGET_ESP_WEBSOCKET_CLIENT=1"
+    # 1. Herstel het websocket include-pad uit compile_commands.json
+    - "-I/Users/admin/Library/Caches/esphome/idf/frameworks/5.5.5/components/esp_websocket_client/include"
+    # 2. Dwing de preprocessor om de authenticatie-functies in web_server_base.h te activeren
+    - "-DUSE_WEBSERVER_AUTH=1"
+
+oq_tunnel:
+  id: openquatt_tunnel_service
+  relay_host: ${oq_tunnel_relay_host}
+  pump_secret: ${oq_tunnel_pump_secret}
 
 packages:
   unified_q_single: !include single.yaml
