@@ -1295,3 +1295,68 @@ import { formatNumber, optionLabel, t } from "../i18n/index.js";
       `,
     );
   }
+
+export function renderSettingsTunnelProxySection() {
+  if (!hasEntity("openquatt_tunnel_service")) {
+    // Toon de sectie alleen als de firmware-component daadwerkelijk is mee-gecompileerd
+    return "";
+  }
+
+  // CONTROLEER DE USER FLOW: Zit de gebruiker op een mobiel apparaat?
+  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 768;
+  const tunnelEnabled = isInstallationMonitoringIntegrationEnabled("openquatt_tunnel_service");
+  const pumpSecret = getSettingsTextStatValue("oq_tunnel_pump_secret", "—");
+
+  // Logica voor de desktop waarschuwings-banner
+  const desktopWarningCard = !isMobile ? `
+    <div class="oq-settings-integration-diagnostic-item is-warning" style="margin-bottom: 1rem; border-left: 4px solid var(--oq-color-warning); padding: 0.75rem;">
+      <p style="margin: 0; font-weight: bold; color: var(--oq-color-warning-text);">⚠️ Desktop Toegang Vergrendeld</p>
+      <p style="margin: 0.25rem 0 0 0; font-size: 0.875rem;">U kunt de uitgaande proxy-paho pijplijn alleen activeren vanaf uw mobiele telefoon (openquatt.local) om de anonieme koppeling AVG-proof te starten.</p>
+    </div>
+  ` : "";
+
+  return renderSettingsSection(
+    "OpenQuatt Proxy Tunnel",
+    "Buitenshuis Toegang (AVG-Proof)",
+    "Exposeer uw openquatt.local interface veilig aan de buitenwereld zonder poorten open te zetten in uw router. 100% database-vrij en anoniem via Cloudflare.",
+    `
+      <div class="oq-settings-tunnel-shell">
+        ${desktopWarningCard}
+        
+        <div class="oq-settings-integration-card">
+          <div class="oq-settings-integration-card-head">
+            <h4>Anonieme WebSocket Pijplijn</h4>
+            <label class="oq-switch">
+              <input 
+                type="checkbox" 
+                data-oq-field="openquatt_tunnel_service" 
+                ${tunnelEnabled ? "checked" : ""} 
+                ${!isMobile || state.loadingEntities ? "disabled" : ""}
+                data-oq-action="toggle-tunnel-proxy"
+              >
+              <span class="oq-switch-slider"></span>
+            </label>
+          </div>
+          <p style="margin-top: 0.5rem; font-size: 0.875rem; color: var(--oq-color-text-muted);">
+            Actieve Pump-ID in RAM: <code style="background: var(--oq-color-bg-muted); padding: 0.2rem 0.4rem; rx: 4px;">${escapeHtml(pumpSecret)}</code>
+          </p>
+        </div>
+
+        <div class="oq-settings-integration-card" style="margin-top: 1rem; display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <h4>Beheer Gekoppelde Apparaten</h4>
+            <p style="margin: 0; font-size: 0.85rem; color: var(--oq-color-text-muted);">Mocht u uw telefoon verliezen, wis dan hier alle actieve ID's uit de ESP32.</p>
+          </div>
+          <button 
+            class="oq-helper-button oq-helper-button--danger" 
+            type="button" 
+            data-oq-action="clear-tunnel-ids"
+            ${state.loadingEntities ? "disabled" : ""}
+          >
+            Gegenereerde ID's wissen
+          </button>
+        </div>
+      </div>
+    `
+  );
+}
