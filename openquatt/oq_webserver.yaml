@@ -1,1 +1,17 @@
-# Weblevel variables mapped to the main firmware build tree
+# ==============================================================================
+# OpenQuatt – Webserver
+# ==============================================================================
+# Goal:
+#   Configure the authenticated OpenQuatt web app. The SPA owns entity layout;
+#   ESPHome sorting metadata is intentionally omitted to protect internal heap.
+# ==============================================================================
+web_server:
+  port: 80
+  version: 3
+  auth:
+    type: digest
+    username: ${web_auth_bootstrap_username}
+    password: ${web_auth_bootstrap_password}
+  css_include: ${oq_webserver_css_include}
+  js_include: ${oq_webserver_js_include}
+  js_url: "${oq_webserver_js_url}"
