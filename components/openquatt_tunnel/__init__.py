@@ -2,7 +2,8 @@ import esphome.codegen as cg
 import esphome.config_validation as cv
 from esphome.const import CONF_ID
 
-AUTO_LOAD = ["network"]
+# Direct aangesloten op de netwerk- en webserver-IDF context van de core om elkaars headers in te zien
+AUTO_LOAD = ["network", "web_server_base"]
 
 openquatt_tunnel_ns = cg.esphome_ns.namespace("openquatt_tunnel")
 OpenQuattTunnel = openquatt_tunnel_ns.class_("OpenQuattTunnel", cg.Component)
@@ -14,10 +15,6 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Required("pump_secret"): cv.string,
     }
 ).extend(cv.COMPONENT_SCHEMA)
-
-def esp32_component_dependencies(config):
-    # Dit dwingt de CMake-generator om het include-pad van de websockets te delen
-    return ["esp_websocket_client", "json"]
 
 async def to_code(config):
     cg.add_global(openquatt_tunnel_ns.using)
