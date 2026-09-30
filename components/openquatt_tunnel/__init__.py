@@ -15,6 +15,10 @@ CONFIG_SCHEMA = cv.Schema(
     }
 ).extend(cv.COMPONENT_SCHEMA)
 
+def esp32_component_dependencies(config):
+    # Dit dwingt de CMake-generator om het include-pad van de websockets te delen
+    return ["esp_websocket_client", "json"]
+
 async def to_code(config):
     cg.add_global(openquatt_tunnel_ns.using)
     var = cg.new_Pvariable(config[CONF_ID])
