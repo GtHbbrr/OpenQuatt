@@ -21,12 +21,9 @@ esphome:
   name: heatpump_controller_q_single
   compile_process_limit: 8
   build_flags:
-    # 1. Herstel het websocket include-pad uit compile_commands.json
-    - "-I/Users/admin/Library/Caches/esphome/idf/frameworks/5.5.5/components/esp_websocket_client/include"
-    # 2. Dwing de preprocessor om de authenticatie-functies in web_server_base.h te activeren
-    - "-DUSE_WEBSERVER_AUTH=1"
+    # 1. Dwing de preprocessor om de authenticatie-functies in web_server_base.h te activeren
+    - -DUSE_WEBSERVER_AUTH=1
 
 packages:
   unified_q_single: !include single.yaml
   oq_tunnel_proxy: !include ../../openquatt/oq_tunnel.yaml
-
