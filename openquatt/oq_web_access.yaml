@@ -1,109 +1,14 @@
-# ==============================================================================
-# OpenQuatt - Web Access Runtime
-# ==============================================================================
-# Runtime auth store and lightweight web-access diagnostics for the full app.
-# Keeps the web_server auth support compiled in while allowing runtime toggling.
-# ==============================================================================
+# OpenQuatt Core Web Access & Proxy Environment Integration
 
 external_components:
   - source:
       type: local
-      path: ${external_components_path}
+      path: "${external_components_path}"
     components: [web_server, web_server_base, openquatt_web_auth, openquatt_recovery, openquatt_trends, openquatt_energy_history, openquatt_log_history, openquatt_debug_recorder, openquatt_entities, openquatt_service_status, openquatt_mqtt_config, openquatt_decision_log, openquatt_incident_manager, openquatt_odu_eeprom_dump, openquatt_odu_runtime_frequency, openquatt_odu_settings, openquatt_tunnel]
 
-openquatt_web_auth:
-  id: oq_web_auth_store
-  bootstrap_username: "${web_auth_bootstrap_username}"
-  bootstrap_password: "${web_auth_bootstrap_password}"
-  default_auth_enabled: ${web_auth_default_enabled}
-
-openquatt_recovery:
-  id: oq_recovery
-  web_auth: oq_web_auth_store
-  button: oq_web_auth_recovery_button
-
-openquatt_log_history:
-  id: oq_log_history
-  clock: oq_time
-
-openquatt_debug_recorder:
-  id: oq_debug_recorder
-  clock: oq_time
-
-openquatt_entities:
-  id: oq_entities
-
-openquatt_decision_log:
-  id: oq_decision_log
-  clock: oq_time
-  flash_switch: oq_decision_log_flash_switch
-  event_capacity: 5120
-  event_fallback_capacity: 128
-  hour_buckets: 168
-  hour_buckets_fallback: 24
-
-openquatt_incident_manager:
-  id: oq_incident_manager
-  minimum_off_time: ${oq_hp_min_off_s}s
-  polling_paused: oq_runtime_polling_paused
-  clock: oq_time
-  control_mode_code: oq_control_mode_code
-  decision_log: oq_decision_log
-  web_auth: oq_web_auth_store
-
-openquatt_service_status:
-  id: oq_service_status_endpoint
-  control_mode_code: oq_control_mode_code
-  commissioning_active: oq_commissioning_active
-  commissioning_task_code: oq_commissioning_task_code
-  commissioning_status: oq_commissioning_status_value
-  boiler_result_w: oq_commissioning_result_w
-  boiler_confidence: oq_commissioning_result_confidence
-  boiler_quality: oq_boiler_power_test_result_quality_value
-  boiler_status: oq_boiler_power_test_status_value
-  flow_autotune_status: oq_flow_autotune_status_value
-  flow_kp_suggested: oq_flow_kp_suggested_value
-  flow_ki_suggested: oq_flow_ki_suggested_value
-  air_purge_active: oq_air_purge_active
-  air_purge_status: oq_air_purge_status_value
-  air_purge_remaining: oq_air_purge_remaining_s
-  air_purge_phase: oq_air_purge_phase
-  air_purge_target_ipwm: oq_air_purge_target_ipwm
-  manual_flow_active: oq_manual_flow_active
-  manual_flow_status: oq_manual_flow_status_value
-  manual_flow_target_ipwm: oq_flow_last_pwm
-  manual_hp_active: oq_manual_hp_active
-  manual_hp_status: oq_manual_hp_status_value
-  manual_hp_guard_status: oq_manual_hp_guard_status_value
-  hp_water_calibration_active: oq_hp_water_calibration_active
-  hp_water_calibration_status: oq_hp_water_calibration_status_value
-  hp_water_calibration_remaining: oq_hp_water_calibration_remaining_s
-  hp_water_calibration_phase: oq_hp_water_calibration_phase
-  hp_water_calibration_spread: oq_hp_water_calibration_spread_c
-  hp_water_calibration_supply_delta: oq_hp_water_calibration_supply_delta_c
-  hp_water_calibration_stable_progress: oq_hp_water_calibration_stable_progress_s
-  hp_water_calibration_stable_required: oq_hp_water_calibration_stable_required_s
-  hp_water_calibration_result_reference: oq_hp_water_calibration_result_reference_c
-  hp_water_calibration_result_spread_before: oq_hp_water_calibration_result_spread_before_c
-  hp_water_calibration_result_expected_spread: oq_hp_water_calibration_result_expected_spread_c
-  hp_water_calibration_result_hp1_in_raw_avg: oq_hp_water_calibration_result_hp1_in_raw_avg_c
-  hp_water_calibration_result_hp1_out_raw_avg: oq_hp_water_calibration_result_hp1_out_raw_avg_c
-  hp_water_calibration_result_hp2_in_raw_avg: oq_hp_water_calibration_result_hp2_in_raw_avg_c
-  hp_water_calibration_result_hp2_out_raw_avg: oq_hp_water_calibration_result_hp2_out_raw_avg_c
-  hp_water_calibration_result_supply_raw_avg: oq_hp_water_calibration_result_supply_raw_avg_c
-  hp_water_calibration_result_supply_offset: oq_hp_water_calibration_result_supply_offset_c
-  hp_water_calibration_result_supply_source: oq_hp_water_calibration_result_supply_source
-
-binary_sensor:
-  - platform: gpio
-    id: oq_web_auth_recovery_button
-    internal: true
-    pin:
-      number: ${web_auth_recovery_pin}
-      mode:
-        input: true
-        pullup: true
-      inverted: true
-      ignore_strapping_warning: true
-    filters:
-      - delayed_on_off: 30ms
+# Dit activeert en linkt de native framework compiler-paden van de websocket client voor de core array
+esp32:
+  framework:
+    advanced:
+      include_builtin_idf_components:
+        - esp_websocket_client
