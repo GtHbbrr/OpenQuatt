@@ -1,7 +1,6 @@
 import esphome.codegen as cg
 import esphome.config_validation as cv
 from esphome.const import CONF_ID
-from esphome.core import CORE
 
 AUTO_LOAD = ["network"]
 
@@ -17,18 +16,6 @@ CONFIG_SCHEMA = cv.Schema(
 ).extend(cv.COMPONENT_SCHEMA)
 
 async def to_code(config):
-    if CORE.is_esp32:
-        # 1. Forceer de compiler-flags en de benodigde macros
-        cg.add_build_flag("-DUSE_ESP_WEBSOCKET_CLIENT")
-        cg.add_build_flag("-D_GLIBCXX_USE_C99")
-        
-        # 2. VOEG DIT CRUCIALE INCLUDE-PAD TOE: dwingt de compiler de headers te vinden
-        cg.add_build_flag("-I$IDF_PATH/components/esp_websocket_client/include")
-        
-        # 3. Activeer de component binnen de IDF build-tree
-        import esphome.components.esp32 as esp32_ext
-        esp32_ext.include_builtin_idf_component("esp_websocket_client")
-
     cg.add_global(openquatt_tunnel_ns.using)
     var = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(var, config)
