@@ -6,6 +6,7 @@ from esphome.const import CONF_ID
 
 AUTO_LOAD = ["network"]
 
+# We zetten de namespace strak conform de ESPHome-mapnaam mapping
 openquatt_tunnel_ns = cg.esphome_ns.namespace("openquatt_tunnel")
 OpenQuattTunnel = openquatt_tunnel_ns.class_("OpenQuattTunnel", cg.Component)
 
@@ -19,14 +20,13 @@ CONFIG_SCHEMA = cv.Schema(
 
 async def to_code(config):
     if CORE.is_esp32:
-        # Dit dwingt de ESP-IDF netwerkstack om de websocket component te compileren
+        # 1. Zorg dat de IDF component gecompileerd wordt
         include_builtin_idf_component("esp_websocket_client")
         include_builtin_idf_component("json")
         
-        # Voeg de core ESP-IDF include paden toe aan deze specifieke component compiler-context
+        # 2. Dwing CMake om het header-pad van de ESP-IDF component vindbaar te maken
+        cg.add_build_flag("-I$IDF_PATH/components/esp_websocket_client/include")
         cg.add_build_flag("-D_GLIBCXX_USE_C99")
-
-    cg.add_global(openquatt_tunnel_ns.using)
 
     var = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(var, config)
