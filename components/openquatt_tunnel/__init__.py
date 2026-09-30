@@ -2,8 +2,8 @@ import esphome.codegen as cg
 import esphome.config_validation as cv
 from esphome.const import CONF_ID
 
-# Direct aangesloten op de netwerk- en webserver-IDF context van de core om elkaars headers in te zien
-AUTO_LOAD = ["network", "web_server_base"]
+# Koppelt de proxy aan de volledige core netwerk- en websocket-context van het framework
+AUTO_LOAD = ["network", "web_server_base", "mdns", "api"]
 
 openquatt_tunnel_ns = cg.esphome_ns.namespace("openquatt_tunnel")
 OpenQuattTunnel = openquatt_tunnel_ns.class_("OpenQuattTunnel", cg.Component)
