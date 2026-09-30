@@ -1,5 +1,21 @@
+# ==============================================================================
 # OpenQuatt - Stateless HTTP Reverse Proxy Tunnel (Cloudflare Tunnel Client)
-# Geïntegreerd in de centrale core-omgeving via oq_web_access.yaml
+# ==============================================================================
+# Universele integratie zonder de core oq_web_access.yaml te wijzigen.
+# ==============================================================================
+
+external_components:
+  - source:
+      type: local
+      path: "${external_components_path}"
+    components: [openquatt_tunnel]
+
+# Dit dwingt de CMake-generator om de websocket-headers overal in te linken
+esp32:
+  framework:
+    advanced:
+      include_builtin_idf_components:
+        - esp_websocket_client
 
 openquatt_tunnel:
   id: openquatt_tunnel_service
