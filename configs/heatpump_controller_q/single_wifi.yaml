@@ -17,13 +17,6 @@ substitutions:
 web_server:
   port: 80
 
-external_components:
-  - source:
-      type: local
-      path: "/Volumes/USB Sonoma/Users/sonoma/Documents/GitHub/OpenQuatt/components"
-    components:
-      - openquatt_tunnel
-
 esphome:
   name: heatpump_controller_q_single
   compile_process_limit: 8
@@ -33,10 +26,7 @@ esphome:
     # 2. Dwing de preprocessor om de authenticatie-functies in web_server_base.h te activeren
     - "-DUSE_WEBSERVER_AUTH=1"
 
-openquatt_tunnel:
-  id: openquatt_tunnel_service
-  relay_host: ${oq_tunnel_relay_host}
-  pump_secret: ${oq_tunnel_pump_secret}
-
 packages:
   unified_q_single: !include single.yaml
+  oq_tunnel_proxy: !include ../../openquatt/oq_tunnel.yaml
+
