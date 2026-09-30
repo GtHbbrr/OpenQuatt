@@ -382,7 +382,7 @@ export function handleTunnelProxyChange(event) {
       // Automatische redirect naar Cloudflare frontend
       window.setTimeout(() => {
         window.location.href = `https://quatt.openheatpumps.nl/pair#${anonymousId}`;
-      }, 800);
+      }, 2500);
     } else {
       void fetch(`/control?id=openquatt_tunnel_service&state=${stateVal}`);
     }
