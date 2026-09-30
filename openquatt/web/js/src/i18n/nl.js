@@ -1597,7 +1597,7 @@ export default {
     apiLabel: "Beveiligde verbinding met Home Assistant",
     sectionGroup: "Toegang",
     sectionTitle: "Toegang & Beveiliging",
-    sectionCopy: "Beheer hier de web-login en bekijk of Home Assistant veilig verbonden is.",
+    sectionCopy: "Beheer hier de web-login (thuis en buitenshuis) en bekijk of Home Assistant veilig verbonden is.",
     statusAction: "Status",
     adjustAction: "Aanpassen",
     tunnelLabel: "Buitenshuis Toegang (Stateless Proxy)",
