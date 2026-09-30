@@ -32,15 +32,15 @@ export function renderSettingsAccessSecuritySection() {
         ${desktopWarning}
         
         ${items.map(([id, label, status, detail, action]) => `
-          <div class="oq-settings-quickstart-status" data-oq-access-security-item="\${id}">
+          <div class="oq-settings-quickstart-status" data-oq-access-security-item="${id}">
             <div class="oq-settings-quickstart-status-row">
               <div>
-                <p class="oq-settings-quickstart-status-label">\${escapeHtml(label)}</p>
-                <strong class="oq-settings-quickstart-status-value">\${escapeHtml(status)}</strong>
-                <p class="oq-settings-quickstart-status-copy">\${escapeHtml(detail)}</p>
+                <p class="oq-settings-quickstart-status-label">${escapeHtml(label)}</p>
+                <strong class="oq-settings-quickstart-status-value">${escapeHtml(status)}</strong>
+                <p class="oq-settings-quickstart-status-copy">${escapeHtml(detail)}</p>
               </div>
-              <button class="oq-helper-button oq-helper-button--ghost" type="button" data-oq-action="\${action}">
-                \${escapeHtml(id === "api" ? t("settingsSecurity.statusAction") : t("settingsSecurity.adjustAction"))}
+              <button class="oq-helper-button oq-helper-button--ghost" type="button" data-oq-action="${action}">
+                ${escapeHtml(id === "api" ? t("settingsSecurity.statusAction") : t("settingsSecurity.adjustAction"))}
               </button>
             </div>
           </div>
