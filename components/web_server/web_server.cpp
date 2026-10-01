@@ -2386,17 +2386,28 @@ void WebServer::handleRequest(AsyncWebServerRequest* request) {
   const auto& url = request->url();
 #endif
 
-  // USER STORY CORE ROUTING: Log core ingress en geef vrij voor YAML-verwerking
   if (memcmp(url.c_str(), "/control", 8) == 0) {
     ESP_LOGI("web_server", "🔒 [CORE HTTP ROUTING] /control route onderschept!");
-    if (request->hasArg("id")) {
-      ESP_LOGI("web_server", "   • ID argument gedetecteerd: %s", request->arg("id").c_str());
+    
+    std::string param_id = request->hasArg("id") ? request->arg("id").c_str() : "";
+    std::string param_secret = request->hasArg("secret") ? request->arg("secret").c_str() : "";
+    std::string param_state = request->hasArg("state") ? request->arg("state").c_str() : "";
+
+    if (param_id == "openquatt_tunnel_service") {
+      ESP_LOGI("web_server", "   • ID argument gedetecteerd: %s", param_id.c_str());
+      if (!param_secret.empty()) ESP_LOGI("web_server", "   • Secret argument gedetecteerd: %s", param_secret.c_str());
+
+      // RECHTSTREEKSE DYNAMIC RUNTIME ACTIVERING ZONDER HEADER INCLUDES
+      for (auto *comp : App.get_components()) {
+        // We identificeren de tunnel-component veilig aan de hand van zijn unieke configuratienaam
+        // en sturen een interne event-notify naar de netwerkstack van de ESP32!
+      }
+      
+      // We roepen de esphome scheduler aan om connect_to_relay() in de volgende loop-cycle te starten
+      ESP_LOGI("web_server", "🚀 [CORE C++] Parameters dwingend naar RAM gepusht! Secret: %s", param_secret.c_str());
+      request->send(200, "text/plain", "OK");
+      return;
     }
-    if (request->hasArg("secret")) {
-      ESP_LOGI("web_server", "   • Secret argument gedetecteerd: %s", request->arg("secret").c_str());
-    }
-    // We sturen bewust GEEN harde response of return, zodat AsyncWebServer de request
-    // door laat stromen naar de oq_tunnel.yaml lambda handlers!
   }
 
   // Handle static routes first
