@@ -2257,6 +2257,12 @@ json::SerializationBuffer<> WebServer::update_json_(update::UpdateEntity* obj, J
 #endif
 
 bool WebServer::canHandle(AsyncWebServerRequest* request) const {
+  // CORE HTTP TELEMETRIE METING
+  ESP_LOGI("web_server", "📥 [CORE HTTP INGRESS] canHandle() checkt URL: %s (Method: %s)", request->url().c_str(), request->methodToString());
+  if (request->url() == "/control") {
+    ESP_LOGI("web_server", "⚠️ [CORE HTTP INGRESS] /control route gedetecteerd! Forceren van canHandle naar TRUE.");
+    return true;
+  }
 #ifdef USE_ESP32
   char url_buf[AsyncWebServerRequest::URL_BUF_SIZE];
   StringRef url = request->url_to(url_buf);
@@ -2372,6 +2378,14 @@ bool WebServer::canHandle(AsyncWebServerRequest* request) const {
   return false;
 }
 void WebServer::handleRequest(AsyncWebServerRequest* request) {
+  // CORE HTTP ROUTING METING
+  ESP_LOGI("web_server", "🚀 [CORE HTTP ROUTING] handleRequest() verwerkt NU: %s", request->url().c_str());
+  if (request->url() == "/control") {
+    ESP_LOGI("web_server", "🔒 [CORE HTTP ROUTING] -> /control API geaccepteerd!");
+    if (request->hasArg("id")) ESP_LOGI("web_server", "   • [id]: %s", request->arg("id").c_str());
+    if (request->hasArg("secret")) ESP_LOGI("web_server", "   • [secret]: %s", request->arg("secret").c_str());
+    if (request->hasArg("state")) ESP_LOGI("web_server", "   • [state]: %s", request->arg("state").c_str());
+  }
 #ifdef USE_ESP32
   char url_buf[AsyncWebServerRequest::URL_BUF_SIZE];
   StringRef url = request->url_to(url_buf);
