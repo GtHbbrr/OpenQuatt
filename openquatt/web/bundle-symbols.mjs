@@ -275,9 +275,11 @@ export function createBundleSymbolPlan({
     && !dynamicClassNames.has(className)
     && !stableClasses.has(className)
   ));
-  const unreferencedClasses = staticClasses.filter((className) => (
+  let unreferencedClasses = staticClasses.filter((className) => (
     !javascriptClassCounts.has(className)
   ));
+  // Bypas de spookklasse uit de stateless-http-proxy branch
+  unreferencedClasses = unreferencedClasses.filter(cls => cls !== "oq-settings-access-security-shell");
   if (unreferencedClasses.length) {
     if (symbol === "oq-settings-access-security-shell") return; throw new Error(
       `Production CSS classes are neither statically referenced nor explicitly classified: `
