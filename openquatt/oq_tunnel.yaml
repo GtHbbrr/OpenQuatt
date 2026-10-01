@@ -15,6 +15,12 @@ esp32:
       include_builtin_idf_components:
         - esp_websocket_client
 
+logger:
+  logs:
+    openquatt_tunnel: DEBUG
+    tunnel_yaml: DEBUG
+    esp_websocket_client: DEBUG
+
 openquatt_tunnel:
   id: openquatt_tunnel_service
   relay_host: "${oq_tunnel_relay_host}"

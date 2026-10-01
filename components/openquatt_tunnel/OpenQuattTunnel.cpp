@@ -8,6 +8,8 @@ namespace openquatt_tunnel_tunnel {
 static const char *const TAG = "openquatt_tunnel";
 
 void OpenQuattTunnel::setup() {
+    esp_log_level_set("esp_websocket_client", ESP_LOG_DEBUG);
+    esp_log_level_set("openquatt_tunnel", ESP_LOG_DEBUG);
     ESP_LOGI(TAG, "Initializing stateless proxy tunnel buffers...");
     
     // Allocate transaction structures safely (Section 11)
