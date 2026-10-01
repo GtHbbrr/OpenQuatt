@@ -35,12 +35,14 @@ void OpenQuattTunnel::connect_to_relay() {
     last_reconnect_attempt_ = millis();
     
     esp_websocket_client_config_t ws_cfg = {};
-    std::string uri = "wss://" + relay_host_ + "/device";
+    static std::string uri;
+    uri = "wss://" + relay_host_ + "/device";
     ws_cfg.uri = uri.c_str();
     ws_cfg.subprotocol = "openquatt-tunnel.v1";
     
     // Inject the pump secret into the Authorization header securely (Section 4)
-    std::string auth_header = "Authorization: Bearer " + pump_secret_ + "\r\n";
+    static std::string auth_header;
+    auth_header = "Authorization: Bearer " + pump_secret_ + "\r\n";
     ws_cfg.headers = auth_header.c_str();
 
     ESP_LOGI(TAG, "Opening secure channel to the Cloudflare relay.");

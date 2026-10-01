@@ -4,7 +4,7 @@ from esphome.const import CONF_ID
 
 AUTO_LOAD = ["network"]
 
-openquatt_tunnel_ns = cg.esphome_ns.namespace("openquatt_tunnel")
+openquatt_tunnel_ns = cg.esphome_ns.namespace("openquatt_tunnel_tunnel")
 OpenQuattTunnel = openquatt_tunnel_ns.class_("OpenQuattTunnel", cg.Component)
 
 CONFIG_SCHEMA = cv.Schema(

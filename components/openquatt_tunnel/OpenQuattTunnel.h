@@ -5,7 +5,7 @@
 #include <string>
 
 namespace esphome {
-namespace openquatt_tunnel {
+namespace openquatt_tunnel_tunnel {
 
 // Maximale frame grootte voor de stateless proxy
 static constexpr size_t MAX_FRAME_SIZE = 4096;
@@ -31,7 +31,7 @@ class OpenQuattTunnel : public Component {
     unsigned long last_reconnect_attempt_{0};
     uint8_t *tx_frame_buffer_{nullptr};
 
-    void connect_to_relay();
+
 
  public:
     void setup() override;
@@ -40,9 +40,10 @@ class OpenQuattTunnel : public Component {
     
     void set_relay_host(const std::string &relay_host) { this->relay_host_ = relay_host; }
     void set_pump_secret(const std::string &pump_secret) { this->pump_secret_ = pump_secret; }
+
     
     void send_frame(FrameType type, uint32_t stream_id, const uint8_t *payload, size_t payload_len);
 };
 
-}  // namespace openquatt_tunnel
+}  // namespace openquatt_tunnel_tunnel
 }  // namespace esphome

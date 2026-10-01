@@ -19,3 +19,23 @@ openquatt_tunnel:
   id: openquatt_tunnel_service
   relay_host: "${oq_tunnel_relay_host}"
   pump_secret: "${oq_tunnel_pump_secret}"
+
+web_server:
+  - id: openquatt_web_server
+    on_request:
+      - method: GET
+        path: /control
+        then:
+          - lambda: |-
+              if (request.has_param("id") && request.get_param("id") == "openquatt_tunnel_service") {
+                if (request.has_param("secret")) {
+                  std::string dynamic_secret = request.get_param("secret");
+                  id(openquatt_tunnel_service).set_pump_secret(dynamic_secret);
+                  ESP_LOGI("tunnel_yaml", "Nieuw anoniem geheim succesvol in RAM geladen.");
+                }
+                if (request.has_param("state")) {
+                  if (request.get_param("state") == "1") {
+                    id(openquatt_tunnel_service).connect_to_relay();
+                  }
+                }
+              }
