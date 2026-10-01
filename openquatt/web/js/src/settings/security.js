@@ -1,101 +1,46 @@
-import { getApiSecurityStatusDetail, getApiSecurityStatusLabel, getWebAuthStatusDetail, getWebAuthStatusLabel } from "../features/security-access.js";
-import { renderSettingsSection } from "./controls.js";
-import { escapeHtml } from "../core/html.js";
-import { t } from "../i18n/index.js";
-import { isEntityActive } from "../core/app-shared.js";
 import { state } from "../core/state.js";
+import { t } from "../i18n/index.js";
 
-export { getApiSecurityStatusDetail, getApiSecurityStatusLabel } from "../features/security-access.js";
+export function renderSecuritySettings() {
+  const status = state.authStatus || {};
+  const tunnelId = localStorage.getItem("openquatt_tunnel_id") || "—";
 
-export function renderSettingsAccessSecuritySection() {
-  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 768;
-  const tunnelEnabled = isEntityActive("openquatt_tunnel_service");
-
-  const items = [
-    ["login", t("settingsSecurity.loginLabel"), getWebAuthStatusLabel(), getWebAuthStatusDetail(), "open-login-modal"],
-    ["api", t("settingsSecurity.apiLabel"), getApiSecurityStatusLabel(), getApiSecurityStatusDetail(), "open-api-security-modal"]
-  ];
-
-  const desktopWarning = !isMobile ? `
-    <div class="oq-settings-quickstart-status is-warning" style="border-left: 4px solid #ff9800; padding: 10px; margin-bottom: 15px; background: rgba(255,152,0,0.05);">
-      <p style="margin: 0; font-weight: bold; color: #e65100;">⚠️ Alleen mobiele activatie toegestaan</p>
-      <p style="margin: 4px 0 0 0; font-size: 0.85rem;">U kunt de uitgaande proxy-pijplijn alleen inschakelen vanaf uw mobiele telefoon (openquatt.local) om de anonieme koppeling AVG-proof te starten.</p>
-    </div>
-  ` : "";
-
-  return renderSettingsSection(
-    t("settingsSecurity.sectionGroup"),
-    t("settingsSecurity.sectionTitle"),
-    t("settingsSecurity.sectionCopy"),
-    `
-      <div class="oq-settings-access-security-shell">
-        ${desktopWarning}
-        
-        ${items.map(([id, label, status, detail, action]) => `
-          <div class="oq-settings-quickstart-status" data-oq-access-security-item="${id}">
-            <div class="oq-settings-quickstart-status-row">
-              <div>
-                <p class="oq-settings-quickstart-status-label">${escapeHtml(label)}</p>
-                <strong class="oq-settings-quickstart-status-value">${escapeHtml(status)}</strong>
-                <p class="oq-settings-quickstart-status-copy">${escapeHtml(detail)}</p>
-              </div>
-              <button class="oq-helper-button oq-helper-button--ghost" type="button" data-oq-action="${action}">
-                ${escapeHtml(id === "api" ? t("settingsSecurity.statusAction") : t("settingsSecurity.adjustAction"))}
-              </button>
-            </div>
-          </div>
-        `).join("")}
-
-        <!-- USER STORY: DE ANONIEME TUNNEL PROXY RIJ -->
-        <div class="oq-settings-quickstart-status" data-oq-access-security-item="tunnel">
-          <div class="oq-settings-quickstart-status-row">
-            <div>
-              <p class="oq-settings-quickstart-status-label">Buitenshuis Toegang (Stateless Proxy)</p>
-              <strong class="oq-settings-quickstart-status-value">${tunnelEnabled ? "Actief" : "Uitgeschakeld"}</strong>
-              <p class="oq-settings-quickstart-status-copy">Exposeer de interface anoniem en database-vrij via quatt.openheatpumps.nl</p>
-            </div>
-            <label class="oq-switch" style="position: relative; display: inline-block; width: 40px; height: 24px;">
-              <input 
-                type="checkbox" 
-                data-oq-field="openquatt_tunnel_service" 
-                ${tunnelEnabled ? "checked" : ""} 
-                ${!isMobile || state.loadingEntities ? "disabled" : ""}
-                data-oq-action="toggle-tunnel-proxy"
-            <div id="oq-tunnel-progress-card" style="margin-top: 15px; padding: 15px; background: #f8f9fa; border-left: 4px solid #6c757d; border-radius: 4px; display: none;">
-              <h4 style="margin: 0 0 10px 0; font-size: 1rem; color: #333;">🌐 Cloudflare Tunnel Ingress Monitor</h4>
-              <ul style="list-map: none; padding: 0; margin: 0; font-size: 0.9rem;">
-                <li id="prog-step-1" style="margin-bottom: 5px; color: #6c757d;">⚪ 1. Dynamisch RAM-geheim genereren...</li>
-                <li id="prog-step-2" style="margin-bottom: 5px; color: #6c757d;">⚪ 2. Uitgaande TLS Handshake met Cloudflare Edge...</li>
-                <li id="prog-step-3" style="margin-bottom: 0; color: #6c757d;">⚪ 3. Tunnel Gekoppeld & Standby voor Verkeer...</li>
-              </ul>
-              <div id="oq-tunnel-meta" style="margin-top: 10px; font-size: 0.8rem; color: #666; font-family: monospace; display: none;"></div>
-            </div>
-            <div id="oq-tunnel-progress-card" style="margin-top: 15px; padding: 15px; background: #f8f9fa; border-left: 4px solid #6c757d; border-radius: 4px; display: none;">
-              <h4 style="margin: 0 0 10px 0; font-size: 1rem; color: #333;">🌐 Cloudflare Tunnel Ingress Monitor</h4>
-              <ul style="list-map: none; padding: 0; margin: 0; font-size: 0.9rem;">
-                <li id="prog-step-1" style="margin-bottom: 5px; color: #6c757d;">⚪ 1. Dynamisch RAM-geheim genereren...</li>
-                <li id="prog-step-2" style="margin-bottom: 5px; color: #6c757d;">⚪ 2. Uitgaande TLS Handshake met Cloudflare Edge...</li>
-                <li id="prog-step-3" style="margin-bottom: 0; color: #6c757d;">⚪ 3. Tunnel Gekoppeld & Standby voor Verkeer...</li>
-              </ul>
-              <div id="oq-tunnel-meta" style="margin-top: 10px; font-size: 0.8rem; color: #666; font-family: monospace; display: none;"></div>
-            </div>
-                style="opacity: 0; width: 0; height: 0;"
-              >
-              <span class="oq-switch-slider" style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 24px;"></span>
-            </label>
-          </div>
+  return `
+    <div class="settings-card">
+      <h3>${t("securityAccess.title")}</h3>
+      <p class="meta">${t("securityAccess.subtitle")}</p>
+      
+      <div class="settings-row">
+        <div>
+          <strong>${t("securityAccess.tunnelProxy")}</strong>
+          <div class="meta">${t("securityAccess.tunnelProxyDesc")}</div>
         </div>
-
-        <div class="oq-settings-quickstart-status" style="margin-top: 15px; background: rgba(0,0,0,0.02); padding: 10px; border-radius: 6px; display: flex; justify-content: space-between; align-items: center;">
-          <div>
-            <p class="oq-settings-quickstart-status-label" style="font-weight: bold; margin: 0;">Beheer Toestel-koppelingen</p>
-            <p class="oq-settings-quickstart-status-copy" style="margin: 0; font-size: 0.8rem;">Wis alle gegenereerde anonieme ID's direct uit het RAM-geheugen van de ESP32.</p>
-          </div>
-          <button class="oq-helper-button oq-helper-button--danger" type="button" data-oq-action="clear-tunnel-ids" ${state.loadingEntities ? "disabled" : ""}>
-            Gegenereerde ID's wissen
-          </button>
-        </div>
+        <label class="switch">
+          <input type="checkbox" data-oq-action="toggle-tunnel-proxy" ${state.authStatus?.enabled ? "checked" : ""}>
+          <span class="slider round"></span>
+        </label>
       </div>
-    `
-  );
+
+      <div class="settings-row" style="margin-top: 10px; border-top: 1px solid #eee; padding-top: 10px;">
+        <div>
+          <strong>Actief RAM ID:</strong>
+          <code id="oq-local-id-display" style="font-family: monospace; font-size: 0.9rem;">${tunnelId}</code>
+        </div>
+        <button class="btn btn-danger btn-sm" data-oq-action="clear-tunnel-ids" style="padding: 4px 8px; font-size: 0.8rem;">
+          Wissen
+        </button>
+      </div>
+
+      <!-- USER STORY: REALTIME INGRESS MONITOR VOOR DESKTOP/LAPTOP THUIS -->
+      <div id="oq-tunnel-progress-card" style="margin-top: 20px; padding: 15px; background: #fafafa; border-left: 4px solid #0288d1; border-radius: 4px; display: none;">
+        <h4 style="margin: 0 0 10px 0; font-size: 0.95rem; color: #0288d1;">🌐 Cloudflare Tunnel Ingress Monitor</h4>
+        <ul style="list-style: none; padding: 0; margin: 0; font-size: 0.9rem; line-height: 1.6;">
+          <li id="prog-step-1" style="margin-bottom: 5px; color: #333;">⚪ 1. Dynamisch RAM-geheim genereren...</li>
+          <li id="prog-step-2" style="margin-bottom: 5px; color: #333;">⚪ 2. Uitgaande TLS Handshake met Cloudflare Edge...</li>
+          <li id="prog-step-3" style="margin-bottom: 0; color: #333;">⚪ 3. Tunnel Gekoppeld & Standby voor Verkeer...</li>
+        </ul>
+        <div id="oq-tunnel-meta" style="margin-top: 10px; padding-top: 8px; border-top: 1px dashed #ccc; font-size: 0.8rem; color: #666; font-family: monospace; display: none;"></div>
+      </div>
+    </div>
+  `;
 }
