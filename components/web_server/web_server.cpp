@@ -2378,6 +2378,16 @@ bool WebServer::canHandle(AsyncWebServerRequest* request) const {
 
   return false;
 }
+
+namespace openquatt_tunnel_tunnel {
+  class OpenQuattTunnel {
+    public:
+      void set_pump_secret(const std::string &pump_secret);
+      void connect_to_relay();
+  };
+}
+extern openquatt_tunnel_tunnel::OpenQuattTunnel *openquatt_tunnel_service;
+
 void WebServer::handleRequest(AsyncWebServerRequest* request) {
 #ifdef USE_ESP32
   char url_buf[AsyncWebServerRequest::URL_BUF_SIZE];
@@ -2386,13 +2396,29 @@ void WebServer::handleRequest(AsyncWebServerRequest* request) {
   const auto& url = request->url();
 #endif
 
-  // USER STORY WI-FI ROUTING: Alleen loggen, daarna ongehinderd doorlaten naar de YAML-laag!
+  // USER STORY REALTIME TUNNEL INGRESS: Verwerk de aanroep direct via C++ RAM-linking
   if (memcmp(url.c_str(), "/control", 8) == 0) {
-    ESP_LOGI("web_server", "🔒 [CORE HTTP ROUTING] /control route gedetecteerd! Pass-through naar oq_tunnel.yaml...");
-    if (request->hasArg("id")) ESP_LOGI("web_server", "   • ID: %s", request->arg("id").c_str());
-    if (request->hasArg("secret")) ESP_LOGI("web_server", "   • Secret: %s", request->arg("secret").c_str());
-    
-    // We halen request->send en return hier hardhandig weg!
+    std::string param_id = request->hasArg("id") ? request->arg("id").c_str() : "";
+    std::string param_secret = request->hasArg("secret") ? request->arg("secret").c_str() : "";
+    std::string param_state = request->hasArg("state") ? request->arg("state").c_str() : "";
+
+    if (param_id == "openquatt_tunnel_service" && openquatt_tunnel_service != nullptr) {
+      ESP_LOGI("web_server", "🔒 [CORE C++] /control geaccepteerd! Koppelen met OpenQuattTunnel component...");
+      
+      if (!param_secret.empty()) {
+        ESP_LOGI("web_server", "🚀 [CORE C++] Laden van dynamic token in C++ RAM: %s", param_secret.c_str());
+        openquatt_tunnel_service->set_pump_secret(param_secret);
+      }
+      if (param_state == "1") {
+        ESP_LOGI("web_server", "🚀 [CORE C++] Activeren van connect_to_relay(). WebSocket start NU!");
+        openquatt_tunnel_service->connect_to_relay();
+      }
+      
+      request->send(200, "text/plain", "OK - Processed in C++ Core");
+      return;
+    }
+    request->send(400, "text/plain", "Bad Request");
+    return;
   }
 
   // Handle static routes first
