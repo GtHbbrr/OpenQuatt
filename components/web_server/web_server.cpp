@@ -2385,10 +2385,40 @@ void WebServer::handleRequest(AsyncWebServerRequest* request) {
   const auto& url = request->url();
 #endif
 
-  // CORE HTTP ROUTING TRACE
+  // USER STORY CORE IMPLEMENTATIE: Activeer de tunnel direct vanaf de C++ voordeur
   if (memcmp(url.c_str(), "/control", 8) == 0) {
-    ESP_LOGI("web_server", "🔒 [CORE HTTP ROUTING] /control route succesvol opgevangen! Doorruteren naar oq_tunnel.yaml...");
-    // We halen de harde "return;" hier weg, zodat de AsyncWebServer de request doorgeeft aan de YAML lambda handlers!
+    ESP_LOGI("web_server", "🔒 [CORE HTTP ROUTING] /control route onderschept! Starten van parameter-extractie...");
+    
+    // Lees de parameters direct uit de AsyncWebServerRequest url-arguments
+    std::string param_id = request->hasArg("id") ? request->arg("id").c_str() : "";
+    std::string param_state = request->hasArg("state") ? request->arg("state").c_str() : "";
+    std::string param_secret = request->hasArg("secret") ? request->arg("secret").c_str() : "";
+    
+    ESP_LOGI("web_server", "   • Ontvangen [id]: %s", param_id.c_str());
+    ESP_LOGI("web_server", "   • Ontvangen [state]: %s", param_state.c_str());
+    ESP_LOGI("web_server", "   • Ontvangen [secret]: %s", param_secret.c_str());
+
+    if (param_id == "openquatt_tunnel_service") {
+      // Zoek jouw component op in de esphome global application registry met de juiste namespace
+      auto *tunnel = (esphome::openquatt_tunnel_tunnel::OpenQuattTunnel*) App.get_component_by_id("openquatt_tunnel_service");
+      
+      if (tunnel != nullptr) {
+        if (!param_secret.empty()) {
+          ESP_LOGI("web_server", "🚀 [CORE C++] Laden van token in C++ RAM...");
+          tunnel->set_pump_secret(param_secret);
+        }
+        if (param_state == "1") {
+          ESP_LOGI("web_server", "🚀 [CORE C++] Triggeren van connect_to_relay()...");
+          tunnel->connect_to_relay();
+        }
+        request->send(200, "text/plain", "OK - Tunnel Request Processed in C++ Core");
+        return;
+      } else {
+        ESP_LOGE("web_server", "🚨 [CORE C++ ERROR] openquatt_tunnel_service component pointer is NULL!");
+      }
+    }
+    request->send(400, "text/plain", "Bad Request - Invalid Component ID");
+    return;
   }
 
   // Handle static routes first
