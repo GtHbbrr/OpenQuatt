@@ -44,7 +44,7 @@ void OpenQuattTunnel::connect_to_relay() {
     
     // Inject the pump secret into the Authorization header securely (Section 4)
     static std::string auth_header;
-    auth_header = "Authorization: Bearer " + pump_secret_ + "\r\n";
+    auth_header = "Authorization: Bearer " + pump_secret_;
     ws_cfg.headers = auth_header.c_str();
 
     ESP_LOGI(TAG, "Opening secure channel to the Cloudflare relay.");
