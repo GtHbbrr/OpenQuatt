@@ -2257,12 +2257,14 @@ json::SerializationBuffer<> WebServer::update_json_(update::UpdateEntity* obj, J
 #endif
 
 bool WebServer::canHandle(AsyncWebServerRequest* request) const {
-  // CORE HTTP TELEMETRIE METING
-  ESP_LOGI("web_server", "📥 [CORE HTTP INGRESS] canHandle() checkt URL: %s (Method: %s)", request->url().c_str(), request->methodToString());
-  if (request->url() == "/control") {
-    ESP_LOGI("web_server", "⚠️ [CORE HTTP INGRESS] /control route gedetecteerd! Forceren van canHandle naar TRUE.");
+#ifdef USE_ESP32
+  char url_buf[AsyncWebServerRequest::URL_BUF_SIZE];
+  StringRef url_check = request->url_to(url_buf);
+  if (memcmp(url_check.c_str(), "/control", 8) == 0) {
+    ESP_LOGI("web_server", "⚠️ [CORE HTTP INGRESS] /control route gedetecteerd! canHandle gedwongen op TRUE.");
     return true;
   }
+#endif
 #ifdef USE_ESP32
   char url_buf[AsyncWebServerRequest::URL_BUF_SIZE];
   StringRef url = request->url_to(url_buf);
@@ -2378,13 +2380,21 @@ bool WebServer::canHandle(AsyncWebServerRequest* request) const {
   return false;
 }
 void WebServer::handleRequest(AsyncWebServerRequest* request) {
-  // CORE HTTP ROUTING METING
-  ESP_LOGI("web_server", "🚀 [CORE HTTP ROUTING] handleRequest() verwerkt NU: %s", request->url().c_str());
-  if (request->url() == "/control") {
-    ESP_LOGI("web_server", "🔒 [CORE HTTP ROUTING] -> /control API geaccepteerd!");
-    if (request->hasArg("id")) ESP_LOGI("web_server", "   • [id]: %s", request->arg("id").c_str());
-    if (request->hasArg("secret")) ESP_LOGI("web_server", "   • [secret]: %s", request->arg("secret").c_str());
-    if (request->hasArg("state")) ESP_LOGI("web_server", "   • [state]: %s", request->arg("state").c_str());
+#ifdef USE_ESP32
+  char url_buf[AsyncWebServerRequest::URL_BUF_SIZE];
+  StringRef url = request->url_to(url_buf);
+#else
+  const auto& url = request->url();
+#endif
+
+  if (memcmp(url.c_str(), "/control", 8) == 0) {
+    ESP_LOGI("web_server", "🔒 [CORE HTTP ROUTING] Inkomende /control aanroep succesvol opgevangen op ESP-IDF laag!");
+    optional<std::string> id_param = request->get_header("id");
+    optional<std::string> secret_param = request->get_header("secret");
+    
+    // Log de rauwe data direct naar de terminal via C++ string pointers
+    ESP_LOGI("web_server", "   • HTTP Method: %d (GET=1, POST=2)", request->method());
+    return;
   }
 #ifdef USE_ESP32
   char url_buf[AsyncWebServerRequest::URL_BUF_SIZE];
