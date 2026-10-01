@@ -34,14 +34,15 @@ web_server:
         then:
           - lambda: |-
               if (request.has_param("id") && request.get_param("id") == "openquatt_tunnel_service") {
+                auto *tunnel = (openquatt_tunnel_tunnel::OpenQuattTunnel*) id(openquatt_tunnel_service);
                 if (request.has_param("secret")) {
                   std::string dynamic_secret = request.get_param("secret");
-                  id(openquatt_tunnel_service).set_pump_secret(dynamic_secret);
+                  tunnel->set_pump_secret(dynamic_secret);
                   ESP_LOGI("tunnel_yaml", "Nieuw anoniem geheim succesvol in RAM geladen.");
                 }
                 if (request.has_param("state")) {
                   if (request.get_param("state") == "1") {
-                    id(openquatt_tunnel_service).connect_to_relay();
+                    tunnel->connect_to_relay();
                   }
                 }
               }
