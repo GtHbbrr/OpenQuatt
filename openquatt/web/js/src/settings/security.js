@@ -95,3 +95,9 @@ export function renderCredentialsRecoverySettings() {
     </div>
   `;
 }
+
+
+// FRAMEWORK ALIAS LINK: Zorgt dat core.js de sectie foutloos kan inladen zonder import crashes
+export function renderSettingsAccessSecuritySection() {
+  return renderSecuritySettings();
+}
