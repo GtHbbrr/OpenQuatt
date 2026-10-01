@@ -2386,15 +2386,13 @@ void WebServer::handleRequest(AsyncWebServerRequest* request) {
   const auto& url = request->url();
 #endif
 
-  // USER STORY WI-FI ROUTING: Onderschep /control, log parameters en deblokkeer de YAML-laag
+  // USER STORY WI-FI ROUTING: Alleen loggen, daarna ongehinderd doorlaten naar de YAML-laag!
   if (memcmp(url.c_str(), "/control", 8) == 0) {
-    ESP_LOGI("web_server", "🔒 [CORE HTTP ROUTING] /control route succesvol opgevangen!");
+    ESP_LOGI("web_server", "🔒 [CORE HTTP ROUTING] /control route gedetecteerd! Pass-through naar oq_tunnel.yaml...");
     if (request->hasArg("id")) ESP_LOGI("web_server", "   • ID: %s", request->arg("id").c_str());
     if (request->hasArg("secret")) ESP_LOGI("web_server", "   • Secret: %s", request->arg("secret").c_str());
     
-    // Antwoord direct om de mobiele browser te bevrijden van time-outs
-    request->send(200, "text/plain", "OK");
-    return;
+    // We halen request->send en return hier hardhandig weg!
   }
 
   // Handle static routes first
