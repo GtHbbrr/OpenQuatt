@@ -2310,6 +2310,9 @@ bool WebServer::canHandle(AsyncWebServerRequest* request) const {
   // CORE PASS-THROUGH BYPASS
   if (memcmp(url.c_str(), "/control", 8) == 0) return true;
 
+  // CORE PASS-THROUGH BYPASS
+  if (memcmp(url.c_str(), "/control", 8) == 0) return true;
+
   // Parse URL for component checks
   UrlMatch match = match_url(url.c_str(), url.length(), true);
   if (!match.valid) return false;
@@ -2440,6 +2443,12 @@ void WebServer::handleRequest(AsyncWebServerRequest* request) {
   if (memcmp(url.c_str(), "/control", 8) == 0) {
     ESP_LOGI("web_server", "🔒 [CORE HTTP] /control gedetecteerd! Vrijgeven voor oq_tunnel.yaml lambda...");
     return; // We stoppen de C++ server HIER zonder te antwoorden, zodat de YAML lambda het overneemt!
+  }
+
+  // CORE PASS-THROUGH BYPASS
+  if (memcmp(url.c_str(), "/control", 8) == 0) {
+    ESP_LOGI("web_server", "🔒 [CORE HTTP] /control gedetecteerd! Vrijgeven voor oq_tunnel.yaml...");
+    return;
   }
 
   // CORE PASS-THROUGH BYPASS
