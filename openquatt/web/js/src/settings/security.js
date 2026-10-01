@@ -61,6 +61,24 @@ export function renderSettingsAccessSecuritySection() {
                 ${tunnelEnabled ? "checked" : ""} 
                 ${!isMobile || state.loadingEntities ? "disabled" : ""}
                 data-oq-action="toggle-tunnel-proxy"
+            <div id="oq-tunnel-progress-card" style="margin-top: 15px; padding: 15px; background: #f8f9fa; border-left: 4px solid #6c757d; border-radius: 4px; display: none;">
+              <h4 style="margin: 0 0 10px 0; font-size: 1rem; color: #333;">🌐 Cloudflare Tunnel Ingress Monitor</h4>
+              <ul style="list-map: none; padding: 0; margin: 0; font-size: 0.9rem;">
+                <li id="prog-step-1" style="margin-bottom: 5px; color: #6c757d;">⚪ 1. Dynamisch RAM-geheim genereren...</li>
+                <li id="prog-step-2" style="margin-bottom: 5px; color: #6c757d;">⚪ 2. Uitgaande TLS Handshake met Cloudflare Edge...</li>
+                <li id="prog-step-3" style="margin-bottom: 0; color: #6c757d;">⚪ 3. Tunnel Gekoppeld & Standby voor Verkeer...</li>
+              </ul>
+              <div id="oq-tunnel-meta" style="margin-top: 10px; font-size: 0.8rem; color: #666; font-family: monospace; display: none;"></div>
+            </div>
+            <div id="oq-tunnel-progress-card" style="margin-top: 15px; padding: 15px; background: #f8f9fa; border-left: 4px solid #6c757d; border-radius: 4px; display: none;">
+              <h4 style="margin: 0 0 10px 0; font-size: 1rem; color: #333;">🌐 Cloudflare Tunnel Ingress Monitor</h4>
+              <ul style="list-map: none; padding: 0; margin: 0; font-size: 0.9rem;">
+                <li id="prog-step-1" style="margin-bottom: 5px; color: #6c757d;">⚪ 1. Dynamisch RAM-geheim genereren...</li>
+                <li id="prog-step-2" style="margin-bottom: 5px; color: #6c757d;">⚪ 2. Uitgaande TLS Handshake met Cloudflare Edge...</li>
+                <li id="prog-step-3" style="margin-bottom: 0; color: #6c757d;">⚪ 3. Tunnel Gekoppeld & Standby voor Verkeer...</li>
+              </ul>
+              <div id="oq-tunnel-meta" style="margin-top: 10px; font-size: 0.8rem; color: #666; font-family: monospace; display: none;"></div>
+            </div>
                 style="opacity: 0; width: 0; height: 0;"
               >
               <span class="oq-switch-slider" style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 24px;"></span>
