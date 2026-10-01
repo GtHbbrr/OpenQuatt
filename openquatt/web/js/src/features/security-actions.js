@@ -375,15 +375,14 @@ export function handleTunnelProxyChange(event) {
       // Genereer een anonieme ID en sla deze direct op in de localStorage van de mobiel
       const anonymousId = "oq-" + Math.random().toString(36).substring(2, 15);
       
-      // Activeer en update de realtime monitor op de laptop/desktop thuis
       const card = document.getElementById("oq-tunnel-progress-card");
       if (card) {
         card.style.display = "block";
         document.getElementById("prog-step-1").innerHTML = "🟢 <b>1. Dynamisch RAM-geheim gegenereerd:</b> <code>" + anonymousId + "</code>";
-        document.getElementById("prog-step-2").innerHTML = "🔵 <b>2. Uitgaande TLS Handshake...</b> ESP32 start breedbandtunnel naar wss://quatt.openheatpumps.nl/device";
+        document.getElementById("prog-step-2").innerHTML = "🔵 <b>2. Uitgaande TLS Handshake...</b> ESP32 start tunnel naar Cloudflare Edge...";
         const meta = document.getElementById("oq-tunnel-meta");
         meta.style.display = "block";
-        meta.innerText = "Target Host: quatt.openheatpumps.nl\nProtocol: esp-websocket-client (WSS)\nTimeout buffer: 5000ms";
+        meta.innerText = "Target Host: quatt.openheatpumps.nl\nProtocol: esp-websocket-client (WSS)";
       }
       localStorage.setItem("openquatt_tunnel_id", anonymousId);
       
