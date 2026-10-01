@@ -2259,13 +2259,17 @@ json::SerializationBuffer<> WebServer::update_json_(update::UpdateEntity* obj, J
 bool WebServer::canHandle(AsyncWebServerRequest* request) const {
 #ifdef USE_ESP32
   char url_buf[AsyncWebServerRequest::URL_BUF_SIZE];
-  StringRef url_check = request->url_to(url_buf);
-  ESP_LOGI("web_server", "📥 [CORE HTTP INGRESS] canHandle() controleert: %s", url_check.c_str());
-  if (memcmp(url_check.c_str(), "/control", 8) == 0) {
-    ESP_LOGI("web_server", "⚠️ [CORE HTTP INGRESS] /control route herkend! canHandle gedwongen op TRUE.");
+  StringRef url = request->url_to(url_buf);
+#else
+  const auto& url = request->url();
+#endif
+  const auto method = request->method();
+
+  // CORE HTTP INGRESS TRACE
+  if (memcmp(url.c_str(), "/control", 8) == 0) {
+    ESP_LOGI("web_server", "⚠️ [CORE HTTP INGRESS] /control route gedetecteerd in canHandle! Dwingen naar TRUE.");
     return true;
   }
-#endif
 
   // Static URL checks - use ESPHOME_F to keep strings in flash on ESP8266
   if (url == ESPHOME_F("/")) return true;
@@ -2381,10 +2385,10 @@ void WebServer::handleRequest(AsyncWebServerRequest* request) {
   const auto& url = request->url();
 #endif
 
-  ESP_LOGI("web_server", "🚀 [CORE HTTP ROUTING] Inkomende route bij handleRequest(): %s", url.c_str());
+  // CORE HTTP ROUTING TRACE
   if (memcmp(url.c_str(), "/control", 8) == 0) {
-    ESP_LOGI("web_server", "🔒 [CORE HTTP ROUTING] /control endpoint succesvol opgevangen op ESP-IDF laag!");
-    ESP_LOGI("web_server", "   • HTTP Method: %d (GET=1, POST=2)", request->method());
+    ESP_LOGI("web_server", "🔒 [CORE HTTP ROUTING] /control route succesvol opgevangen bij handleRequest!");
+    ESP_LOGI("web_server", "   • Method ID: %d (GET=1, POST=2)", request->method());
     return;
   }
 
