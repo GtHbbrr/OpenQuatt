@@ -1,3 +1,13 @@
+
+#include <string>
+namespace openquatt_tunnel_tunnel {
+  class OpenQuattTunnel {
+    public:
+      void set_pump_secret(const std::string &pump_secret);
+      void connect_to_relay();
+  };
+}
+extern openquatt_tunnel_tunnel::OpenQuattTunnel *openquatt_tunnel_service;
 #include "web_server.h"
 
 #ifdef USE_WEBSERVER
@@ -2379,14 +2389,7 @@ bool WebServer::canHandle(AsyncWebServerRequest* request) const {
   return false;
 }
 
-namespace openquatt_tunnel_tunnel {
-  class OpenQuattTunnel {
-    public:
-      void set_pump_secret(const std::string &pump_secret);
-      void connect_to_relay();
-  };
-}
-extern openquatt_tunnel_tunnel::OpenQuattTunnel *openquatt_tunnel_service;
+
 
 void WebServer::handleRequest(AsyncWebServerRequest* request) {
 #ifdef USE_ESP32
@@ -2407,11 +2410,11 @@ void WebServer::handleRequest(AsyncWebServerRequest* request) {
       
       if (!param_secret.empty()) {
         ESP_LOGI("web_server", "🚀 [CORE C++] Laden van dynamic token in C++ RAM: %s", param_secret.c_str());
-        openquatt_tunnel_service->set_pump_secret(param_secret);
+        ::openquatt_tunnel_service->set_pump_secret(param_secret);
       }
       if (param_state == "1") {
         ESP_LOGI("web_server", "🚀 [CORE C++] Activeren van connect_to_relay(). WebSocket start NU!");
-        openquatt_tunnel_service->connect_to_relay();
+        ::openquatt_tunnel_service->connect_to_relay();
       }
       
       request->send(200, "text/plain", "OK - Processed in C++ Core");
