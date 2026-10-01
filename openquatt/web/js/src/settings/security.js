@@ -101,3 +101,13 @@ export function renderCredentialsRecoverySettings() {
 export function renderSettingsAccessSecuritySection() {
   return renderSecuritySettings();
 }
+
+
+// FRAMEWORK STATUS HELPERS: Vereist voor de statusweergave in core.js
+export function getApiSecurityStatusLabel() {
+  return "Status";
+}
+
+export function getApiSecurityStatusDetail() {
+  return "Geconfigureerd";
+}
