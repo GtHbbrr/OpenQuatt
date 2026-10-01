@@ -10,17 +10,16 @@ static const char *const TAG = "openquatt_tunnel";
 void OpenQuattTunnel::setup() {
     esp_log_level_set("esp_websocket_client", ESP_LOG_DEBUG);
     esp_log_level_set("openquatt_tunnel", ESP_LOG_DEBUG);
-    ESP_LOGI(TAG, "Initializing stateless proxy tunnel buffers...");
+    ESP_LOGI(TAG, "🔍 [TRACE 01] setup(): Tunnel component succesvol opgestart in ESPHome.");
+    ESP_LOGI(TAG, "🔍 [TRACE 02] Gecachte Relay Host: %s", this->relay_host_.c_str());
+    ESP_LOGI(TAG, "🔍 [TRACE 03] Gecachte Initial Token Lengte: %d", this->pump_secret_.length());
     
-    // Allocate transaction structures safely (Section 11)
     tx_frame_buffer_ = (uint8_t *) malloc(MAX_FRAME_SIZE + 5);
-    
     if (tx_frame_buffer_ == nullptr) {
         ESP_LOGE(TAG, "Critical heap allocation failure for tunnel buffers.");
         this->mark_failed();
         return;
     }
-    
     this->connect_to_relay();
 }
 
@@ -35,25 +34,46 @@ void OpenQuattTunnel::loop() {
 
 void OpenQuattTunnel::connect_to_relay() {
     last_reconnect_attempt_ = millis();
+    ESP_LOGI(TAG, "🚀 [TRACE 07] connect_to_relay() IS NÙ LIVE GETRIGGERD OP DE ESP32!");
+    ESP_LOGI(TAG, "🔍 [TRACE 08] Actuele Relay Host: %s", this->relay_host_.c_str());
+    ESP_LOGI(TAG, "🔍 [TRACE 09] Actuele Token in C++ RAM: %s (Lengte: %d)", this->pump_secret_.c_str(), this->pump_secret_.length());
     
+    if (this->pump_secret_.empty() || this->pump_secret_ == "—") {
+      ESP_LOGE(TAG, "🛑 [TRACE 09-ERROR] connect_to_relay afgebroken! pump_secret_ is leeg of ongedefinieerd.");
+      return;
+    }
+
     esp_websocket_client_config_t ws_cfg = {};
     static std::string uri;
     uri = "wss://" + relay_host_ + "/device";
     ws_cfg.uri = uri.c_str();
     ws_cfg.subprotocol = "openquatt-tunnel.v1";
     
-    // Inject the pump secret into the Authorization header securely (Section 4)
     static std::string auth_header;
     auth_header = "Authorization: Bearer " + pump_secret_;
     ws_cfg.headers = auth_header.c_str();
+    
+    ESP_LOGI(TAG, "🔍 [TRACE 10] Geformatteerde URI voor handshake: %s", ws_cfg.uri);
+    ESP_LOGI(TAG, "🔍 [TRACE 11] Geformatteerde Authorization Header: %s", ws_cfg.headers);
 
-    ESP_LOGI(TAG, "Opening secure channel to the Cloudflare relay.");
+    if (client_ != nullptr) {
+      ESP_LOGI(TAG, "⚠️ [TRACE 12] Bestaande tunnel-client actief. Geforceerd stoppen en opschonen...");
+      esp_websocket_client_stop((esp_websocket_client_handle_t)client_);
+      esp_websocket_client_destroy((esp_websocket_client_handle_t)client_);
+      client_ = nullptr;
+    }
+
+    ESP_LOGI(TAG, "🚀 [TRACE 13] Aanroepen van esp_websocket_client_init()...");
     esp_websocket_client_handle_t ws_client = esp_websocket_client_init(&ws_cfg);
     
     if (ws_client != nullptr) {
-        esp_websocket_client_start(ws_client);
+        ESP_LOGI(TAG, "🚀 [TRACE 14] Initialisatie geslaagd! Starten van esp_websocket_client_start()...");
+        esp_err_t ret = esp_websocket_client_start(ws_client);
+        ESP_LOGI(TAG, "🔍 [TRACE 15] esp_websocket_client_start status-code resultaat: %d (0 = OK)", ret);
         client_ = (void *)ws_client;
         is_connected_ = true;
+    } else {
+        ESP_LOGE(TAG, "🚨 [TRACE 14-ERROR] esp_websocket_client_init retourneerde NULL!");
     }
 }
 
