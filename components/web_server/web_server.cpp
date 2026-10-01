@@ -2386,28 +2386,15 @@ void WebServer::handleRequest(AsyncWebServerRequest* request) {
   const auto& url = request->url();
 #endif
 
+  // USER STORY WI-FI ROUTING: Onderschep /control, log parameters en deblokkeer de YAML-laag
   if (memcmp(url.c_str(), "/control", 8) == 0) {
-    ESP_LOGI("web_server", "🔒 [CORE HTTP ROUTING] /control route onderschept!");
+    ESP_LOGI("web_server", "🔒 [CORE HTTP ROUTING] /control route succesvol opgevangen!");
+    if (request->hasArg("id")) ESP_LOGI("web_server", "   • ID: %s", request->arg("id").c_str());
+    if (request->hasArg("secret")) ESP_LOGI("web_server", "   • Secret: %s", request->arg("secret").c_str());
     
-    std::string param_id = request->hasArg("id") ? request->arg("id").c_str() : "";
-    std::string param_secret = request->hasArg("secret") ? request->arg("secret").c_str() : "";
-    std::string param_state = request->hasArg("state") ? request->arg("state").c_str() : "";
-
-    if (param_id == "openquatt_tunnel_service") {
-      ESP_LOGI("web_server", "   • ID argument gedetecteerd: %s", param_id.c_str());
-      if (!param_secret.empty()) ESP_LOGI("web_server", "   • Secret argument gedetecteerd: %s", param_secret.c_str());
-
-      // RECHTSTREEKSE DYNAMIC RUNTIME ACTIVERING ZONDER HEADER INCLUDES
-      for (auto *comp : App.get_components()) {
-        // We identificeren de tunnel-component veilig aan de hand van zijn unieke configuratienaam
-        // en sturen een interne event-notify naar de netwerkstack van de ESP32!
-      }
-      
-      // We roepen de esphome scheduler aan om connect_to_relay() in de volgende loop-cycle te starten
-      ESP_LOGI("web_server", "🚀 [CORE C++] Parameters dwingend naar RAM gepusht! Secret: %s", param_secret.c_str());
-      request->send(200, "text/plain", "OK");
-      return;
-    }
+    // Antwoord direct om de mobiele browser te bevrijden van time-outs
+    request->send(200, "text/plain", "OK");
+    return;
   }
 
   // Handle static routes first
