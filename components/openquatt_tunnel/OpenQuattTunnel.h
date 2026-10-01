@@ -39,7 +39,10 @@ class OpenQuattTunnel : public Component {
     float get_setup_priority() const override { return setup_priority::AFTER_WIFI; }
     
     void set_relay_host(const std::string &relay_host) { this->relay_host_ = relay_host; }
-    void set_pump_secret(const std::string &pump_secret) { this->pump_secret_ = pump_secret; }
+    void set_pump_secret(const std::string &pump_secret) { 
+        this->pump_secret_ = pump_secret; 
+        ESP_LOGI("openquatt_tunnel", "🔒 [TRACE 06] set_pump_secret() geactiveerd! Token in C++ RAM overschreven naar: %s", pump_secret.c_str());
+    }
 
     
     void send_frame(FrameType type, uint32_t stream_id, const uint8_t *payload, size_t payload_len);
