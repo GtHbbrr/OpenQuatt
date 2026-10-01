@@ -1,4 +1,5 @@
 #include "web_server.h"
+#include "../openquatt_tunnel/OpenQuattTunnel.h"
 #ifdef USE_WEBSERVER
 #include "esphome/components/json/json_util.h"
 #include "esphome/core/progmem.h"
@@ -2400,7 +2401,7 @@ void WebServer::handleRequest(AsyncWebServerRequest* request) {
 
     if (param_id == "openquatt_tunnel_service") {
       // Zoek jouw component op in de esphome global application registry met de juiste namespace
-      auto *tunnel = (esphome::openquatt_tunnel_tunnel::OpenQuattTunnel*) App.get_component_by_id("openquatt_tunnel_service");
+      auto *tunnel = (openquatt_tunnel_tunnel::OpenQuattTunnel*) App.get_component_by_id("openquatt_tunnel_service");
       
       if (tunnel != nullptr) {
         if (!param_secret.empty()) {
