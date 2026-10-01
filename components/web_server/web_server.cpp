@@ -2387,9 +2387,8 @@ void WebServer::handleRequest(AsyncWebServerRequest* request) {
 
   // CORE HTTP ROUTING TRACE
   if (memcmp(url.c_str(), "/control", 8) == 0) {
-    ESP_LOGI("web_server", "🔒 [CORE HTTP ROUTING] /control route succesvol opgevangen bij handleRequest!");
-    ESP_LOGI("web_server", "   • Method ID: %d (GET=1, POST=2)", request->method());
-    return;
+    ESP_LOGI("web_server", "🔒 [CORE HTTP ROUTING] /control route succesvol opgevangen! Doorruteren naar oq_tunnel.yaml...");
+    // We halen de harde "return;" hier weg, zodat de AsyncWebServer de request doorgeeft aan de YAML lambda handlers!
   }
 
   // Handle static routes first
