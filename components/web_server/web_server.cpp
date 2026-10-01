@@ -2386,13 +2386,17 @@ void WebServer::handleRequest(AsyncWebServerRequest* request) {
   const auto& url = request->url();
 #endif
 
-  // USER STORY CORE ROUTING: Accepteer /control direct op core-niveau en deblokkeer de keten
+  // USER STORY CORE ROUTING: Log core ingress en geef vrij voor YAML-verwerking
   if (memcmp(url.c_str(), "/control", 8) == 0) {
-    ESP_LOGI("web_server", "🔒 [CORE HTTP ROUTING] /control route onderschept! Status 200 OK terugsturen naar browser...");
-    
-    // Stuur direct een succesvolle status terug om timeout-crashes in de browser te voorkomen
-    request->send(200, "text/plain", "OK");
-    return;
+    ESP_LOGI("web_server", "🔒 [CORE HTTP ROUTING] /control route onderschept!");
+    if (request->hasArg("id")) {
+      ESP_LOGI("web_server", "   • ID argument gedetecteerd: %s", request->arg("id").c_str());
+    }
+    if (request->hasArg("secret")) {
+      ESP_LOGI("web_server", "   • Secret argument gedetecteerd: %s", request->arg("secret").c_str());
+    }
+    // We sturen bewust GEEN harde response of return, zodat AsyncWebServer de request
+    // door laat stromen naar de oq_tunnel.yaml lambda handlers!
   }
 
   // Handle static routes first
