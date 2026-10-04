@@ -2,6 +2,7 @@ import esphome.codegen as cg
 import esphome.config_validation as cv
 from esphome.const import CONF_ID
 
+# Dwing het framework om de websocket componenten mee te linken
 CORE_CHILDREN = ["esp_websocket_client"]
 
 AUTO_LOAD = ["network"]
@@ -20,3 +21,6 @@ async def to_code(config):
     await cg.register_component(var, config)
     cg.add(var.set_relay_host(config["relay_host"]))
     cg.add(var.set_pump_secret(config["pump_secret"]))
+    
+    # Voeg de benodigde ESP-IDF component definitie toe aan de compileer-context
+    cg.add_build_macro("USE_ESP_WEBSOCKET_CLIENT")
