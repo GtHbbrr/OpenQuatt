@@ -2,9 +2,6 @@ import esphome.codegen as cg
 import esphome.config_validation as cv
 from esphome.const import CONF_ID
 
-# Dwing het framework om de websocket componenten mee te linken
-CORE_CHILDREN = ["esp_websocket_client"]
-
 AUTO_LOAD = ["network"]
 
 openquatt_tunnel_ns = cg.esphome_ns.namespace("openquatt_tunnel_tunnel")
@@ -22,5 +19,5 @@ async def to_code(config):
     cg.add(var.set_relay_host(config["relay_host"]))
     cg.add(var.set_pump_secret(config["pump_secret"]))
     
-    # Gebruik de juiste codegen methode om build flags door te geven aan PlatformIO
-    cg.add_build_flag("-DUSE_ESP_WEBSOCKET_CLIENT")
+    # Voeg het absolute ESP-IDF websocket include pad rechtstreeks toe aan de CXX compiler flags
+    cg.add_build_flag("-I/Users/sonoma/Library/Caches/esphome/idf/frameworks/5.5.5/components/esp_websocket_client/include")
