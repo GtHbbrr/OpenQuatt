@@ -18,6 +18,3 @@ async def to_code(config):
     await cg.register_component(var, config)
     cg.add(var.set_relay_host(config["relay_host"]))
     cg.add(var.set_pump_secret(config["pump_secret"]))
-    
-    # Voeg het absolute ESP-IDF websocket include pad rechtstreeks toe aan de CXX compiler flags
-    cg.add_build_flag("-I/Users/sonoma/Library/Caches/esphome/idf/frameworks/5.5.5/components/esp_websocket_client/include")
