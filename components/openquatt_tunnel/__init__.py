@@ -2,12 +2,10 @@ import esphome.codegen as cg
 import esphome.config_validation as cv
 from esphome.const import CONF_ID
 
-# Dwing het framework om de websocket componenten mee te linken
 CORE_CHILDREN = ["esp_websocket_client"]
 
 AUTO_LOAD = ["network"]
 
-# Match exact de namespace en klasse-structuur
 openquatt_tunnel_ns = cg.esphome_ns.namespace("openquatt_tunnel_tunnel")
 OpenQuattTunnel = openquatt_tunnel_ns.class_("OpenQuattTunnel", cg.Component)
 
@@ -22,6 +20,3 @@ async def to_code(config):
     await cg.register_component(var, config)
     cg.add(var.set_relay_host(config["relay_host"]))
     cg.add(var.set_pump_secret(config["pump_secret"]))
-    
-    # DIT IS DE SLEUTEL: Voeg de C++ bronbestanden toe aan de compilatielijst van CMake
-    cg.add_library("openquatt_tunnel", ["openquatt_tunnel.cpp"])
