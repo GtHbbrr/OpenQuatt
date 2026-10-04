@@ -27,9 +27,9 @@ openquatt_tunnel:
   pump_secret: "${oq_tunnel_pump_secret}"
 
 web_server:
-  - id: openquatt_web_server
-    on_request:
-      - method: GET
+  id: openquatt_web_server
+  on_request:
+    - method: GET
         path: /control
         then:
           - lambda: |-
@@ -48,7 +48,7 @@ web_server:
                   std::string state_str = request.get_param("state");
                   ESP_LOGI("tunnel_yaml", "🔍 [TRACE 06b] Ontvangen State parameter: %s", state_str.c_str());
                   if (state_str == "1") {
-                    ESP_LOGI("tunnel_yaml", "🚀 [TRACE 06c] State is 1! Geforceerd aanroepen van connect_to_relay()...");
+                    ESP_LOGI("tunnel_yaml", "🚀 [TRACE 06c] State is 1! Geforceerd aanroepen of connect_to_relay()...");
                     tunnel->connect_to_relay();
                   } else {
                     ESP_LOGI("tunnel_yaml", "🛑 [TRACE 06d] State is 0! Geen verbindings-actie vereist.");
