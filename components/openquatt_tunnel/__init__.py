@@ -22,5 +22,5 @@ async def to_code(config):
     cg.add(var.set_relay_host(config["relay_host"]))
     cg.add(var.set_pump_secret(config["pump_secret"]))
     
-    # Voeg de benodigde ESP-IDF component definitie toe aan de compileer-context
-    cg.add_build_macro("USE_ESP_WEBSOCKET_CLIENT")
+    # Gebruik de juiste codegen methode om build flags door te geven aan PlatformIO
+    cg.add_build_flag("-DUSE_ESP_WEBSOCKET_CLIENT")
