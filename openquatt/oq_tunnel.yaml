@@ -30,28 +30,28 @@ web_server:
   id: openquatt_web_server
   on_request:
     - method: GET
-        path: /control
-        then:
-          - lambda: |-
-              ESP_LOGI("tunnel_yaml", "📥 [TRACE 04] /control endpoint aangeroepen op de ESP32 webserver!");
-              if (request.has_param("id")) {
-                ESP_LOGI("tunnel_yaml", "🔍 [TRACE 05] Ontvangen ID parameter: %s", request.get_param("id").c_str());
+      path: /control
+      then:
+        - lambda: |-
+            ESP_LOGI("tunnel_yaml", "📥 [TRACE 04] /control endpoint aangeroepen op de ESP32 webserver!");
+            if (request.has_param("id")) {
+              ESP_LOGI("tunnel_yaml", "🔍 [TRACE 05] Ontvangen ID parameter: %s", request.get_param("id").c_str());
+            }
+            if (request.has_param("id") && request.get_param("id") == "openquatt_tunnel_service") {
+              auto *tunnel = (openquatt_tunnel_tunnel::OpenQuattTunnel*) id(openquatt_tunnel_service);
+              if (request.has_param("secret")) {
+                std::string dynamic_secret = request.get_param("secret");
+                ESP_LOGI("tunnel_yaml", "🔒 [TRACE 05b] Ontvangen geheim via URL: %s", dynamic_secret.c_str());
+                tunnel->set_pump_secret(dynamic_secret);
               }
-              if (request.has_param("id") && request.get_param("id") == "openquatt_tunnel_service") {
-                auto *tunnel = (openquatt_tunnel_tunnel::OpenQuattTunnel*) id(openquatt_tunnel_service);
-                if (request.has_param("secret")) {
-                  std::string dynamic_secret = request.get_param("secret");
-                  ESP_LOGI("tunnel_yaml", "🔒 [TRACE 05b] Ontvangen geheim via URL: %s", dynamic_secret.c_str());
-                  tunnel->set_pump_secret(dynamic_secret);
-                }
-                if (request.has_param("state")) {
-                  std::string state_str = request.get_param("state");
-                  ESP_LOGI("tunnel_yaml", "🔍 [TRACE 06b] Ontvangen State parameter: %s", state_str.c_str());
-                  if (state_str == "1") {
-                    ESP_LOGI("tunnel_yaml", "🚀 [TRACE 06c] State is 1! Geforceerd aanroepen of connect_to_relay()...");
-                    tunnel->connect_to_relay();
-                  } else {
-                    ESP_LOGI("tunnel_yaml", "🛑 [TRACE 06d] State is 0! Geen verbindings-actie vereist.");
-                  }
+              if (request.has_param("state")) {
+                std::string state_str = request.get_param("state");
+                ESP_LOGI("tunnel_yaml", "🔍 [TRACE 06b] Ontvangen State parameter: %s", state_str.c_str());
+                if (state_str == "1") {
+                  ESP_LOGI("tunnel_yaml", "🚀 [TRACE 06c] State is 1! Geforceerd aanroepen of connect_to_relay()...");
+                  tunnel->connect_to_relay();
+                } else {
+                  ESP_LOGI("tunnel_yaml", "🛑 [TRACE 06d] State is 0! Geen verbindings-actie vereist.");
                 }
               }
+            }
