@@ -8,9 +8,12 @@ external_components:
       path: "${external_components_path}"
     components: [openquatt_tunnel]
 
-# Dit dwingt de generator om de websocket include-paden globaal open te stellen
+# Declareer de externe ESP-IDF component dependency via het exacte string-formaat
 esp32:
   framework:
+    type: esp-idf
+    components:
+      - "espressif/esp_websocket_client^1.0.0"
 
 logger:
   logs:

@@ -34,6 +34,11 @@ void OpenQuattTunnel::loop() {
     }
 }
 
+void OpenQuattTunnel::set_pump_secret(const std::string &pump_secret) {
+    this->pump_secret_ = pump_secret;
+    ESP_LOGI(TAG, "🔒 [TRACE 06] set_pump_secret() geactiveerd! Token in C++ RAM overschreven.");
+}
+
 void OpenQuattTunnel::connect_to_relay() {
     last_reconnect_attempt_ = millis();
     if (this->pump_secret_.empty() || this->pump_secret_ == "—") return;
