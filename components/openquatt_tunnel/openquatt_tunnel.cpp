@@ -18,7 +18,6 @@ void OpenQuattTunnel::setup() {
     esp_log_level_set("openquatt_tunnel", ESP_LOG_DEBUG);
     ESP_LOGI(TAG, "🔍 [TRACE 01] setup(): Tunnel gestart.");
     
-    // Wijs de buffer expliciet toe aan PSRAM om kostbaar intern DRAM te sparen
     tx_frame_buffer_ = (uint8_t *) heap_caps_malloc(MAX_FRAME_SIZE + 5, MALLOC_CAP_SPIRAM);
     if (tx_frame_buffer_ == nullptr) {
         this->mark_failed();
