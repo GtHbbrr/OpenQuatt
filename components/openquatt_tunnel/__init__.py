@@ -18,7 +18,3 @@ async def to_code(config):
     await cg.register_component(var, config)
     cg.add(var.set_relay_host(config["relay_host"]))
     cg.add(var.set_pump_secret(config["pump_secret"]))
-    
-    # Herstel de header-zichtbaarheid binnen ESPHome 2026.x.x voor deze IDF module
-    from esphome.components.esp32 import include_builtin_idf_component
-    include_builtin_idf_component("esp_websocket_client")

@@ -89,9 +89,6 @@ esp32:
       CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC: y
       CONFIG_MBEDTLS_INTERNAL_MEM_ALLOC: n
     # Dwing de generator om de include-paden voor de websocket client globaal te openen
-    advanced:
-      include_builtin_idf_components:
-        - esp_websocket_client
 
 sensor:
   - platform: debug

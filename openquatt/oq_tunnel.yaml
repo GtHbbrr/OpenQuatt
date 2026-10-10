@@ -11,9 +11,6 @@ external_components:
 # Dit dwingt de generator om de websocket include-paden globaal open te stellen
 esp32:
   framework:
-    advanced:
-      include_builtin_idf_components:
-        - esp_websocket_client
 
 logger:
   logs:
