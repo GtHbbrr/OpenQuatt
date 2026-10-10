@@ -1,6 +1,7 @@
 #include "openquatt_tunnel.h"
 #include "esphome/core/log.h"
 #include "esp_websocket_client.h"
+#include "esp_heap_caps.h"
 
 namespace esphome {
   openquatt_tunnel_tunnel::OpenQuattTunnel *openquatt_tunnel_service = nullptr;
@@ -17,7 +18,8 @@ void OpenQuattTunnel::setup() {
     esp_log_level_set("openquatt_tunnel", ESP_LOG_DEBUG);
     ESP_LOGI(TAG, "🔍 [TRACE 01] setup(): Tunnel gestart.");
     
-    tx_frame_buffer_ = (uint8_t *) malloc(MAX_FRAME_SIZE + 5);
+    // Wijs de buffer expliciet toe aan PSRAM om kostbaar intern DRAM te sparen
+    tx_frame_buffer_ = (uint8_t *) heap_caps_malloc(MAX_FRAME_SIZE + 5, MALLOC_CAP_SPIRAM);
     if (tx_frame_buffer_ == nullptr) {
         this->mark_failed();
         return;
@@ -46,9 +48,9 @@ void OpenQuattTunnel::connect_to_relay() {
     ws_cfg.headers = auth.c_str();
 
     if (client_ != nullptr) {
-      esp_websocket_client_stop((esp_websocket_client_handle_t)client_);
-      esp_websocket_client_destroy((esp_websocket_client_handle_t)client_);
-      client_ = nullptr;
+        esp_websocket_client_stop((esp_websocket_client_handle_t)client_);
+        esp_websocket_client_destroy((esp_websocket_client_handle_t)client_);
+        client_ = nullptr;
     }
 
     esp_websocket_client_handle_t ws_client = esp_websocket_client_init(&ws_cfg);

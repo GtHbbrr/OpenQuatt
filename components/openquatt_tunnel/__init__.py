@@ -4,6 +4,9 @@ from esphome.const import CONF_ID
 
 AUTO_LOAD = ["network"]
 
+# Dwing ESPHome om de externe ESP-IDF component te linken in CMake
+cg.add_library("esp_websocket_client", None)
+
 openquatt_tunnel_ns = cg.esphome_ns.namespace("openquatt_tunnel_tunnel")
 OpenQuattTunnel = openquatt_tunnel_ns.class_("OpenQuattTunnel", cg.Component)
 
