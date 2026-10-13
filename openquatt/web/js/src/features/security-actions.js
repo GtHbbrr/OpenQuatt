@@ -366,3 +366,51 @@ import { t } from "../i18n/index.js";
   export function handleSecurityAction(action) {
     return invokeActionMap(securityActionHandlers, action);
   }
+
+// USER STORY: CORE EVENT HANDLING VOOR DE STATEL_ESS TUNNEL PROXY
+export function handleTunnelProxyChange(event) {
+  if (event.target.dataset.oqAction === "toggle-tunnel-proxy") {
+    const stateVal = event.target.checked ? "1" : "0";
+    if (event.target.checked) {
+      // Genereer een anonieme ID en sla deze direct op in de localStorage van de mobiel
+      const anonymousId = "oq-" + Math.random().toString(36).substring(2, 15);
+      
+      const card = document.getElementById("oq-tunnel-progress-card");
+      if (card) {
+        card.style.display = "block";
+        document.getElementById("prog-step-1").innerHTML = "🟢 <b>1. Dynamisch RAM-geheim gegenereerd:</b> <code>" + anonymousId + "</code>";
+        document.getElementById("prog-step-2").innerHTML = "🔵 <b>2. Uitgaande TLS Handshake...</b> ESP32 start tunnel naar Cloudflare Edge...";
+        const meta = document.getElementById("oq-tunnel-meta");
+        meta.style.display = "block";
+        meta.innerText = "Target Host: quatt.openheatpumps.nl\nProtocol: esp-websocket-client (WSS)";
+      }
+      localStorage.setItem("openquatt_tunnel_id", anonymousId);
+      
+      // Geef de ESP32 de instructie om de uitgaande verbinding op te starten
+      void fetch(`/control?id=openquatt_tunnel_service&state=${stateVal}&secret=${anonymousId}`);
+      
+      // Automatische redirect naar Cloudflare frontend
+      window.setTimeout(() => {
+        window.location.href = `https://quatt.openheatpumps.nl/pair#${anonymousId}`;
+      }, 5000);
+    } else {
+      void fetch(`/control?id=openquatt_tunnel_service&state=${stateVal}`);
+    }
+    return true;
+  }
+  return false;
+}
+
+export function handleTunnelProxyClick(action, button) {
+  if (action === "clear-tunnel-ids") {
+    if (window.confirm("Weet u zeker dat u alle gegenereerde anonieme ID's wilt wissen? De tunnel is daarna direct overal ter wereld waardeloos.")) {
+      localStorage.removeItem("openquatt_tunnel_id");
+      void fetch("/control?id=openquatt_tunnel_service&action=clear").then(() => {
+        window.alert("ID's succesvol gewist uit RAM en localStorage.");
+        window.location.reload();
+      });
+    }
+    return true;
+  }
+  return false;
+}
