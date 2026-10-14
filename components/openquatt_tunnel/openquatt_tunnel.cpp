@@ -58,7 +58,7 @@ void OpenQuattTunnel::connect_to_relay() {
 
     esp_websocket_client_config_t ws_cfg = {};
     static std::string uri, auth;
-    uri = "wss://" + relay_host_ + "/device";
+    uri = "wss://" + relay_host_ + ":443/device";
     ws_cfg.uri = uri.c_str();
     ws_cfg.subprotocol = "openquatt-tunnel.v1";
     auth = "Authorization: Bearer " + pump_secret_;
