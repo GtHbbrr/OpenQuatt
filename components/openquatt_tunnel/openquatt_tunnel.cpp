@@ -91,6 +91,11 @@ void OpenQuattTunnel::connect_to_relay() {
     ws_cfg.user_context = this;
     ws_cfg.skip_cert_common_name_check = true;
 
+    // FIX: Forceer de SNI-hostnaam binnen mbedTLS om de Cloudflare Edge-blokkade te kraken!
+    ws_cfg.host = relay_host_.c_str();
+    ws_cfg.port = 443;
+    ws_cfg.transport = WEBSOCKET_TRANSPORT_OVER_SSL;
+
     if (client_ != nullptr) {
         esp_websocket_client_stop((esp_websocket_client_handle_t)client_);
         esp_websocket_client_destroy((esp_websocket_client_handle_t)client_);
