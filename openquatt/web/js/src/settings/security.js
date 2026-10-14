@@ -1,4 +1,5 @@
 import { getApiSecurityStatusDetail, getApiSecurityStatusLabel, getWebAuthStatusDetail, getWebAuthStatusLabel } from "../features/security-access.js";
+import { isEntityActive } from "../core/app-shared.js";
 import { renderSettingsSection } from "./controls.js";
 import { escapeHtml } from "../core/html.js";
 import { t } from "../i18n/index.js";
