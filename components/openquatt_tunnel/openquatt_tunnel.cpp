@@ -52,20 +52,44 @@ void OpenQuattTunnel::set_pump_secret(const std::string &pump_secret) {
     ESP_LOGI(TAG, "🔒 [TRACE 06] set_pump_secret() geactiveerd! Token in C++ RAM overschreven.");
 }
 
+// De officiële Espressif Event Handler Callback met de exact juiste types
+static void websocket_event_handler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data) {
+    esp_websocket_event_data_t *data = (esp_websocket_event_data_t *)event_data;
+    OpenQuattTunnel *tunnel = (OpenQuattTunnel *)handler_args;
+    
+    switch (event_id) {
+        case WEBSOCKET_EVENT_CONNECTED:
+            ESP_LOGI("openquatt_tunnel", "🟢 [WEBSOCKET] TLS Handshake geslaagd! Verbonden met Cloudflare.");
+            break;
+        case WEBSOCKET_EVENT_DISCONNECTED:
+            ESP_LOGW("openquatt_tunnel", "🔴 [WEBSOCKET] Verbinding met Cloudflare abrupt verbroken.");
+            break;
+        case WEBSOCKET_EVENT_DATA:
+            if (data->data_ptr != nullptr && data->data_len > 0) {
+                tunnel->on_websocket_data((uint8_t *)data->data_ptr, data->data_len);
+            }
+            break;
+        case WEBSOCKET_EVENT_ERROR:
+            ESP_LOGE("openquatt_tunnel", "🚨 [WEBSOCKET] Interne transportfout of SSL/TLS handshake geweigerd.");
+            break;
+    }
+}
+
 void OpenQuattTunnel::connect_to_relay() {
     last_reconnect_attempt_ = millis();
     if (this->pump_secret_.empty() || this->pump_secret_ == "—") return;
 
     esp_websocket_client_config_t ws_cfg = {};
     static std::string uri, auth;
+    
+    // Poort 443 expliciet meegeven voor Cloudflare edge routing [7.tech-support]
     uri = "wss://" + relay_host_ + ":443/device";
     ws_cfg.uri = uri.c_str();
     ws_cfg.subprotocol = "openquatt-tunnel.v1";
     auth = "Authorization: Bearer " + pump_secret_;
     ws_cfg.headers = auth.c_str();
-    
-    // FIX: Zorg dat de data-context naar dit object wijst
     ws_cfg.user_context = this;
+    ws_cfg.skip_cert_common_name_check = true;
 
     if (client_ != nullptr) {
         esp_websocket_client_stop((esp_websocket_client_handle_t)client_);
@@ -75,9 +99,12 @@ void OpenQuattTunnel::connect_to_relay() {
 
     esp_websocket_client_handle_t ws_client = esp_websocket_client_init(&ws_cfg);
     if (ws_client != nullptr) {
+        // FIX: Registreer de handler handmatig op de client om de ontbrekende default event loop te herstellen!
+        esp_websocket_register_events(ws_client, WEBSOCKET_EVENT_ANY, websocket_event_handler, (void *)this);
+        
         esp_websocket_client_start(ws_client);
         client_ = (void *)ws_client;
-        // is_connected_ = true; <-- Verwijderd: loop() meet dit nu live via de API!
+        ESP_LOGI(TAG, "📡 [DEBUG] esp_websocket_client_start() uitgevoerd richting: %s", uri.c_str());
     }
 }
 
