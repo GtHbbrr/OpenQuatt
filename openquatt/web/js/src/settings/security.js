@@ -45,13 +45,23 @@ export function renderSecuritySettings() {
         "<span class=\"slider round\"></span>" +
       "</label>" +
     "</div>" +
+    
+    // RECHTSTREEKSE VENSTER VOOR REAL-TIME COUPLING DIAGNOSTICS
+    "<div style=\"margin-top: 15px; background: #1e1e1e; color: #a4ef53; padding: 12px; border-radius: 6px; font-family: monospace; font-size: 0.8rem; box-shadow: inset 0 2px 4px rgba(0,0,0,0.3);\" data-oq-bypass-patcher=\"true\">" +
+      "<div style=\"color: #fff; font-weight: bold; margin-bottom: 6px; border-bottom: 1px solid #333; padding-bottom: 4px; display: flex; justify-content: space-between;\">" +
+        "<span>📡 esp_websocket Live Verbindingsstatus</span>" +
+        "<span id=\"oq-tunnel-pulse\" style=\"width: 8px; height: 8px; background: #ffa726; border-radius: 50%; display: inline-block; align-self: center;\"></span>" +
+      "</div>" +
+      "<div id=\"oq-tunnel-debug-log\" style=\"max-height: 120px; overflow-y: auto; white-space: pre-wrap; color: #a4ef53;\">Wacht op activatie...</div>" +
+    "</div>" +
+
     "<div style=\"margin-top: 25px;\">" +
       "<div class=\"settings-row\" style=\"margin-bottom: 5px\">" +
         "<strong>📋 " + t("settingsSecurity.purgeTitle") + "</strong>" +
         (tunnelId ? "<button class=\"btn btn-danger btn-sm\" data-oq-action=\"clear-tunnel-ids\" style=\"padding: 4px 10px; font-size: 0.8rem;\">" + t("settingsSecurity.purgeButton") + "</button>" : "") +
       "</div>" +
       "<p class=\"meta\" style=\"margin-bottom: 10px;\">" + t("settingsSecurity.purgeCopy") + "</p>" +
-      "<div style=\"margin-top: 10px;\">" + localIdRowsHtml + "</div>" +
+      "<div style=\"margin-top: 10px;\">" + idRowsHtml + "</div>" +
     "</div>" +
   "</div>";
 }

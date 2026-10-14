@@ -461,6 +461,33 @@ function syncFrequencyRangeControl(control) {
       return false;
     }
 
+    // Real-time esp_websocket stream-handler
+    const liveLogContainer = document.getElementById("oq-tunnel-debug-log");
+    if (liveLogContainer) {
+      const pulseDot = document.getElementById("oq-tunnel-pulse");
+      if (!window.oqTunnelMonitorInterval) {
+        window.oqTunnelMonitorInterval = setInterval(async () => {
+          if (!document.getElementById("oq-tunnel-debug-log")) {
+            clearInterval(window.oqTunnelMonitorInterval);
+            window.oqTunnelMonitorInterval = null;
+            return;
+          }
+          try {
+            const response = await fetch("/api/tunnel/status");
+            if (response.ok) {
+              const tunnelData = await response.json();
+              liveLogContainer.innerText = tunnelData.logs || "Verbinding actief, wacht op cloud-handshake...";
+              if (pulseDot) pulseDot.style.background = tunnelData.connected ? "#2e7d32" : "#c62828";
+            } else {
+              liveLogContainer.innerText = `⚠️ ESP32 retourneerde HTTP code: ${response.status}`;
+            }
+          } catch (netErr) {
+            liveLogContainer.innerText = "🔌 Wacht op reactie van interne webserver...";
+          }
+        }, 1000);
+      }
+    }
+
     return true;
   }
 
