@@ -29,13 +29,23 @@ void OpenQuattTunnel::setup() {
 }
 
 void OpenQuattTunnel::loop() {
+    // Vraag de werkelijke, actieve status op bij de ESP32 netwerkstack
+    bool active_connection = false;
+    if (client_ != nullptr) {
+        active_connection = esp_websocket_client_is_connected((esp_websocket_client_handle_t)client_);
+    }
+    
+    is_connected_ = active_connection;
+
     if (!is_connected_) {
         unsigned long now = millis();
         if (now - last_reconnect_attempt_ > 15000) {
+            ESP_LOGW(TAG, "⚠️ Tunnel offline gedetecteerd. Start automatische reconnect naar Cloudflare...");
             this->connect_to_relay();
         }
     }
 }
+
 
 void OpenQuattTunnel::set_pump_secret(const std::string &pump_secret) {
     this->pump_secret_ = pump_secret;
@@ -67,7 +77,7 @@ void OpenQuattTunnel::connect_to_relay() {
     if (ws_client != nullptr) {
         esp_websocket_client_start(ws_client);
         client_ = (void *)ws_client;
-        is_connected_ = true;
+        // is_connected_ = true; <-- Verwijderd: loop() meet dit nu live via de API!
     }
 }
 
