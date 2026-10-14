@@ -4,6 +4,8 @@
 substitutions:
   # Topology is hard-pinned by the release target; hardware/network ownership lives in their packages.
   oq_topology_build_flag: "-DOQ_TOPOLOGY_DUO=0"
+  oq_tunnel_relay_host: "quatt.openheatpumps.nl"
+  oq_tunnel_pump_secret: "pvNavDWsiZ7mU!9"
 
 esphome:
   build_path: ../../../.esphome/build/heatpump_controller_q_single

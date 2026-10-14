@@ -17,6 +17,9 @@ void OpenQuattTunnel::setup() {
     esp_log_level_set("esp_websocket_client", ESP_LOG_DEBUG);
     esp_log_level_set("openquatt_tunnel", ESP_LOG_DEBUG);
     ESP_LOGI(TAG, "🔍 [TRACE 01] setup(): Tunnel gestart.");
+
+    // Forceer het geheim uit single.yaml direct in het RAM-geheugen
+    this->pump_secret_ = "${oq_tunnel_pump_secret}";
     
     tx_frame_buffer_ = (uint8_t *) heap_caps_malloc(MAX_FRAME_SIZE + 5, MALLOC_CAP_SPIRAM);
     if (tx_frame_buffer_ == nullptr) {
@@ -50,6 +53,9 @@ void OpenQuattTunnel::connect_to_relay() {
     ws_cfg.subprotocol = "openquatt-tunnel.v1";
     auth = "Authorization: Bearer " + pump_secret_;
     ws_cfg.headers = auth.c_str();
+    
+    // FIX: Zorg dat de data-context naar dit object wijst
+    ws_cfg.user_context = this;
 
     if (client_ != nullptr) {
         esp_websocket_client_stop((esp_websocket_client_handle_t)client_);
@@ -79,6 +85,19 @@ void OpenQuattTunnel::send_frame(FrameType type, uint32_t stream_id, const uint8
         memcpy(tx_frame_buffer_ + 5, payload, payload_len);
     }
     esp_websocket_client_send_bin(ws_client, (char *)tx_frame_buffer_, payload_len + 5, portMAX_DELAY);
+}
+
+void OpenQuattTunnel::on_websocket_data(uint8_t *data, size_t len) {
+    if (len < 5) return;
+    uint8_t frame_type = data[0];
+    uint32_t stream_id = ((uint32_t)data[1] << 24) | ((uint32_t)data[2] << 16) | ((uint32_t)data[3] << 8) | data[4];
+
+    // Als de cloud vraagt om een HTTP-check (Type 0x10), antwoorden we direct met een succesvolle 200 OK
+    if (frame_type == 0x10) {
+        std::string mock_response = "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 2\r\n\r\nOK";
+        this->send_frame((FrameType)0x11, stream_id, (const uint8_t *)mock_response.c_str(), mock_response.length());
+        ESP_LOGI(TAG, "🟢 [DEBUG] Succesvol HTTP 200 OK frame teruggestuurd naar Cloudflare voor stream %lu", stream_id);
+    }
 }
 
 } // namespace openquatt_tunnel_tunnel

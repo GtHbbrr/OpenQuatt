@@ -42,6 +42,9 @@ class OpenQuattTunnel : public Component {
     
     void connect_to_relay();
     void send_frame(FrameType type, uint32_t stream_id, const uint8_t *payload, size_t payload_len);
+
+    // FIX: Declareer de inkomende data-ontvanger om de compiler te bevrijden!
+    void on_websocket_data(uint8_t *data, size_t len);
 };
 
 }  // namespace openquatt_tunnel_tunnel

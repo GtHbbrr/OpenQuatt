@@ -20,10 +20,10 @@ export function renderSecuritySettings() {
   const tunnelId = localStorage.getItem("openquatt_tunnel_id") || "";
   const deviceName = getFriendlyDeviceName();
 
-  let idRowsHtml = "<div class=\"settings-row\"><div class=\"meta\" style=\"text-align: center; width: 100%;\">Geen actieve koppelingen gegenereerd</div></div>";
+  let localIdRowsHtml = "<div class=\"settings-row\"><div class=\"meta\" style=\"text-align: center; width: 100%;\">Geen actieve koppelingen gegenereerd</div></div>";
 
   if (tunnelId) {
-    idRowsHtml = "<div class=\"settings-row\" style=\"border-top: 1px dashed #eee; padding-top: 10px; margin-top: 10px;\">" +
+    localIdRowsHtml = "<div class=\"settings-row\" style=\"border-top: 1px dashed #eee; padding-top: 10px; margin-top: 10px;\">" +
       "<div>" +
         "<code style=\"font-family: monospace; font-size: 0.85rem; color: #0288d1;\">" + tunnelId + "</code>" +
         "<div class=\"meta\">" + deviceName + "</div>" +
@@ -51,20 +51,32 @@ export function renderSecuritySettings() {
         (tunnelId ? "<button class=\"btn btn-danger btn-sm\" data-oq-action=\"clear-tunnel-ids\" style=\"padding: 4px 10px; font-size: 0.8rem;\">" + t("settingsSecurity.purgeButton") + "</button>" : "") +
       "</div>" +
       "<p class=\"meta\" style=\"margin-bottom: 10px;\">" + t("settingsSecurity.purgeCopy") + "</p>" +
-      "<div style=\"margin-top: 10px;\">" + idRowsHtml + "</div>" +
+      "<div style=\"margin-top: 10px;\">" + localIdRowsHtml + "</div>" +
     "</div>" +
   "</div>";
 }
 
 export function renderSettingsAccessSecuritySection() {
   const tunnelId = localStorage.getItem("openquatt_tunnel_id") || "";
+  const deviceName = getFriendlyDeviceName();
   
   const loginStatus = getWebAuthStatusLabel();
   const loginDetail = getWebAuthStatusDetail();
   const apiStatus = getApiSecurityStatusLabel();
   const apiDetail = getApiSecurityStatusDetail();
 
-  // We gebruiken de officiële renderSettingsSection van de hoofdontwikkelaar voor perfecte layout
+  // FIX: Bouw de tabelrijen hier op binnen de juiste scope van de tabel
+  let idRowsHtml = "<tr><td colspan=\"3\" style=\"text-align: center; color: #999; padding: 10px 0;\">Geen actieve koppelingen gegenereerd</td></tr>";
+  if (tunnelId) {
+    idRowsHtml = "<tr style=\"border-bottom: 1px solid #eee;\">" +
+      "<td style=\"padding: 6px 5px; font-family: monospace; font-size: 0.85rem; color: #0288d1;\">" + escapeHtml(tunnelId) + "</td>" +
+      "<td style=\"padding: 6px 5px; font-size: 0.85rem; font-weight: bold;\">" + escapeHtml(deviceName) + "</td>" +
+      "<td style=\"padding: 6px 5px; text-align: right;\">" +
+        "<span class=\"badge\" style=\"background: #2e7d32; color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem;\">" + t("settingsSecurity.tunnelStatusActive") + "</span>" +
+      "</td>" +
+    "</tr>";
+  }
+
   return renderSettingsSection(
     t("settingsSecurity.sectionGroup"),
     t("settingsSecurity.sectionTitle"),
@@ -83,7 +95,7 @@ export function renderSettingsAccessSecuritySection() {
         "</div>" +
       "</div>" +
       
-      // 2. JOUW PROXY TUNNEL BLOK (Met herstelde OpenQuatt styling)
+      // 2. JOUW PROXY TUNNEL BLOK
       "<div class=\"oq-settings-quickstart-status\" data-oq-access-security-item=\"tunnel\">" +
         "<div class=\"oq-settings-quickstart-status-row\" style=\"margin-bottom: 15px;\">" +
           "<div>" +
@@ -99,7 +111,7 @@ export function renderSettingsAccessSecuritySection() {
           "</label>" +
         "</div>" +
         
-        // De actieve toestelkoppelingen-tabel, nu volledig vertaald conform i18n-eisen!
+        // De actieve toestelkoppelingen-tabel
         "<div style=\"margin-top: 18px; border-top: 1px solid #f0f0f0; padding-top: 15px;\">" +
           "<div class=\"oq-settings-quickstart-status-row\" style=\"margin-bottom: 10px; justify-content: space-between; align-items: center;\">" +
             "<strong style=\"font-size: 0.85rem; color: #444; text-transform: uppercase; letter-spacing: 0.5px;\">📋 " + t("settingsSecurity.purgeTitle") + "</strong>" +
@@ -115,7 +127,7 @@ export function renderSettingsAccessSecuritySection() {
               "</tr>" +
             "</thead>" +
             "<tbody>" +
-              "<tr><td colspan=\"3\">" + idRowsHtml + "</td></tr>" +
+              idRowsHtml +
             "</tbody>" +
           "</table>" +
         "</div>" +
