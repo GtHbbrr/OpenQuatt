@@ -1611,6 +1611,9 @@ export default {
     purgeButton: "Gegenereerde ID's wissen",
     purgeConfirm: "Weet u zeker dat u alle tunnels wilt sluiten? Gekoppelde apparaten verliezen direct buitenshuis-toegang.",
     purgeSuccess: "Alle actieve ID's zijn gewist. De tunnel is direct onbruikbaar.",
+    tableThId: "GEGENEREERD ID",
+    tableThDevice: "APPARAAT / BROWSER",
+    tableThStatus: "STATUS",
   },
   settingsService: {
     phasePrep: "Voorbereiden",

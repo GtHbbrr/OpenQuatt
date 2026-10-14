@@ -1611,6 +1611,9 @@ export default {
     purgeButton: "Clear generated IDs",
     purgeConfirm: "Are you sure you want to close all tunnels? Linked devices will immediately lose remote access.",
     purgeSuccess: "All active IDs have been cleared. The tunnel is instantly deactivated.",
+    tableThId: "GENERATED ID",
+    tableThDevice: "DEVICE / BROWSER",
+    tableThStatus: "STATUS",
   },
   settingsService: {
     phasePrep: "Preparing",
