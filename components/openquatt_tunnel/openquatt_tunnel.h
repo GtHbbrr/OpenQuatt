@@ -24,9 +24,11 @@ class OpenQuattTunnel : public Component {
  private:
     std::string relay_host_;
     std::string pump_secret_;
+    std::string auth_header_storage_; // FIX: Persistente RAM buffer voor de header!
     
     void *client_{nullptr};
     bool is_connected_{false};
+    bool is_connecting_{false}; // CONCURRENCY GUARD METADATA
     unsigned long last_reconnect_attempt_{0};
     uint8_t *tx_frame_buffer_{nullptr};
 
@@ -36,14 +38,11 @@ class OpenQuattTunnel : public Component {
     float get_setup_priority() const override { return setup_priority::AFTER_WIFI; }
     
     void set_relay_host(const std::string &relay_host) { this->relay_host_ = relay_host; }
-    
-    // Alleen de declaratie behouden, implementatie verhuist naar .cpp voor de linker
     void set_pump_secret(const std::string &pump_secret);
+    void set_connecting_false(); // EXPLICIT EVENT LOOP UNLOCK
     
     void connect_to_relay();
     void send_frame(FrameType type, uint32_t stream_id, const uint8_t *payload, size_t payload_len);
-
-    // FIX: Declareer de inkomende data-ontvanger om de compiler te bevrijden!
     void on_websocket_data(uint8_t *data, size_t len);
 };
 
