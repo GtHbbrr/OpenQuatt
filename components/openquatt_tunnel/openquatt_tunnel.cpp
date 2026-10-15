@@ -92,28 +92,27 @@ void OpenQuattTunnel::set_connecting_false() {
 }
 
 void OpenQuattTunnel::connect_to_relay() {
-    // Keiharde asynchrone guard
     if (this->is_connected_ || this->is_connecting_) {
         return;
     }
 
+    last_reconnect_attempt_ = millis();
     if (this->pump_secret_.empty() || this->pump_secret_ == "—") return;
 
     this->is_connecting_ = true;
-    last_reconnect_attempt_ = millis();
 
-    esp_websocket_client_config_t ws_cfg = {};
+    // FIX: Reset en gebruik de persistente klasse-buffer
+    memset(&this->ws_cfg_storage_, 0, sizeof(esp_websocket_client_config_t));
 
-    ws_cfg.uri = "wss://quatt.openheatpumps.nl/device";
-    ws_cfg.subprotocol = "openquatt-tunnel.v1";
+    this->ws_cfg_storage_.uri = "wss://quatt.openheatpumps.nl/device";
+    this->ws_cfg_storage_.subprotocol = "openquatt-tunnel.v1";
 
-    // FIX: Sla de header op in de klasse-buffer zodat mbedTLS hem asynchroon kan uitlezen!
     this->auth_header_storage_ = "Authorization: Bearer " + this->pump_secret_;
-    ws_cfg.headers = this->auth_header_storage_.c_str();
+    this->ws_cfg_storage_.headers = this->auth_header_storage_.c_str();
 
-    ws_cfg.user_context = this;
-    ws_cfg.skip_cert_common_name_check = true;
-
+    this->ws_cfg_storage_.user_context = this;
+    this->ws_cfg_storage_.skip_cert_common_name_check = true;
+    this->ws_cfg_storage_.buffer_size = 8192;
 
     if (client_ != nullptr) {
         esp_websocket_client_stop((esp_websocket_client_handle_t)client_);
@@ -121,14 +120,16 @@ void OpenQuattTunnel::connect_to_relay() {
         client_ = nullptr;
     }
 
-    esp_websocket_client_handle_t ws_client = esp_websocket_client_init(&ws_cfg);
+    // Geef de stabiele RAM-pointer mee aan de initialisatie
+    esp_websocket_client_handle_t ws_client = esp_websocket_client_init(&this->ws_cfg_storage_);
     if (ws_client != nullptr) {
         esp_websocket_register_events(ws_client, WEBSOCKET_EVENT_ANY, websocket_event_handler, (void *)this);
         esp_websocket_client_start(ws_client);
         client_ = (void *)ws_client;
-        ESP_LOGI(TAG, "📡 [DEBUG] esp_websocket_client_start() succesvol uitgevoerd!");
+        ESP_LOGI(TAG, "📡 [DEBUG] esp_websocket_client_start() uitgevoerd met stabiele RAM buffers.");
     }
 }
+
 
 void OpenQuattTunnel::send_frame(FrameType type, uint32_t stream_id, const uint8_t *payload, size_t payload_len) {
     if (!is_connected_ || client_ == nullptr || payload_len > MAX_FRAME_SIZE) return;
