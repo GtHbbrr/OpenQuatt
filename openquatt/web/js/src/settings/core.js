@@ -195,10 +195,6 @@ function syncFrequencyRangeControl(control) {
           const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 768;
           input.disabled = !isMobile || state.loadingEntities;
         }
-        if (fieldKey === "openquatt_tunnel_service") {
-          const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 768;
-          input.disabled = !isMobile || state.loadingEntities;
-        }
         const value = input.type === "time"
           ? toTimeInputValue(getInputDraftValue(fieldKey))
           : String(getInputDraftValue(fieldKey) ?? "");
