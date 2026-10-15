@@ -350,6 +350,7 @@ function syncFrequencyRangeControl(control) {
         const valueNode = row.querySelector(".oq-settings-quickstart-status-value");
         const copyNode = row.querySelector(".oq-settings-quickstart-status-copy");
         const button = row.querySelector("button[data-oq-action]");
+        
         if (item === "login") {
           const statusLabel = getWebAuthStatusLabel();
           const statusCopy = getWebAuthStatusDetail();
@@ -360,9 +361,14 @@ function syncFrequencyRangeControl(control) {
             copyNode.textContent = statusCopy;
           }
         } else if (item === "tunnel") {
-          const tunnelActive = isEntityActive("openquatt_tunnel_service");
-          if (valueNode && valueNode.textContent !== (tunnelActive ? "Actief" : "Uitgeschakeld")) {
-            valueNode.textContent = tunnelActive ? "Actief" : "Uitgeschakeld";
+          const isTunnelActive = isEntityActive("openquatt_tunnel_service");
+          const statusLabel = isTunnelActive ? t("settingsSecurity.tunnelStatusActive") : t("settingsSecurity.tunnelStatusDisabled");
+          const statusCopy = t("settingsSecurity.tunnelCopy");
+          if (valueNode && valueNode.textContent !== statusLabel) {
+            valueNode.textContent = statusLabel;
+          }
+          if (copyNode && copyNode.textContent !== statusCopy) {
+            copyNode.textContent = statusCopy;
           }
         } else if (item === "api") {
           const statusLabel = getApiSecurityStatusLabel();
@@ -371,26 +377,6 @@ function syncFrequencyRangeControl(control) {
             valueNode.textContent = statusLabel;
           }
           if (copyNode && copyNode.textContent !== statusCopy) {
-        } else if (item === "tunnel") {
-          const isTunnelActive = isEntityActive("openquatt_tunnel_service");
-          const statusLabel = isTunnelActive ? t("settingsSecurity.tunnelStatusActive") : t("settingsSecurity.tunnelStatusDisabled");
-          const statusCopy = t("settingsSecurity.tunnelCopy");
-          if (valueNode && valueNode.textContent !== statusLabel) {
-            valueNode.textContent = statusLabel;
-          }
-          if (copyNode && copyNode.textContent !== statusCopy) {
-            copyNode.textContent = statusCopy;
-          }
-        } else if (item === "tunnel") {
-          const isTunnelActive = isEntityActive("openquatt_tunnel_service");
-          const statusLabel = isTunnelActive ? t("settingsSecurity.tunnelStatusActive") : t("settingsSecurity.tunnelStatusDisabled");
-          const statusCopy = t("settingsSecurity.tunnelCopy");
-          if (valueNode && valueNode.textContent !== statusLabel) {
-            valueNode.textContent = statusLabel;
-          }
-          if (copyNode && copyNode.textContent !== statusCopy) {
-            copyNode.textContent = statusCopy;
-          }
             copyNode.textContent = statusCopy;
           }
         }
@@ -399,7 +385,6 @@ function syncFrequencyRangeControl(control) {
         }
       });
     }
-
 
     const systemSummary = stack.querySelector(".oq-settings-system-summary");
     if (systemSummary) {
