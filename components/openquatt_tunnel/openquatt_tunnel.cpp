@@ -82,10 +82,12 @@ void OpenQuattTunnel::connect_to_relay() {
     if (this->pump_secret_.empty() || this->pump_secret_ == "—") return;
 
     esp_websocket_client_config_t ws_cfg = {};
-    static std::string uri, auth;
-    uri = "wss://" + relay_host_ + "/device";
-    ws_cfg.uri = uri.c_str();
+    
+    // FIX: Forceer een 100% zuivere, statische URI-string zonder string-concatenatie risico's!
+    ws_cfg.uri = "wss://quatt.openheatpumps.nl/device";
     ws_cfg.subprotocol = "openquatt-tunnel.v1";
+    
+    static std::string auth;
     auth = "Authorization: Bearer " + pump_secret_;
     ws_cfg.headers = auth.c_str();
     ws_cfg.user_context = this;
@@ -102,7 +104,7 @@ void OpenQuattTunnel::connect_to_relay() {
         esp_websocket_register_events(ws_client, WEBSOCKET_EVENT_ANY, websocket_event_handler, (void *)this);
         esp_websocket_client_start(ws_client);
         client_ = (void *)ws_client;
-        ESP_LOGI(TAG, "📡 [DEBUG] esp_websocket_client_start() uitgevoerd richting: %s", uri.c_str());
+        ESP_LOGI(TAG, "📡 [DEBUG] esp_websocket_client_start() succesvol uitgevoerd!");
     }
 }
 
