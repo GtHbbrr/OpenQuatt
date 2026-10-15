@@ -44,8 +44,7 @@ void OpenQuattTunnel::setup() {
     esphome::openquatt_tunnel_service = this;
     esp_log_level_set("esp_websocket_client", ESP_LOG_DEBUG);
     esp_log_level_set("openquatt_tunnel", ESP_LOG_DEBUG);
-    
-    this->pump_secret_ = "${oq_tunnel_pump_secret}";
+
     this->last_reconnect_attempt_ = millis() - 16000;
     
     tx_frame_buffer_ = (uint8_t *) heap_caps_malloc(MAX_FRAME_SIZE + 5, MALLOC_CAP_SPIRAM);
