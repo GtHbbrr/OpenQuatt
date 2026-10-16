@@ -100,7 +100,7 @@ void OpenQuattTunnel::connect_to_relay() {
     this->ws_cfg_storage_.headers = this->auth_header_storage_.c_str();
     this->ws_cfg_storage_.user_context = this;
     this->ws_cfg_storage_.skip_cert_common_name_check = true;
-    this->ws_cfg_storage_.buffer_size = 4096;
+    this->ws_cfg_storage_.buffer_size = 8192;
 
     if (client_ != nullptr) {
         esp_websocket_client_stop((esp_websocket_client_handle_t)client_);
