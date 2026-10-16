@@ -12,6 +12,39 @@ namespace openquatt_tunnel_tunnel {
 
 static const char *const TAG = "openquatt_tunnel";
 
+// De officiële Espressif Event Handler om de protocol-handshake (HELLO) direct na SSL-succes af te vuren
+static void websocket_event_handler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data) {
+    OpenQuattTunnel *tunnel = (OpenQuattTunnel *)handler_args;
+    if (tunnel == nullptr) return;
+
+    switch (event_id) {
+        case WEBSOCKET_EVENT_CONNECTED:
+            tunnel->set_connecting_false();
+            ESP_LOGI(TAG, "🟢 [WEBSOCKET] TLS Handshake geslaagd! Starten van Wire Protocol v2.0 HELLO...");
+            
+            // Zend het binaire HELLO frame (Type 0x01, Stream ID 0) conform Sectie 5 & 6 van de specificatie
+            {
+                std::string hello_json = "{\"v\":2,\"fw\":\"0.54.1\",\"max_frame\":4096}";
+                tunnel->send_frame(FRAME_HELLO, 0, (const uint8_t *)hello_json.c_str(), hello_json.length());
+                ESP_LOGI(TAG, "📡 [TUNNEL] FRAME_HELLO (0x01) succesvol over de beveiligde socket gestuurd!");
+            }
+            break;
+            
+        case WEBSOCKET_EVENT_DISCONNECTED:
+            tunnel->set_connecting_false();
+            ESP_LOGW(TAG, "🔴 [WEBSOCKET] Verbinding met Cloudflare verbroken.");
+            break;
+            
+        case WEBSOCKET_EVENT_DATA:
+            break;
+            
+        case WEBSOCKET_EVENT_ERROR:
+            tunnel->set_connecting_false();
+            ESP_LOGE(TAG, "🚨 [WEBSOCKET] Netwerk transportfout gedetecteerd.");
+            break;
+    }
+}
+
 void OpenQuattTunnel::setup() {
     esphome::openquatt_tunnel_service = this;
     this->pump_secret_ = "";
@@ -59,17 +92,12 @@ void OpenQuattTunnel::connect_to_relay() {
     this->is_connecting_ = true;
     last_reconnect_attempt_ = millis();
 
-    // Reset de configuratiestructuur in het RAM
     memset(&this->ws_cfg_storage_, 0, sizeof(esp_websocket_client_config_t));
-    
-    // Pure, standaard URI zonder query-string parser conflicten
     this->ws_cfg_storage_.uri = "wss://quatt.openheatpumps.nl/device";
     this->ws_cfg_storage_.subprotocol = "openquatt-tunnel.v1";
     
-    // Veranker de header permanent in de klasse-string van het RAM
     this->auth_header_storage_ = "Authorization: Bearer " + this->pump_secret_ + "\r\n";
     this->ws_cfg_storage_.headers = this->auth_header_storage_.c_str();
-    
     this->ws_cfg_storage_.user_context = this;
     this->ws_cfg_storage_.skip_cert_common_name_check = true;
     this->ws_cfg_storage_.buffer_size = 4096;
@@ -82,17 +110,18 @@ void OpenQuattTunnel::connect_to_relay() {
 
     esp_websocket_client_handle_t ws_client = esp_websocket_client_init(&this->ws_cfg_storage_);
     if (ws_client != nullptr) {
+        // Registreer de native callback om de handshake direct te forceren bij verbinding
+        esp_websocket_register_events(ws_client, WEBSOCKET_EVENT_ANY, websocket_event_handler, (void *)this);
         esp_websocket_client_start(ws_client);
         client_ = (void *)ws_client;
-        ESP_LOGI(TAG, "🚀 [TUNNEL] WebSocket client permanent gestart over stabiele klasse-headers.");
+        ESP_LOGI(TAG, "🚀 [TUNNEL] WebSocket client succesvol geactiveerd via event listeners.");
     }
 }
 
 void OpenQuattTunnel::send_frame(FrameType type, uint32_t stream_id, const uint8_t *payload, size_t payload_len) {
-    if (!is_connected_ || client_ == nullptr || payload_len > MAX_FRAME_SIZE) return;
+    if (client_ == nullptr || payload_len > MAX_FRAME_SIZE) return;
     esp_websocket_client_handle_t ws_client = (esp_websocket_client_handle_t)client_;
 
-    // FIX: Gebruik array-indexering [0..4] in plaats van de pointer-overschrijving!
     tx_frame_buffer_[0] = (uint8_t)type;
     tx_frame_buffer_[1] = (uint8_t)((stream_id >> 24) & 0xFF);
     tx_frame_buffer_[2] = (uint8_t)((stream_id >> 16) & 0xFF);
@@ -104,7 +133,6 @@ void OpenQuattTunnel::send_frame(FrameType type, uint32_t stream_id, const uint8
     }
     esp_websocket_client_send_bin(ws_client, (char *)tx_frame_buffer_, payload_len + 5, portMAX_DELAY);
 }
-
 
 void OpenQuattTunnel::on_websocket_data(uint8_t *data, size_t len) {}
 
