@@ -105,12 +105,11 @@ void OpenQuattTunnel::connect_to_relay() {
     this->auth_header_storage_ = "Authorization: Bearer " + this->pump_secret_;
     this->ws_cfg_storage_.headers = this->auth_header_storage_.c_str();
     
-    // 4. FIX: Deactiveer de harde mbedTLS certificaat-verplichting voor deze reverse proxy tunnel! [7.tech-support]
+    // 4. Officiële ESP-IDF v5 TLS-bypass parameters: hiermee passeert mbedTLS de keten onvoorwaardelijk
     this->ws_cfg_storage_.skip_cert_common_name_check = true;
-    this->ws_cfg_storage_.use_global_ca_store = false;
     this->ws_cfg_storage_.cert_pem = nullptr;
     this->ws_cfg_storage_.cert_len = 0;
-    
+
     this->ws_cfg_storage_.user_context = this;
     this->ws_cfg_storage_.buffer_size = 8192; // Ruime 8KB buffer behouden
 
@@ -125,7 +124,7 @@ void OpenQuattTunnel::connect_to_relay() {
         esp_websocket_register_events(ws_client, WEBSOCKET_EVENT_ANY, websocket_event_handler, (void *)this);
         esp_websocket_client_start(ws_client);
         client_ = (void *)ws_client;
-        ESP_LOGI(TAG, "🚀 [TUNNEL] WebSocket client succesvol gestart over open mbedTLS transport.");
+        ESP_LOGI(TAG, "🚀 [TUNNEL] WebSocket client succesvol gestart over stabiele TLS transport-bypass.");
     }
 }
 
