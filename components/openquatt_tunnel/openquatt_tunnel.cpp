@@ -95,19 +95,24 @@ void OpenQuattTunnel::connect_to_relay() {
     // Wis en initialiseer de stabiele klasse-buffer in het RAM
     memset(&this->ws_cfg_storage_, 0, sizeof(esp_websocket_client_config_t));
     
-    // 1. Pure, standaard URI zonder query-string conflicten
+    // 1. Pure, standaard URI zonder query-string parser conflicten
     this->ws_cfg_storage_.uri = "wss://quatt.openheatpumps.nl/device";
     
-    // 2. Gebruik het OFFICIËLE subprotocol-veld van Espressif (voorkomt header-corruptie!)
+    // 2. Gebruik het officiële subprotocol-veld van Espressif
     this->ws_cfg_storage_.subprotocol = "openquatt-tunnel.v1";
     
-    // 3. Veranker de pure Authorization header zonder handmatige regeleinden (\r\n)
+    // 3. Veranker de pure Authorization header in het RAM
     this->auth_header_storage_ = "Authorization: Bearer " + this->pump_secret_;
     this->ws_cfg_storage_.headers = this->auth_header_storage_.c_str();
     
-    this->ws_cfg_storage_.user_context = this;
+    // 4. FIX: Deactiveer de harde mbedTLS certificaat-verplichting voor deze reverse proxy tunnel! [7.tech-support]
     this->ws_cfg_storage_.skip_cert_common_name_check = true;
-    this->ws_cfg_storage_.buffer_size = 8192; // Behoud de ruime 8KB buffer
+    this->ws_cfg_storage_.use_global_ca_store = false;
+    this->ws_cfg_storage_.cert_pem = nullptr;
+    this->ws_cfg_storage_.cert_len = 0;
+    
+    this->ws_cfg_storage_.user_context = this;
+    this->ws_cfg_storage_.buffer_size = 8192; // Ruime 8KB buffer behouden
 
     if (client_ != nullptr) {
         esp_websocket_client_stop((esp_websocket_client_handle_t)client_);
@@ -120,7 +125,7 @@ void OpenQuattTunnel::connect_to_relay() {
         esp_websocket_register_events(ws_client, WEBSOCKET_EVENT_ANY, websocket_event_handler, (void *)this);
         esp_websocket_client_start(ws_client);
         client_ = (void *)ws_client;
-        ESP_LOGI(TAG, "🚀 [TUNNEL] WebSocket client gestart met native structuurvelden.");
+        ESP_LOGI(TAG, "🚀 [TUNNEL] WebSocket client succesvol gestart over open mbedTLS transport.");
     }
 }
 
