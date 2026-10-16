@@ -94,9 +94,13 @@ void OpenQuattTunnel::connect_to_relay() {
 
     memset(&this->ws_cfg_storage_, 0, sizeof(esp_websocket_client_config_t));
     this->ws_cfg_storage_.uri = "wss://quatt.openheatpumps.nl/device";
-    this->ws_cfg_storage_.subprotocol = "openquatt-tunnel.v1";
     
-    this->auth_header_storage_ = "Authorization: Bearer " + this->pump_secret_ + "\r\n";
+    // FIX: Injecteer het subprotocol en de User-Agent direct asynchroon in de stabiele RAM-headers! [7.tech-support]
+    this->auth_header_storage_ = 
+        "Authorization: Bearer " + this->pump_secret_ + "\r\n"
+        "Sec-WebSocket-Protocol: openquatt-tunnel.v1\r\n"
+        "User-Agent: Espressif-ESP32S3-mbedTLS/5.5.5\r\n";
+        
     this->ws_cfg_storage_.headers = this->auth_header_storage_.c_str();
     this->ws_cfg_storage_.user_context = this;
     this->ws_cfg_storage_.skip_cert_common_name_check = true;
