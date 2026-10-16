@@ -39,7 +39,6 @@ void OpenQuattTunnel::loop() {
 }
 
 void OpenQuattTunnel::set_pump_secret(const std::string &pump_secret) {
-    // WATERDICHTE SINGLE-TOKEN LOCK: Voorkomt oneindige herstarts door dubbele browser-prikkels [7.tech-support]
     if (!this->pump_secret_.empty() && this->pump_secret_ != "—") {
         ESP_LOGD(TAG, "🔒 [LOCK] Overtollige browser-prikkel genegeerd. Actief token behouden.");
         return;
@@ -60,15 +59,20 @@ void OpenQuattTunnel::connect_to_relay() {
     this->is_connecting_ = true;
     last_reconnect_attempt_ = millis();
 
-    // WIRE PROTOCOL V2.0: Directe query-token URI structuur [7.tech-support]
-    std::string full_uri = "wss://quatt.openheatpumps.nl/device?token=" + this->pump_secret_;
-
+    // Reset de configuratiestructuur in het RAM
     memset(&this->ws_cfg_storage_, 0, sizeof(esp_websocket_client_config_t));
-    this->ws_cfg_storage_.uri = full_uri.c_str();
+    
+    // Pure, standaard URI zonder query-string parser conflicten
+    this->ws_cfg_storage_.uri = "wss://quatt.openheatpumps.nl/device";
     this->ws_cfg_storage_.subprotocol = "openquatt-tunnel.v1";
+    
+    // Veranker de header permanent in de klasse-string van het RAM
+    this->auth_header_storage_ = "Authorization: Bearer " + this->pump_secret_ + "\r\n";
+    this->ws_cfg_storage_.headers = this->auth_header_storage_.c_str();
+    
     this->ws_cfg_storage_.user_context = this;
     this->ws_cfg_storage_.skip_cert_common_name_check = true;
-    this->ws_cfg_storage_.buffer_size = 8192;
+    this->ws_cfg_storage_.buffer_size = 4096;
 
     if (client_ != nullptr) {
         esp_websocket_client_stop((esp_websocket_client_handle_t)client_);
@@ -80,7 +84,7 @@ void OpenQuattTunnel::connect_to_relay() {
     if (ws_client != nullptr) {
         esp_websocket_client_start(ws_client);
         client_ = (void *)ws_client;
-        ESP_LOGI(TAG, "🚀 [TUNNEL] WebSocket client succesvol gestart over v2.0 cloud-pijplijn.");
+        ESP_LOGI(TAG, "🚀 [TUNNEL] WebSocket client permanent gestart over stabiele klasse-headers.");
     }
 }
 
@@ -88,6 +92,7 @@ void OpenQuattTunnel::send_frame(FrameType type, uint32_t stream_id, const uint8
     if (!is_connected_ || client_ == nullptr || payload_len > MAX_FRAME_SIZE) return;
     esp_websocket_client_handle_t ws_client = (esp_websocket_client_handle_t)client_;
 
+    // FIX: Gebruik array-indexering [0..4] in plaats van de pointer-overschrijving!
     tx_frame_buffer_[0] = (uint8_t)type;
     tx_frame_buffer_[1] = (uint8_t)((stream_id >> 24) & 0xFF);
     tx_frame_buffer_[2] = (uint8_t)((stream_id >> 16) & 0xFF);
@@ -99,6 +104,7 @@ void OpenQuattTunnel::send_frame(FrameType type, uint32_t stream_id, const uint8
     }
     esp_websocket_client_send_bin(ws_client, (char *)tx_frame_buffer_, payload_len + 5, portMAX_DELAY);
 }
+
 
 void OpenQuattTunnel::on_websocket_data(uint8_t *data, size_t len) {}
 
