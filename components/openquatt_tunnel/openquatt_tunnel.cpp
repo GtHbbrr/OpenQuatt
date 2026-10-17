@@ -96,16 +96,15 @@ void OpenQuattTunnel::set_connecting_false() {
 }
 
 void OpenQuattTunnel::connect_to_relay() {
-    if (this->is_connected_ || this->is_connecting_) return;
+    // CRUCIAAL: Harde return als er al een actieve TLS-handshake loopt!
+    // Dit voorkomt dat zware telemetrie-blokkades (1239 ms) de token-buffers in RAM corrumperen.
+    if (this->is_connecting_ || this->is_connected_) {
+        ESP_LOGD(TAG, "⏳ [TUNNEL] connect_to_relay genegeerd: al bezig of verbonden.");
+        return;
+    }
+    
     if (this->pump_secret_.empty() || this->pump_secret_ == "—") return;
 
-    if (client_ != nullptr) {
-        esp_websocket_client_stop((esp_websocket_client_handle_t)client_);
-        esp_websocket_client_destroy((esp_websocket_client_handle_t)client_);
-        client_ = nullptr;
-    }
-
-    // FIX 1: Underscore toegevoegd conform klasse-definitie
     this->is_connecting_ = true;
     last_reconnect_attempt_ = millis();
 
@@ -117,9 +116,11 @@ void OpenQuattTunnel::connect_to_relay() {
     this->ws_cfg_storage_.subprotocol = "openquatt-tunnel.v1";
     this->ws_cfg_storage_.user_context = this;
 
-    static std::string static_path_buffer;
-    static_path_buffer = "/device?token=" + this->pump_secret_;
-    this->ws_cfg_storage_.path = static_path_buffer.c_str();
+    // We maken een persistente, statische kopie van het op dit moment actieve secret
+    // Dit bevriest het token zodat parallelle RTOS-taken de string niet kunnen wijzigen!
+    static std::string frozen_path_buffer;
+    frozen_path_buffer = "/device?token=" + this->pump_secret_;
+    this->ws_cfg_storage_.path = frozen_path_buffer.c_str();
     
     static std::string static_header_buffer;
     static_header_buffer = "User-Agent: OpenQuatt/2.0 ESP32-S3\r\n";
@@ -131,15 +132,21 @@ void OpenQuattTunnel::connect_to_relay() {
     this->ws_cfg_storage_.buffer_size = 4608;
     this->ws_cfg_storage_.task_stack = 16384; 
 
+    if (client_ != nullptr) {
+        esp_websocket_client_stop((esp_websocket_client_handle_t)client_);
+        esp_websocket_client_destroy((esp_websocket_client_handle_t)client_);
+        client_ = nullptr;
+    }
+
     esp_websocket_client_handle_t ws_client = esp_websocket_client_init(&this->ws_cfg_storage_);
     if (ws_client != nullptr) {
         esp_websocket_register_events(ws_client, WEBSOCKET_EVENT_ANY, websocket_event_handler, (void *)this);
         esp_websocket_client_start(ws_client);
         client_ = (void *)ws_client;
-        ESP_LOGI(TAG, "🚀 [TUNNEL] Veilige WSS Secure TLS Handshake gestart via 16KB stack.");
+        ESP_LOGI(TAG, "🚀 [TUNNEL] Veilige WSS Secure TLS Handshake gestart via bevroren token.");
     } else {
         this->is_connecting_ = false;
-        ESP_LOGE(TAG, "🚨 [TUNNEL] Allocatiefout tijdens initialisatie.");
+        ESP_LOGE(TAG, "🚨 [TUNNEL] Allocatiefout tijdens initialisatie van esp_websocket_client.");
     }
 }
 
