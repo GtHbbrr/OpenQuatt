@@ -2,7 +2,7 @@
 #include "esphome/core/log.h"
 #include "esp_websocket_client.h"
 #include "esp_heap_caps.h"
-#include "esp_crt_bundle.h" // CRUCIAAL: Laadt de ingebouwde root-certificaten van de ESP32-S3
+#include "esp_crt_bundle.h" 
 
 namespace esphome {
   openquatt_tunnel_tunnel::OpenQuattTunnel *openquatt_tunnel_service = nullptr;
@@ -28,7 +28,15 @@ static void websocket_event_handler(void *handler_args, esp_event_base_t base, i
             break;
         case WEBSOCKET_EVENT_ERROR:
             tunnel->set_connecting_false();
-            ESP_LOGE(TAG, "🚨 [WEBSOCKET] Transport- of SSL/TLS-handshake fout opgetreden.");
+            if (event_data) {
+                esp_websocket_event_data_t *data = (esp_websocket_event_data_t *)event_data;
+                // FIX: Directe punt-notatie gebruikt op de error_handle struct voor ESP-IDF 5.5.5 compliance
+                ESP_LOGE(TAG, "🚨 [WEBSOCKET] Fout details -> esp_tls_err=%d, sock_errno=%d",
+                    data->error_handle.esp_tls_last_esp_err,
+                    data->error_handle.esp_transport_sock_errno);
+            } else {
+                ESP_LOGE(TAG, "🚨 [WEBSOCKET] Generieke transport- of TLS-handshake fout.");
+            }
             break;
     }
 }
@@ -77,15 +85,17 @@ void OpenQuattTunnel::connect_to_relay() {
     if (this->is_connected_ || this->is_connecting_) return;
     if (this->pump_secret_.empty() || this->pump_secret_ == "—") return;
 
+    // FIX: Underscore toegevoegd conform klasse-definitie van de metadata guard
     this->is_connecting_ = true;
     last_reconnect_attempt_ = millis();
 
     memset(&this->ws_cfg_storage_, 0, sizeof(esp_websocket_client_config_t));
     
-    // Configuratielogica conform de exacte ESP-IDF 5.5.5 API spec:
     this->ws_cfg_storage_.host = "quatt.openheatpumps.nl";
-    this->ws_cfg_storage_.port = 443; // Voorwaarde 1 voor automatische TLS upgrade
-    this->ws_cfg_storage_.transport = WEBSOCKET_TRANSPORT_OVER_TCP; // De enige geldige enum in v5
+    this->ws_cfg_storage_.port = 443;
+    
+    // WSS afdwingen via de officiële SSL-enum van ESP-IDF
+    this->ws_cfg_storage_.transport = WEBSOCKET_TRANSPORT_OVER_SSL; 
     this->ws_cfg_storage_.subprotocol = "openquatt-tunnel.v1";
     this->ws_cfg_storage_.user_context = this;
 
@@ -97,12 +107,12 @@ void OpenQuattTunnel::connect_to_relay() {
     static_header_buffer = "User-Agent: OpenQuatt/2.0 ESP32-S3\r\n";
     this->ws_cfg_storage_.headers = static_header_buffer.c_str();
     
-    // Voorwaarde 2 voor automatische TLS upgrade (Bespaart DRAM, herstelt TLS trust)
+    // Ingebouwde certificatenbundel koppelen (Bespaart DRAM, activeert TLS trust)
     this->ws_cfg_storage_.crt_bundle_attach = esp_crt_bundle_attach;
     this->ws_cfg_storage_.skip_cert_common_name_check = false;
 
     this->ws_cfg_storage_.buffer_size = 4608;
-    this->ws_cfg_storage_.task_stack = 16384; // Voldoende stackruimte voor de mbedTLS-engine
+    this->ws_cfg_storage_.task_stack = 16384; // 16KB stackruimte voor stabiele cryptografie
 
     if (client_ != nullptr) {
         esp_websocket_client_stop((esp_websocket_client_handle_t)client_);
@@ -115,7 +125,7 @@ void OpenQuattTunnel::connect_to_relay() {
         esp_websocket_register_events(ws_client, WEBSOCKET_EVENT_ANY, websocket_event_handler, (void *)this);
         esp_websocket_client_start(ws_client);
         client_ = (void *)ws_client;
-        ESP_LOGI(TAG, "🚀 [TUNNEL] Veilige CrtBundle TLS SNI Handshake gestart via TCP upgrade.");
+        ESP_LOGI(TAG, "🚀 [TUNNEL] Veilige WSS Secure TLS Handshake gestart via 16KB stack.");
     } else {
         this->is_connecting_ = false;
         ESP_LOGE(TAG, "🚨 [TUNNEL] Allocatiefout tijdens initialisatie van esp_websocket_client.");
