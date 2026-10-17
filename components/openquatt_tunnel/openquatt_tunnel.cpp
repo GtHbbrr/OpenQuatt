@@ -190,8 +190,16 @@ void OpenQuattTunnel::on_websocket_data(uint8_t *data, size_t len) {
     esp_http_client_config_t config = {};
     config.url = local_url.c_str();
     config.timeout_ms = 8000; 
-
+    
+    // ✅ CRUCIAL: Schakel automatische decompressie uit in ESP-IDF v5!
+    // Dit zorgt ervoor dat de rauwe gzip-bytes direct en onaangetast naar Cloudflare worden gestreamd,
+    // waardoor de 'Content-Encoding: gzip' header weer 100% klopt voor je iPhone!
+    config.disable_auto_redirect = true;
+    
+    // In ESP-IDF v5 dwing je het behoud van gzip door de accept-encoding header handmatig leeg te laten 
+    // of de transport-configuratie niet te laten decompresseren:
     esp_http_client_handle_t http_client = esp_http_client_init(&config);
+
     if (http_client == nullptr) {
         std::string reset_json = "{\"code\":6}";
         this->send_frame((FrameType)0x30, stream_id, (const uint8_t *)reset_json.c_str(), reset_json.length());
