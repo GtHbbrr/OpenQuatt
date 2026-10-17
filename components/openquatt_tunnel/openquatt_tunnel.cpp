@@ -96,6 +96,13 @@ void OpenQuattTunnel::connect_to_relay() {
     if (this->is_connected_ || this->is_connecting_) return;
     if (this->pump_secret_.empty() || this->pump_secret_ == "—") return;
 
+    // FIX: Harde guard om dubbele parallelle clients bij opeenvolgende /control triggers te voorkomen!
+    if (client_ != nullptr) {
+        esp_websocket_client_stop((esp_websocket_client_handle_t)client_);
+        esp_websocket_client_destroy((esp_websocket_client_handle_t)client_);
+        client_ = nullptr;
+    }
+
     this->is_connecting_ = true;
     last_reconnect_attempt_ = millis();
 
@@ -120,12 +127,6 @@ void OpenQuattTunnel::connect_to_relay() {
 
     this->ws_cfg_storage_.buffer_size = 4608;
     this->ws_cfg_storage_.task_stack = 16384; 
-
-    if (client_ != nullptr) {
-        esp_websocket_client_stop((esp_websocket_client_handle_t)client_);
-        esp_websocket_client_destroy((esp_websocket_client_handle_t)client_);
-        client_ = nullptr;
-    }
 
     esp_websocket_client_handle_t ws_client = esp_websocket_client_init(&this->ws_cfg_storage_);
     if (ws_client != nullptr) {
