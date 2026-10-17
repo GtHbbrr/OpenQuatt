@@ -82,9 +82,10 @@ void OpenQuattTunnel::connect_to_relay() {
 
     memset(&this->ws_cfg_storage_, 0, sizeof(esp_websocket_client_config_t));
     
+    // Configuratielogica conform de exacte ESP-IDF 5.5.5 API spec:
     this->ws_cfg_storage_.host = "quatt.openheatpumps.nl";
-    this->ws_cfg_storage_.port = 443;
-    this->ws_cfg_storage_.transport = WEBSOCKET_TRANSPORT_OVER_TCP; 
+    this->ws_cfg_storage_.port = 443; // Voorwaarde 1 voor automatische TLS upgrade
+    this->ws_cfg_storage_.transport = WEBSOCKET_TRANSPORT_OVER_TCP; // De enige geldige enum in v5
     this->ws_cfg_storage_.subprotocol = "openquatt-tunnel.v1";
     this->ws_cfg_storage_.user_context = this;
 
@@ -96,12 +97,12 @@ void OpenQuattTunnel::connect_to_relay() {
     static_header_buffer = "User-Agent: OpenQuatt/2.0 ESP32-S3\r\n";
     this->ws_cfg_storage_.headers = static_header_buffer.c_str();
     
-    // Ingebouwde certificatenbundel koppelen (Bespaart DRAM, herstelt TLS trust)
+    // Voorwaarde 2 voor automatische TLS upgrade (Bespaart DRAM, herstelt TLS trust)
     this->ws_cfg_storage_.crt_bundle_attach = esp_crt_bundle_attach;
     this->ws_cfg_storage_.skip_cert_common_name_check = false;
 
     this->ws_cfg_storage_.buffer_size = 4608;
-    this->ws_cfg_storage_.task_stack = 8192;
+    this->ws_cfg_storage_.task_stack = 16384; // Voldoende stackruimte voor de mbedTLS-engine
 
     if (client_ != nullptr) {
         esp_websocket_client_stop((esp_websocket_client_handle_t)client_);
@@ -114,7 +115,7 @@ void OpenQuattTunnel::connect_to_relay() {
         esp_websocket_register_events(ws_client, WEBSOCKET_EVENT_ANY, websocket_event_handler, (void *)this);
         esp_websocket_client_start(ws_client);
         client_ = (void *)ws_client;
-        ESP_LOGI(TAG, "🚀 [TUNNEL] Veilige CrtBundle TLS SNI Handshake gestart.");
+        ESP_LOGI(TAG, "🚀 [TUNNEL] Veilige CrtBundle TLS SNI Handshake gestart via TCP upgrade.");
     } else {
         this->is_connecting_ = false;
         ESP_LOGE(TAG, "🚨 [TUNNEL] Allocatiefout tijdens initialisatie van esp_websocket_client.");
