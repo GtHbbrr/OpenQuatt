@@ -69,13 +69,23 @@ void OpenQuattTunnel::loop() {
 }
 
 void OpenQuattTunnel::set_pump_secret(const std::string &pump_secret) {
-    if (!this->pump_secret_.empty() && this->pump_secret_ != "—") {
-        ESP_LOGD(TAG, "🔒 [LOCK] Overtollige browser-prikkel genegeerd. Actief token behouden.");
-        return;
+    // FIX: Altijd overschrijven als het token afwijkt — oude verbinding wordt live opgeruimd
+    if (this->pump_secret_ != pump_secret) {
+        this->pump_secret_ = pump_secret;
+        ESP_LOGI(TAG, "🔒 [LOCK] Token succesvol overschreven en verankerd in RAM: %s", pump_secret.c_str());
+        
+        // Vernietig de oude actieve client om mbedTLS-zombietunnels te voorkomen
+        if (client_ != nullptr) {
+            esp_websocket_client_stop((esp_websocket_client_handle_t)client_);
+            esp_websocket_client_destroy((esp_websocket_client_handle_t)client_);
+            client_ = nullptr;
+        }
+        
+        // Reset de vlaggen om connect_to_relay() direct te deblokkeren!
+        this->is_connected_ = false;
+        this->is_connecting_ = false;
+        this->last_reconnect_attempt_ = millis() - 16000; // Dwingt onmiddellijke reconnect
     }
-    
-    this->pump_secret_ = pump_secret;
-    ESP_LOGI(TAG, "🔒 [LOCK] Token verankerd in RAM: %s", pump_secret.c_str());
 }
 
 void OpenQuattTunnel::set_connecting_false() {
