@@ -21,6 +21,8 @@ static void websocket_event_handler(void *handler_args, esp_event_base_t base, i
         case WEBSOCKET_EVENT_CONNECTED:
             tunnel->set_connecting_false();
             ESP_LOGI(TAG, "🟢 [WEBSOCKET] TLS Handshake geslaagd! Verbonden met Cloudflare.");
+            // FIX 1: Direct de binaire handshake starten zodra de SSL/TLS tunnel openstaat!
+            tunnel->send_hello();
             break;
         case WEBSOCKET_EVENT_DISCONNECTED:
             tunnel->set_connecting_false();
@@ -30,7 +32,6 @@ static void websocket_event_handler(void *handler_args, esp_event_base_t base, i
             tunnel->set_connecting_false();
             if (event_data) {
                 esp_websocket_event_data_t *data = (esp_websocket_event_data_t *)event_data;
-                // FIX: Directe punt-notatie gebruikt op de error_handle struct voor ESP-IDF 5.5.5 compliance
                 ESP_LOGE(TAG, "🚨 [WEBSOCKET] Fout details -> esp_tls_err=%d, sock_errno=%d",
                     data->error_handle.esp_tls_last_esp_err,
                     data->error_handle.esp_transport_sock_errno);
@@ -85,7 +86,6 @@ void OpenQuattTunnel::connect_to_relay() {
     if (this->is_connected_ || this->is_connecting_) return;
     if (this->pump_secret_.empty() || this->pump_secret_ == "—") return;
 
-    // FIX: Underscore toegevoegd conform klasse-definitie van de metadata guard
     this->is_connecting_ = true;
     last_reconnect_attempt_ = millis();
 
@@ -93,8 +93,6 @@ void OpenQuattTunnel::connect_to_relay() {
     
     this->ws_cfg_storage_.host = "quatt.openheatpumps.nl";
     this->ws_cfg_storage_.port = 443;
-    
-    // WSS afdwingen via de officiële SSL-enum van ESP-IDF
     this->ws_cfg_storage_.transport = WEBSOCKET_TRANSPORT_OVER_SSL; 
     this->ws_cfg_storage_.subprotocol = "openquatt-tunnel.v1";
     this->ws_cfg_storage_.user_context = this;
@@ -107,12 +105,11 @@ void OpenQuattTunnel::connect_to_relay() {
     static_header_buffer = "User-Agent: OpenQuatt/2.0 ESP32-S3\r\n";
     this->ws_cfg_storage_.headers = static_header_buffer.c_str();
     
-    // Ingebouwde certificatenbundel koppelen (Bespaart DRAM, activeert TLS trust)
     this->ws_cfg_storage_.crt_bundle_attach = esp_crt_bundle_attach;
     this->ws_cfg_storage_.skip_cert_common_name_check = false;
 
     this->ws_cfg_storage_.buffer_size = 4608;
-    this->ws_cfg_storage_.task_stack = 16384; // 16KB stackruimte voor stabiele cryptografie
+    this->ws_cfg_storage_.task_stack = 16384; 
 
     if (client_ != nullptr) {
         esp_websocket_client_stop((esp_websocket_client_handle_t)client_);
@@ -132,8 +129,36 @@ void OpenQuattTunnel::connect_to_relay() {
     }
 }
 
+// FIX 2: De binaire HELLO frame-generator conform Wire Protocol v2.0 (Sectie 5 & 6)
+void OpenQuattTunnel::send_hello() {
+    if (client_ == nullptr || tx_frame_buffer_ == nullptr) return;
+    esp_websocket_client_handle_t ws_client = (esp_websocket_client_handle_t)client_;
+
+    // Smeed de handshake JSON-payload exact conform de verwachting van de Worker
+    const char *hello_json = "{\"v\":1,\"max_frame\":4096,\"max_streams\":2}";
+    size_t payload_len = strlen(hello_json);
+
+    // Bouw het binaire frame op: Type=0x01 (HELLO) | Stream_id=0 (4 bytes Big Endian)
+    tx_frame_buffer_[0] = 0x01; 
+    tx_frame_buffer_[1] = 0x00;
+    tx_frame_buffer_[2] = 0x00;
+    tx_frame_buffer_[3] = 0x00;
+    tx_frame_buffer_[4] = 0x00;
+
+    memcpy(tx_frame_buffer_ + 5, hello_json, payload_len);
+
+    // Forceer binaire verzending (Dit lost Cloudflare's strict ArrayBuffer check op)
+    int sent = esp_websocket_client_send_bin(ws_client, (char *)tx_frame_buffer_, payload_len + 5, portMAX_DELAY);
+
+    if (sent > 0) {
+        ESP_LOGI(TAG, "🚀 [TUNNEL] Binaire HELLO handshake succesvol verzonden (%d bytes).", sent);
+    } else {
+        ESP_LOGE(TAG, "🚨 [TUNNEL] Fout tijdens verzenden van binaire HELLO (rc=%d).", sent);
+    }
+}
+
 void OpenQuattTunnel::send_frame(FrameType type, uint32_t stream_id, const uint8_t *payload, size_t payload_len) {
-    if (!is_connected_ || client_ == nullptr || payload_len > MAX_FRAME_SIZE) return;
+    if (!is_connected_ || client_ == nullptr || payload_len > MAX_FRAME_SIZE || tx_frame_buffer_ == nullptr) return;
     esp_websocket_client_handle_t ws_client = (esp_websocket_client_handle_t)client_;
 
     tx_frame_buffer_[0] = (uint8_t)type;

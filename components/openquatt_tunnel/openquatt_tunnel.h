@@ -43,6 +43,7 @@ class OpenQuattTunnel : public Component {
     void set_relay_host(const std::string &relay_host) { this->relay_host_ = relay_host; }
     void set_pump_secret(const std::string &pump_secret);
     void set_connecting_false(); // EXPLICIT EVENT LOOP UNLOCK
+    void send_hello();
     
     void connect_to_relay();
     void send_frame(FrameType type, uint32_t stream_id, const uint8_t *payload, size_t payload_len);
