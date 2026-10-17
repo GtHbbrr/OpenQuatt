@@ -196,7 +196,12 @@ void OpenQuattTunnel::on_websocket_data(uint8_t *data, size_t len) {
         esp_http_client_fetch_headers(http_client);
         int http_code = esp_http_client_get_status_code(http_client);
 
-        std::string res_head_json = "{\"s\":" + std::to_string(http_code) + ",\"h\":{\"content-type\":\"text/html\"}}";
+        // ✅ FIX: Haal het ECHTE content-type op van de lokale webserver i.p.v. text/html te hardcoderen!
+        char *content_type_val = nullptr;
+        esp_http_client_get_header(http_client, "Content-Type", &content_type_val);
+        std::string c_type = (content_type_val != nullptr) ? content_type_val : "text/html";
+
+        std::string res_head_json = "{\"s\":" + std::to_string(http_code) + ",\"h\":{\"content-type\":\"" + c_type + "\"}}";
         this->send_frame((FrameType)0x20, stream_id, (const uint8_t *)res_head_json.c_str(), res_head_json.length());
 
         uint8_t *static_chunk_buffer = (uint8_t *) heap_caps_malloc(2048, MALLOC_CAP_SPIRAM);
@@ -210,7 +215,6 @@ void OpenQuattTunnel::on_websocket_data(uint8_t *data, size_t len) {
         }
 
         this->send_frame((FrameType)0x22, stream_id, nullptr, 0);
-        // FIX 3: %u hersteld naar %lu om te voldoen aan uint32_t logging-eisen
         ESP_LOGI(TAG, "📤 [TUNNEL] Streaming succesvol afgerond voor stream=%lu", stream_id);
     } else {
         std::string reset_json = "{\"code\":6}";
