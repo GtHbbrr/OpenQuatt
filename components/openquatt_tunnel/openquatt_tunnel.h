@@ -4,6 +4,7 @@
 #include "esphome/core/helpers.h"
 #include "esphome/core/log.h"
 #include <string>
+#include "esp_websocket_client.h" // FIX: Zorgt dat de compiler de struct kent!
 
 namespace esphome {
 namespace openquatt_tunnel_tunnel {
@@ -25,6 +26,8 @@ class OpenQuattTunnel : public Component {
     std::string relay_host_;
     std::string pump_secret_;
     std::string auth_header_storage_; // FIX: Persistente RAM buffer voor de header!
+    // FIX: Sla de volledige netwerkconfiguratie permanent op in het RAM!
+    esp_websocket_client_config_t ws_cfg_storage_{};
     
     void *client_{nullptr};
     bool is_connected_{false};

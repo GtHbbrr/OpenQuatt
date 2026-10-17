@@ -94,17 +94,28 @@ void OpenQuattTunnel::connect_to_relay() {
 
     memset(&this->ws_cfg_storage_, 0, sizeof(esp_websocket_client_config_t));
     
-    this->ws_cfg_storage_.uri = "wss://quatt.openheatpumps.nl/device";
+    // In deze ESP-IDF build staan de parameters plat op de struct:
+    this->ws_cfg_storage_.host = "quatt.openheatpumps.nl";
+    this->ws_cfg_storage_.port = 443;
+    this->ws_cfg_storage_.transport = WEBSOCKET_TRANSPORT_OVER_TCP; 
     this->ws_cfg_storage_.subprotocol = "openquatt-tunnel.v1";
+    this->ws_cfg_storage_.user_context = this;
+
+    // We gebruiken persistente C++ std::string buffers om scope-corruptie te voorkomen
+    static std::string static_path_buffer;
+    static_path_buffer = "/device?token=" + this->pump_secret_;
+    this->ws_cfg_storage_.path = static_path_buffer.c_str();
     
-    this->auth_header_storage_ = "Authorization: Bearer " + this->pump_secret_;
-    this->ws_cfg_storage_.headers = this->auth_header_storage_.c_str();
+    static std::string static_header_buffer;
+    static_header_buffer = "User-Agent: OpenQuatt/2.0 ESP32-S3\r\n";
+    this->ws_cfg_storage_.headers = static_header_buffer.c_str();
     
     this->ws_cfg_storage_.cert_pem = CLOUDFLARE_ROOT_CA;
-    this->ws_cfg_storage_.skip_cert_common_name_check = true;
+    this->ws_cfg_storage_.cert_len = strlen(CLOUDFLARE_ROOT_CA);
     
-    this->ws_cfg_storage_.user_context = this;
-    this->ws_cfg_storage_.buffer_size = 8192;
+    this->ws_cfg_storage_.skip_cert_common_name_check = false;
+    this->ws_cfg_storage_.buffer_size = 4608;
+    this->ws_cfg_storage_.task_stack = 8192;
 
     if (client_ != nullptr) {
         esp_websocket_client_stop((esp_websocket_client_handle_t)client_);
@@ -117,9 +128,13 @@ void OpenQuattTunnel::connect_to_relay() {
         esp_websocket_register_events(ws_client, WEBSOCKET_EVENT_ANY, websocket_event_handler, (void *)this);
         esp_websocket_client_start(ws_client);
         client_ = (void *)ws_client;
-        ESP_LOGI(TAG, "🚀 [TUNNEL] WebSocket client succesvol gestart over verankerd mbedTLS transport.");
+        ESP_LOGI(TAG, "🚀 [TUNNEL] TLS SNI Handshake geïnitieerd richting Cloudflare Edge.");
+    } else {
+        this->is_connecting_ = false;
+        ESP_LOGE(TAG, "🚨 [TUNNEL] Allocatiefout tijdens initialisatie van esp_websocket_client.");
     }
 }
+
 
 void OpenQuattTunnel::send_frame(FrameType type, uint32_t stream_id, const uint8_t *payload, size_t payload_len) {
     if (!is_connected_ || client_ == nullptr || payload_len > MAX_FRAME_SIZE) return;
